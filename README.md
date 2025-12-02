@@ -7,15 +7,17 @@ A real-time web-based logistics management system for DCS World servers. Monitor
 - **Real-time Dashboard**: Monitor all airports with expandable detailed views
 - **Automatic Mission Generation**: Creates supply missions when critical weapons fall below threshold
 - **Mission Dispatch System**: Accept and manage logistics missions with multi-user support
-- **Historical Data**: Track inventory trends over time (stored in SQLite)
+- **Historical Data**: Track inventory trends over time (stored in JSON files)
 - **Live Updates**: WebSocket-based real-time synchronization across all connected clients
 - **Scalable Configuration**: Easy-to-configure system for adding new airports and rules
+- **CSV Read-Only**: CSV files are NEVER modified, only read
 
 ## Tech Stack
 
-- **Backend**: Node.js + Express + Socket.io + SQLite
+- **Backend**: Node.js + Express + Socket.io + JSON file storage
 - **Frontend**: React + Vite + Tailwind CSS
 - **Real-time**: WebSocket for live updates
+- **Storage**: JSON files for historical data and missions (NO database)
 
 ## Project Structure
 
@@ -27,8 +29,8 @@ dcsitalia-webviewer/
 │       │   ├── airports.config.js    # Airport configuration
 │       │   └── rules.config.js       # Mission rules and thresholds
 │       ├── services/
-│       │   ├── csvParser.js          # CSV file parser
-│       │   ├── historicalData.js     # Database operations
+│       │   ├── csvParser.js          # CSV file parser (READ-ONLY)
+│       │   ├── historicalData.js     # JSON file operations
 │       │   └── missionGenerator.js   # Mission generation logic
 │       └── server.js                 # Express server + WebSocket
 ├── frontend/
@@ -42,10 +44,12 @@ dcsitalia-webviewer/
 │       │   └── socket.js             # WebSocket client
 │       └── App.jsx                   # Root component
 ├── data/
-│   └── historical/                   # SQLite database storage
-├── {Airport}_weapons.csv             # Weapons inventory CSV
-├── {Airport}_liquids.csv             # Fuel inventory CSV
-└── {Airport}_aircraft.csv            # Aircraft inventory CSV (not used)
+│   └── historical/                   # JSON files storage
+│       ├── snapshots.json            # Historical warehouse snapshots
+│       └── missions.json             # Mission records
+├── {Airport}_weapons.csv             # Weapons inventory CSV (READ-ONLY)
+├── {Airport}_liquids.csv             # Fuel inventory CSV (READ-ONLY)
+└── {Airport}_aircraft.csv            # Aircraft inventory CSV (READ-ONLY, not used)
 ```
 
 ## Installation
@@ -237,11 +241,14 @@ The system automatically watches CSV files for changes:
 - Data is reloaded and all clients are notified via WebSocket
 - New missions are generated if needed
 
-## Database
+## Data Storage
 
-Historical data is stored in SQLite at `data/historical/warehouse.db`:
-- **warehouse_snapshots**: Inventory snapshots every hour
-- **missions**: All mission records with status tracking
+Historical data is stored in JSON files at `data/historical/`:
+- **snapshots.json**: Inventory snapshots (keeps last 1000 snapshots)
+- **missions.json**: All mission records with status tracking
+
+**IMPORTANT**: CSV files are NEVER modified by this application. They are only read.
+The system only writes to JSON files in the `data/historical/` directory.
 
 ## Troubleshooting
 
