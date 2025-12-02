@@ -9,17 +9,24 @@ export const airports = [
     displayName: 'Adana Sakirpasa',
     isMainBase: true, // Main base with infinite supplies
     csvPrefix: 'Adana Sakirpasa', // Prefix used in CSV filenames
-    coordinates: { lat: 37.0, lon: 35.4 }, // Optional: for future map view
+    coordinates: { lat: 37.0, lon: 35.4 },
   },
-  // Add more airports following this structure:
-  // {
-  //   id: 'incirlik',
-  //   name: 'Incirlik',
-  //   displayName: 'Incirlik Air Base',
-  //   isMainBase: false,
-  //   csvPrefix: 'Incirlik',
-  //   coordinates: { lat: 37.0, lon: 35.4 },
-  // },
+  {
+    id: 'incirlik',
+    name: 'Incirlik',
+    displayName: 'Incirlik Air Base',
+    isMainBase: false,
+    csvPrefix: 'Incirlik',
+    coordinates: { lat: 37.0, lon: 35.4 },
+  },
+  {
+    id: 'farp-base',
+    name: 'FARP_BASE',
+    displayName: 'FARP Base',
+    isMainBase: false,
+    csvPrefix: 'FARP_BASE',
+    coordinates: { lat: 37.0, lon: 35.4 },
+  },
 ];
 
 /**
