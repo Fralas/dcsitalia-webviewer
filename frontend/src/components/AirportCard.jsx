@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Plus, X } from 'lucide-react';
+import { createOrder } from '../services/api';
 
 /**
  * Get weapon display name (remove prefix)
@@ -14,8 +15,8 @@ function getWeaponDisplayName(weaponId) {
 function getWeaponStatus(quantity, isImportant) {
   if (!isImportant) return 'normal';
   if (quantity <= 5) return 'critical';
-  if (quantity <= 20) return 'warning';
-  if (quantity <= 50) return 'low';
+  if (quantity <= 20) return 'high';
+  if (quantity <= 50) return 'medium';
   return 'ok';
 }
 
@@ -25,16 +26,16 @@ function getWeaponStatus(quantity, isImportant) {
 function StatusBadge({ status }) {
   const styles = {
     critical: 'bg-red-500/20 text-red-400 border-red-500/50',
-    warning: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50',
-    low: 'bg-orange-500/20 text-orange-400 border-orange-500/50',
+    high: 'bg-orange-500/20 text-orange-400 border-orange-500/50',
+    medium: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50',
     ok: 'bg-green-500/20 text-green-400 border-green-500/50',
     normal: 'bg-gray-500/20 text-gray-400 border-gray-500/50',
   };
 
   const icons = {
     critical: AlertTriangle,
-    warning: AlertCircle,
-    low: AlertCircle,
+    high: AlertCircle,
+    medium: AlertCircle,
     ok: CheckCircle,
     normal: Package,
   };
@@ -55,12 +56,33 @@ function StatusBadge({ status }) {
 export default function AirportCard({ airport, missions = [] }) {
   const [expanded, setExpanded] = useState(false);
   const [filter, setFilter] = useState('all'); // all, critical, important
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [selectedWeapon, setSelectedWeapon] = useState('');
+  const [orderQuantity, setOrderQuantity] = useState(100);
 
   if (!airport || !airport.data) {
     return null;
   }
 
   const { weapons = [], liquids = [] } = airport.data;
+
+  // Handle order creation
+  const handleCreateOrder = async () => {
+    if (!selectedWeapon || orderQuantity <= 0) {
+      alert('Seleziona un\'arma e inserisci una quantità valida');
+      return;
+    }
+
+    try {
+      await createOrder(airport.id, selectedWeapon, orderQuantity);
+      setShowOrderModal(false);
+      setSelectedWeapon('');
+      setOrderQuantity(100);
+      alert('Ordine creato con successo!');
+    } catch (error) {
+      alert('Errore nella creazione dell\'ordine: ' + error.message);
+    }
+  };
 
   // Important weapons (from config)
   const importantWeaponIds = [
@@ -78,7 +100,8 @@ export default function AirportCard({ airport, missions = [] }) {
   // Calculate stats
   const stats = {
     critical: 0,
-    warning: 0,
+    high: 0,
+    medium: 0,
     ok: 0,
   };
 
@@ -86,7 +109,8 @@ export default function AirportCard({ airport, missions = [] }) {
     const isImportant = importantWeaponIds.includes(weapon.item);
     const status = getWeaponStatus(weapon.quantity, isImportant);
     if (status === 'critical') stats.critical++;
-    else if (status === 'warning' || status === 'low') stats.warning++;
+    else if (status === 'high') stats.high++;
+    else if (status === 'medium') stats.medium++;
     else if (isImportant) stats.ok++;
   });
 
@@ -109,12 +133,12 @@ export default function AirportCard({ airport, missions = [] }) {
     const statusA = getWeaponStatus(a.quantity, isImportantA);
     const statusB = getWeaponStatus(b.quantity, isImportantB);
 
-    const priority = { critical: 0, warning: 1, low: 2, ok: 3, normal: 4 };
+    const priority = { critical: 0, high: 1, medium: 2, ok: 3, normal: 4 };
     return priority[statusA] - priority[statusB];
   });
 
   const airportMissions = missions.filter(m => m.airport_id === airport.id);
-  const cardBorderClass = stats.critical > 0 ? 'border-red-500 pulse-border-critical' : stats.warning > 0 ? 'border-yellow-500' : 'border-gray-700';
+  const cardBorderClass = stats.critical > 0 ? 'border-red-500 pulse-border-critical' : stats.high > 0 ? 'border-orange-500' : stats.medium > 0 ? 'border-yellow-500' : 'border-gray-700';
 
   return (
     <div className={`bg-slate-800 rounded-lg border-2 ${cardBorderClass} overflow-hidden hover:shadow-xl transition-shadow`}>
@@ -140,15 +164,21 @@ export default function AirportCard({ airport, missions = [] }) {
                 <span className="font-bold">{stats.critical}</span>
               </div>
             )}
-            {stats.warning > 0 && (
+            {stats.high > 0 && (
+              <div className="flex items-center gap-1 text-orange-400">
+                <AlertCircle className="w-5 h-5" />
+                <span className="font-bold">{stats.high}</span>
+              </div>
+            )}
+            {stats.medium > 0 && (
               <div className="flex items-center gap-1 text-yellow-400">
                 <AlertCircle className="w-5 h-5" />
-                <span className="font-bold">{stats.warning}</span>
+                <span className="font-bold">{stats.medium}</span>
               </div>
             )}
             {airportMissions.length > 0 && (
               <div className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-sm font-bold">
-                {airportMissions.length} missions
+                {airportMissions.length} ordini
               </div>
             )}
             {expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
@@ -160,26 +190,69 @@ export default function AirportCard({ airport, missions = [] }) {
       {expanded && (
         <div className="border-t border-gray-700">
           {/* Filters */}
-          <div className="p-4 bg-slate-900/50 flex gap-2">
-            <button
-              onClick={() => setFilter('all')}
-              className={`px-3 py-1 rounded text-sm ${filter === 'all' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
-            >
-              All ({weapons.length})
-            </button>
-            <button
-              onClick={() => setFilter('important')}
-              className={`px-3 py-1 rounded text-sm ${filter === 'important' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
-            >
-              Important ({importantWeaponIds.filter(id => weapons.find(w => w.item === id)).length})
-            </button>
-            <button
-              onClick={() => setFilter('critical')}
-              className={`px-3 py-1 rounded text-sm ${filter === 'critical' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
-            >
-              Critical ({stats.critical})
-            </button>
+          <div className="p-4 bg-slate-900/50 flex gap-2 justify-between items-center">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setFilter('all')}
+                className={`px-3 py-1 rounded text-sm ${filter === 'all' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+              >
+                All ({weapons.length})
+              </button>
+              <button
+                onClick={() => setFilter('important')}
+                className={`px-3 py-1 rounded text-sm ${filter === 'important' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+              >
+                Important ({importantWeaponIds.filter(id => weapons.find(w => w.item === id)).length})
+              </button>
+              <button
+                onClick={() => setFilter('critical')}
+                className={`px-3 py-1 rounded text-sm ${filter === 'critical' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+              >
+                Critical ({stats.critical})
+              </button>
+            </div>
+            {!airport.isMainBase && (
+              <button
+                onClick={() => setShowOrderModal(true)}
+                className="px-3 py-1 rounded text-sm bg-green-600 text-white hover:bg-green-700 flex items-center gap-1"
+              >
+                <Plus className="w-4 h-4" />
+                Richiedi Rifornimento
+              </button>
+            )}
           </div>
+
+          {/* Active Orders Section */}
+          {!airport.isMainBase && airportMissions.length > 0 && (
+            <div className="p-4 bg-purple-900/20 border-t border-purple-500/30">
+              <h4 className="text-sm font-bold text-purple-300 mb-2 flex items-center gap-2">
+                <Package className="w-4 h-4" />
+                ORDINI ATTIVI ({airportMissions.length})
+              </h4>
+              <div className="space-y-2">
+                {airportMissions.map(mission => (
+                  <div key={mission.id} className="bg-slate-800 p-3 rounded flex justify-between items-center">
+                    <div>
+                      <div className="font-mono text-sm text-white">{getWeaponDisplayName(mission.weapon_id)}</div>
+                      <div className="text-xs text-gray-400">
+                        Quantità richiesta: <span className="font-bold text-white">{mission.quantity_needed}</span> |
+                        Attuale: <span className="font-bold text-orange-400">{mission.current_quantity}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        mission.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                        mission.status === 'accepted' ? 'bg-blue-500/20 text-blue-400' :
+                        'bg-gray-500/20 text-gray-400'
+                      }`}>
+                        {mission.status.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Liquids Section */}
           <div className="p-4 bg-slate-900/30">
@@ -229,6 +302,77 @@ export default function AirportCard({ airport, missions = [] }) {
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Order Creation Modal */}
+      {showOrderModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setShowOrderModal(false)}>
+          <div className="bg-slate-800 rounded-lg p-6 max-w-md w-full mx-4 border-2 border-green-500" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <Plus className="w-5 h-5 text-green-400" />
+                Richiedi Rifornimento
+              </h3>
+              <button onClick={() => setShowOrderModal(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Airport Info */}
+              <div className="bg-slate-900 p-3 rounded">
+                <div className="text-xs text-gray-400">Aeroporto</div>
+                <div className="text-white font-bold">{airport.displayName || airport.name}</div>
+              </div>
+
+              {/* Weapon Selection */}
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Seleziona Arma</label>
+                <select
+                  value={selectedWeapon}
+                  onChange={(e) => setSelectedWeapon(e.target.value)}
+                  className="w-full bg-slate-900 text-white border border-gray-600 rounded px-3 py-2 focus:outline-none focus:border-green-500"
+                >
+                  <option value="">-- Seleziona --</option>
+                  {weapons.map((weapon, idx) => (
+                    <option key={idx} value={weapon.item}>
+                      {getWeaponDisplayName(weapon.item)} (Attuale: {weapon.quantity})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Quantity Input */}
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Quantità da Ordinare</label>
+                <input
+                  type="number"
+                  value={orderQuantity}
+                  onChange={(e) => setOrderQuantity(parseInt(e.target.value) || 0)}
+                  min="1"
+                  className="w-full bg-slate-900 text-white border border-gray-600 rounded px-3 py-2 focus:outline-none focus:border-green-500"
+                  placeholder="100"
+                />
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCreateOrder}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+                >
+                  Crea Ordine
+                </button>
+                <button
+                  onClick={() => setShowOrderModal(false)}
+                  className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
+                >
+                  Annulla
+                </button>
+              </div>
             </div>
           </div>
         </div>

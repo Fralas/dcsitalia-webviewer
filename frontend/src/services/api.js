@@ -89,6 +89,16 @@ export async function cancelMission(missionId) {
 }
 
 /**
+ * Create a manual supply order
+ */
+export async function createOrder(airportId, weaponId, quantity) {
+  return fetchAPI(`/airports/${airportId}/create-order`, {
+    method: 'POST',
+    body: JSON.stringify({ weaponId, quantity }),
+  });
+}
+
+/**
  * Get overall statistics
  */
 export async function getStats() {
@@ -104,5 +114,6 @@ export default {
   acceptMission,
   completeMission,
   cancelMission,
+  createOrder,
   getStats,
 };
