@@ -196,6 +196,124 @@ app.get('/api/stats', (req, res) => {
   res.json(stats);
 });
 
+// ==================== TEST ENDPOINTS ====================
+
+/**
+ * POST /api/test/generate-mission - Generate a test mission (for testing only)
+ * Body: { airportId, weaponId, currentQuantity }
+ */
+app.post('/api/test/generate-mission', (req, res) => {
+  const { airportId, weaponId, currentQuantity = 5 } = req.body;
+
+  if (!airportId || !weaponId) {
+    return res.status(400).json({ error: 'airportId and weaponId are required' });
+  }
+
+  // Check if airport exists
+  const airport = airports.find(a => a.id === airportId);
+  if (!airport) {
+    return res.status(404).json({ error: 'Airport not found' });
+  }
+
+  // Check if mission already exists
+  if (historicalData.missionExistsForWeapon(airportId, weaponId)) {
+    return res.status(400).json({ error: 'Mission already exists for this weapon' });
+  }
+
+  // Create mission
+  const missionId = historicalData.createMission(
+    airportId,
+    weaponId,
+    100, // quantity needed
+    currentQuantity,
+    24 // expires in 24 hours
+  );
+
+  console.log(`🧪 TEST: Generated mission ${missionId} for ${weaponId} at ${airportId}`);
+
+  // Broadcast to all clients
+  io.emit('missions:updated', {
+    missions: historicalData.getActiveMissions()
+  });
+
+  res.json({
+    success: true,
+    missionId,
+    message: 'Test mission created'
+  });
+});
+
+/**
+ * POST /api/test/generate-random-missions - Generate random test missions
+ * Body: { count, airportId? }
+ */
+app.post('/api/test/generate-random-missions', (req, res) => {
+  const { count = 5, airportId } = req.body;
+
+  const testWeapons = [
+    'weapons.missiles.AIM_120C',
+    'weapons.missiles.AIM_9X',
+    'weapons.missiles.AGM_65F',
+    'weapons.missiles.AGM_88',
+    'weapons.missiles.AGM_154A',
+    'weapons.nurs.HYDRA_70_M151',
+    'weapons.bombs.GBU_16',
+    'weapons.missiles.RB75',
+    'weapons.missiles.X_58',
+    'weapons.nurs.C_13',
+  ];
+
+  let targetAirport = airportId;
+  if (!targetAirport) {
+    // Pick random non-main-base airport
+    const nonMainBases = airports.filter(a => !a.isMainBase);
+    if (nonMainBases.length === 0) {
+      return res.status(400).json({ error: 'No non-main-base airports available' });
+    }
+    targetAirport = nonMainBases[Math.floor(Math.random() * nonMainBases.length)].id;
+  }
+
+  const generatedMissions = [];
+
+  for (let i = 0; i < count; i++) {
+    const randomWeapon = testWeapons[Math.floor(Math.random() * testWeapons.length)];
+    const randomQuantity = Math.floor(Math.random() * 15); // 0-14
+
+    // Skip if mission already exists
+    if (historicalData.missionExistsForWeapon(targetAirport, randomWeapon)) {
+      continue;
+    }
+
+    const missionId = historicalData.createMission(
+      targetAirport,
+      randomWeapon,
+      100,
+      randomQuantity,
+      24
+    );
+
+    generatedMissions.push({
+      missionId,
+      weapon: randomWeapon,
+      quantity: randomQuantity
+    });
+
+    console.log(`🧪 TEST: Generated random mission ${missionId} for ${randomWeapon} (qty: ${randomQuantity})`);
+  }
+
+  // Broadcast to all clients
+  io.emit('missions:updated', {
+    missions: historicalData.getActiveMissions()
+  });
+
+  res.json({
+    success: true,
+    count: generatedMissions.length,
+    missions: generatedMissions,
+    airportId: targetAirport
+  });
+});
+
 // ==================== WEBSOCKET ====================
 
 io.on('connection', (socket) => {
