@@ -63,9 +63,10 @@ export function getWeaponDisplayName(weaponId) {
  * Get mission priority based on current quantity
  */
 export function getMissionPriority(currentQuantity) {
-  if (currentQuantity <= 5) return 'critical';
-  if (currentQuantity <= missionRules.criticalThreshold) return 'high';
-  return 'medium';
+  if (currentQuantity <= missionRules.criticalThreshold) return 'critical';  // <= 5
+  if (currentQuantity <= missionRules.highThreshold) return 'high';          // <= 20
+  if (currentQuantity <= missionRules.mediumThreshold) return 'medium';      // <= 50
+  return 'ok';
 }
 
 export default {

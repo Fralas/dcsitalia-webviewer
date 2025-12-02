@@ -4,11 +4,10 @@
  */
 
 export const missionRules = {
-  // Threshold for critical weapons (below this triggers mission)
-  criticalThreshold: 20,
-
-  // Warning threshold (for visual indicators)
-  warningThreshold: 50,
+  // Priority thresholds for automatic order generation
+  criticalThreshold: 5,   // CRITICAL: quantity <= 5
+  highThreshold: 20,      // HIGH: quantity <= 20
+  mediumThreshold: 50,    // MEDIUM: quantity <= 50
 
   // Important weapons that trigger missions when low
   // Add DCS weapon identifiers here
@@ -70,16 +69,12 @@ export function isImportantWeapon(weaponId) {
 }
 
 /**
- * Get threshold status for a quantity
+ * Get priority based on current quantity
  */
-export function getThresholdStatus(quantity, type = 'weapon') {
-  if (type === 'weapon') {
-    if (quantity <= missionRules.criticalThreshold) return 'critical';
-    if (quantity <= missionRules.warningThreshold) return 'warning';
-    return 'ok';
-  }
-
-  // For liquids, use liquid-specific thresholds
+export function getPriority(quantity) {
+  if (quantity <= missionRules.criticalThreshold) return 'critical';
+  if (quantity <= missionRules.highThreshold) return 'high';
+  if (quantity <= missionRules.mediumThreshold) return 'medium';
   return 'ok';
 }
 

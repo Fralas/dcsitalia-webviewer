@@ -183,11 +183,11 @@ app.get('/api/stats', (req, res) => {
     criticalAirports: 0,
   };
 
-  // Count airports with critical weapons
+  // Count airports with critical weapons (quantity <= 5)
   Object.values(currentData).forEach(airport => {
     if (airport.data && airport.data.weapons) {
       const hasCritical = airport.data.weapons.some(w =>
-        isImportantWeapon(w.item) && w.quantity <= 20
+        isImportantWeapon(w.item) && w.quantity <= 5
       );
       if (hasCritical) stats.criticalAirports++;
     }
@@ -314,6 +314,66 @@ app.post('/api/test/generate-random-missions', (req, res) => {
   });
 });
 
+/**
+ * POST /api/airports/:id/create-order - Create a manual supply order
+ * Body: { weaponId, quantity }
+ */
+app.post('/api/airports/:id/create-order', (req, res) => {
+  const { weaponId, quantity } = req.body;
+  const airportId = req.params.id;
+
+  if (!weaponId || !quantity) {
+    return res.status(400).json({ error: 'weaponId and quantity are required' });
+  }
+
+  // Check if airport exists
+  const airport = airports.find(a => a.id === airportId);
+  if (!airport) {
+    return res.status(404).json({ error: 'Airport not found' });
+  }
+
+  // Check if it's the main base
+  if (airport.isMainBase) {
+    return res.status(400).json({ error: 'Cannot create orders for main base' });
+  }
+
+  // Check if order already exists
+  if (historicalData.missionExistsForWeapon(airportId, weaponId)) {
+    return res.status(400).json({ error: 'Order already exists for this weapon' });
+  }
+
+  // Get current quantity from CSV data
+  let currentQuantity = 0;
+  if (currentData[airportId] && currentData[airportId].data && currentData[airportId].data.weapons) {
+    const weaponData = currentData[airportId].data.weapons.find(w => w.item === weaponId);
+    if (weaponData) {
+      currentQuantity = weaponData.quantity;
+    }
+  }
+
+  // Create order
+  const orderId = historicalData.createMission(
+    airportId,
+    weaponId,
+    quantity,
+    currentQuantity,
+    24 // expires in 24 hours
+  );
+
+  console.log(`📦 Manual order created: ${orderId} for ${weaponId} at ${airport.displayName} (qty: ${quantity})`);
+
+  // Broadcast to all clients
+  io.emit('missions:updated', {
+    missions: historicalData.getActiveMissions()
+  });
+
+  res.json({
+    success: true,
+    orderId,
+    message: 'Order created successfully'
+  });
+});
+
 // ==================== WEBSOCKET ====================
 
 io.on('connection', (socket) => {
@@ -369,6 +429,13 @@ setInterval(() => {
     });
   }
 }, 5 * 60 * 1000);
+
+// Check for new orders every hour (hourly polling)
+setInterval(() => {
+  console.log('⏰ Hourly check: Scanning for critical weapons...');
+  loadAllData();
+  io.emit('data:updated', currentData);
+}, 60 * 60 * 1000); // Every hour
 
 // ==================== START SERVER ====================
 
