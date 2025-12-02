@@ -7,6 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import airports from './config/airports.config.js';
+import { isImportantWeapon } from './config/rules.config.js';
 import * as csvParser from './services/csvParser.js';
 import * as historicalData from './services/historicalData.js';
 import * as missionGenerator from './services/missionGenerator.js';
@@ -186,7 +187,7 @@ app.get('/api/stats', (req, res) => {
   Object.values(currentData).forEach(airport => {
     if (airport.data && airport.data.weapons) {
       const hasCritical = airport.data.weapons.some(w =>
-        missionGenerator.isImportantWeapon(w.item) && w.quantity <= 20
+        isImportantWeapon(w.item) && w.quantity <= 20
       );
       if (hasCritical) stats.criticalAirports++;
     }
