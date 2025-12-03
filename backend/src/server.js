@@ -1,7 +1,11 @@
+import dotenv from 'dotenv';
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import bcrypt from 'bcrypt';
 import chokidar from 'chokidar';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -12,24 +16,52 @@ import * as csvParser from './services/csvParser.js';
 import * as historicalData from './services/historicalData.js';
 import * as missionGenerator from './services/missionGenerator.js';
 import { findBestSourceAirport } from './services/missionGenerator.js';
+import { generateToken } from './utils/jwt.js';
+import { authenticateToken, requireAdmin } from './middleware/auth.js';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import logger from './utils/logger.js';
+
+// Load environment variables
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const httpServer = createServer(app);
+
+// CORS configuration based on environment
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const io = new Server(httpServer, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
+    origin: process.env.NODE_ENV === 'production' ? FRONTEND_URL : '*',
+    methods: ['GET', 'POST'],
+    credentials: true
   }
 });
 
 const PORT = process.env.PORT || 3001;
 const CSV_DIR = path.resolve(__dirname, '../../');
 
-// Middleware
-app.use(cors());
+// Security Middleware
+app.use(helmet());
+
+// CORS
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' ? FRONTEND_URL : '*',
+  credentials: true
+}));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use(limiter);
 app.use(express.json());
 
 // Store current data in memory
@@ -422,9 +454,9 @@ app.post('/api/airports/:id/create-order', (req, res) => {
 // ==================== DEBUG ENDPOINTS ====================
 
 /**
- * POST /api/debug/generate-orders - Force generation of orders for all airports
+ * POST /api/debug/generate-orders - Force generation of orders for all airports (requires authentication)
  */
-app.post('/api/debug/generate-orders', (req, res) => {
+app.post('/api/debug/generate-orders', authenticateToken, requireAdmin, (req, res) => {
   console.log('🔧 DEBUG: Force generating orders for all airports...');
 
   const results = [];
@@ -485,9 +517,9 @@ app.post('/api/debug/generate-orders', (req, res) => {
 });
 
 /**
- * POST /api/debug/clear-orders - Clear all existing orders
+ * POST /api/debug/clear-orders - Clear all existing orders (requires authentication)
  */
-app.post('/api/debug/clear-orders', (req, res) => {
+app.post('/api/debug/clear-orders', authenticateToken, requireAdmin, (req, res) => {
   console.log('🔧 DEBUG: Clearing all orders...');
 
   const beforeCount = historicalData.getActiveMissions().length;
@@ -578,11 +610,12 @@ setInterval(() => {
 loadAllData();
 
 httpServer.listen(PORT, () => {
-  console.log(`
+  logger.info(`
 ╔═══════════════════════════════════════════════════════╗
 ║   🎮 DCS Warehouse Viewer Server                     ║
 ║                                                       ║
 ║   Server running on: http://localhost:${PORT}         ║
+║   Environment: ${process.env.NODE_ENV || 'development'}                    ║
 ║   CSV Directory: ${CSV_DIR.substring(0, 35)}...      ║
 ║   Airports loaded: ${airports.length}                          ║
 ║                                                       ║
@@ -594,39 +627,101 @@ httpServer.listen(PORT, () => {
 
 // ==================== ADMIN ENDPOINTS ====================
 
-const ADMIN_PASSWORD = 'merda';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
+if (!ADMIN_PASSWORD) {
+  logger.error('⚠️  ADMIN_PASSWORD is not set in environment variables');
+}
 
 /**
- * POST /api/admin/login - Verify admin password
+ * POST /api/admin/login - Verify admin password and return JWT
  */
-app.post('/api/admin/login', (req, res) => {
-  const { password } = req.body;
+app.post('/api/admin/login', async (req, res) => {
+  try {
+    const { password } = req.body;
 
-  if (password === ADMIN_PASSWORD) {
-    res.json({ success: true, message: 'Login successful' });
-  } else {
-    res.status(401).json({ success: false, message: 'Invalid password' });
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password is required'
+      });
+    }
+
+    // Simple password comparison (in production, use hashed passwords)
+    if (password === ADMIN_PASSWORD) {
+      // Generate JWT token
+      const token = generateToken({
+        role: 'admin',
+        timestamp: Date.now()
+      });
+
+      logger.security('Admin login successful', {
+        ip: req.ip || req.connection.remoteAddress,
+        timestamp: new Date().toISOString()
+      });
+
+      res.json({
+        success: true,
+        message: 'Login successful',
+        token
+      });
+    } else {
+      logger.security('Admin login failed - invalid password', {
+        ip: req.ip || req.connection.remoteAddress,
+        timestamp: new Date().toISOString()
+      });
+
+      res.status(401).json({
+        success: false,
+        message: 'Invalid password'
+      });
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
   }
 });
 
 /**
- * GET /api/admin/config/rules - Get rules configuration
+ * GET /api/admin/config/rules - Get rules configuration (requires authentication)
  */
-app.get('/api/admin/config/rules', (req, res) => {
-  // Import the config dynamically to get the latest version
-  import('./config/rules.config.js').then(module => {
-    res.json(module.missionRules);
-  }).catch(err => {
-    res.status(500).json({ error: 'Failed to load config' });
-  });
+app.get('/api/admin/config/rules', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    // Import the config dynamically to get the latest version
+    import('./config/rules.config.js').then(module => {
+      res.json(module.missionRules);
+    }).catch(err => {
+      console.error('Error loading rules config:', err);
+      res.status(500).json({ error: 'Failed to load config' });
+    });
+  } catch (error) {
+    console.error('Error in /api/admin/config/rules:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 /**
- * GET /api/admin/config/airports - Get airports configuration
+ * GET /api/admin/config/airports - Get airports configuration (requires authentication)
  */
-app.get('/api/admin/config/airports', (req, res) => {
-  res.json(airports);
+app.get('/api/admin/config/airports', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    res.json(airports);
+  } catch (error) {
+    console.error('Error in /api/admin/config/airports:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
+
+// ==================== ERROR HANDLERS ====================
+
+// 404 handler - must be after all routes
+app.use(notFoundHandler);
+
+// Global error handler - must be last
+app.use(errorHandler);
 
 // ==================== GRACEFUL SHUTDOWN ====================
 process.on('SIGTERM', () => {

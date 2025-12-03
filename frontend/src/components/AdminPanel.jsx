@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Lock, Settings, MapPin, Trash2, RefreshCw, Eye, EyeOff, Shield } from 'lucide-react';
+import { login, logout, isAuthenticated, apiRequest } from '../utils/api';
 
 /**
  * Admin Panel Component
  */
 export default function AdminPanel() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
@@ -16,26 +17,29 @@ export default function AdminPanel() {
   const [airportsConfig, setAirportsConfig] = useState(null);
   const [activeTab, setActiveTab] = useState('debug'); // debug, rules, airports
 
-  // Check if already authenticated
+  // Check if already authenticated on mount
   useEffect(() => {
-    const auth = sessionStorage.getItem('admin_authenticated');
-    if (auth === 'true') {
-      setIsAuthenticated(true);
+    if (isAuthenticated()) {
+      setAuthenticated(true);
       loadConfigs();
     }
   }, []);
 
   const loadConfigs = async () => {
     try {
-      const [rulesRes, airportsRes] = await Promise.all([
-        fetch('http://localhost:3001/api/admin/config/rules'),
-        fetch('http://localhost:3001/api/admin/config/airports')
+      const [rulesData, airportsData] = await Promise.all([
+        apiRequest('/admin/config/rules'),
+        apiRequest('/admin/config/airports')
       ]);
 
-      if (rulesRes.ok) setRulesConfig(await rulesRes.json());
-      if (airportsRes.ok) setAirportsConfig(await airportsRes.json());
+      setRulesConfig(rulesData);
+      setAirportsConfig(airportsData);
     } catch (error) {
       console.error('Failed to load configs:', error);
+      if (error.message.includes('Session expired')) {
+        setAuthenticated(false);
+        setLoginError('Sessione scaduta. Effettua nuovamente il login.');
+      }
     }
   };
 
@@ -45,44 +49,34 @@ export default function AdminPanel() {
     setLoginError('');
 
     try {
-      const response = await fetch('http://localhost:3001/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        setIsAuthenticated(true);
-        sessionStorage.setItem('admin_authenticated', 'true');
-        loadConfigs();
-      } else {
-        setLoginError('Password non valida');
-      }
+      await login(password);
+      setAuthenticated(true);
+      await loadConfigs();
     } catch (error) {
-      setLoginError('Errore di connessione al server');
+      setLoginError(error.message || 'Password non valida');
     } finally {
       setLoading(false);
     }
   };
 
   const handleLogout = () => {
-    setIsAuthenticated(false);
-    sessionStorage.removeItem('admin_authenticated');
+    logout();
+    setAuthenticated(false);
     setPassword('');
+    setRulesConfig(null);
+    setAirportsConfig(null);
   };
 
   const handleGenerateOrders = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:3001/api/debug/generate-orders', {
-        method: 'POST',
-      });
-      const data = await response.json();
+      const data = await apiRequest('/debug/generate-orders', { method: 'POST' });
       alert(`✅ Generati ${data.totalGenerated} ordini`);
     } catch (error) {
-      alert('❌ Errore nella generazione degli ordini');
+      alert(`❌ Errore: ${error.message}`);
+      if (error.message.includes('Session expired')) {
+        setAuthenticated(false);
+      }
     } finally {
       setLoading(false);
     }
@@ -93,20 +87,20 @@ export default function AdminPanel() {
 
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:3001/api/debug/clear-orders', {
-        method: 'POST',
-      });
-      const data = await response.json();
+      const data = await apiRequest('/debug/clear-orders', { method: 'POST' });
       alert(`✅ Cancellati ${data.clearedCount} ordini`);
     } catch (error) {
-      alert('❌ Errore nella cancellazione degli ordini');
+      alert(`❌ Errore: ${error.message}`);
+      if (error.message.includes('Session expired')) {
+        setAuthenticated(false);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   // Login Screen
-  if (!isAuthenticated) {
+  if (!authenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-6">
         <div className="bg-slate-800 rounded-lg p-8 max-w-md w-full border-2 border-gray-700 shadow-2xl">
