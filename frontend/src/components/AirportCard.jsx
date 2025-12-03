@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Plus, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Plus, X, TrendingUp } from 'lucide-react';
 import { createOrder } from '../services/api';
+import WeaponChart from './WeaponChart';
 
 /**
  * Get weapon display name (remove prefix)
@@ -59,6 +60,7 @@ export default function AirportCard({ airport, missions = [] }) {
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [selectedWeapon, setSelectedWeapon] = useState('');
   const [orderQuantity, setOrderQuantity] = useState(100);
+  const [chartWeapon, setChartWeapon] = useState(''); // For the historical chart
 
   if (!airport || !airport.data) {
     return null;
@@ -324,6 +326,50 @@ export default function AirportCard({ airport, missions = [] }) {
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* Historical Chart Section */}
+          <div className="p-4 bg-slate-800/50 border-t border-gray-700">
+            <div className="mb-4">
+              <h4 className="text-sm font-bold text-gray-400 mb-3 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" />
+                ANDAMENTO STORICO (7 giorni)
+              </h4>
+              <select
+                value={chartWeapon}
+                onChange={(e) => setChartWeapon(e.target.value)}
+                className="w-full bg-slate-900 text-white border border-gray-600 rounded px-3 py-2 focus:outline-none focus:border-blue-500"
+              >
+                <option value="">-- Seleziona un'arma per vedere il grafico --</option>
+                {weapons
+                  .filter(w => importantWeaponIds.includes(w.item))
+                  .map((weapon, idx) => (
+                    <option key={idx} value={weapon.item}>
+                      {getWeaponDisplayName(weapon.item)} (Attuale: {weapon.quantity})
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            {chartWeapon && (
+              <WeaponChart
+                airportId={airport.id}
+                weaponId={chartWeapon}
+                days={7}
+              />
+            )}
+
+            {!chartWeapon && (
+              <div className="bg-slate-900/50 rounded-lg p-8 text-center">
+                <TrendingUp className="w-12 h-12 text-gray-600 mx-auto mb-2" />
+                <p className="text-gray-400 text-sm">
+                  Seleziona un'arma dal menu a tendina per visualizzare il grafico storico
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  📊 I dati vengono salvati automaticamente ogni ora
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}

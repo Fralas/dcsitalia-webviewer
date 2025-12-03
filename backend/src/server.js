@@ -96,6 +96,25 @@ app.get('/api/airports/:id/history', (req, res) => {
 });
 
 /**
+ * GET /api/airports/:id/weapons/:weaponId/history - Get historical data for a specific weapon
+ */
+app.get('/api/airports/:id/weapons/:weaponId/history', (req, res) => {
+  const airportId = req.params.id;
+  const weaponId = decodeURIComponent(req.params.weaponId);
+  const days = parseInt(req.query.days) || 7;
+
+  const history = historicalData.getWeaponHistory(airportId, weaponId, days);
+
+  res.json({
+    airportId,
+    weaponId,
+    days,
+    dataPoints: history.length,
+    history
+  });
+});
+
+/**
  * GET /api/missions - Get all active missions
  */
 app.get('/api/missions', (req, res) => {

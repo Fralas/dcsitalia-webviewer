@@ -47,6 +47,14 @@ export async function getAirportHistory(airportId, hours = 24) {
 }
 
 /**
+ * Get historical data for a specific weapon
+ */
+export async function getWeaponHistory(airportId, weaponId, days = 7) {
+  const encodedWeaponId = encodeURIComponent(weaponId);
+  return fetchAPI(`/airports/${airportId}/weapons/${encodedWeaponId}/history?days=${days}`);
+}
+
+/**
  * Get all active missions
  */
 export async function getMissions() {
@@ -127,6 +135,7 @@ export default {
   getAirports,
   getAirport,
   getAirportHistory,
+  getWeaponHistory,
   getMissions,
   getAirportMissions,
   acceptMission,

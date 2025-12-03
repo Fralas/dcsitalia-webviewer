@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { isImportantWeapon } from '../config/rules.config.js';
 
 const DATA_DIR = './data/historical';
 const SNAPSHOTS_FILE = path.join(DATA_DIR, 'snapshots.json');
@@ -67,23 +68,31 @@ function writeMissions(missions) {
 }
 
 /**
- * Save warehouse snapshot
+ * Save warehouse snapshot (only important weapons for efficiency)
  */
 export function saveSnapshot(airportId, data) {
   const snapshots = readSnapshots();
 
+  // Filter only important weapons to reduce file size
+  const importantWeapons = data.weapons ? data.weapons.filter(w => isImportantWeapon(w.item)) : [];
+
   snapshots.push({
     airport_id: airportId,
     timestamp: Date.now(),
-    data: data,
+    weapons: importantWeapons,
   });
 
-  // Keep only last 1000 snapshots to prevent file from growing too large
-  if (snapshots.length > 1000) {
-    snapshots.splice(0, snapshots.length - 1000);
-  }
+  // Cleanup old snapshots (older than 7 days)
+  const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+  const filteredSnapshots = snapshots.filter(s => s.timestamp >= sevenDaysAgo);
 
-  writeSnapshots(snapshots);
+  writeSnapshots(filteredSnapshots);
+
+  // Log cleanup if any were removed
+  const removed = snapshots.length - filteredSnapshots.length;
+  if (removed > 0) {
+    console.log(`🧹 Cleaned up ${removed} old snapshots (>7 days)`);
+  }
 }
 
 /**
@@ -97,8 +106,36 @@ export function getHistory(airportId, hoursBack = 24) {
     .filter(s => s.airport_id === airportId && s.timestamp >= timestamp)
     .map(s => ({
       timestamp: s.timestamp,
-      data: s.data,
+      weapons: s.weapons || s.data?.weapons || [], // Support both old and new format
     }));
+}
+
+/**
+ * Get historical data for a specific weapon at an airport
+ * @param {string} airportId - Airport ID
+ * @param {string} weaponId - Weapon ID
+ * @param {number} days - Number of days to look back (default: 7)
+ * @returns {Array} Array of {timestamp, quantity} objects
+ */
+export function getWeaponHistory(airportId, weaponId, days = 7) {
+  const snapshots = readSnapshots();
+  const timestamp = Date.now() - (days * 24 * 60 * 60 * 1000);
+
+  const history = snapshots
+    .filter(s => s.airport_id === airportId && s.timestamp >= timestamp)
+    .map(s => {
+      // Find the weapon in this snapshot
+      const weapons = s.weapons || s.data?.weapons || [];
+      const weapon = weapons.find(w => w.item === weaponId);
+
+      return {
+        timestamp: s.timestamp,
+        quantity: weapon ? weapon.quantity : null,
+      };
+    })
+    .filter(h => h.quantity !== null); // Only include snapshots where weapon was found
+
+  return history;
 }
 
 /**
@@ -113,7 +150,7 @@ export function getLatestSnapshot(airportId) {
   const latest = airportSnapshots[airportSnapshots.length - 1];
   return {
     timestamp: latest.timestamp,
-    data: latest.data,
+    weapons: latest.weapons || latest.data?.weapons || [],
   };
 }
 
@@ -268,6 +305,7 @@ export function clearAllMissions() {
 export default {
   saveSnapshot,
   getHistory,
+  getWeaponHistory,
   getLatestSnapshot,
   createMission,
   getActiveMissions,
