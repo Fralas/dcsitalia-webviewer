@@ -41,7 +41,13 @@ const io = new Server(httpServer, {
 });
 
 const PORT = process.env.PORT || 3001;
-const CSV_DIR = path.resolve(__dirname, '../../');
+
+// CSV Directory - configurable via environment variable
+const CSV_DIR = process.env.CSV_DIR
+  ? path.resolve(process.env.CSV_DIR)
+  : path.resolve(__dirname, '../../');
+
+logger.info(`📁 CSV Directory: ${CSV_DIR}`);
 
 // Security Middleware
 app.use(helmet());
