@@ -21,11 +21,11 @@ import { authenticateToken, requireAdmin } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import logger from './utils/logger.js';
 
-// Load environment variables
-dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Load environment variables from backend/.env
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const app = express();
 const httpServer = createServer(app);
