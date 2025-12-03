@@ -65,6 +65,19 @@ export const missionRules = {
 
     // Auto-expire missions after X hours if not accepted
     missionExpiry: 24,
+  },
+
+  // Donor airport configuration
+  donor: {
+    // Minimum quantity to be eligible as donor
+    minQuantityToDonate: 150,
+
+    // Buffer quantity: donor must keep at least (mediumThreshold + buffer) after donation
+    // Example: mediumThreshold=50, buffer=25 → must keep at least 75
+    bufferAfterDonation: 25,
+
+    // Distance threshold (nm): if (mainBaseDistance - donorDistance) < threshold, use main base
+    distanceThreshold: 30,
   }
 };
 

@@ -1,6 +1,9 @@
 /**
  * Airport Configuration
  * Add new airports here to make them visible in the system
+ *
+ * Coordinates are in decimal degrees (converted from DMS)
+ * Distances calculated using Euclidean distance in Nautical Miles
  */
 export const airports = [
   {
@@ -9,7 +12,7 @@ export const airports = [
     displayName: 'Adana Sakirpasa',
     isMainBase: true, // Main base with infinite supplies
     csvPrefix: 'Adana Sakirpasa', // Prefix used in CSV filenames
-    coordinates: { lat: 37.0, lon: 35.4 },
+    coordinates: { lat: 36.982222, lon: 35.281111 }, // 36°58'55"N, 35°16'52"E
   },
   {
     id: 'incirlik',
@@ -17,7 +20,7 @@ export const airports = [
     displayName: 'Incirlik Air Base',
     isMainBase: false,
     csvPrefix: 'Incirlik',
-    coordinates: { lat: 37.0, lon: 35.4 },
+    coordinates: { lat: 37.000000, lon: 35.425833 }, // 37°00'00"N, 35°25'33"E
   },
   {
     id: 'farp-base',
@@ -25,7 +28,7 @@ export const airports = [
     displayName: 'FARP Base',
     isMainBase: false,
     csvPrefix: 'FARP_BASE',
-    coordinates: { lat: 37.0, lon: 35.4 },
+    coordinates: { lat: 37.066944, lon: 35.974722 }, // 37°04'01"N, 35°58'29"E
   },
 ];
 
