@@ -565,12 +565,12 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-// Check for new orders every 4 hours (automatic polling)
+// Check for new orders every 5 minutes (automatic polling)
 setInterval(() => {
-  console.log('⏰ 4-hour check: Scanning for critical weapons...');
+  console.log('⏰ 5-minute check: Scanning for critical weapons...');
   loadAllData();
   io.emit('data:updated', currentData);
-}, 4 * 60 * 60 * 1000); // Every 4 hours
+}, 5 * 60 * 1000); // Every 5 minutes
 
 // ==================== START SERVER ====================
 
