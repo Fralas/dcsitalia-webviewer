@@ -83,7 +83,7 @@ const createAirportIcon = (isMainBase, missionCount) => {
 /**
  * Mission Card Component (sidebar)
  */
-function MissionCard({ mission, airport, onHover, isHighlighted }) {
+function MissionCard({ mission, airport, onHover, onSelect, isHighlighted, isSelected }) {
   const sourceName = mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Main Base';
   const distance = mission.distance_nm ? `${mission.distance_nm}nm` : '-';
   const isPending = mission.status === 'pending';
@@ -91,12 +91,15 @@ function MissionCard({ mission, airport, onHover, isHighlighted }) {
   return (
     <div
       className={`bg-slate-800 p-3 rounded border-2 transition-all cursor-pointer ${
-        isHighlighted
+        isSelected
+          ? 'border-yellow-400 shadow-lg shadow-yellow-400/30 scale-105'
+          : isHighlighted
           ? 'border-yellow-400 shadow-lg shadow-yellow-400/20'
           : isPending ? 'border-blue-500/30' : 'border-red-500/30'
       }`}
       onMouseEnter={() => onHover(mission.id)}
       onMouseLeave={() => onHover(null)}
+      onClick={() => onSelect(mission.id)}
     >
       <div className="flex justify-between items-start mb-2">
         <div className="flex-1">
@@ -122,6 +125,12 @@ function MissionCard({ mission, airport, onHover, isHighlighted }) {
         <span className="text-gray-500">•</span>
         <span className="text-cyan-400 font-mono">{distance}</span>
       </div>
+
+      {isSelected && (
+        <div className="mt-2 pt-2 border-t border-yellow-400/30 text-xs text-yellow-400 text-center">
+          👆 Clicca di nuovo per andare alla pagina Missions
+        </div>
+      )}
     </div>
   );
 }
@@ -129,7 +138,7 @@ function MissionCard({ mission, airport, onHover, isHighlighted }) {
 /**
  * Mission Polyline Component
  */
-function MissionPolyline({ mission, sourceAirport, destAirport, isHighlighted, onHover }) {
+function MissionPolyline({ mission, sourceAirport, destAirport, isHighlighted, isSelected, onHover, onSelect }) {
   if (!sourceAirport || !destAirport) return null;
 
   const isPending = mission.status === 'pending';
@@ -138,18 +147,23 @@ function MissionPolyline({ mission, sourceAirport, destAirport, isHighlighted, o
     [destAirport.coordinates.lat, destAirport.coordinates.lon],
   ];
 
+  // Enhanced visibility for pending missions
+  const baseOpacity = isPending ? 0.65 : 0.5;
+  const baseWeight = isPending ? 3 : 2;
+
   return (
     <Polyline
       positions={positions}
       pathOptions={{
-        color: isPending ? '#60a5fa' : '#f87171',
-        weight: isHighlighted ? 4 : 2,
-        opacity: isHighlighted ? 1 : 0.4,
+        color: isSelected ? '#facc15' : isPending ? '#60a5fa' : '#f87171',
+        weight: isSelected ? 5 : isHighlighted ? 4 : baseWeight,
+        opacity: isSelected ? 1 : isHighlighted ? 1 : baseOpacity,
         dashArray: isPending ? '10, 10' : undefined,
       }}
       eventHandlers={{
         mouseover: () => onHover(mission.id),
         mouseout: () => onHover(null),
+        click: () => onSelect(mission.id),
       }}
     >
       <Popup>
@@ -177,8 +191,9 @@ function MissionPolyline({ mission, sourceAirport, destAirport, isHighlighted, o
 /**
  * Map View Component
  */
-export default function MapView({ missions, airportsData }) {
+export default function MapView({ missions, airportsData, onNavigateToMissions }) {
   const [hoveredMission, setHoveredMission] = useState(null);
+  const [selectedMission, setSelectedMission] = useState(null);
 
   // Calculate center and bounds
   const validAirports = airports.filter(a => a.coordinates);
@@ -187,6 +202,19 @@ export default function MapView({ missions, airportsData }) {
     : [37.0, 35.5];
 
   const allPositions = validAirports.map(a => [a.coordinates.lat, a.coordinates.lon]);
+
+  // Handle mission selection
+  const handleSelectMission = (missionId) => {
+    if (selectedMission === missionId) {
+      // Second click - navigate to Missions page
+      if (onNavigateToMissions) {
+        onNavigateToMissions();
+      }
+    } else {
+      // First click - select mission
+      setSelectedMission(missionId);
+    }
+  };
 
   // Debug logging - fixed dependencies
   console.log('🗺️ MapView rendered with', missions.length, 'missions');
@@ -283,7 +311,9 @@ export default function MapView({ missions, airportsData }) {
                     sourceAirport={sourceAirport}
                     destAirport={destAirport}
                     isHighlighted={hoveredMission === mission.id}
+                    isSelected={selectedMission === mission.id}
                     onHover={setHoveredMission}
+                    onSelect={handleSelectMission}
                   />
                 );
               })}
@@ -344,7 +374,9 @@ export default function MapView({ missions, airportsData }) {
                       mission={mission}
                       airport={airport}
                       onHover={setHoveredMission}
+                      onSelect={handleSelectMission}
                       isHighlighted={hoveredMission === mission.id}
+                      isSelected={selectedMission === mission.id}
                     />
                   );
                 })

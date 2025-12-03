@@ -205,6 +205,7 @@ function App() {
           <MapView
             missions={missions}
             airportsData={Object.values(airports)}
+            onNavigateToMissions={() => setCurrentView('missions')}
           />
         )}
       </main>
