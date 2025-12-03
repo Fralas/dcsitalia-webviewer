@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Map, Plane, ArrowRight } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { Map as MapIcon, Plane, ArrowRight } from 'lucide-react';
 import { getAirportName } from '../config/airports';
 import airports from '../config/airports';
 
@@ -11,37 +14,71 @@ function getWeaponDisplayName(weaponId) {
 }
 
 /**
- * Convert lat/lon to SVG coordinates
+ * Component to fit bounds of all airports
  */
-function projectToSVG(lat, lon, bounds, width, height, padding = 60) {
-  const x = ((lon - bounds.minLon) / (bounds.maxLon - bounds.minLon)) * (width - 2 * padding) + padding;
-  const y = height - (((lat - bounds.minLat) / (bounds.maxLat - bounds.minLat)) * (height - 2 * padding) + padding);
-  return { x, y };
+function FitBounds({ positions }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (positions.length > 0) {
+      const bounds = L.latLngBounds(positions);
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  }, [map, positions]);
+
+  return null;
 }
 
 /**
- * Calculate map bounds from airport coordinates
+ * Custom airport icon
  */
-function calculateBounds(airports) {
-  const lats = airports.map(a => a.coordinates.lat);
-  const lons = airports.map(a => a.coordinates.lon);
+const createAirportIcon = (isMainBase, missionCount) => {
+  const color = isMainBase ? '#facc15' : '#3b82f6';
+  const size = isMainBase ? 16 : 12;
 
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLon = Math.min(...lons);
-  const maxLon = Math.max(...lons);
-
-  // Add 10% padding
-  const latPadding = (maxLat - minLat) * 0.1;
-  const lonPadding = (maxLon - minLon) * 0.1;
-
-  return {
-    minLat: minLat - latPadding,
-    maxLat: maxLat + latPadding,
-    minLon: minLon - lonPadding,
-    maxLon: maxLon + lonPadding,
-  };
-}
+  return L.divIcon({
+    className: 'custom-airport-marker',
+    html: `
+      <div style="position: relative;">
+        <div style="
+          width: ${size * 2}px;
+          height: ${size * 2}px;
+          background: ${color};
+          border: 3px solid ${isMainBase ? '#fbbf24' : '#2563eb'};
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        ">
+          ✈️
+        </div>
+        ${missionCount > 0 ? `
+          <div style="
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #dc2626;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: bold;
+            border: 2px solid #1e293b;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          ">${missionCount}</div>
+        ` : ''}
+      </div>
+    `,
+    iconSize: [size * 2, size * 2],
+    iconAnchor: [size, size],
+  });
+};
 
 /**
  * Mission Card Component (sidebar)
@@ -90,30 +127,68 @@ function MissionCard({ mission, airport, onHover, isHighlighted }) {
 }
 
 /**
+ * Mission Polyline Component
+ */
+function MissionPolyline({ mission, sourceAirport, destAirport, isHighlighted, onHover }) {
+  if (!sourceAirport || !destAirport) return null;
+
+  const isPending = mission.status === 'pending';
+  const positions = [
+    [sourceAirport.coordinates.lat, sourceAirport.coordinates.lon],
+    [destAirport.coordinates.lat, destAirport.coordinates.lon],
+  ];
+
+  return (
+    <Polyline
+      positions={positions}
+      pathOptions={{
+        color: isPending ? '#60a5fa' : '#f87171',
+        weight: isHighlighted ? 4 : 2,
+        opacity: isHighlighted ? 1 : 0.4,
+        dashArray: isPending ? '10, 10' : undefined,
+      }}
+      eventHandlers={{
+        mouseover: () => onHover(mission.id),
+        mouseout: () => onHover(null),
+      }}
+    >
+      <Popup>
+        <div className="text-xs">
+          <div className="font-bold">{getWeaponDisplayName(mission.weapon_id)}</div>
+          <div className="text-gray-600">
+            {sourceAirport.displayName} → {destAirport.displayName}
+          </div>
+          <div className="text-gray-600">
+            {mission.distance_nm ? `${mission.distance_nm}nm` : '-'}
+          </div>
+          <div className="mt-1">
+            <span className={`px-2 py-1 rounded text-xs ${
+              isPending ? 'bg-blue-500/20 text-blue-600' : 'bg-red-500/20 text-red-600'
+            }`}>
+              {mission.status.toUpperCase()}
+            </span>
+          </div>
+        </div>
+      </Popup>
+    </Polyline>
+  );
+}
+
+/**
  * Map View Component
  */
 export default function MapView({ missions, airportsData }) {
   const [hoveredMission, setHoveredMission] = useState(null);
-  const [svgSize] = useState({ width: 800, height: 600 });
 
-  // Calculate bounds for the map
-  const bounds = calculateBounds(airports.filter(a => a.coordinates));
+  // Calculate center and bounds
+  const validAirports = airports.filter(a => a.coordinates);
+  const center = validAirports.length > 0
+    ? [validAirports[0].coordinates.lat, validAirports[0].coordinates.lon]
+    : [37.0, 35.5];
 
-  // Project airport coordinates to SVG
-  const airportPositions = airports
-    .filter(a => a.coordinates)
-    .map(airport => ({
-      ...airport,
-      position: projectToSVG(
-        airport.coordinates.lat,
-        airport.coordinates.lon,
-        bounds,
-        svgSize.width,
-        svgSize.height
-      ),
-    }));
+  const allPositions = validAirports.map(a => [a.coordinates.lat, a.coordinates.lon]);
 
-  // Group missions by airport
+  // Group missions by airport for badge count
   const missionsByAirport = {};
   missions.forEach(mission => {
     if (!missionsByAirport[mission.airport_id]) {
@@ -129,11 +204,11 @@ export default function MapView({ missions, airportsData }) {
         <div className="bg-slate-800 rounded-lg p-6 border border-gray-700 mb-6">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-blue-500/20 rounded-lg">
-              <Map className="w-8 h-8 text-blue-400" />
+              <MapIcon className="w-8 h-8 text-blue-400" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white">Mappa delle Rotte</h1>
-              <p className="text-gray-400">Visualizzazione delle missioni di rifornimento</p>
+              <p className="text-gray-400">Visualizzazione geografica delle missioni di rifornimento</p>
             </div>
           </div>
 
@@ -148,11 +223,11 @@ export default function MapView({ missions, airportsData }) {
               <span className="text-gray-300">Accepted</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-blue-400"></div>
+              <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-blue-600"></div>
               <span className="text-gray-300">Aeroporto</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full border-2 border-yellow-400 bg-yellow-400/20"></div>
+              <div className="w-4 h-4 rounded-full bg-yellow-400 border-2 border-yellow-500"></div>
               <span className="text-gray-300">Main Base</span>
             </div>
           </div>
@@ -160,144 +235,71 @@ export default function MapView({ missions, airportsData }) {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Map */}
-          <div className="lg:col-span-2 bg-slate-800 rounded-lg p-6 border border-gray-700">
-            <svg
-              width={svgSize.width}
-              height={svgSize.height}
-              className="w-full h-auto"
-              viewBox={`0 0 ${svgSize.width} ${svgSize.height}`}
+          <div className="lg:col-span-2 bg-slate-800 rounded-lg overflow-hidden border border-gray-700" style={{ height: '700px' }}>
+            <MapContainer
+              center={center}
+              zoom={10}
+              style={{ height: '100%', width: '100%' }}
+              scrollWheelZoom={true}
             >
-              {/* Background */}
-              <rect width={svgSize.width} height={svgSize.height} fill="#0f172a" rx="8" />
+              {/* OpenStreetMap tiles */}
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
 
-              {/* Grid lines */}
-              <defs>
-                <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" strokeWidth="0.5" />
-                </pattern>
-              </defs>
-              <rect width={svgSize.width} height={svgSize.height} fill="url(#grid)" />
+              {/* Fit bounds to show all airports */}
+              <FitBounds positions={allPositions} />
 
               {/* Mission routes */}
               {missions.map(mission => {
-                const sourceAirport = airportPositions.find(a => a.id === mission.source_airport_id);
-                const destAirport = airportPositions.find(a => a.id === mission.airport_id);
-
-                if (!sourceAirport || !destAirport) return null;
-
-                const isPending = mission.status === 'pending';
-                const isHighlighted = hoveredMission === mission.id;
-                const opacity = isHighlighted ? 1 : 0.3;
-                const strokeWidth = isHighlighted ? 3 : 2;
+                const sourceAirport = validAirports.find(a => a.id === mission.source_airport_id);
+                const destAirport = validAirports.find(a => a.id === mission.airport_id);
 
                 return (
-                  <g key={mission.id}>
-                    {/* Route line */}
-                    <line
-                      x1={sourceAirport.position.x}
-                      y1={sourceAirport.position.y}
-                      x2={destAirport.position.x}
-                      y2={destAirport.position.y}
-                      stroke={isPending ? '#60a5fa' : '#f87171'}
-                      strokeWidth={strokeWidth}
-                      strokeDasharray={isPending ? '8,4' : '0'}
-                      opacity={opacity}
-                      className="transition-all cursor-pointer"
-                      onMouseEnter={() => setHoveredMission(mission.id)}
-                      onMouseLeave={() => setHoveredMission(null)}
-                    />
-
-                    {/* Arrow head */}
-                    <circle
-                      cx={destAirport.position.x}
-                      cy={destAirport.position.y}
-                      r={isHighlighted ? 6 : 4}
-                      fill={isPending ? '#60a5fa' : '#f87171'}
-                      opacity={opacity}
-                      className="transition-all"
-                    />
-                  </g>
+                  <MissionPolyline
+                    key={mission.id}
+                    mission={mission}
+                    sourceAirport={sourceAirport}
+                    destAirport={destAirport}
+                    isHighlighted={hoveredMission === mission.id}
+                    onHover={setHoveredMission}
+                  />
                 );
               })}
 
-              {/* Airport nodes */}
-              {airportPositions.map(airport => (
-                <g key={airport.id}>
-                  {/* Outer ring for main base */}
-                  {airport.isMainBase && (
-                    <circle
-                      cx={airport.position.x}
-                      cy={airport.position.y}
-                      r={16}
-                      fill="none"
-                      stroke="#facc15"
-                      strokeWidth="2"
-                      opacity="0.6"
-                    />
-                  )}
+              {/* Airport markers */}
+              {validAirports.map(airport => {
+                const missionCount = missionsByAirport[airport.id]?.length || 0;
 
-                  {/* Airport node */}
-                  <circle
-                    cx={airport.position.x}
-                    cy={airport.position.y}
-                    r={12}
-                    fill={airport.isMainBase ? '#facc15' : '#3b82f6'}
-                    opacity={airport.isMainBase ? 0.4 : 0.8}
-                    className="transition-all"
-                  />
-
-                  {/* Airport icon */}
-                  <text
-                    x={airport.position.x}
-                    y={airport.position.y}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fill="white"
-                    fontSize="12"
-                    fontWeight="bold"
+                return (
+                  <Marker
+                    key={airport.id}
+                    position={[airport.coordinates.lat, airport.coordinates.lon]}
+                    icon={createAirportIcon(airport.isMainBase, missionCount)}
                   >
-                    ✈
-                  </text>
-
-                  {/* Airport label */}
-                  <text
-                    x={airport.position.x}
-                    y={airport.position.y + 28}
-                    textAnchor="middle"
-                    fill="#e5e7eb"
-                    fontSize="12"
-                    fontWeight="600"
-                  >
-                    {airport.displayName}
-                  </text>
-
-                  {/* Mission count badge */}
-                  {missionsByAirport[airport.id] && missionsByAirport[airport.id].length > 0 && (
-                    <g>
-                      <circle
-                        cx={airport.position.x + 15}
-                        cy={airport.position.y - 10}
-                        r={10}
-                        fill="#dc2626"
-                        stroke="#1e293b"
-                        strokeWidth="2"
-                      />
-                      <text
-                        x={airport.position.x + 15}
-                        y={airport.position.y - 10}
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        fill="white"
-                        fontSize="10"
-                        fontWeight="bold"
-                      >
-                        {missionsByAirport[airport.id].length}
-                      </text>
-                    </g>
-                  )}
-                </g>
-              ))}
-            </svg>
+                    <Popup>
+                      <div className="text-sm">
+                        <div className="font-bold text-base">{airport.displayName}</div>
+                        {airport.isMainBase && (
+                          <div className="text-yellow-600 text-xs font-semibold">MAIN BASE</div>
+                        )}
+                        <div className="text-gray-600 text-xs mt-1">
+                          {airport.coordinates.lat.toFixed(6)}°N, {airport.coordinates.lon.toFixed(6)}°E
+                        </div>
+                        {missionCount > 0 && (
+                          <div className="mt-2 text-xs">
+                            <span className="px-2 py-1 bg-red-500 text-white rounded">
+                              {missionCount} missioni attive
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </Popup>
+                  </Marker>
+                );
+              })}
+            </MapContainer>
           </div>
 
           {/* Mission List Sidebar */}
@@ -307,7 +309,7 @@ export default function MapView({ missions, airportsData }) {
               Missioni Attive ({missions.length})
             </h3>
 
-            <div className="space-y-2 max-h-[600px] overflow-y-auto">
+            <div className="space-y-2 max-h-[640px] overflow-y-auto">
               {missions.length === 0 ? (
                 <div className="text-center py-8">
                   <Plane className="w-12 h-12 text-gray-600 mx-auto mb-2" />

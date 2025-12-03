@@ -50,3 +50,19 @@ code {
 .pulse-border-critical {
   animation: pulse-border 2s ease-in-out infinite;
 }
+
+/* Leaflet custom styles */
+.custom-airport-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Fix leaflet popup z-index */
+.leaflet-popup-pane {
+  z-index: 700;
+}
+
+/* Ensure map container has proper background */
+.leaflet-container {
+  background: #1e293b;
+}
