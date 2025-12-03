@@ -6,11 +6,12 @@ import chokidar from 'chokidar';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import airports from './config/airports.config.js';
+import airports, { getAirportById } from './config/airports.config.js';
 import { isImportantWeapon, getPriority, getSupplyQuantityForPriority } from './config/rules.config.js';
 import * as csvParser from './services/csvParser.js';
 import * as historicalData from './services/historicalData.js';
 import * as missionGenerator from './services/missionGenerator.js';
+import { findBestSourceAirport } from './services/missionGenerator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -46,10 +47,11 @@ function loadAllData() {
     if (airportData.data && airportData.data.weapons) {
       historicalData.saveSnapshot(airportId, airportData.data);
 
-      // Check and generate missions
+      // Check and generate missions (with donor selection)
       const newMissions = missionGenerator.checkAndGenerateMissions(
         airportId,
-        airportData.data.weapons
+        airportData.data.weapons,
+        data // Pass all airports data for donor selection
       );
 
       if (newMissions.length > 0) {
@@ -377,16 +379,27 @@ app.post('/api/airports/:id/create-order', (req, res) => {
     console.log(`📊 Auto-calculated quantity for ${weaponId}: ${quantity} (priority: ${priority.toUpperCase()}, current: ${currentQuantity})`);
   }
 
-  // Create order
+  // Find best source airport using donor selection algorithm
+  const bestSource = findBestSourceAirport({
+    recipientAirport: airport,
+    weaponId,
+    quantityNeeded: quantity,
+    allAirportsData: currentData,
+  });
+
+  // Create order with source routing
   const orderId = historicalData.createMission(
     airportId,
     weaponId,
     quantity,
     currentQuantity,
-    24 // expires in 24 hours
+    24, // expires in 24 hours
+    bestSource.airportId,
+    bestSource.distance
   );
 
   console.log(`📦 Manual order created: ${orderId} for ${weaponId} at ${airport.displayName} (qty: ${quantity})`);
+  console.log(`   Route: ${bestSource.airportName} → ${airport.displayName} (${bestSource.distance}nm)`);
 
   // Broadcast to all clients
   io.emit('missions:updated', {
@@ -396,7 +409,13 @@ app.post('/api/airports/:id/create-order', (req, res) => {
   res.json({
     success: true,
     orderId,
-    message: 'Order created successfully'
+    message: 'Order created successfully',
+    route: {
+      from: bestSource.airportName,
+      to: airport.displayName,
+      distance: bestSource.distance,
+      isDonor: bestSource.isDonor
+    }
   });
 });
 
@@ -434,10 +453,11 @@ app.post('/api/debug/generate-orders', (req, res) => {
       return;
     }
 
-    // Generate missions for this airport
+    // Generate missions for this airport (with donor selection)
     const generatedMissions = missionGenerator.checkAndGenerateMissions(
       airport.id,
-      airportData.data.weapons
+      airportData.data.weapons,
+      currentData // Pass all airports data for donor selection
     );
 
     results.push({

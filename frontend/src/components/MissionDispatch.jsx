@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Plane, Clock, User, CheckCircle, XCircle, AlertTriangle, Package } from 'lucide-react';
+import { Plane, Clock, User, CheckCircle, XCircle, AlertTriangle, Package, ArrowRight } from 'lucide-react';
 import * as api from '../services/api';
+import { getAirportName } from '../config/airports';
 
 /**
  * Get weapon display name
@@ -134,6 +135,24 @@ function MissionCard({ mission, airports, onUpdate }) {
                 <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-bold">ACCEPTED</span>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Route Information */}
+        <div className="mt-3 pt-3 border-t border-gray-700">
+          <div className="flex items-center gap-2 text-sm bg-slate-800/50 px-3 py-2 rounded">
+            <Plane className="w-4 h-4 text-gray-400" />
+            <span className="text-blue-400 font-semibold">From:</span>
+            <span className="text-white">{mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Main Base'}</span>
+            <ArrowRight className="w-4 h-4 text-gray-500" />
+            <span className="text-green-400 font-semibold">To:</span>
+            <span className="text-white">{airport?.displayName || airport?.name || 'Unknown'}</span>
+            {mission.distance_nm && (
+              <>
+                <span className="text-gray-500">•</span>
+                <span className="text-cyan-400 font-mono">{mission.distance_nm}nm</span>
+              </>
+            )}
           </div>
         </div>
 

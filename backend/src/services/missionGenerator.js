@@ -81,7 +81,7 @@ export function checkAndGenerateMissions(recipientAirportId, recipientWeapons, a
  * @param {Object} params.allAirportsData - All airports current data
  * @returns {Object} {airportId, airportName, distance, isDonor}
  */
-function findBestSourceAirport({ recipientAirport, weaponId, quantityNeeded, allAirportsData }) {
+export function findBestSourceAirport({ recipientAirport, weaponId, quantityNeeded, allAirportsData }) {
   const mainBase = getMainBase();
   const minDonorQty = missionRules.donor.minQuantityToDonate;
   const bufferQty = missionRules.mediumThreshold + missionRules.donor.bufferAfterDonation; // 50 + 25 = 75
@@ -172,6 +172,7 @@ export function getMissionPriority(currentQuantity) {
 
 export default {
   checkAndGenerateMissions,
+  findBestSourceAirport,
   getWeaponDisplayName,
   getMissionPriority,
 };

@@ -155,9 +155,9 @@ export function getLatestSnapshot(airportId) {
 }
 
 /**
- * Create a new mission
+ * Create a new mission with source routing
  */
-export function createMission(airportId, weaponId, quantityNeeded, currentQuantity, expiryHours = 24) {
+export function createMission(airportId, weaponId, quantityNeeded, currentQuantity, expiryHours = 24, sourceAirportId = null, distance = null) {
   const missions = readMissions();
 
   const missionId = `mission_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -166,7 +166,9 @@ export function createMission(airportId, weaponId, quantityNeeded, currentQuanti
 
   missions.push({
     id: missionId,
-    airport_id: airportId,
+    airport_id: airportId, // Destination (recipient)
+    source_airport_id: sourceAirportId, // Source (donor or main base)
+    distance_nm: distance, // Distance in nautical miles
     weapon_id: weaponId,
     quantity_needed: quantityNeeded,
     current_quantity: currentQuantity,

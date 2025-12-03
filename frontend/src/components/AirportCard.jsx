@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Plus, X, TrendingUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Plus, X, TrendingUp, ArrowRight } from 'lucide-react';
 import { createOrder } from '../services/api';
 import WeaponChart from './WeaponChart';
+import { getAirportName } from '../config/airports';
 
 /**
  * Get weapon display name (remove prefix)
@@ -253,26 +254,43 @@ export default function AirportCard({ airport, missions = [] }) {
                 ORDINI ATTIVI ({airportMissions.length})
               </h4>
               <div className="space-y-2">
-                {airportMissions.map(mission => (
-                  <div key={mission.id} className="bg-slate-800 p-3 rounded flex justify-between items-center">
-                    <div>
-                      <div className="font-mono text-sm text-white">{getWeaponDisplayName(mission.weapon_id)}</div>
-                      <div className="text-xs text-gray-400">
-                        Quantità richiesta: <span className="font-bold text-white">{mission.quantity_needed}</span> |
-                        Attuale: <span className="font-bold text-orange-400">{mission.current_quantity}</span>
+                {airportMissions.map(mission => {
+                  const sourceName = mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Main Base';
+                  const distance = mission.distance_nm ? `${mission.distance_nm}nm` : '-';
+
+                  return (
+                    <div key={mission.id} className="bg-slate-800 p-3 rounded">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1">
+                          <div className="font-mono text-sm text-white mb-1">{getWeaponDisplayName(mission.weapon_id)}</div>
+                          <div className="text-xs text-gray-400">
+                            Quantità richiesta: <span className="font-bold text-white">{mission.quantity_needed}</span> |
+                            Attuale: <span className="font-bold text-orange-400">{mission.current_quantity}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            mission.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                            mission.status === 'accepted' ? 'bg-blue-500/20 text-blue-400' :
+                            'bg-gray-500/20 text-gray-400'
+                          }`}>
+                            {mission.status.toUpperCase()}
+                          </span>
+                        </div>
+                      </div>
+                      {/* Route Information */}
+                      <div className="flex items-center gap-2 text-xs bg-slate-900/50 px-2 py-1 rounded">
+                        <span className="text-blue-400 font-semibold">Da:</span>
+                        <span className="text-white">{sourceName}</span>
+                        <ArrowRight className="w-3 h-3 text-gray-500" />
+                        <span className="text-green-400 font-semibold">A:</span>
+                        <span className="text-white">{airport.displayName || airport.name}</span>
+                        <span className="text-gray-500">•</span>
+                        <span className="text-cyan-400 font-mono">{distance}</span>
                       </div>
                     </div>
-                    <div>
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        mission.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                        mission.status === 'accepted' ? 'bg-blue-500/20 text-blue-400' :
-                        'bg-gray-500/20 text-gray-400'
-                      }`}>
-                        {mission.status.toUpperCase()}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
