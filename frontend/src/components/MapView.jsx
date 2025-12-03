@@ -188,7 +188,9 @@ export default function MapView({ missions, airportsData }) {
 
   const allPositions = validAirports.map(a => [a.coordinates.lat, a.coordinates.lon]);
 
-  // Debug logging
+  // Debug logging - fixed dependencies
+  console.log('🗺️ MapView rendered with', missions.length, 'missions');
+
   useEffect(() => {
     console.log('MapView - Missions:', missions);
     console.log('MapView - Valid Airports:', validAirports);
@@ -204,7 +206,7 @@ export default function MapView({ missions, airportsData }) {
         destAirport
       });
     });
-  }, [missions, validAirports]);
+  }, [missions]); // Only depend on missions, not validAirports
 
   // Group missions by airport for badge count
   const missionsByAirport = {};
