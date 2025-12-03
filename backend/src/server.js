@@ -592,7 +592,43 @@ httpServer.listen(PORT, () => {
   `);
 });
 
-// Graceful shutdown
+// ==================== ADMIN ENDPOINTS ====================
+
+const ADMIN_PASSWORD = 'merda';
+
+/**
+ * POST /api/admin/login - Verify admin password
+ */
+app.post('/api/admin/login', (req, res) => {
+  const { password } = req.body;
+
+  if (password === ADMIN_PASSWORD) {
+    res.json({ success: true, message: 'Login successful' });
+  } else {
+    res.status(401).json({ success: false, message: 'Invalid password' });
+  }
+});
+
+/**
+ * GET /api/admin/config/rules - Get rules configuration
+ */
+app.get('/api/admin/config/rules', (req, res) => {
+  // Import the config dynamically to get the latest version
+  import('./config/rules.config.js').then(module => {
+    res.json(module.missionRules);
+  }).catch(err => {
+    res.status(500).json({ error: 'Failed to load config' });
+  });
+});
+
+/**
+ * GET /api/admin/config/airports - Get airports configuration
+ */
+app.get('/api/admin/config/airports', (req, res) => {
+  res.json(airports);
+});
+
+// ==================== GRACEFUL SHUTDOWN ====================
 process.on('SIGTERM', () => {
   console.log('👋 Shutting down gracefully...');
   watcher.close();

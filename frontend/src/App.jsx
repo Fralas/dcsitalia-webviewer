@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Plane, Package, Activity, AlertCircle, Map } from 'lucide-react';
+import { Plane, Package, Activity, AlertCircle, Map, Shield } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import MissionDispatch from './components/MissionDispatch';
 import MapView from './components/MapView';
+import AdminPanel from './components/AdminPanel';
 import * as api from './services/api';
 import socketService from './services/socket';
 
@@ -180,13 +181,20 @@ function App() {
                 <Map className="w-4 h-4" />
                 Mappa
               </button>
+              <button
+                onClick={() => setCurrentView('admin')}
+                className={`px-4 py-2 rounded font-bold flex items-center gap-2 ${currentView === 'admin' ? 'bg-red-600 text-white' : 'bg-slate-800 text-gray-300 hover:bg-slate-700'}`}
+              >
+                <Shield className="w-4 h-4" />
+                Admin
+              </button>
             </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className={currentView === 'map' ? '' : 'container mx-auto px-4 py-6'}>
+      <main className={currentView === 'map' || currentView === 'admin' ? '' : 'container mx-auto px-4 py-6'}>
         {currentView === 'dashboard' && (
           <Dashboard
             airports={airports}
@@ -207,6 +215,9 @@ function App() {
             airportsData={Object.values(airports)}
             onNavigateToMissions={() => setCurrentView('missions')}
           />
+        )}
+        {currentView === 'admin' && (
+          <AdminPanel />
         )}
       </main>
 
