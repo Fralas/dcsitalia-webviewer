@@ -9,18 +9,30 @@ const airports = [
     name: 'Adana Sakirpasa',
     displayName: 'Adana Sakirpasa',
     isMainBase: true,
+    coordinates: {
+      lat: 36.982222,
+      lon: 35.281111,
+    },
   },
   {
     id: 'incirlik',
     name: 'Incirlik',
     displayName: 'Incirlik Air Base',
     isMainBase: false,
+    coordinates: {
+      lat: 37.000000,
+      lon: 35.425833,
+    },
   },
   {
     id: 'farp-base',
     name: 'FARP_BASE',
     displayName: 'FARP Base',
     isMainBase: false,
+    coordinates: {
+      lat: 37.066944,
+      lon: 35.974722,
+    },
   },
 ];
 

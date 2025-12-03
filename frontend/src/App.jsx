@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plane, Package, Activity, AlertCircle } from 'lucide-react';
+import { Plane, Package, Activity, AlertCircle, Map } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import MissionDispatch from './components/MissionDispatch';
+import MapView from './components/MapView';
 import * as api from './services/api';
 import socketService from './services/socket';
 
@@ -172,13 +173,20 @@ function App() {
                   </span>
                 )}
               </button>
+              <button
+                onClick={() => setCurrentView('map')}
+                className={`px-4 py-2 rounded font-bold flex items-center gap-2 ${currentView === 'map' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-gray-300 hover:bg-slate-700'}`}
+              >
+                <Map className="w-4 h-4" />
+                Mappa
+              </button>
             </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-6">
+      <main className={currentView === 'map' ? '' : 'container mx-auto px-4 py-6'}>
         {currentView === 'dashboard' && (
           <Dashboard
             airports={airports}
@@ -191,6 +199,12 @@ function App() {
             missions={missions}
             airports={Object.values(airports)}
             onUpdate={handleMissionUpdate}
+          />
+        )}
+        {currentView === 'map' && (
+          <MapView
+            missions={missions}
+            airportsData={Object.values(airports)}
           />
         )}
       </main>
