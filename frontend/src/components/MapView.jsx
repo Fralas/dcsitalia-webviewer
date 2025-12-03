@@ -188,6 +188,24 @@ export default function MapView({ missions, airportsData }) {
 
   const allPositions = validAirports.map(a => [a.coordinates.lat, a.coordinates.lon]);
 
+  // Debug logging
+  useEffect(() => {
+    console.log('MapView - Missions:', missions);
+    console.log('MapView - Valid Airports:', validAirports);
+    missions.forEach(mission => {
+      const sourceAirport = validAirports.find(a => a.id === mission.source_airport_id);
+      const destAirport = validAirports.find(a => a.id === mission.airport_id);
+      console.log(`Mission ${mission.id}:`, {
+        source_airport_id: mission.source_airport_id,
+        airport_id: mission.airport_id,
+        sourceFound: !!sourceAirport,
+        destFound: !!destAirport,
+        sourceAirport,
+        destAirport
+      });
+    });
+  }, [missions, validAirports]);
+
   // Group missions by airport for badge count
   const missionsByAirport = {};
   missions.forEach(mission => {
