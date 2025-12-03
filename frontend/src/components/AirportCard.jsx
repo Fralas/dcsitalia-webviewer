@@ -366,7 +366,7 @@ export default function AirportCard({ airport, missions = [] }) {
                   Seleziona un'arma dal menu a tendina per visualizzare il grafico storico
                 </p>
                 <p className="text-xs text-gray-500 mt-2">
-                  📊 I dati vengono salvati automaticamente ogni ora
+                  📊 I dati vengono salvati automaticamente ogni 4 ore
                 </p>
               </div>
             )}

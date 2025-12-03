@@ -98,7 +98,7 @@ export default function WeaponChart({ airportId, weaponId, days = 7 }) {
       <div className="bg-slate-900/50 rounded-lg p-8 text-center">
         <p className="text-yellow-400">{error}</p>
         <p className="text-xs text-gray-500 mt-2">
-          I dati vengono salvati ogni ora. Attendi il prossimo snapshot.
+          I dati vengono salvati ogni 4 ore. Attendi il prossimo snapshot.
         </p>
       </div>
     );
@@ -196,7 +196,7 @@ export default function WeaponChart({ airportId, weaponId, days = 7 }) {
       </div>
 
       <div className="mt-3 text-xs text-gray-500 text-center">
-        📊 Dati raccolti ogni ora • {chartData.length} punti dati
+        📊 Dati raccolti ogni 4 ore • {chartData.length} punti dati
       </div>
     </div>
   );
