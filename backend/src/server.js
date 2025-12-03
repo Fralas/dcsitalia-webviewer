@@ -381,6 +381,95 @@ app.post('/api/airports/:id/create-order', (req, res) => {
   });
 });
 
+// ==================== DEBUG ENDPOINTS ====================
+
+/**
+ * POST /api/debug/generate-orders - Force generation of orders for all airports
+ */
+app.post('/api/debug/generate-orders', (req, res) => {
+  console.log('🔧 DEBUG: Force generating orders for all airports...');
+
+  const results = [];
+
+  // Loop through all airports
+  airports.forEach(airport => {
+    if (airport.isMainBase) {
+      results.push({
+        airportId: airport.id,
+        airportName: airport.displayName,
+        skipped: true,
+        reason: 'Main base - no orders generated'
+      });
+      return;
+    }
+
+    // Get weapons data for this airport
+    const airportData = currentData[airport.id];
+    if (!airportData || !airportData.data || !airportData.data.weapons) {
+      results.push({
+        airportId: airport.id,
+        airportName: airport.displayName,
+        skipped: true,
+        reason: 'No weapons data available'
+      });
+      return;
+    }
+
+    // Generate missions for this airport
+    const generatedMissions = missionGenerator.checkAndGenerateMissions(
+      airport.id,
+      airportData.data.weapons
+    );
+
+    results.push({
+      airportId: airport.id,
+      airportName: airport.displayName,
+      missionsGenerated: generatedMissions.length,
+      missionIds: generatedMissions
+    });
+  });
+
+  // Broadcast updated missions to all clients
+  io.emit('missions:updated', {
+    missions: historicalData.getActiveMissions()
+  });
+
+  const totalGenerated = results.reduce((sum, r) => sum + (r.missionsGenerated || 0), 0);
+
+  console.log(`🔧 DEBUG: Generated ${totalGenerated} total orders`);
+
+  res.json({
+    success: true,
+    totalGenerated,
+    results
+  });
+});
+
+/**
+ * POST /api/debug/clear-orders - Clear all existing orders
+ */
+app.post('/api/debug/clear-orders', (req, res) => {
+  console.log('🔧 DEBUG: Clearing all orders...');
+
+  const beforeCount = historicalData.getActiveMissions().length;
+
+  // Clear all missions
+  historicalData.clearAllMissions();
+
+  // Broadcast updated missions to all clients
+  io.emit('missions:updated', {
+    missions: []
+  });
+
+  console.log(`🔧 DEBUG: Cleared ${beforeCount} orders`);
+
+  res.json({
+    success: true,
+    clearedCount: beforeCount,
+    message: `Cleared ${beforeCount} orders`
+  });
+});
+
 // ==================== WEBSOCKET ====================
 
 io.on('connection', (socket) => {

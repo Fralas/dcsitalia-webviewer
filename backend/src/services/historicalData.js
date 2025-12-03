@@ -257,6 +257,14 @@ export function cleanupExpiredMissions() {
   return expiredCount;
 }
 
+/**
+ * Clear all missions (DEBUG ONLY)
+ */
+export function clearAllMissions() {
+  writeMissions([]);
+  return true;
+}
+
 export default {
   saveSnapshot,
   getHistory,
@@ -269,4 +277,5 @@ export default {
   cancelMission,
   missionExistsForWeapon,
   cleanupExpiredMissions,
+  clearAllMissions,
 };

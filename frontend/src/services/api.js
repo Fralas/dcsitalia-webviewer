@@ -105,6 +105,24 @@ export async function getStats() {
   return fetchAPI('/stats');
 }
 
+/**
+ * DEBUG: Force generate orders for all airports
+ */
+export async function debugGenerateOrders() {
+  return fetchAPI('/debug/generate-orders', {
+    method: 'POST',
+  });
+}
+
+/**
+ * DEBUG: Clear all existing orders
+ */
+export async function debugClearOrders() {
+  return fetchAPI('/debug/clear-orders', {
+    method: 'POST',
+  });
+}
+
 export default {
   getAirports,
   getAirport,
@@ -116,4 +134,6 @@ export default {
   cancelMission,
   createOrder,
   getStats,
+  debugGenerateOrders,
+  debugClearOrders,
 };
