@@ -21,7 +21,7 @@ weapons.missiles.AGM_84E,200
 weapons.bombs.AN_M30A1,200
 weapons.nurs.C_25,10000
 weapons.containers.AV8BNA_ALQ164,10000
-weapons.missiles.P_60,1622
+weapons.missiles.P_60,1686
 weapons.bombs.OH58D_Red_Smoke_Grenade,200
 weapons.bombs.FAB_1500,200
 1,100000
@@ -34,7 +34,7 @@ weapons.missiles.KD_63B,200
 weapons.droptanks.FuelTank_150L,10000
 weapons.missiles.Rb 15F (for A.I.),200
 weapons.missiles.CATM_65K,200
-weapons.missiles.Vikhr_M,5528
+weapons.missiles.Vikhr_M,5768
 weapons.nurs.FFAR M156 WP,10000
 weapons.nurs.British_HE_60LBSAPNo2_3INCHNo1,10000
 weapons.missiles.DWS39_MJ2,200
@@ -52,13 +52,13 @@ weapons.missiles.TGM_65H,200
 weapons.bombs.Type_200A,200
 weapons.nurs.M8rocket,10000
 weapons.bombs.GBU_27,200
-weapons.missiles.AGR_20A,774
+weapons.missiles.AGR_20A,814
 weapons.droptanks.M2KC_RPL_522_EMPTY,10000
 weapons.droptanks.M2KC_02_RPL541,10000
 weapons.droptanks.F4U-1D_Drop_Tank_Aux,10000
 weapons.missiles.AGM_84A,200
 weapons.missiles.P_33E,200
-weapons.missiles.Ataka_9M120,17800
+weapons.missiles.Ataka_9M120,18600
 weapons.bombs.MK76,200
 weapons.bombs.AB_250_2_SD_2,200
 weapons.missiles.Rb 05A,200
@@ -194,7 +194,7 @@ weapons.containers.wmd7,10000
 weapons.missiles.AIM-7E-2,200
 weapons.nurs.HVAR,10000
 weapons.droptanks.PTB-800-MIG21,10000
-weapons.missiles.AGM_114,2285
+weapons.missiles.AGM_114,2413
 weapons.containers.HB_ORD_Pave_Spike_Fast,10000
 weapons.bombs.British_GP_500LB_Bomb_Mk1,200
 weapons.bombs.M_117,200
@@ -349,7 +349,7 @@ weapons.nurs.Tiny Tim,10000
 weapons.missiles.X_22,200
 weapons.containers.FAS,10000
 weapons.nurs.S-25-O,10000
-weapons.missiles.OH58D_FIM_92,1606
+weapons.missiles.OH58D_FIM_92,1670
 weapons.droptanks.HB_F-4E_EXT_Center_Fuel_Tank_EMPTY,10000
 weapons.droptanks.HB_F-4E_EXT_WingTank_EMPTY,10000
 weapons.missiles.X_31P,200
@@ -405,8 +405,8 @@ weapons.containers.{EclairM_42},10000
 weapons.nurs.S5MO_HEFRAG_FFAR,10000
 weapons.nurs.HYDRA_70_M229,9898
 weapons.missiles.Super_530D,200
-weapons.nurs.C_13,23200
-weapons.nurs.HYDRA_70_M151,27600
+weapons.nurs.C_13,23800
+weapons.nurs.HYDRA_70_M151,28400
 weapons.missiles.HOT3_MBDA,200
 weapons.missiles.AIM-9J,200
 weapons.bombs.250-2,200
@@ -415,7 +415,7 @@ weapons.droptanks.AV8BNA_AERO1D_EMPTY,10000
 weapons.bombs.Mk_84AIR_GP,200
 weapons.missiles.R-13M,200
 weapons.bombs.SC_500_J,200
-weapons.nurs.C_8OFP2,27560
+weapons.nurs.C_8OFP2,28360
 weapons.bombs.OH58D_White_Smoke_Grenade,200
 weapons.containers.F-18-LDT-POD,10000
 weapons.nurs.SNEB_TYPE254_F1B_RED,10000
@@ -435,7 +435,7 @@ weapons.missiles.R-13M1,200
 weapons.missiles.RB75T,200
 weapons.bombs.FAB_100SV,200
 weapons.missiles.AIM_54A_Mk60,200
-weapons.missiles.AGM_114K,2356
+weapons.missiles.AGM_114K,2484
 weapons.missiles.ALARM,200
 weapons.bombs.Mk_83,200
 weapons.containers.KBpod,10000
@@ -500,7 +500,7 @@ weapons.containers.{F4U1D_SMOKE_WHITE},10000
 weapons.droptanks.PTB400_MIG19,10000
 weapons.missiles.P_73,200
 weapons.bombs.AB_500_1_SD_10A,200
-weapons.missiles.R-60,1622
+weapons.missiles.R-60,1686
 weapons.missiles.AGM_119,200
 weapons.nurs.ARAKM70BAP,10000
 weapons.nurs.C_8CM_YE,10000
@@ -520,7 +520,7 @@ weapons.bombs.BetAB_500ShP,200
 weapons.nurs.HYDRA_70_M274,10000
 weapons.missiles.P_24R,200
 weapons.containers.MPS-410,10000
-weapons.missiles.Igla_1E,1618
+weapons.missiles.Igla_1E,1682
 weapons.bombs.LYSBOMB 11086,200
 weapons.nurs.C_24,10000
 weapons.containers.MATRA-PHIMAT,10000
