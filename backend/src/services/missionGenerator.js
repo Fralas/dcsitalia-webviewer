@@ -1,4 +1,4 @@
-import { missionRules, isImportantWeapon } from '../config/rules.config.js';
+import { missionRules, isImportantWeapon, getPriority, getSupplyQuantityForPriority } from '../config/rules.config.js';
 import { getMainBase } from '../config/airports.config.js';
 import * as historicalData from './historicalData.js';
 
@@ -35,8 +35,10 @@ export function checkAndGenerateMissions(airportId, weapons) {
       return;
     }
 
-    // Generate mission
-    const quantityNeeded = missionRules.mission.defaultSupplyQuantity;
+    // Calculate priority and quantity needed based on current quantity
+    const priority = getPriority(weapon.quantity);
+    const quantityNeeded = getSupplyQuantityForPriority(priority);
+
     const missionId = historicalData.createMission(
       airportId,
       weapon.item,
@@ -45,7 +47,7 @@ export function checkAndGenerateMissions(airportId, weapons) {
       missionRules.mission.missionExpiry
     );
 
-    console.log(`✈️  Generated mission ${missionId} for ${weapon.item} at ${airportId} (current: ${weapon.quantity}, needed: ${quantityNeeded})`);
+    console.log(`✈️  Generated ${priority.toUpperCase()} mission ${missionId} for ${weapon.item} at ${airportId} (current: ${weapon.quantity}, needed: ${quantityNeeded})`);
     generatedMissions.push(missionId);
   });
 

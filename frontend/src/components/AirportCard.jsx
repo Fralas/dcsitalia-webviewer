@@ -66,6 +66,27 @@ export default function AirportCard({ airport, missions = [] }) {
 
   const { weapons = [], liquids = [] } = airport.data;
 
+  // Get suggested quantity based on priority
+  const getSuggestedQuantity = (weaponId) => {
+    const weapon = weapons.find(w => w.item === weaponId);
+    if (!weapon) return 100;
+
+    const quantity = weapon.quantity;
+    if (quantity <= 5) return 150;  // CRITICAL
+    if (quantity <= 20) return 100; // HIGH
+    if (quantity <= 50) return 50;  // MEDIUM
+    return 100; // Default
+  };
+
+  // Handle weapon selection
+  const handleWeaponSelect = (weaponId) => {
+    setSelectedWeapon(weaponId);
+    if (weaponId) {
+      const suggestedQty = getSuggestedQuantity(weaponId);
+      setOrderQuantity(suggestedQty);
+    }
+  };
+
   // Handle order creation
   const handleCreateOrder = async () => {
     if (!selectedWeapon || orderQuantity <= 0) {
@@ -333,21 +354,32 @@ export default function AirportCard({ airport, missions = [] }) {
                 <label className="block text-sm text-gray-300 mb-2">Seleziona Arma</label>
                 <select
                   value={selectedWeapon}
-                  onChange={(e) => setSelectedWeapon(e.target.value)}
+                  onChange={(e) => handleWeaponSelect(e.target.value)}
                   className="w-full bg-slate-900 text-white border border-gray-600 rounded px-3 py-2 focus:outline-none focus:border-green-500"
                 >
                   <option value="">-- Seleziona --</option>
-                  {weapons.map((weapon, idx) => (
-                    <option key={idx} value={weapon.item}>
-                      {getWeaponDisplayName(weapon.item)} (Attuale: {weapon.quantity})
-                    </option>
-                  ))}
+                  {weapons.map((weapon, idx) => {
+                    const status = getWeaponStatus(weapon.quantity, importantWeaponIds.includes(weapon.item));
+                    const priorityLabel = status === 'critical' ? '🔴 CRITICAL' : status === 'high' ? '🟠 HIGH' : status === 'medium' ? '🟡 MEDIUM' : '';
+                    return (
+                      <option key={idx} value={weapon.item}>
+                        {getWeaponDisplayName(weapon.item)} (Attuale: {weapon.quantity}) {priorityLabel}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
               {/* Quantity Input */}
               <div>
-                <label className="block text-sm text-gray-300 mb-2">Quantità da Ordinare</label>
+                <label className="block text-sm text-gray-300 mb-2">
+                  Quantità da Ordinare
+                  {selectedWeapon && (
+                    <span className="text-xs text-gray-500 ml-2">
+                      (Suggerito: {getSuggestedQuantity(selectedWeapon)})
+                    </span>
+                  )}
+                </label>
                 <input
                   type="number"
                   value={orderQuantity}

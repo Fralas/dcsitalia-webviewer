@@ -50,7 +50,14 @@ export const missionRules = {
 
   // Mission generation settings
   mission: {
-    // Default supply quantity to request
+    // Supply quantities based on priority
+    supplyQuantityByPriority: {
+      critical: 150,   // CRITICAL priority (quantity <= 5)
+      high: 100,       // HIGH priority (quantity <= 20)
+      medium: 50,      // MEDIUM priority (quantity <= 50)
+    },
+
+    // Default supply quantity (fallback if priority can't be determined)
     defaultSupplyQuantity: 100,
 
     // Minimum time between missions for same weapon (minutes)
@@ -76,6 +83,13 @@ export function getPriority(quantity) {
   if (quantity <= missionRules.highThreshold) return 'high';
   if (quantity <= missionRules.mediumThreshold) return 'medium';
   return 'ok';
+}
+
+/**
+ * Get supply quantity based on priority
+ */
+export function getSupplyQuantityForPriority(priority) {
+  return missionRules.mission.supplyQuantityByPriority[priority] || missionRules.mission.defaultSupplyQuantity;
 }
 
 export default missionRules;

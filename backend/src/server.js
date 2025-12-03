@@ -7,7 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import airports from './config/airports.config.js';
-import { isImportantWeapon } from './config/rules.config.js';
+import { isImportantWeapon, getPriority, getSupplyQuantityForPriority } from './config/rules.config.js';
 import * as csvParser from './services/csvParser.js';
 import * as historicalData from './services/historicalData.js';
 import * as missionGenerator from './services/missionGenerator.js';
@@ -319,11 +319,11 @@ app.post('/api/test/generate-random-missions', (req, res) => {
  * Body: { weaponId, quantity }
  */
 app.post('/api/airports/:id/create-order', (req, res) => {
-  const { weaponId, quantity } = req.body;
+  let { weaponId, quantity } = req.body;
   const airportId = req.params.id;
 
-  if (!weaponId || !quantity) {
-    return res.status(400).json({ error: 'weaponId and quantity are required' });
+  if (!weaponId) {
+    return res.status(400).json({ error: 'weaponId is required' });
   }
 
   // Check if airport exists
@@ -349,6 +349,13 @@ app.post('/api/airports/:id/create-order', (req, res) => {
     if (weaponData) {
       currentQuantity = weaponData.quantity;
     }
+  }
+
+  // If quantity not specified or is 0, calculate based on priority
+  if (!quantity || quantity <= 0) {
+    const priority = getPriority(currentQuantity);
+    quantity = getSupplyQuantityForPriority(priority);
+    console.log(`📊 Auto-calculated quantity for ${weaponId}: ${quantity} (priority: ${priority.toUpperCase()}, current: ${currentQuantity})`);
   }
 
   // Create order
