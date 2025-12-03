@@ -212,9 +212,9 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
   // Handle mission selection
   const handleSelectMission = (missionId) => {
     if (selectedMission === missionId) {
-      // Second click - navigate to Missions page
+      // Second click - navigate to Missions page with mission ID
       if (onNavigateToMissions) {
-        onNavigateToMissions();
+        onNavigateToMissions(missionId);
       }
     } else {
       // First click - select mission

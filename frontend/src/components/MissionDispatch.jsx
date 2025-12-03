@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Plane, Clock, User, CheckCircle, XCircle, AlertTriangle, Package, ArrowRight } from 'lucide-react';
 import * as api from '../services/api';
 import { getAirportName } from '../config/airports';
@@ -36,14 +36,28 @@ function PriorityBadge({ currentQuantity }) {
 /**
  * Mission Card Component
  */
-function MissionCard({ mission, airports, onUpdate }) {
+function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
   const [loading, setLoading] = useState(false);
   const [userName, setUserName] = useState('');
   const [showAccept, setShowAccept] = useState(false);
+  const cardRef = useRef(null);
 
   const airport = airports.find(a => a.id === mission.airport_id);
   const timeAgo = getTimeAgo(mission.created_at);
   const expiresIn = getTimeRemaining(mission.expires_at);
+
+  // Scroll to and highlight this card when isHighlighted is true
+  useEffect(() => {
+    if (isHighlighted && cardRef.current) {
+      // Small delay to ensure the element is rendered
+      setTimeout(() => {
+        cardRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+      }, 100);
+    }
+  }, [isHighlighted]);
 
   const handleAccept = async () => {
     if (!userName.trim()) {
@@ -92,7 +106,14 @@ function MissionCard({ mission, airports, onUpdate }) {
   };
 
   return (
-    <div className={`bg-slate-800 rounded-lg border-2 ${mission.status === 'accepted' ? 'border-blue-500' : 'border-gray-700'} p-4`}>
+    <div
+      ref={cardRef}
+      className={`bg-slate-800 rounded-lg border-2 p-4 transition-all duration-500 ${
+        mission.status === 'accepted' ? 'border-blue-500' : 'border-gray-700'
+      } ${
+        isHighlighted ? 'ring-4 ring-yellow-400 shadow-lg shadow-yellow-400/50 scale-105' : ''
+      }`}
+    >
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-blue-500/20 rounded">
@@ -231,7 +252,7 @@ function MissionCard({ mission, airports, onUpdate }) {
 /**
  * Mission Dispatch Component
  */
-export default function MissionDispatch({ missions, airports, onUpdate }) {
+export default function MissionDispatch({ missions, airports, onUpdate, highlightedMissionId }) {
   const [filter, setFilter] = useState('all'); // all, pending, accepted
 
   const filteredMissions = missions.filter(m => {
@@ -314,6 +335,7 @@ export default function MissionDispatch({ missions, airports, onUpdate }) {
               mission={mission}
               airports={airports}
               onUpdate={onUpdate}
+              isHighlighted={mission.id === highlightedMissionId}
             />
           ))}
         </div>

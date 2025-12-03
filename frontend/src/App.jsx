@@ -15,6 +15,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('connecting');
+  const [highlightedMissionId, setHighlightedMissionId] = useState(null);
 
   // Load initial data
   useEffect(() => {
@@ -207,13 +208,19 @@ function App() {
             missions={missions}
             airports={Object.values(airports)}
             onUpdate={handleMissionUpdate}
+            highlightedMissionId={highlightedMissionId}
           />
         )}
         {currentView === 'map' && (
           <MapView
             missions={missions}
             airportsData={Object.values(airports)}
-            onNavigateToMissions={() => setCurrentView('missions')}
+            onNavigateToMissions={(missionId) => {
+              setHighlightedMissionId(missionId);
+              setCurrentView('missions');
+              // Reset highlighted mission after navigation
+              setTimeout(() => setHighlightedMissionId(null), 3000);
+            }}
           />
         )}
         {currentView === 'admin' && (
