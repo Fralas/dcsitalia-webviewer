@@ -6,14 +6,17 @@
  * Distances calculated using Euclidean distance in Nautical Miles
  */
 export const airports = [
+  // ==== MAIN BASE (Turkey) ====
   {
     id: 'adana-sakirpasa',
     name: 'Adana Sakirpasa',
     displayName: 'Adana Sakirpasa',
     isMainBase: true, // Main base with infinite supplies
-    csvPrefix: 'Adana Sakirpasa', // Prefix used in CSV filenames
+    csvPrefix: 'Adana Sakirpasa',
     coordinates: { lat: 36.982222, lon: 35.281111 }, // 36°58'55"N, 35°16'52"E
   },
+
+  // ==== TURKEY AIRPORTS ====
   {
     id: 'incirlik',
     name: 'Incirlik',
@@ -22,6 +25,114 @@ export const airports = [
     csvPrefix: 'Incirlik',
     coordinates: { lat: 37.000000, lon: 35.425833 }, // 37°00'00"N, 35°25'33"E
   },
+  {
+    id: 'gaziantep',
+    name: 'Gaziantep',
+    displayName: 'Gaziantep',
+    isMainBase: false,
+    csvPrefix: 'Gaziantep',
+    coordinates: { lat: 36.947222, lon: 37.478611 }, // 36°56'50"N, 37°28'43"E
+  },
+  {
+    id: 'hatay',
+    name: 'Hatay',
+    displayName: 'Hatay',
+    isMainBase: false,
+    csvPrefix: 'Hatay',
+    coordinates: { lat: 36.362778, lon: 36.282222 }, // 36°21'46"N, 36°16'56"E
+  },
+  {
+    id: 'sanliurfa',
+    name: 'Sanliurfa',
+    displayName: 'Sanliurfa',
+    isMainBase: false,
+    csvPrefix: 'Sanliurfa',
+    coordinates: { lat: 37.094444, lon: 38.847222 }, // 37°05'40"N, 38°50'50"E
+  },
+
+  // ==== SYRIA AIRPORTS ====
+  {
+    id: 'aleppo',
+    name: 'Aleppo',
+    displayName: 'Aleppo International',
+    isMainBase: false,
+    csvPrefix: 'Aleppo',
+    coordinates: { lat: 36.180833, lon: 37.224444 }, // 36°10'51"N, 37°13'28"E
+  },
+  {
+    id: 'bassel-al-assad',
+    name: 'Bassel Al-Assad',
+    displayName: 'Bassel Al-Assad (Latakia)',
+    isMainBase: false,
+    csvPrefix: 'Bassel Al-Assad',
+    coordinates: { lat: 35.401111, lon: 35.948611 }, // 35°24'04"N, 35°56'55"E
+  },
+  {
+    id: 'abu-al-duhur',
+    name: 'Abu al-Duhur',
+    displayName: 'Abu al-Duhur',
+    isMainBase: false,
+    csvPrefix: 'Abu al-Duhur',
+    coordinates: { lat: 35.732500, lon: 37.103056 }, // 35°43'57"N, 37°06'11"E
+  },
+  {
+    id: 'jirah',
+    name: 'Jirah',
+    displayName: 'Jirah',
+    isMainBase: false,
+    csvPrefix: 'Jirah',
+    coordinates: { lat: 36.098333, lon: 37.935278 }, // 36°05'54"N, 37°56'07"E
+  },
+  {
+    id: 'kuweires',
+    name: 'Kuweires',
+    displayName: 'Kuweires',
+    isMainBase: false,
+    csvPrefix: 'Kuweires',
+    coordinates: { lat: 36.181944, lon: 37.576667 }, // 36°10'55"N, 37°34'36"E
+  },
+  {
+    id: 'minakh',
+    name: 'Minakh',
+    displayName: 'Minakh',
+    isMainBase: false,
+    csvPrefix: 'Minakh',
+    coordinates: { lat: 36.520000, lon: 36.988889 }, // 36°31'12"N, 36°59'20"E
+  },
+  {
+    id: 'tabqa',
+    name: 'Tabqa',
+    displayName: 'Tabqa',
+    isMainBase: false,
+    csvPrefix: 'Tabqa',
+    coordinates: { lat: 35.756389, lon: 38.566111 }, // 35°45'23"N, 38°33'58"E
+  },
+  {
+    id: 'taftanaz',
+    name: 'Taftanaz',
+    displayName: 'Taftanaz',
+    isMainBase: false,
+    csvPrefix: 'Taftanaz',
+    coordinates: { lat: 36.018611, lon: 36.777778 }, // 36°01'07"N, 36°46'40"E
+  },
+  {
+    id: 'kharab-ishk',
+    name: 'Kharab Ishk',
+    displayName: 'Kharab Ishk',
+    isMainBase: false,
+    csvPrefix: 'Kharab Ishk',
+    coordinates: { lat: 36.528889, lon: 37.078611 }, // 36°31'44"N, 37°04'43"E
+  },
+  {
+    id: 'tal-siman',
+    name: 'Tal Siman',
+    displayName: 'Tal Siman',
+    isMainBase: false,
+    csvPrefix: 'Tal Siman',
+    coordinates: { lat: 36.150000, lon: 37.450000 }, // 36°09'00"N, 37°27'00"E
+  },
+
+  // ==== FARP ====
   {
     id: 'farp-base',
     name: 'FARP_BASE',
