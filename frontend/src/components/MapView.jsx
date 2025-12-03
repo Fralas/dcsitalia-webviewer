@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -14,7 +14,7 @@ function getWeaponDisplayName(weaponId) {
 }
 
 /**
- * Component to fit bounds of all airports
+ * Component to fit bounds of all airports (only on mount)
  */
 function FitBounds({ positions }) {
   const map = useMap();
@@ -24,7 +24,8 @@ function FitBounds({ positions }) {
       const bounds = L.latLngBounds(positions);
       map.fitBounds(bounds, { padding: [50, 50] });
     }
-  }, [map, positions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map]); // Only run once on mount
 
   return null;
 }
@@ -195,13 +196,18 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
   const [hoveredMission, setHoveredMission] = useState(null);
   const [selectedMission, setSelectedMission] = useState(null);
 
-  // Calculate center and bounds
-  const validAirports = airports.filter(a => a.coordinates);
-  const center = validAirports.length > 0
-    ? [validAirports[0].coordinates.lat, validAirports[0].coordinates.lon]
-    : [37.0, 35.5];
+  // Memoize airports calculations to prevent re-renders
+  const validAirports = useMemo(() => airports.filter(a => a.coordinates), []);
 
-  const allPositions = validAirports.map(a => [a.coordinates.lat, a.coordinates.lon]);
+  const center = useMemo(() =>
+    validAirports.length > 0
+      ? [validAirports[0].coordinates.lat, validAirports[0].coordinates.lon]
+      : [37.0, 35.5]
+  , [validAirports]);
+
+  const allPositions = useMemo(() =>
+    validAirports.map(a => [a.coordinates.lat, a.coordinates.lon])
+  , [validAirports]);
 
   // Handle mission selection
   const handleSelectMission = (missionId) => {
