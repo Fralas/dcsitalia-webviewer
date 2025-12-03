@@ -26,7 +26,7 @@ const airports = [
     name: 'Gaziantep',
     displayName: 'Gaziantep',
     isMainBase: false,
-    coordinates: { lat: 36.947222, lon: 37.478611 },
+    coordinates: { lat: 36.947222, lon: 37.471389 },
   },
   {
     id: 'hatay',
@@ -40,7 +40,7 @@ const airports = [
     name: 'Sanliurfa',
     displayName: 'Sanliurfa',
     isMainBase: false,
-    coordinates: { lat: 37.094444, lon: 38.847222 },
+    coordinates: { lat: 37.441111, lon: 38.902778 },
   },
 
   // ==== SYRIA AIRPORTS ====
@@ -84,7 +84,7 @@ const airports = [
     name: 'Minakh',
     displayName: 'Minakh',
     isMainBase: false,
-    coordinates: { lat: 36.520000, lon: 36.988889 },
+    coordinates: { lat: 36.520000, lon: 37.039444 },
   },
   {
     id: 'tabqa',
@@ -98,21 +98,21 @@ const airports = [
     name: 'Taftanaz',
     displayName: 'Taftanaz',
     isMainBase: false,
-    coordinates: { lat: 36.018611, lon: 36.777778 },
+    coordinates: { lat: 35.972500, lon: 36.783333 },
   },
   {
     id: 'kharab-ishk',
     name: 'Kharab Ishk',
     displayName: 'Kharab Ishk',
     isMainBase: false,
-    coordinates: { lat: 36.528889, lon: 37.078611 },
+    coordinates: { lat: 36.544722, lon: 38.587222 },
   },
   {
     id: 'tal-siman',
     name: 'Tal Siman',
     displayName: 'Tal Siman',
     isMainBase: false,
-    coordinates: { lat: 36.150000, lon: 37.450000 },
+    coordinates: { lat: 36.260278, lon: 38.929444 },
   },
 
   // ==== FARP ====

@@ -31,7 +31,7 @@ export const airports = [
     displayName: 'Gaziantep',
     isMainBase: false,
     csvPrefix: 'Gaziantep',
-    coordinates: { lat: 36.947222, lon: 37.478611 }, // 36°56'50"N, 37°28'43"E
+    coordinates: { lat: 36.947222, lon: 37.471389 }, // 36°56'50"N, 37°28'17"E
   },
   {
     id: 'hatay',
@@ -47,7 +47,7 @@ export const airports = [
     displayName: 'Sanliurfa',
     isMainBase: false,
     csvPrefix: 'Sanliurfa',
-    coordinates: { lat: 37.094444, lon: 38.847222 }, // 37°05'40"N, 38°50'50"E
+    coordinates: { lat: 37.441111, lon: 38.902778 }, // 37°26'28"N, 38°54'10"E
   },
 
   // ==== SYRIA AIRPORTS ====
@@ -97,7 +97,7 @@ export const airports = [
     displayName: 'Minakh',
     isMainBase: false,
     csvPrefix: 'Minakh',
-    coordinates: { lat: 36.520000, lon: 36.988889 }, // 36°31'12"N, 36°59'20"E
+    coordinates: { lat: 36.520000, lon: 37.039444 }, // 36°31'12"N, 37°02'22"E
   },
   {
     id: 'tabqa',
@@ -113,7 +113,7 @@ export const airports = [
     displayName: 'Taftanaz',
     isMainBase: false,
     csvPrefix: 'Taftanaz',
-    coordinates: { lat: 36.018611, lon: 36.777778 }, // 36°01'07"N, 36°46'40"E
+    coordinates: { lat: 35.972500, lon: 36.783333 }, // 35°58'21"N, 36°47'00"E
   },
   {
     id: 'kharab-ishk',
@@ -121,7 +121,7 @@ export const airports = [
     displayName: 'Kharab Ishk',
     isMainBase: false,
     csvPrefix: 'Kharab Ishk',
-    coordinates: { lat: 36.528889, lon: 37.078611 }, // 36°31'44"N, 37°04'43"E
+    coordinates: { lat: 36.544722, lon: 38.587222 }, // 36°32'41"N, 38°35'14"E
   },
   {
     id: 'tal-siman',
@@ -129,7 +129,7 @@ export const airports = [
     displayName: 'Tal Siman',
     isMainBase: false,
     csvPrefix: 'Tal Siman',
-    coordinates: { lat: 36.150000, lon: 37.450000 }, // 36°09'00"N, 37°27'00"E
+    coordinates: { lat: 36.260278, lon: 38.929444 }, // 36°15'37"N, 38°55'46"E
   },
 
   // ==== FARP ====
