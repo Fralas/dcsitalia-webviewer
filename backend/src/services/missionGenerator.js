@@ -24,8 +24,8 @@ export function checkAndGenerateMissions(airportId, weapons) {
       return;
     }
 
-    // Check if quantity is below threshold
-    if (weapon.quantity > missionRules.criticalThreshold) {
+    // Check if quantity is below medium threshold (generates for CRITICAL, HIGH, MEDIUM)
+    if (weapon.quantity > missionRules.mediumThreshold) {
       return;
     }
 
