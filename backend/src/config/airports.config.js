@@ -2,11 +2,13 @@
  * Airport Configuration
  * Add new airports here to make them visible in the system
  *
- * Coordinates are in decimal degrees (converted from DMS)
+ * Coordinates are in decimal degrees (converted from DMS) 
+ * Tool to convert DMS to decimal: https://www.latlong.net/lat-long-dms.html
  * Distances calculated using Euclidean distance in Nautical Miles
- *
+ * 
  * isHeliport: true if this is a heliport/FARP (only helicopters can land)
  * herculesBase: true if C-130 Hercules can spawn/operate from this base
+ * 
  */
 export const airports = [
   // ==== MAIN BASE (Turkey) ====
