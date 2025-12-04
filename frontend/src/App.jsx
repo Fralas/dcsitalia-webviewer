@@ -144,7 +144,7 @@ function App() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-white">DCS Warehouse Viewer</h1>
-                <p className="text-sm text-gray-400">Logistics Management System</p>
+                <p className="text-sm text-gray-400">Sistema di Gestione Logistica</p>
               </div>
             </div>
 
@@ -152,7 +152,9 @@ function App() {
               {/* Connection Status */}
               <div className="flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full ${connectionStatus === 'connected' ? 'bg-green-400' : connectionStatus === 'disconnected' ? 'bg-red-400' : 'bg-yellow-400'}`} />
-                <span className="text-sm text-gray-400 capitalize">{connectionStatus}</span>
+                <span className="text-sm text-gray-400 capitalize">
+                  {connectionStatus === 'connected' ? 'connesso' : connectionStatus === 'disconnected' ? 'disconnesso' : 'connessione...'}
+                </span>
               </div>
 
               {/* Navigation */}
@@ -168,7 +170,7 @@ function App() {
                 className={`px-4 py-2 rounded font-bold flex items-center gap-2 ${currentView === 'missions' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-gray-300 hover:bg-slate-700'}`}
               >
                 <Package className="w-4 h-4" />
-                Missions
+                Missioni
                 {stats.activeMissions > 0 && (
                   <span className="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
                     {stats.activeMissions}

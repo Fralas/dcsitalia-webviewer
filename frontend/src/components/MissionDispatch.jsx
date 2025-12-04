@@ -17,13 +17,13 @@ function PriorityBadge({ currentQuantity }) {
   let color, text;
   if (currentQuantity <= 5) {
     color = 'bg-red-500/20 text-red-400 border-red-500';
-    text = 'CRITICAL';
+    text = 'CRITICA';
   } else if (currentQuantity <= 20) {
     color = 'bg-orange-500/20 text-orange-400 border-orange-500';
-    text = 'HIGH';
+    text = 'ALTA';
   } else {
     color = 'bg-yellow-500/20 text-yellow-400 border-yellow-500';
-    text = 'MEDIUM';
+    text = 'MEDIA';
   }
 
   return (
@@ -61,7 +61,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
 
   const handleAccept = async () => {
     if (!userName.trim()) {
-      alert('Please enter your name');
+      alert('Inserisci il tuo nome');
       return;
     }
 
@@ -71,35 +71,35 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
       onUpdate();
       setShowAccept(false);
     } catch (error) {
-      alert(`Failed to accept mission: ${error.message}`);
+      alert(`Errore nell'accettare la missione: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
   const handleComplete = async () => {
-    if (!confirm('Mark this mission as completed?')) return;
+    if (!confirm('Segnare questa missione come completata?')) return;
 
     setLoading(true);
     try {
       await api.completeMission(mission.id);
       onUpdate();
     } catch (error) {
-      alert(`Failed to complete mission: ${error.message}`);
+      alert(`Errore nel completare la missione: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
   const handleCancel = async () => {
-    if (!confirm('Cancel this mission?')) return;
+    if (!confirm('Annullare questa missione?')) return;
 
     setLoading(true);
     try {
       await api.cancelMission(mission.id);
       onUpdate();
     } catch (error) {
-      alert(`Failed to cancel mission: ${error.message}`);
+      alert(`Errore nell'annullare la missione: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -120,12 +120,12 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
             <Plane className="w-6 h-6 text-blue-400" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-white">{airport?.displayName || airport?.name || 'Unknown Airport'}</h3>
+            <h3 className="text-lg font-bold text-white">{airport?.displayName || airport?.name || 'Aeroporto Sconosciuto'}</h3>
             <div className="flex items-center gap-2 text-sm text-gray-400">
               <Clock className="w-4 h-4" />
-              <span>Created {timeAgo}</span>
+              <span>Creata {timeAgo}</span>
               <span className="text-gray-600">•</span>
-              <span className="text-yellow-400">Expires in {expiresIn}</span>
+              <span className="text-yellow-400">Scade tra {expiresIn}</span>
             </div>
           </div>
         </div>
@@ -135,25 +135,25 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
       <div className="bg-slate-900/50 rounded p-3 mb-3">
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div>
-            <div className="text-gray-400 mb-1">Weapon</div>
+            <div className="text-gray-400 mb-1">Arma</div>
             <div className="font-mono text-white font-bold">{getWeaponDisplayName(mission.weapon_id)}</div>
           </div>
           <div>
-            <div className="text-gray-400 mb-1">Current Stock</div>
+            <div className="text-gray-400 mb-1">Scorte Attuali</div>
             <div className="text-2xl font-bold text-red-400">{mission.current_quantity}</div>
           </div>
           <div>
-            <div className="text-gray-400 mb-1">Quantity Needed</div>
+            <div className="text-gray-400 mb-1">Quantità Richiesta</div>
             <div className="text-2xl font-bold text-green-400">{mission.quantity_needed}</div>
           </div>
           <div>
-            <div className="text-gray-400 mb-1">Status</div>
+            <div className="text-gray-400 mb-1">Stato</div>
             <div className="flex items-center gap-1">
               {mission.status === 'pending' && (
-                <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs font-bold">PENDING</span>
+                <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs font-bold">IN ATTESA</span>
               )}
               {mission.status === 'accepted' && (
-                <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-bold">ACCEPTED</span>
+                <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-bold">ACCETTATA</span>
               )}
             </div>
           </div>
@@ -163,11 +163,11 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
         <div className="mt-3 pt-3 border-t border-gray-700">
           <div className="flex items-center gap-2 text-sm bg-slate-800/50 px-3 py-2 rounded">
             <Plane className="w-4 h-4 text-gray-400" />
-            <span className="text-blue-400 font-semibold">From:</span>
-            <span className="text-white">{mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Main Base'}</span>
+            <span className="text-blue-400 font-semibold">Da:</span>
+            <span className="text-white">{mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Base Principale'}</span>
             <ArrowRight className="w-4 h-4 text-gray-500" />
-            <span className="text-green-400 font-semibold">To:</span>
-            <span className="text-white">{airport?.displayName || airport?.name || 'Unknown'}</span>
+            <span className="text-green-400 font-semibold">A:</span>
+            <span className="text-white">{airport?.displayName || airport?.name || 'Sconosciuto'}</span>
             {mission.distance_nm && (
               <>
                 <span className="text-gray-500">•</span>
@@ -180,7 +180,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
         {mission.status === 'accepted' && mission.accepted_by && (
           <div className="mt-3 pt-3 border-t border-gray-700 flex items-center gap-2 text-sm">
             <User className="w-4 h-4 text-gray-400" />
-            <span className="text-gray-400">Accepted by:</span>
+            <span className="text-gray-400">Accettata da:</span>
             <span className="text-white font-bold">{mission.accepted_by}</span>
           </div>
         )}
@@ -194,7 +194,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
             className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded font-bold transition-colors flex items-center justify-center gap-2"
           >
             <CheckCircle className="w-4 h-4" />
-            Accept Mission
+            Accetta Missione
           </button>
         )}
 
@@ -202,7 +202,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
           <div className="flex-1 flex gap-2">
             <input
               type="text"
-              placeholder="Your name..."
+              placeholder="Il tuo nome..."
               value={userName}
               onChange={(e) => setUserName(e.target.value)}
               className="flex-1 px-3 py-2 bg-slate-900 border border-gray-700 rounded text-white"
@@ -213,14 +213,14 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
               disabled={loading}
               className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded font-bold transition-colors"
             >
-              Confirm
+              Conferma
             </button>
             <button
               onClick={() => setShowAccept(false)}
               disabled={loading}
               className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
             >
-              Cancel
+              Annulla
             </button>
           </div>
         )}
@@ -232,7 +232,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
             className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded font-bold transition-colors flex items-center justify-center gap-2"
           >
             <CheckCircle className="w-4 h-4" />
-            Complete Mission
+            Completa Missione
           </button>
         )}
 
@@ -242,7 +242,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
           className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white rounded font-bold transition-colors flex items-center justify-center gap-2"
         >
           <XCircle className="w-4 h-4" />
-          Cancel
+          Annulla
         </button>
       </div>
     </div>
@@ -277,22 +277,22 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
               <Package className="w-8 h-8 text-purple-400" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-white">Mission Dispatch</h2>
-              <p className="text-gray-400">Manage supply missions</p>
+              <h2 className="text-2xl font-bold text-white">Gestione Missioni</h2>
+              <p className="text-gray-400">Gestisci le missioni di rifornimento</p>
             </div>
           </div>
           <div className="flex gap-4">
             <div className="text-center">
               <div className="text-3xl font-bold text-yellow-400">{stats.pending}</div>
-              <div className="text-xs text-gray-400">Pending</div>
+              <div className="text-xs text-gray-400">In Attesa</div>
             </div>
             <div className="text-center">
               <div className="text-3xl font-bold text-blue-400">{stats.accepted}</div>
-              <div className="text-xs text-gray-400">Accepted</div>
+              <div className="text-xs text-gray-400">Accettate</div>
             </div>
             <div className="text-center">
               <div className="text-3xl font-bold text-red-400">{stats.critical}</div>
-              <div className="text-xs text-gray-400">Critical</div>
+              <div className="text-xs text-gray-400">Critiche</div>
             </div>
           </div>
         </div>
@@ -303,19 +303,19 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
             onClick={() => setFilter('all')}
             className={`px-4 py-2 rounded font-bold ${filter === 'all' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
           >
-            All ({stats.pending + stats.accepted})
+            Tutte ({stats.pending + stats.accepted})
           </button>
           <button
             onClick={() => setFilter('pending')}
             className={`px-4 py-2 rounded font-bold ${filter === 'pending' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
           >
-            Pending ({stats.pending})
+            In Attesa ({stats.pending})
           </button>
           <button
             onClick={() => setFilter('accepted')}
             className={`px-4 py-2 rounded font-bold ${filter === 'accepted' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
           >
-            Accepted ({stats.accepted})
+            Accettate ({stats.accepted})
           </button>
         </div>
       </div>
@@ -324,8 +324,8 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
       {filteredMissions.length === 0 ? (
         <div className="bg-slate-800 rounded-lg p-12 text-center border border-gray-700">
           <Package className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-          <p className="text-xl text-gray-400">No missions available</p>
-          <p className="text-sm text-gray-500 mt-2">Missions will appear here when supplies are low</p>
+          <p className="text-xl text-gray-400">Nessuna missione disponibile</p>
+          <p className="text-sm text-gray-500 mt-2">Le missioni appariranno qui quando le scorte saranno basse</p>
         </div>
       ) : (
         <div className="space-y-3">

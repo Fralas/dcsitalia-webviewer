@@ -177,7 +177,7 @@ export default function AirportCard({ airport, missions = [] }) {
             <div>
               <h3 className="text-lg font-bold text-white">{airport.displayName || airport.name}</h3>
               {airport.isMainBase && (
-                <span className="text-xs text-blue-400 font-semibold">MAIN BASE</span>
+                <span className="text-xs text-blue-400 font-semibold">BASE PRINCIPALE</span>
               )}
             </div>
           </div>
@@ -220,19 +220,19 @@ export default function AirportCard({ airport, missions = [] }) {
                 onClick={() => setFilter('all')}
                 className={`px-3 py-1 rounded text-sm ${filter === 'all' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
               >
-                All ({weapons.length})
+                Tutte ({weapons.length})
               </button>
               <button
                 onClick={() => setFilter('important')}
                 className={`px-3 py-1 rounded text-sm ${filter === 'important' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
               >
-                Important ({importantWeaponIds.filter(id => weapons.find(w => w.item === id)).length})
+                Importanti ({importantWeaponIds.filter(id => weapons.find(w => w.item === id)).length})
               </button>
               <button
                 onClick={() => setFilter('critical')}
                 className={`px-3 py-1 rounded text-sm ${filter === 'critical' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
               >
-                Critical ({stats.critical})
+                Critiche ({stats.critical})
               </button>
             </div>
             {!airport.isMainBase && (
