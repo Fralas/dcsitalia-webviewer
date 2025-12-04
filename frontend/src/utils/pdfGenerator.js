@@ -112,7 +112,9 @@ export async function generateChartsPDF(airportId, airportName) {
     }
 
     // Save PDF
-    const filename = `${airportId}_charts_${Date.now()}.pdf`;
+    // Remove all special characters from airportId (keep only letters and numbers)
+    const cleanAirportId = airportId.replace(/[^a-zA-Z0-9]/g, '');
+    const filename = `${cleanAirportId}charts.pdf`;
 
     // Try to save to selected directory first
     const blob = pdf.output('blob');
