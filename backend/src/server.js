@@ -812,6 +812,22 @@ app.get('/api/admin/config/airports', authenticateToken, requireAdmin, (req, res
   }
 });
 
+// ==================== FRONTEND SERVING ====================
+
+// Serve static files from frontend build
+app.use(express.static(path.resolve(__dirname, '../../frontend/dist')));
+
+// SPA fallback - serve index.html for all non-API routes
+app.get('*', (req, res, next) => {
+  // Skip API routes - let them hit 404 handler
+  if (req.path.startsWith('/api/') || req.path.startsWith('/charts/')) {
+    return next();
+  }
+
+  // Serve index.html for all other routes (SPA routing)
+  res.sendFile(path.resolve(__dirname, '../../frontend/dist/index.html'));
+});
+
 // ==================== ERROR HANDLERS ====================
 
 // 404 handler - must be after all routes
