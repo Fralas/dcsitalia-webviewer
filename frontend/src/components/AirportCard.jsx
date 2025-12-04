@@ -4,6 +4,7 @@ import { createOrder } from '../services/api';
 import WeaponChart from './WeaponChart';
 import { getAirportName } from '../config/airports';
 import { generateChartsPDF, checkChartsAvailable } from '../utils/pdfGenerator';
+import { isImportantWeapon } from '../config/weapons';
 
 /**
  * Get weapon display name (remove prefix)
@@ -130,18 +131,8 @@ export default function AirportCard({ airport, missions = [] }) {
     }
   };
 
-  // Important weapons (from config)
-  const importantWeaponIds = [
-    'weapons.missiles.AIM_120C', 'weapons.missiles.AIM_9X', 'weapons.missiles.AGM_65F',
-    'weapons.missiles.AGM_88', 'weapons.missiles.AGM_154A', 'weapons.missiles.AGM_122',
-    'weapons.missiles.AGM_65G', 'weapons.missiles.AGM_65H', 'weapons.missiles.AGM_65D',
-    'weapons.missiles.RB75', 'weapons.missiles.X_58', 'weapons.missiles.X_29T',
-    'weapons.missiles.AGM_65A', 'weapons.missiles.S_25L', 'weapons.missiles.LD_10',
-    'weapons.missiles.Kh25MP_PRGS1VP', 'weapons.nurs.C_13', 'weapons.nurs.C_8OFP2',
-    'weapons.nurs.HYDRA_70_M151', 'weapons.nurs.FFAR Mk5 HEAT', 'weapons.nurs.AGR_20_M282',
-    'weapons.nurs.AGR_20A', 'weapons.missiles.BRM-1_90MM', 'weapons.containers.AN_ASQ_228',
-    'weapons.droptanks.FPU_8A', 'weapons.bombs.GBU_16',
-  ];
+  // Check if this airport is a heliport
+  const isHeliport = airport.isHeliport || false;
 
   // Calculate stats
   const stats = {
@@ -152,7 +143,7 @@ export default function AirportCard({ airport, missions = [] }) {
   };
 
   weapons.forEach(weapon => {
-    const isImportant = importantWeaponIds.includes(weapon.item);
+    const isImportant = isImportantWeapon(weapon.item, isHeliport);
     const status = getWeaponStatus(weapon.quantity, isImportant);
     if (status === 'critical') stats.critical++;
     else if (status === 'high') stats.high++;
@@ -164,18 +155,18 @@ export default function AirportCard({ airport, missions = [] }) {
   let filteredWeapons = weapons;
   if (filter === 'critical') {
     filteredWeapons = weapons.filter(w => {
-      const isImportant = importantWeaponIds.includes(w.item);
+      const isImportant = isImportantWeapon(w.item, isHeliport);
       const status = getWeaponStatus(w.quantity, isImportant);
       return status === 'critical';
     });
   } else if (filter === 'important') {
-    filteredWeapons = weapons.filter(w => importantWeaponIds.includes(w.item));
+    filteredWeapons = weapons.filter(w => isImportantWeapon(w.item, isHeliport));
   }
 
   // Sort by status (critical first)
   filteredWeapons = [...filteredWeapons].sort((a, b) => {
-    const isImportantA = importantWeaponIds.includes(a.item);
-    const isImportantB = importantWeaponIds.includes(b.item);
+    const isImportantA = isImportantWeapon(a.item, isHeliport);
+    const isImportantB = isImportantWeapon(b.item, isHeliport);
     const statusA = getWeaponStatus(a.quantity, isImportantA);
     const statusB = getWeaponStatus(b.quantity, isImportantB);
 
@@ -248,7 +239,7 @@ export default function AirportCard({ airport, missions = [] }) {
                 onClick={() => setFilter('important')}
                 className={`px-3 py-1 rounded text-sm ${filter === 'important' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
               >
-                Importanti ({importantWeaponIds.filter(id => weapons.find(w => w.item === id)).length})
+                Importanti ({weapons.filter(w => isImportantWeapon(w.item, isHeliport)).length})
               </button>
               <button
                 onClick={() => setFilter('critical')}
@@ -367,7 +358,7 @@ export default function AirportCard({ airport, missions = [] }) {
                 </thead>
                 <tbody>
                   {filteredWeapons.map((weapon, idx) => {
-                    const isImportant = importantWeaponIds.includes(weapon.item);
+                    const isImportant = isImportantWeapon(weapon.item, isHeliport);
                     const status = getWeaponStatus(weapon.quantity, isImportant);
 
                     return (
@@ -399,7 +390,7 @@ export default function AirportCard({ airport, missions = [] }) {
               >
                 <option value="">-- Seleziona un'arma per vedere il grafico --</option>
                 {weapons
-                  .filter(w => importantWeaponIds.includes(w.item))
+                  .filter(w => isImportantWeapon(w.item, isHeliport))
                   .map((weapon, idx) => (
                     <option key={idx} value={weapon.item}>
                       {getWeaponDisplayName(weapon.item)} (Attuale: {weapon.quantity})
@@ -462,7 +453,7 @@ export default function AirportCard({ airport, missions = [] }) {
                 >
                   <option value="">-- Seleziona --</option>
                   {weapons.map((weapon, idx) => {
-                    const status = getWeaponStatus(weapon.quantity, importantWeaponIds.includes(weapon.item));
+                    const status = getWeaponStatus(weapon.quantity, isImportantWeapon(weapon.item, isHeliport));
                     const priorityLabel = status === 'critical' ? '🔴 CRITICAL' : status === 'high' ? '🟠 HIGH' : status === 'medium' ? '🟡 MEDIUM' : '';
                     return (
                       <option key={idx} value={weapon.item}>
