@@ -22,8 +22,8 @@ export function checkAndGenerateMissions(recipientAirportId, recipientWeapons, a
   const generatedMissions = [];
 
   recipientWeapons.forEach(weapon => {
-    // Check if weapon is important
-    if (!isImportantWeapon(weapon.item)) {
+    // Check if weapon is important for this type of base (airport vs heliport)
+    if (!isImportantWeapon(weapon.item, recipientAirport.isHeliport)) {
       return;
     }
 

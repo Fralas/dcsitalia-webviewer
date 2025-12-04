@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { isImportantWeapon } from '../config/rules.config.js';
+import { getAirportById } from '../config/airports.config.js';
 
 const DATA_DIR = './data/historical';
 const SNAPSHOTS_FILE = path.join(DATA_DIR, 'snapshots.json');
@@ -72,9 +73,12 @@ function writeMissions(missions) {
  */
 export function saveSnapshot(airportId, data) {
   const snapshots = readSnapshots();
+  const airport = getAirportById(airportId);
 
-  // Filter only important weapons to reduce file size
-  const importantWeapons = data.weapons ? data.weapons.filter(w => isImportantWeapon(w.item)) : [];
+  // Filter only important weapons for this type of base (airport vs heliport)
+  const importantWeapons = data.weapons ? data.weapons.filter(w =>
+    isImportantWeapon(w.item, airport?.isHeliport || false)
+  ) : [];
 
   snapshots.push({
     airport_id: airportId,
