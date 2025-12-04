@@ -37,78 +37,50 @@ export async function generateChartsPDF(airportId, airportName) {
       return;
     }
 
-    // Create PDF
-    const pdf = new jsPDF({
-      orientation: 'landscape',
-      unit: 'mm',
-      format: 'a4'
-    });
-
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 10;
-
-    // Add title page
-    pdf.setFontSize(24);
-    pdf.setTextColor(41, 128, 185); // Blue color
-    pdf.text(`Charts - ${airportName}`, pageWidth / 2, pageHeight / 2, { align: 'center' });
-
-    pdf.setFontSize(12);
-    pdf.setTextColor(100, 100, 100);
-    pdf.text(`Aeroporto: ${airportId}`, pageWidth / 2, pageHeight / 2 + 10, { align: 'center' });
-    pdf.text(`Totale Charts: ${data.charts.length}`, pageWidth / 2, pageHeight / 2 + 20, { align: 'center' });
-    pdf.text(`Generato: ${new Date().toLocaleString('it-IT')}`, pageWidth / 2, pageHeight / 2 + 30, { align: 'center' });
+    // Create PDF - will set dimensions based on first image
+    let pdf = null;
 
     // Load and add each chart image
     for (let i = 0; i < data.charts.length; i++) {
       const chart = data.charts[i];
 
       try {
-        // Add new page for each chart (except the first one after title page)
-        pdf.addPage();
-
         // Load image - use BASE_URL since chart.url already has full path starting with /charts
         const imgUrl = `${BASE_URL}${chart.url}`;
         const img = await loadImage(imgUrl);
 
-        // Calculate dimensions to fit the page while maintaining aspect ratio
-        const imgAspectRatio = img.width / img.height;
-        const pageAspectRatio = (pageWidth - 2 * margin) / (pageHeight - 2 * margin - 15);
+        // Convert pixel dimensions to mm (assuming 96 DPI)
+        // 1 inch = 25.4 mm, 96 pixels = 1 inch, so 1 pixel = 25.4/96 mm
+        const pixelToMm = 25.4 / 96;
+        const imgWidthMm = img.width * pixelToMm;
+        const imgHeightMm = img.height * pixelToMm;
 
-        let imgWidth, imgHeight;
-        if (imgAspectRatio > pageAspectRatio) {
-          // Image is wider, fit to width
-          imgWidth = pageWidth - 2 * margin;
-          imgHeight = imgWidth / imgAspectRatio;
+        // Create PDF on first iteration, or add new page with custom dimensions
+        if (pdf === null) {
+          // First page - create PDF with image dimensions
+          pdf = new jsPDF({
+            orientation: imgWidthMm > imgHeightMm ? 'landscape' : 'portrait',
+            unit: 'mm',
+            format: [imgWidthMm, imgHeightMm]
+          });
         } else {
-          // Image is taller, fit to height
-          imgHeight = pageHeight - 2 * margin - 15; // Reserve space for filename
-          imgWidth = imgHeight * imgAspectRatio;
+          // Add new page with custom dimensions for this image
+          pdf.addPage([imgWidthMm, imgHeightMm]);
         }
 
-        // Center the image
-        const x = (pageWidth - imgWidth) / 2;
-        const y = margin;
-
-        // Add image to PDF
-        pdf.addImage(img, 'PNG', x, y, imgWidth, imgHeight);
-
-        // Add filename at the bottom
-        pdf.setFontSize(8);
-        pdf.setTextColor(150, 150, 150);
-        pdf.text(chart.filename, pageWidth / 2, pageHeight - 5, { align: 'center' });
+        // Add image at full size (0,0 position, full page)
+        pdf.addImage(img, 'PNG', 0, 0, imgWidthMm, imgHeightMm);
 
       } catch (error) {
         console.error(`Error loading chart ${chart.filename}:`, error);
-
-        // Add error page
-        pdf.setFontSize(14);
-        pdf.setTextColor(220, 53, 69); // Red color
-        pdf.text('Errore nel caricamento della chart', pageWidth / 2, pageHeight / 2, { align: 'center' });
-        pdf.setFontSize(10);
-        pdf.setTextColor(100, 100, 100);
-        pdf.text(chart.filename, pageWidth / 2, pageHeight / 2 + 10, { align: 'center' });
+        // Skip this image and continue with next one
       }
+    }
+
+    // Check if at least one image was loaded successfully
+    if (pdf === null) {
+      alert('Errore: nessuna chart è stata caricata con successo.');
+      return;
     }
 
     // Save PDF
