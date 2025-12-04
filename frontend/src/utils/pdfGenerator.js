@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const BASE_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 
 /**
  * Generate PDF with airport charts
@@ -11,7 +12,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 export async function generateChartsPDF(airportId, airportName) {
   try {
     // Fetch charts list from backend
-    const response = await fetch(`${API_URL}/api/airports/${airportId}/charts`);
+    const response = await fetch(`${API_URL}/airports/${airportId}/charts`);
     const data = await response.json();
 
     if (!data.available || data.charts.length === 0) {
@@ -49,8 +50,8 @@ export async function generateChartsPDF(airportId, airportName) {
         // Add new page for each chart (except the first one after title page)
         pdf.addPage();
 
-        // Load image
-        const imgUrl = `${API_URL}${chart.url}`;
+        // Load image - use BASE_URL since chart.url already has full path starting with /charts
+        const imgUrl = `${BASE_URL}${chart.url}`;
         const img = await loadImage(imgUrl);
 
         // Calculate dimensions to fit the page while maintaining aspect ratio
