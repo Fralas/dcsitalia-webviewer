@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Plus, X, TrendingUp, ArrowRight } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Plus, X, TrendingUp, ArrowRight, FileDown } from 'lucide-react';
 import { createOrder } from '../services/api';
 import WeaponChart from './WeaponChart';
 import { getAirportName } from '../config/airports';
+import { generateChartsPDF } from '../utils/pdfGenerator';
 
 /**
  * Get weapon display name (remove prefix)
@@ -62,6 +63,7 @@ export default function AirportCard({ airport, missions = [] }) {
   const [selectedWeapon, setSelectedWeapon] = useState('');
   const [orderQuantity, setOrderQuantity] = useState(100);
   const [chartWeapon, setChartWeapon] = useState(''); // For the historical chart
+  const [generatingPDF, setGeneratingPDF] = useState(false);
 
   if (!airport || !airport.data) {
     return null;
@@ -105,6 +107,18 @@ export default function AirportCard({ airport, missions = [] }) {
       alert('Ordine creato con successo!');
     } catch (error) {
       alert('Errore nella creazione dell\'ordine: ' + error.message);
+    }
+  };
+
+  // Handle PDF generation
+  const handleGeneratePDF = async () => {
+    setGeneratingPDF(true);
+    try {
+      await generateChartsPDF(airport.id, airport.displayName || airport.name);
+    } catch (error) {
+      console.error('PDF generation error:', error);
+    } finally {
+      setGeneratingPDF(false);
     }
   };
 
@@ -235,15 +249,29 @@ export default function AirportCard({ airport, missions = [] }) {
                 Critiche ({stats.critical})
               </button>
             </div>
-            {!airport.isMainBase && (
+            <div className="flex gap-2">
               <button
-                onClick={() => setShowOrderModal(true)}
-                className="px-3 py-1 rounded text-sm bg-green-600 text-white hover:bg-green-700 flex items-center gap-1"
+                onClick={handleGeneratePDF}
+                disabled={generatingPDF}
+                className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${
+                  generatingPDF
+                    ? 'bg-blue-400 text-white cursor-wait'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
               >
-                <Plus className="w-4 h-4" />
-                Richiedi Rifornimento
+                <FileDown className="w-4 h-4" />
+                {generatingPDF ? 'Generando PDF...' : 'Scarica Charts PDF'}
               </button>
-            )}
+              {!airport.isMainBase && (
+                <button
+                  onClick={() => setShowOrderModal(true)}
+                  className="px-3 py-1 rounded text-sm bg-green-600 text-white hover:bg-green-700 flex items-center gap-1"
+                >
+                  <Plus className="w-4 h-4" />
+                  Richiedi Rifornimento
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Active Orders Section */}

@@ -9,6 +9,7 @@ import bcrypt from 'bcrypt';
 import chokidar from 'chokidar';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 import airports, { getAirportById } from './config/airports.config.js';
 import { isImportantWeapon, getPriority, getSupplyQuantityForPriority } from './config/rules.config.js';
@@ -254,6 +255,82 @@ app.get('/api/stats', (req, res) => {
 
   res.json(stats);
 });
+
+/**
+ * Map airport ID to chart directory name
+ * Some airports have different IDs than their chart directory names
+ */
+function getChartDirectoryName(airportId) {
+  const mapping = {
+    'adana-sakirpasa': 'adana',
+    'abu-al-duhur': 'abualduhur',
+  };
+
+  return mapping[airportId] || airportId;
+}
+
+/**
+ * GET /api/airports/:id/charts - Get list of chart files for an airport
+ */
+app.get('/api/airports/:id/charts', (req, res) => {
+  const airportId = req.params.id;
+  const chartDirName = getChartDirectoryName(airportId);
+  const chartsDir = path.resolve(__dirname, '../../charts', chartDirName);
+
+  // Check if charts directory exists
+  if (!fs.existsSync(chartsDir)) {
+    return res.json({
+      available: false,
+      message: 'Chart non disponibili',
+      charts: []
+    });
+  }
+
+  try {
+    const files = fs.readdirSync(chartsDir);
+
+    // Check if it's just a "no charts" placeholder
+    const noChartsFile = files.find(f => f.includes('NOCHARTS'));
+    if (noChartsFile) {
+      return res.json({
+        available: false,
+        message: 'Chart non disponibili',
+        charts: []
+      });
+    }
+
+    // Filter for image files only
+    const chartFiles = files.filter(f =>
+      /\.(png|jpg|jpeg|gif|webp)$/i.test(f)
+    );
+
+    if (chartFiles.length === 0) {
+      return res.json({
+        available: false,
+        message: 'Chart non disponibili',
+        charts: []
+      });
+    }
+
+    res.json({
+      available: true,
+      charts: chartFiles.map(filename => ({
+        filename,
+        url: `/charts/${chartDirName}/${filename}`
+      }))
+    });
+  } catch (error) {
+    logger.error('Error reading charts directory:', error);
+    res.status(500).json({
+      available: false,
+      message: 'Errore nel caricamento delle chart',
+      charts: []
+    });
+  }
+});
+
+// Serve static chart files
+app.use('/charts', express.static(path.resolve(__dirname, '../../charts')));
 
 // ==================== TEST ENDPOINTS ====================
 
