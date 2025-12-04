@@ -48,7 +48,7 @@ export const airports = [
     displayName: 'Hatay',
     isMainBase: false,
     isHeliport: false,
-    herculesBase: true,
+    herculesBase: false,
     csvPrefix: 'Hatay',
     coordinates: { lat: 36.362778, lon: 36.282222 }, // 36°21'46"N, 36°16'56"E
   },
@@ -109,7 +109,7 @@ export const airports = [
     name: 'Kuweires',
     displayName: 'Kuweires',
     isMainBase: false,
-    isHeliport: false,
+    isHeliport: true,
     herculesBase: false,
     csvPrefix: 'Kuweires',
     coordinates: { lat: 36.181944, lon: 37.576667 }, // 36°10'55"N, 37°34'36"E
@@ -119,7 +119,7 @@ export const airports = [
     name: 'Minakh',
     displayName: 'Minakh',
     isMainBase: false,
-    isHeliport: false,
+    isHeliport: true,
     herculesBase: false,
     csvPrefix: 'Minakh',
     coordinates: { lat: 36.520000, lon: 37.039444 }, // 36°31'12"N, 37°02'22"E
@@ -149,7 +149,7 @@ export const airports = [
     name: 'Kharab Ishk',
     displayName: 'Kharab Ishk',
     isMainBase: false,
-    isHeliport: false,
+    isHeliport: true,
     herculesBase: false,
     csvPrefix: 'Kharab Ishk',
     coordinates: { lat: 36.544722, lon: 38.587222 }, // 36°32'41"N, 38°35'14"E
@@ -159,7 +159,7 @@ export const airports = [
     name: 'Tal Siman',
     displayName: 'Tal Siman',
     isMainBase: false,
-    isHeliport: false,
+    isHeliport: true,
     herculesBase: false,
     csvPrefix: 'Tal Siman',
     coordinates: { lat: 36.260278, lon: 38.929444 }, // 36°15'37"N, 38°55'46"E
