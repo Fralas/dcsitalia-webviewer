@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Plus, X, TrendingUp, ArrowRight, FileDown } from 'lucide-react';
 import { createOrder } from '../services/api';
 import WeaponChart from './WeaponChart';
 import { getAirportName } from '../config/airports';
-import { generateChartsPDF } from '../utils/pdfGenerator';
+import { generateChartsPDF, checkChartsAvailable } from '../utils/pdfGenerator';
 
 /**
  * Get weapon display name (remove prefix)
@@ -64,10 +64,18 @@ export default function AirportCard({ airport, missions = [] }) {
   const [orderQuantity, setOrderQuantity] = useState(100);
   const [chartWeapon, setChartWeapon] = useState(''); // For the historical chart
   const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [chartsAvailable, setChartsAvailable] = useState(null); // null = not checked, true/false = has charts
 
   if (!airport || !airport.data) {
     return null;
   }
+
+  // Check if charts are available when card is expanded
+  useEffect(() => {
+    if (expanded && chartsAvailable === null) {
+      checkChartsAvailable(airport.id).then(setChartsAvailable);
+    }
+  }, [expanded, airport.id, chartsAvailable]);
 
   const { weapons = [], liquids = [] } = airport.data;
 
@@ -252,15 +260,18 @@ export default function AirportCard({ airport, missions = [] }) {
             <div className="flex gap-2">
               <button
                 onClick={handleGeneratePDF}
-                disabled={generatingPDF}
+                disabled={generatingPDF || chartsAvailable === false}
                 className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${
                   generatingPDF
                     ? 'bg-blue-400 text-white cursor-wait'
+                    : chartsAvailable === false
+                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
                     : 'bg-blue-600 text-white hover:bg-blue-700'
                 }`}
+                title={chartsAvailable === false ? 'Nessuna chart disponibile per questo aeroporto' : ''}
               >
                 <FileDown className="w-4 h-4" />
-                {generatingPDF ? 'Generando PDF...' : 'Scarica Charts PDF'}
+                {generatingPDF ? 'Generando PDF...' : chartsAvailable === null ? 'Verifica Charts...' : 'Scarica Charts PDF'}
               </button>
               {!airport.isMainBase && (
                 <button

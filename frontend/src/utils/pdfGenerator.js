@@ -1,7 +1,24 @@
 import { jsPDF } from 'jspdf';
+import { savePDFToDirectory } from './fileSystemAccess';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 const BASE_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+
+/**
+ * Check if airport has charts available
+ * @param {string} airportId - Airport ID
+ * @returns {Promise<boolean>}
+ */
+export async function checkChartsAvailable(airportId) {
+  try {
+    const response = await fetch(`${API_URL}/airports/${airportId}/charts`);
+    const data = await response.json();
+    return data.available && data.charts.length > 0;
+  } catch (error) {
+    console.error('Error checking charts availability:', error);
+    return false;
+  }
+}
 
 /**
  * Generate PDF with airport charts
@@ -96,7 +113,17 @@ export async function generateChartsPDF(airportId, airportName) {
 
     // Save PDF
     const filename = `${airportId}_charts_${Date.now()}.pdf`;
-    pdf.save(filename);
+
+    // Try to save to selected directory first
+    const blob = pdf.output('blob');
+    const savedToDir = await savePDFToDirectory(blob, filename);
+
+    if (savedToDir) {
+      alert(`PDF salvato con successo nella directory selezionata!\n\nFile: ${filename}`);
+    } else {
+      // Fallback to regular download
+      pdf.save(filename);
+    }
 
   } catch (error) {
     console.error('Error generating PDF:', error);

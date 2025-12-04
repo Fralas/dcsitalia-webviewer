@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Package, AlertTriangle, Plane, Activity } from 'lucide-react';
+import { Package, AlertTriangle, Plane, Activity, FolderOpen } from 'lucide-react';
 import AirportCard from './AirportCard';
+import { selectPDFDirectory, isFileSystemAccessSupported } from '../utils/fileSystemAccess';
 
 /**
  * Stats Card Component
@@ -27,6 +28,18 @@ function StatsCard({ title, value, icon: Icon, color }) {
 export default function Dashboard({ airports, missions, stats }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('name'); // name, critical
+
+  // Handle PDF directory selection
+  const handleSelectPDFDirectory = async () => {
+    const success = await selectPDFDirectory();
+    if (success) {
+      alert(
+        'Directory PDF configurata con successo!\n\n' +
+        'Tutti i PDF verranno ora salvati nella directory selezionata.\n' +
+        'La directory verrà ricordata per le prossime sessioni.'
+      );
+    }
+  };
 
   // Filter and sort airports
   let filteredAirports = Object.values(airports).filter(airport => {
@@ -101,6 +114,16 @@ export default function Dashboard({ airports, missions, stats }) {
             >
               Ordina per Criticità
             </button>
+            {isFileSystemAccessSupported() && (
+              <button
+                onClick={handleSelectPDFDirectory}
+                className="px-4 py-2 rounded font-bold bg-green-600 text-white hover:bg-green-700 flex items-center gap-2"
+                title="Seleziona la directory dove salvare i PDF delle chart"
+              >
+                <FolderOpen className="w-4 h-4" />
+                Directory PDF
+              </button>
+            )}
           </div>
         </div>
       </div>
