@@ -1,6 +1,9 @@
 /**
  * Airport Configuration (Frontend)
  * Mirrors backend configuration for UI display
+ *
+ * isHeliport: true if this is a heliport/FARP (only helicopters can land)
+ * herculesBase: true if C-130 Hercules can spawn/operate from this base
  */
 
 const airports = [
@@ -10,6 +13,8 @@ const airports = [
     name: 'Adana Sakirpasa',
     displayName: 'Adana Sakirpasa',
     isMainBase: true,
+    isHeliport: false,
+    herculesBase: true,
     coordinates: { lat: 36.982222, lon: 35.281111 },
   },
 
@@ -19,6 +24,8 @@ const airports = [
     name: 'Incirlik',
     displayName: 'Incirlik Air Base',
     isMainBase: false,
+    isHeliport: false,
+    herculesBase: true,
     coordinates: { lat: 37.000000, lon: 35.425833 },
   },
   {
@@ -26,6 +33,8 @@ const airports = [
     name: 'Gaziantep',
     displayName: 'Gaziantep',
     isMainBase: false,
+    isHeliport: false,
+    herculesBase: true,
     coordinates: { lat: 36.947222, lon: 37.471389 },
   },
   {
@@ -33,6 +42,8 @@ const airports = [
     name: 'Hatay',
     displayName: 'Hatay',
     isMainBase: false,
+    isHeliport: false,
+    herculesBase: true,
     coordinates: { lat: 36.362778, lon: 36.282222 },
   },
   {
@@ -40,6 +51,8 @@ const airports = [
     name: 'Sanliurfa',
     displayName: 'Sanliurfa',
     isMainBase: false,
+    isHeliport: false,
+    herculesBase: true,
     coordinates: { lat: 37.441111, lon: 38.902778 },
   },
 
@@ -49,6 +62,8 @@ const airports = [
     name: 'Aleppo',
     displayName: 'Aleppo International',
     isMainBase: false,
+    isHeliport: false,
+    herculesBase: true,
     coordinates: { lat: 36.180833, lon: 37.224444 },
   },
   {
@@ -56,6 +71,8 @@ const airports = [
     name: 'Bassel Al-Assad',
     displayName: 'Bassel Al-Assad (Latakia)',
     isMainBase: false,
+    isHeliport: false,
+    herculesBase: true,
     coordinates: { lat: 35.401111, lon: 35.948611 },
   },
   {
@@ -63,6 +80,8 @@ const airports = [
     name: 'Abu al-Duhur',
     displayName: 'Abu al-Duhur',
     isMainBase: false,
+    isHeliport: false,
+    herculesBase: false,
     coordinates: { lat: 35.732500, lon: 37.103056 },
   },
   {
@@ -70,6 +89,8 @@ const airports = [
     name: 'Jirah',
     displayName: 'Jirah',
     isMainBase: false,
+    isHeliport: false,
+    herculesBase: false,
     coordinates: { lat: 36.098333, lon: 37.935278 },
   },
   {
@@ -77,6 +98,8 @@ const airports = [
     name: 'Kuweires',
     displayName: 'Kuweires',
     isMainBase: false,
+    isHeliport: false,
+    herculesBase: false,
     coordinates: { lat: 36.181944, lon: 37.576667 },
   },
   {
@@ -84,6 +107,8 @@ const airports = [
     name: 'Minakh',
     displayName: 'Minakh',
     isMainBase: false,
+    isHeliport: false,
+    herculesBase: false,
     coordinates: { lat: 36.520000, lon: 37.039444 },
   },
   {
@@ -91,6 +116,8 @@ const airports = [
     name: 'Tabqa',
     displayName: 'Tabqa',
     isMainBase: false,
+    isHeliport: false,
+    herculesBase: false,
     coordinates: { lat: 35.756389, lon: 38.566111 },
   },
   {
@@ -98,6 +125,8 @@ const airports = [
     name: 'Taftanaz',
     displayName: 'Taftanaz',
     isMainBase: false,
+    isHeliport: true, // Heliport
+    herculesBase: false,
     coordinates: { lat: 35.972500, lon: 36.783333 },
   },
   {
@@ -105,6 +134,8 @@ const airports = [
     name: 'Kharab Ishk',
     displayName: 'Kharab Ishk',
     isMainBase: false,
+    isHeliport: false,
+    herculesBase: false,
     coordinates: { lat: 36.544722, lon: 38.587222 },
   },
   {
@@ -112,6 +143,8 @@ const airports = [
     name: 'Tal Siman',
     displayName: 'Tal Siman',
     isMainBase: false,
+    isHeliport: false,
+    herculesBase: false,
     coordinates: { lat: 36.260278, lon: 38.929444 },
   },
 
@@ -121,6 +154,8 @@ const airports = [
     name: 'FARP_BASE',
     displayName: 'FARP Base',
     isMainBase: false,
+    isHeliport: true, // FARP is heliport only
+    herculesBase: false,
     coordinates: { lat: 37.066944, lon: 35.974722 },
   },
 ];
@@ -133,11 +168,11 @@ export function getAirportById(id) {
 }
 
 /**
- * Get airport display name by ID
+ * Get airport name by ID
  */
 export function getAirportName(id) {
   const airport = getAirportById(id);
-  return airport ? airport.displayName : id;
+  return airport ? airport.displayName || airport.name : id;
 }
 
 export default airports;

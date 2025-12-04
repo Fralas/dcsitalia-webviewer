@@ -175,6 +175,33 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
               </>
             )}
           </div>
+
+          {/* Recommended Aircraft */}
+          {mission.recommended_aircraft && (
+            <div className="flex items-center gap-2 text-sm bg-slate-800/50 px-3 py-2 rounded mt-2">
+              {mission.recommended_aircraft === 'helicopter' && (
+                <>
+                  <span className="text-2xl">🚁</span>
+                  <span className="text-gray-400">Velivolo Consigliato:</span>
+                  <span className="text-purple-400 font-semibold">Elicottero</span>
+                </>
+              )}
+              {mission.recommended_aircraft === 'airplane' && (
+                <>
+                  <Plane className="w-4 h-4 text-blue-400" />
+                  <span className="text-gray-400">Velivolo Consigliato:</span>
+                  <span className="text-blue-400 font-semibold">Aereo (C-130)</span>
+                </>
+              )}
+              {mission.recommended_aircraft === 'airdrop' && (
+                <>
+                  <Package className="w-4 h-4 text-orange-400" />
+                  <span className="text-gray-400">Velivolo Consigliato:</span>
+                  <span className="text-orange-400 font-semibold">Aereo - Airdrop (senza atterraggio)</span>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {mission.status === 'accepted' && mission.accepted_by && (

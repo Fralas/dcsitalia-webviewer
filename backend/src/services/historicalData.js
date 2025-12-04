@@ -157,7 +157,7 @@ export function getLatestSnapshot(airportId) {
 /**
  * Create a new mission with source routing
  */
-export function createMission(airportId, weaponId, quantityNeeded, currentQuantity, expiryHours = 24, sourceAirportId = null, distance = null) {
+export function createMission(airportId, weaponId, quantityNeeded, currentQuantity, expiryHours = 24, sourceAirportId = null, distance = null, recommendedAircraft = 'airplane') {
   const missions = readMissions();
 
   const missionId = `mission_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -173,6 +173,7 @@ export function createMission(airportId, weaponId, quantityNeeded, currentQuanti
     quantity_needed: quantityNeeded,
     current_quantity: currentQuantity,
     status: 'pending',
+    recommended_aircraft: recommendedAircraft, // 'helicopter', 'airplane', or 'airdrop'
     created_at: createdAt,
     expires_at: expiresAt,
     accepted_at: null,

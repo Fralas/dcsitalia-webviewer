@@ -50,7 +50,18 @@ export function checkAndGenerateMissions(recipientAirportId, recipientWeapons, a
       allAirportsData,
     });
 
-    // Create mission with source airport
+    // Get source airport object for aircraft recommendation
+    const sourceAirport = getAirportById(bestSource.airportId);
+
+    // Determine recommended aircraft
+    const recommendedAircraft = determineRecommendedAircraft(
+      sourceAirport,
+      recipientAirport,
+      bestSource.distance,
+      priority
+    );
+
+    // Create mission with source airport and recommended aircraft
     const missionId = historicalData.createMission(
       recipientAirportId,
       weapon.item,
@@ -58,12 +69,14 @@ export function checkAndGenerateMissions(recipientAirportId, recipientWeapons, a
       weapon.quantity,
       missionRules.mission.missionExpiry,
       bestSource.airportId,
-      bestSource.distance
+      bestSource.distance,
+      recommendedAircraft
     );
 
     console.log(`✈️  Generated ${priority.toUpperCase()} mission ${missionId}`);
     console.log(`   Route: ${bestSource.airportName} → ${recipientAirport.displayName} (${bestSource.distance}nm)`);
     console.log(`   Weapon: ${weapon.item} (current: ${weapon.quantity}, needed: ${quantityNeeded})`);
+    console.log(`   Recommended: ${recommendedAircraft.toUpperCase()}`);
 
     generatedMissions.push(missionId);
   });
@@ -151,6 +164,58 @@ export function findBestSourceAirport({ recipientAirport, weaponId, quantityNeed
     distance: bestDonor.distance,
     isDonor: true,
   };
+}
+
+/**
+ * Determine recommended aircraft for mission based on multiple factors
+ *
+ * Logic:
+ * 1. If donor base has herculesBase = false → helicopter
+ * 2. If distance < 35 NM → helicopter
+ * 3. If destination is heliport → helicopter
+ * 4. If mission is CRITICAL → always airplane
+ * 5. BUT if CRITICAL to heliport → airdrop (airplane without landing)
+ * 6. Otherwise → airplane
+ *
+ * @param {Object} sourceAirport - Source airport object
+ * @param {Object} recipientAirport - Recipient airport object
+ * @param {number} distance - Distance in nautical miles
+ * @param {string} priority - Mission priority (critical, high, medium)
+ * @returns {string} 'helicopter', 'airplane', or 'airdrop'
+ */
+export function determineRecommendedAircraft(sourceAirport, recipientAirport, distance, priority) {
+  const isCritical = priority === 'critical';
+  const isDestinationHeliport = recipientAirport.isHeliport === true;
+  const isSourceHerculesBase = sourceAirport.herculesBase === true;
+  const isShortDistance = distance < 35;
+
+  // Special case: CRITICAL to heliport → always airdrop
+  if (isCritical && isDestinationHeliport) {
+    return 'airdrop';
+  }
+
+  // CRITICAL missions always use airplane (unless to heliport, handled above)
+  if (isCritical) {
+    return 'airplane';
+  }
+
+  // If source cannot support Hercules → helicopter
+  if (!isSourceHerculesBase) {
+    return 'helicopter';
+  }
+
+  // If short distance → helicopter
+  if (isShortDistance) {
+    return 'helicopter';
+  }
+
+  // If destination is heliport → helicopter
+  if (isDestinationHeliport) {
+    return 'helicopter';
+  }
+
+  // Default: airplane
+  return 'airplane';
 }
 
 /**

@@ -16,7 +16,7 @@ import { isImportantWeapon, getPriority, getSupplyQuantityForPriority } from './
 import * as csvParser from './services/csvParser.js';
 import * as historicalData from './services/historicalData.js';
 import * as missionGenerator from './services/missionGenerator.js';
-import { findBestSourceAirport } from './services/missionGenerator.js';
+import { findBestSourceAirport, determineRecommendedAircraft } from './services/missionGenerator.js';
 import { generateToken } from './utils/jwt.js';
 import { authenticateToken, requireAdmin } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
@@ -502,7 +502,19 @@ app.post('/api/airports/:id/create-order', (req, res) => {
     allAirportsData: currentData,
   });
 
-  // Create order with source routing
+  // Get source airport and calculate priority for aircraft recommendation
+  const sourceAirport = getAirportById(bestSource.airportId);
+  const priority = getPriority(currentQuantity);
+
+  // Determine recommended aircraft
+  const recommendedAircraft = determineRecommendedAircraft(
+    sourceAirport,
+    airport,
+    bestSource.distance,
+    priority
+  );
+
+  // Create order with source routing and recommended aircraft
   const orderId = historicalData.createMission(
     airportId,
     weaponId,
@@ -510,11 +522,13 @@ app.post('/api/airports/:id/create-order', (req, res) => {
     currentQuantity,
     24, // expires in 24 hours
     bestSource.airportId,
-    bestSource.distance
+    bestSource.distance,
+    recommendedAircraft
   );
 
   console.log(`📦 Manual order created: ${orderId} for ${weaponId} at ${airport.displayName} (qty: ${quantity})`);
   console.log(`   Route: ${bestSource.airportName} → ${airport.displayName} (${bestSource.distance}nm)`);
+  console.log(`   Recommended: ${recommendedAircraft.toUpperCase()}`);
 
   // Broadcast to all clients
   io.emit('missions:updated', {
