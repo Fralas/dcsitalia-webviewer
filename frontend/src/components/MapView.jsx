@@ -37,7 +37,9 @@ function FitBounds({ positions }) {
 const createAirportIcon = (isMainBase, missionCount, isHeliport) => {
   const color = isMainBase ? '#facc15' : '#3b82f6';
   const size = isMainBase ? 16 : 12;
-  const icon = isHeliport ? '🚁' : '✈️';
+  const iconSvg = isHeliport
+    ? `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v-1a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1m-4 0h4m-4 0v1.5m4-1.5v1.5m3-6.5h-3L11 9V4a1 1 0 0 0-2 0v5L7 6H4l4 5v3H6l-2 2v2h4v-1h8v1h4v-2l-2-2h-2v-3l4-5h-3z"/></svg>`
+    : `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>`;
 
   return L.divIcon({
     className: 'custom-airport-marker',
@@ -52,10 +54,10 @@ const createAirportIcon = (isMainBase, missionCount, isHeliport) => {
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 14px;
+          color: #1e293b;
           box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         ">
-          ${icon}
+          ${iconSvg}
         </div>
         ${missionCount > 0 ? `
           <div style="
@@ -287,11 +289,11 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
                 <span className="text-yt-text-secondary">Accettata</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="text-base">✈️</span>
+                <Plane className="w-4 h-4 text-yt-accent" />
                 <span className="text-yt-text-secondary">Airport</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="text-base">🚁</span>
+                <Helicopter className="w-4 h-4 text-purple-400" />
                 <span className="text-yt-text-secondary">Heliport</span>
               </div>
               <div className="flex items-center gap-1.5">
@@ -356,8 +358,8 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
                           {airport.isMainBase && (
                             <span className="text-yellow-600 text-xs font-semibold">MAIN BASE</span>
                           )}
-                          <span className="text-blue-600 text-xs font-semibold">
-                            {airport.isHeliport ? '🚁 ELIPORTO' : '✈️ AEROPORTO'}
+                          <span className={`text-xs font-semibold ${airport.isHeliport ? 'text-purple-600' : 'text-blue-600'}`}>
+                            {airport.isHeliport ? 'ELIPORTO' : 'AEROPORTO'}
                           </span>
                         </div>
                         <div className="text-gray-600 text-xs mt-1">
