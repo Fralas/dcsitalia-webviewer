@@ -287,47 +287,45 @@ export default function AirportCard({ airport, missions = [] }) {
             </div>
           </div>
 
-          {/* Active Orders Section - Design precedente più visibile */}
+          {/* Active Orders Section - Design precedente più visibile e compatto orizzontalmente */}
           {!airport.isMainBase && airportMissions.length > 0 && (
-            <div className="p-4 bg-purple-500/10 border-t-2 border-purple-500/40">
-              <h4 className="text-sm font-bold text-purple-300 mb-3 flex items-center gap-2">
+            <div className="p-3 bg-purple-500/10 border-t-2 border-purple-500/40">
+              <h4 className="text-sm font-bold text-purple-300 mb-2 flex items-center gap-2">
                 <Package className="w-4 h-4" />
                 ORDINI ATTIVI ({airportMissions.length})
               </h4>
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
                 {airportMissions.map(mission => {
                   const sourceName = mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Main Base';
                   const distance = mission.distance_nm ? `${mission.distance_nm}nm` : '-';
 
                   return (
-                    <div key={mission.id} className="bg-yt-bg-secondary p-3 rounded border border-purple-500/30">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex-1">
-                          <div className="font-mono text-sm text-yt-text-primary font-bold mb-1">{getWeaponDisplayName(mission.weapon_id)}</div>
-                          <div className="text-xs text-yt-text-secondary">
-                            Quantità richiesta: <span className="font-bold text-yt-text-primary">{mission.quantity_needed}</span> |
-                            Attuale: <span className="font-bold text-orange-400">{mission.current_quantity}</span>
+                    <div key={mission.id} className="bg-yt-bg-secondary p-2.5 rounded border border-purple-500/30">
+                      <div className="flex justify-between items-start mb-1.5">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-mono text-xs text-yt-text-primary font-bold mb-0.5 truncate">{getWeaponDisplayName(mission.weapon_id)}</div>
+                          <div className="text-[10px] text-yt-text-secondary">
+                            Qty: <span className="font-bold text-yt-text-primary">{mission.quantity_needed}</span> •
+                            Att: <span className="font-bold text-orange-400">{mission.current_quantity}</span>
                           </div>
                         </div>
-                        <div>
-                          <span className={`px-2 py-1 rounded text-xs font-bold ${
+                        <div className="flex-shrink-0 ml-2">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                             mission.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
                             mission.status === 'accepted' ? 'bg-yt-accent/20 text-yt-accent' :
                             'bg-yt-bg-primary/50 text-yt-text-secondary'
                           }`}>
-                            {mission.status === 'pending' ? 'IN ATTESA' : mission.status === 'accepted' ? 'ACCETTATA' : mission.status.toUpperCase()}
+                            {mission.status === 'pending' ? 'ATT' : mission.status === 'accepted' ? 'ACC' : mission.status.toUpperCase().substring(0, 3)}
                           </span>
                         </div>
                       </div>
-                      {/* Route Information */}
-                      <div className="flex items-center gap-2 text-xs bg-yt-bg-primary px-2 py-1.5 rounded">
-                        <span className="text-yt-accent font-semibold">Da:</span>
-                        <span className="text-yt-text-primary">{sourceName}</span>
-                        <ArrowRight className="w-3 h-3 text-yt-text-secondary" />
-                        <span className="text-green-400 font-semibold">A:</span>
-                        <span className="text-yt-text-primary">{airport.displayName || airport.name}</span>
-                        <span className="text-yt-border">•</span>
-                        <span className="text-cyan-400 font-mono">{distance}</span>
+                      {/* Route Information - compatta */}
+                      <div className="flex items-center gap-1 text-[10px] bg-yt-bg-primary px-1.5 py-1 rounded">
+                        <span className="text-yt-accent font-medium truncate">{sourceName}</span>
+                        <ArrowRight className="w-3 h-3 text-yt-text-secondary flex-shrink-0" />
+                        <span className="text-green-400 font-medium truncate">{airport.displayName || airport.name}</span>
+                        <span className="text-yt-border flex-shrink-0">•</span>
+                        <span className="text-cyan-400 font-mono flex-shrink-0">{distance}</span>
                       </div>
                     </div>
                   );
@@ -336,13 +334,13 @@ export default function AirportCard({ airport, missions = [] }) {
             </div>
           )}
 
-          {/* Liquids Section */}
+          {/* Liquids Section - più colonne per sfruttare spazio */}
           <div className="p-3 bg-yt-bg-primary/50">
             <h4 className="text-xs font-bold text-yt-text-secondary mb-2 flex items-center gap-1.5 uppercase tracking-wide">
               <Droplet className="w-3.5 h-3.5" />
               Liquids
             </h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2">
               {liquids.map((liquid, idx) => (
                 <div key={idx} className="bg-yt-bg-tertiary p-2 rounded">
                   <div className="text-xs text-yt-text-secondary">Type {liquid.item}</div>
@@ -352,38 +350,51 @@ export default function AirportCard({ airport, missions = [] }) {
             </div>
           </div>
 
-          {/* Weapons Section */}
+          {/* Weapons Section - layout a colonne per sfruttare spazio */}
           <div className="p-3">
             <h4 className="text-xs font-bold text-yt-text-secondary mb-2 flex items-center gap-1.5 uppercase tracking-wide">
               <Package className="w-3.5 h-3.5" />
               Weapons & Munitions
             </h4>
-            <div className="max-h-96 overflow-y-auto">
-              <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-yt-bg-secondary border-b border-yt-border">
-                  <tr className="text-left text-yt-text-secondary">
-                    <th className="p-2">Weapon</th>
-                    <th className="p-2 text-right">Quantity</th>
-                    <th className="p-2">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredWeapons.map((weapon, idx) => {
-                    const isImportant = isImportantWeapon(weapon.item, isHeliport);
-                    const status = getWeaponStatus(weapon.quantity, isImportant);
 
-                    return (
-                      <tr key={idx} className="border-b border-yt-border hover:bg-yt-bg-tertiary/50 transition-colors">
-                        <td className="p-2 font-mono text-yt-text-primary">{getWeaponDisplayName(weapon.item)}</td>
-                        <td className="p-2 text-right font-bold text-yt-text-primary">{weapon.quantity}</td>
-                        <td className="p-2">
-                          <StatusBadge status={status} />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            {/* Layout a griglia su schermi grandi per ottimizzare spazio */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {/* Suddividi weapons in 2 colonne */}
+              {[0, 1].map(colIndex => {
+                const startIdx = Math.floor(filteredWeapons.length / 2) * colIndex;
+                const endIdx = colIndex === 0 ? Math.floor(filteredWeapons.length / 2) : filteredWeapons.length;
+                const columnWeapons = filteredWeapons.slice(startIdx, endIdx);
+
+                return columnWeapons.length > 0 ? (
+                  <div key={colIndex} className="max-h-96 overflow-y-auto">
+                    <table className="w-full text-xs">
+                      <thead className="sticky top-0 bg-yt-bg-secondary border-b border-yt-border z-10">
+                        <tr className="text-left text-yt-text-secondary">
+                          <th className="p-2">Weapon</th>
+                          <th className="p-2 text-right">Qty</th>
+                          <th className="p-2">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {columnWeapons.map((weapon, idx) => {
+                          const isImportant = isImportantWeapon(weapon.item, isHeliport);
+                          const status = getWeaponStatus(weapon.quantity, isImportant);
+
+                          return (
+                            <tr key={startIdx + idx} className="border-b border-yt-border hover:bg-yt-bg-tertiary/50 transition-colors">
+                              <td className="p-2 font-mono text-yt-text-primary">{getWeaponDisplayName(weapon.item)}</td>
+                              <td className="p-2 text-right font-bold text-yt-text-primary">{weapon.quantity}</td>
+                              <td className="p-2">
+                                <StatusBadge status={status} />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null;
+              })}
             </div>
           </div>
 
