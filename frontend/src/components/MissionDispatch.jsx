@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plane, Clock, User, CheckCircle, XCircle, AlertTriangle, Package, ArrowRight } from 'lucide-react';
+import { Plane, Helipad, Clock, User, CheckCircle, XCircle, AlertTriangle, Package, ArrowRight } from 'lucide-react';
 import * as api from '../services/api';
 import { getAirportName } from '../config/airports';
+import airports from '../config/airports';
 
 /**
  * Get weapon display name
@@ -43,8 +44,10 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
   const cardRef = useRef(null);
 
   const airport = airports.find(a => a.id === mission.airport_id);
+  const sourceAirport = mission.source_airport_id ? airports.find(a => a.id === mission.source_airport_id) : null;
   const timeAgo = getTimeAgo(mission.created_at);
   const expiresIn = getTimeRemaining(mission.expires_at);
+  const isHeliport = airport?.isHeliport || false;
 
   // Scroll to and highlight this card when isHighlighted is true
   useEffect(() => {
@@ -116,11 +119,22 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-500/20 rounded">
-            <Plane className="w-6 h-6 text-blue-400" />
+          <div className={`p-2 rounded ${isHeliport ? 'bg-purple-500/20' : 'bg-blue-500/20'}`}>
+            {isHeliport ? (
+              <Helipad className="w-6 h-6 text-purple-400" />
+            ) : (
+              <Plane className="w-6 h-6 text-blue-400" />
+            )}
           </div>
           <div>
-            <h3 className="text-lg font-bold text-white">{airport?.displayName || airport?.name || 'Aeroporto Sconosciuto'}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-bold text-white">{airport?.displayName || airport?.name || 'Aeroporto Sconosciuto'}</h3>
+              <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                isHeliport ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'
+              }`}>
+                {isHeliport ? '🚁' : '✈️'}
+              </span>
+            </div>
             <div className="flex items-center gap-2 text-sm text-gray-400">
               <Clock className="w-4 h-4" />
               <span>Creata {timeAgo}</span>
@@ -162,10 +176,19 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
         {/* Route Information */}
         <div className="mt-3 pt-3 border-t border-gray-700">
           <div className="flex items-center gap-2 text-sm bg-slate-800/50 px-3 py-2 rounded">
-            <Plane className="w-4 h-4 text-gray-400" />
+            {sourceAirport?.isHeliport ? (
+              <Helipad className="w-4 h-4 text-purple-400" />
+            ) : (
+              <Plane className="w-4 h-4 text-blue-400" />
+            )}
             <span className="text-blue-400 font-semibold">Da:</span>
             <span className="text-white">{mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Base Principale'}</span>
             <ArrowRight className="w-4 h-4 text-gray-500" />
+            {isHeliport ? (
+              <Helipad className="w-4 h-4 text-purple-400" />
+            ) : (
+              <Plane className="w-4 h-4 text-green-400" />
+            )}
             <span className="text-green-400 font-semibold">A:</span>
             <span className="text-white">{airport?.displayName || airport?.name || 'Sconosciuto'}</span>
             {mission.distance_nm && (
