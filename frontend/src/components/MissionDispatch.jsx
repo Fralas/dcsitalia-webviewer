@@ -115,15 +115,15 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
       className={`bg-yt-bg-secondary rounded-lg border-2 p-3 transition-all duration-300 hover:border-yt-border ${
         mission.status === 'accepted' ? 'border-yt-accent/50' : 'border-yt-border'
       } ${
-        isHighlighted ? 'ring-4 ring-yellow-400 shadow-lg shadow-yellow-400/50 scale-[1.02]' : ''
+        isHighlighted ? 'ring-4 ring-fuchsia-400 shadow-lg shadow-fuchsia-400/50 scale-[1.02]' : ''
       }`}
     >
       {/* Header compatto con info principali */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2 flex-1">
-          <div className={`p-1.5 rounded ${isHeliport ? 'bg-purple-500/20' : 'bg-yt-accent/20'}`}>
+          <div className={`p-1.5 rounded ${isHeliport ? 'bg-cyan-500/20' : 'bg-yt-accent/20'}`}>
             {isHeliport ? (
-              <Helicopter className="w-5 h-5 text-purple-400" />
+              <Helicopter className="w-5 h-5 text-cyan-400" />
             ) : (
               <Plane className="w-5 h-5 text-yt-accent" />
             )}
@@ -174,30 +174,42 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
       {/* Route e info missione - compatto */}
       <div className="bg-yt-bg-tertiary rounded p-2 mb-2 text-xs">
         <div className="flex items-center gap-1.5 flex-wrap">
-          {sourceAirport?.isHeliport ? (
-            <Helicopter className="w-3.5 h-3.5 text-purple-400" />
+          {sourceAirport?.isMainBase ? (
+            <span className="text-fuchsia-400 font-medium">{mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Base Principale'}</span>
+          ) : sourceAirport?.isHeliport ? (
+            <>
+              <Helicopter className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="text-cyan-400 font-medium">{getAirportName(mission.source_airport_id)}</span>
+            </>
           ) : (
-            <Plane className="w-3.5 h-3.5 text-yt-accent" />
+            <>
+              <Plane className="w-3.5 h-3.5 text-yt-accent" />
+              <span className="text-yt-accent font-medium">{getAirportName(mission.source_airport_id)}</span>
+            </>
           )}
-          <span className="text-yt-accent font-medium">{mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Base Principale'}</span>
           <ArrowRight className="w-3.5 h-3.5 text-yt-text-secondary" />
           {isHeliport ? (
-            <Helicopter className="w-3.5 h-3.5 text-purple-400" />
+            <>
+              <Helicopter className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="text-cyan-400 font-medium">{airport?.displayName || airport?.name || 'Sconosciuto'}</span>
+            </>
           ) : (
-            <Plane className="w-3.5 h-3.5 text-green-400" />
+            <>
+              <Plane className="w-3.5 h-3.5 text-yt-accent" />
+              <span className="text-yt-accent font-medium">{airport?.displayName || airport?.name || 'Sconosciuto'}</span>
+            </>
           )}
-          <span className="text-green-400 font-medium">{airport?.displayName || airport?.name || 'Sconosciuto'}</span>
           {mission.distance_nm && (
             <>
               <span className="text-yt-border">•</span>
-              <span className="text-cyan-400 font-mono font-medium">{mission.distance_nm}nm</span>
+              <span className="text-yt-text-primary font-mono font-medium">{mission.distance_nm}nm</span>
             </>
           )}
           {mission.total_weight_lbs && mission.total_weight_lbs > 0 && (
             <>
               <span className="text-yt-border">•</span>
-              <Weight className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="text-cyan-400 font-mono font-medium">{formatWeight(mission.total_weight_lbs)}</span>
+              <Weight className="w-3.5 h-3.5 text-yt-text-primary" />
+              <span className="text-yt-text-primary font-mono font-medium">{formatWeight(mission.total_weight_lbs)}</span>
             </>
           )}
         </div>
@@ -207,9 +219,9 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
           <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-yt-border">
             {mission.recommended_aircraft === 'helicopter' && (
               <>
-                <Helicopter className="w-3.5 h-3.5 text-purple-400" />
+                <Helicopter className="w-3.5 h-3.5 text-cyan-400" />
                 <span className="text-yt-text-secondary">Consigliato:</span>
-                <span className="text-purple-400 font-medium">Elicottero</span>
+                <span className="text-cyan-400 font-medium">Elicottero</span>
               </>
             )}
             {mission.recommended_aircraft === 'airplane' && (
@@ -326,8 +338,8 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
       <div className="bg-yt-bg-secondary rounded-lg p-4 border border-yt-border">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-purple-500/20 rounded">
-              <Package className="w-6 h-6 text-purple-400" />
+            <div className="p-2 bg-fuchsia-500/20 rounded">
+              <Package className="w-6 h-6 text-fuchsia-400" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-yt-text-primary">Gestione Missioni</h2>

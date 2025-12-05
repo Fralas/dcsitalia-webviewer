@@ -35,7 +35,7 @@ function FitBounds({ positions }) {
  * Custom airport icon
  */
 const createAirportIcon = (isMainBase, missionCount, isHeliport) => {
-  const color = isMainBase ? '#facc15' : '#3b82f6';
+  const color = isMainBase ? '#e879f9' : isHeliport ? '#22d3ee' : '#3b82f6';
   const size = isMainBase ? 16 : 12;
   const iconSvg = isHeliport
     ? `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v-1a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1m-4 0h4m-4 0v1.5m4-1.5v1.5m3-6.5h-3L11 9V4a1 1 0 0 0-2 0v5L7 6H4l4 5v3H6l-2 2v2h4v-1h8v1h4v-2l-2-2h-2v-3l4-5h-3z"/></svg>`
@@ -49,7 +49,7 @@ const createAirportIcon = (isMainBase, missionCount, isHeliport) => {
           width: ${size * 2}px;
           height: ${size * 2}px;
           background: ${color};
-          border: 3px solid ${isMainBase ? '#fbbf24' : '#2563eb'};
+          border: 3px solid ${isMainBase ? '#d946ef' : isHeliport ? '#06b6d4' : '#2563eb'};
           border-radius: 50%;
           display: flex;
           align-items: center;
@@ -97,7 +97,7 @@ function MissionCard({ mission, airport, onHover, onSelect, isHighlighted, isSel
     <div
       className={`bg-yt-bg-secondary p-3 rounded-lg border-2 transition-all cursor-pointer ${
         isSelected
-          ? 'border-yellow-400 shadow-lg shadow-yellow-400/30 scale-[1.02]'
+          ? 'border-fuchsia-400 shadow-lg shadow-fuchsia-400/30 scale-[1.02]'
           : isHighlighted
           ? 'border-yt-accent shadow-lg shadow-yt-accent/20'
           : 'border-yt-border hover:border-yt-border/50'
@@ -114,7 +114,7 @@ function MissionCard({ mission, airport, onHover, onSelect, isHighlighted, isSel
             <span className="font-bold text-yt-text-primary bg-yt-bg-tertiary px-1.5 py-0.5 rounded">{mission.quantity_needed}</span>
           </div>
           {mission.total_weight_lbs && mission.total_weight_lbs > 0 && (
-            <div className="flex items-center gap-1.5 text-xs text-cyan-400 mt-1.5">
+            <div className="flex items-center gap-1.5 text-xs text-yt-text-primary mt-1.5">
               <Weight className="w-3.5 h-3.5" />
               <span className="font-mono font-medium">{formatWeight(mission.total_weight_lbs)}</span>
             </div>
@@ -133,13 +133,13 @@ function MissionCard({ mission, airport, onHover, onSelect, isHighlighted, isSel
       <div className="flex items-center gap-1.5 text-xs bg-yt-bg-tertiary px-2.5 py-2 rounded">
         <span className="text-yt-accent font-medium truncate">{sourceName}</span>
         <ArrowRight className="w-3.5 h-3.5 text-yt-text-secondary flex-shrink-0" />
-        <span className="text-green-400 font-medium truncate">{airport?.displayName}</span>
+        <span className="text-yt-accent font-medium truncate">{airport?.displayName}</span>
         <span className="text-yt-border flex-shrink-0">•</span>
-        <span className="text-cyan-400 font-mono font-medium flex-shrink-0">{distance}</span>
+        <span className="text-yt-text-primary font-mono font-medium flex-shrink-0">{distance}</span>
       </div>
 
       {isSelected && (
-        <div className="mt-2 pt-2 border-t border-yellow-400/30 text-xs text-yellow-400 text-center font-medium">
+        <div className="mt-2 pt-2 border-t border-fuchsia-400/30 text-xs text-fuchsia-400 text-center font-medium">
           👆 Clicca di nuovo per aprire la pagina Missioni
         </div>
       )}
@@ -167,7 +167,7 @@ function MissionPolyline({ mission, sourceAirport, destAirport, isHighlighted, i
     <Polyline
       positions={positions}
       pathOptions={{
-        color: isSelected ? '#facc15' : isPending ? '#60a5fa' : '#f87171',
+        color: isSelected ? '#e879f9' : isPending ? '#60a5fa' : '#f87171',
         weight: isSelected ? 5 : isHighlighted ? 4 : baseWeight,
         opacity: isSelected ? 1 : isHighlighted ? 1 : baseOpacity,
         dashArray: isPending ? '10, 10' : undefined,
@@ -293,11 +293,11 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
                 <span className="text-yt-text-secondary">Airport</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Helicopter className="w-4 h-4 text-purple-400" />
+                <Helicopter className="w-4 h-4 text-cyan-400" />
                 <span className="text-yt-text-secondary">Heliport</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-yellow-400 border-2 border-yellow-500"></div>
+                <div className="w-3 h-3 rounded-full bg-fuchsia-400 border-2 border-fuchsia-500"></div>
                 <span className="text-yt-text-secondary">Base</span>
               </div>
             </div>
@@ -356,9 +356,9 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
                         <div className="font-bold text-base">{airport.displayName}</div>
                         <div className="flex items-center gap-2 mt-1">
                           {airport.isMainBase && (
-                            <span className="text-yellow-600 text-xs font-semibold">MAIN BASE</span>
+                            <span className="text-fuchsia-600 text-xs font-semibold">MAIN BASE</span>
                           )}
-                          <span className={`text-xs font-semibold ${airport.isHeliport ? 'text-purple-600' : 'text-blue-600'}`}>
+                          <span className={`text-xs font-semibold ${airport.isHeliport ? 'text-cyan-600' : 'text-blue-600'}`}>
                             {airport.isHeliport ? 'ELIPORTO' : 'AEROPORTO'}
                           </span>
                         </div>

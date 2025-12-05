@@ -187,7 +187,7 @@ export default function AirportCard({ airport, missions = [] }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             {isHeliport ? (
-              <Helicopter className="w-5 h-5 text-purple-400" />
+              <Helicopter className="w-5 h-5 text-cyan-400" />
             ) : (
               <Plane className="w-5 h-5 text-yt-accent" />
             )}
@@ -195,13 +195,13 @@ export default function AirportCard({ airport, missions = [] }) {
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold text-yt-text-primary">{airport.displayName || airport.name}</h3>
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${
-                  isHeliport ? 'bg-purple-500/20 text-purple-400' : 'bg-yt-accent/20 text-yt-accent'
+                  isHeliport ? 'bg-cyan-500/20 text-cyan-400' : 'bg-yt-accent/20 text-yt-accent'
                 }`}>
                   {isHeliport ? '🚁' : '✈️'}
                 </span>
               </div>
               {airport.isMainBase && (
-                <span className="text-xs text-yellow-400 font-semibold">⭐ Base</span>
+                <span className="text-xs text-fuchsia-400 font-semibold">⭐ Base</span>
               )}
             </div>
           </div>
@@ -225,7 +225,7 @@ export default function AirportCard({ airport, missions = [] }) {
               </div>
             )}
             {airportMissions.length > 0 && (
-              <div className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-sm font-bold">
+              <div className="px-2 py-1 bg-fuchsia-500/20 text-fuchsia-400 rounded text-sm font-bold">
                 {airportMissions.length} ordini
               </div>
             )}
@@ -289,8 +289,8 @@ export default function AirportCard({ airport, missions = [] }) {
 
           {/* Active Orders Section - Design precedente più visibile e compatto orizzontalmente */}
           {!airport.isMainBase && airportMissions.length > 0 && (
-            <div className="p-3 bg-purple-500/10 border-t-2 border-purple-500/40">
-              <h4 className="text-sm font-bold text-purple-300 mb-2 flex items-center gap-2">
+            <div className="p-3 bg-fuchsia-500/10 border-t-2 border-fuchsia-500/40">
+              <h4 className="text-sm font-bold text-fuchsia-300 mb-2 flex items-center gap-2">
                 <Package className="w-4 h-4" />
                 ORDINI ATTIVI ({airportMissions.length})
               </h4>
@@ -300,7 +300,7 @@ export default function AirportCard({ airport, missions = [] }) {
                   const distance = mission.distance_nm ? `${mission.distance_nm}nm` : '-';
 
                   return (
-                    <div key={mission.id} className="bg-yt-bg-secondary p-2.5 rounded border border-purple-500/30">
+                    <div key={mission.id} className="bg-yt-bg-secondary p-2.5 rounded border border-fuchsia-500/30">
                       <div className="flex justify-between items-start mb-1.5">
                         <div className="flex-1 min-w-0">
                           <div className="font-mono text-xs text-yt-text-primary font-bold mb-0.5 truncate">{getWeaponDisplayName(mission.weapon_id)}</div>
@@ -321,11 +321,11 @@ export default function AirportCard({ airport, missions = [] }) {
                       </div>
                       {/* Route Information - compatta */}
                       <div className="flex items-center gap-1 text-[10px] bg-yt-bg-primary px-1.5 py-1 rounded">
-                        <span className="text-yt-accent font-medium truncate">{sourceName}</span>
+                        <span className={`font-medium truncate ${mission.source_airport_id ? 'text-yt-accent' : 'text-fuchsia-400'}`}>{sourceName}</span>
                         <ArrowRight className="w-3 h-3 text-yt-text-secondary flex-shrink-0" />
-                        <span className="text-green-400 font-medium truncate">{airport.displayName || airport.name}</span>
+                        <span className={`font-medium truncate ${isHeliport ? 'text-cyan-400' : 'text-yt-accent'}`}>{airport.displayName || airport.name}</span>
                         <span className="text-yt-border flex-shrink-0">•</span>
-                        <span className="text-cyan-400 font-mono flex-shrink-0">{distance}</span>
+                        <span className="text-yt-text-primary font-mono flex-shrink-0">{distance}</span>
                       </div>
                     </div>
                   );
