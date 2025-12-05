@@ -51,7 +51,7 @@ function getWeaponStatus(quantity, isImportant) {
   if (!isImportant) return 'normal';
   if (quantity <= 5) return 'critical';
   if (quantity <= 20) return 'high';
-  if (quantity <= 50) return 'medium';
+  if (quantity <= 40) return 'medium';
   return 'ok';
 }
 
@@ -122,7 +122,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
     const quantity = weapon.quantity;
     if (quantity <= 5) return 150;  // CRITICAL
     if (quantity <= 20) return 100; // HIGH
-    if (quantity <= 50) return 50;  // MEDIUM
+    if (quantity <= 40) return 50;  // MEDIUM
     return 100; // Default
   };
 
