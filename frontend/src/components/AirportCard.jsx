@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Packag
 import { createOrder } from '../services/api';
 import WeaponChart from './WeaponChart';
 import { getAirportName } from '../config/airports';
+import airports from '../config/airports';
 import { generateChartsPDF, checkChartsAvailable } from '../utils/pdfGenerator';
 import { isImportantWeapon } from '../config/weapons';
 
@@ -297,6 +298,7 @@ export default function AirportCard({ airport, missions = [] }) {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
                 {airportMissions.map(mission => {
                   const sourceName = mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Main Base';
+                  const sourceAirport = mission.source_airport_id ? airports.find(a => a.id === mission.source_airport_id) : null;
                   const distance = mission.distance_nm ? `${mission.distance_nm}nm` : '-';
 
                   return (
@@ -321,9 +323,33 @@ export default function AirportCard({ airport, missions = [] }) {
                       </div>
                       {/* Route Information - compatta */}
                       <div className="flex items-center gap-1 text-[10px] bg-yt-bg-primary px-1.5 py-1 rounded">
-                        <span className={`font-medium truncate ${mission.source_airport_id ? 'text-yt-accent' : 'text-fuchsia-400'}`}>{sourceName}</span>
+                        {!sourceAirport ? (
+                          <span className="text-fuchsia-400 font-medium truncate">{sourceName}</span>
+                        ) : sourceAirport.isMainBase ? (
+                          <span className="text-fuchsia-400 font-medium truncate">{sourceName}</span>
+                        ) : sourceAirport.isHeliport ? (
+                          <>
+                            <Helicopter className="w-3 h-3 text-cyan-400 flex-shrink-0" />
+                            <span className="text-cyan-400 font-medium truncate">{sourceName}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plane className="w-3 h-3 text-yt-accent flex-shrink-0" />
+                            <span className="text-yt-accent font-medium truncate">{sourceName}</span>
+                          </>
+                        )}
                         <ArrowRight className="w-3 h-3 text-yt-text-secondary flex-shrink-0" />
-                        <span className={`font-medium truncate ${isHeliport ? 'text-cyan-400' : 'text-yt-accent'}`}>{airport.displayName || airport.name}</span>
+                        {isHeliport ? (
+                          <>
+                            <Helicopter className="w-3 h-3 text-cyan-400 flex-shrink-0" />
+                            <span className="text-cyan-400 font-medium truncate">{airport.displayName || airport.name}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plane className="w-3 h-3 text-yt-accent flex-shrink-0" />
+                            <span className="text-yt-accent font-medium truncate">{airport.displayName || airport.name}</span>
+                          </>
+                        )}
                         <span className="text-yt-border flex-shrink-0">•</span>
                         <span className="text-yt-text-primary font-mono flex-shrink-0">{distance}</span>
                       </div>
