@@ -60,10 +60,10 @@ function getWeaponStatus(quantity, isImportant) {
  */
 function StatusBadge({ status }) {
   const styles = {
-    critical: 'bg-red-500/20 text-red-400 border-red-500/50',
+    critical: 'bg-red-400/20 text-red-400 border-red-400/50',
     high: 'bg-orange-500/20 text-orange-400 border-orange-500/50',
-    medium: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50',
-    ok: 'bg-green-500/20 text-green-400 border-green-500/50',
+    medium: 'bg-yellow-400/20 text-yellow-400 border-yellow-400/50',
+    ok: 'bg-green-400/20 text-green-400 border-green-400/50',
     normal: 'bg-gray-500/20 text-gray-400 border-gray-500/50',
   };
 
@@ -261,7 +261,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
   });
 
   const airportMissions = missions.filter(m => m.airport_id === airport.id);
-  const cardBorderClass = stats.critical > 0 ? 'border-red-500 pulse-border-critical' : stats.high > 0 ? 'border-orange-500' : stats.medium > 0 ? 'border-yellow-500' : 'border-yt-border';
+  const cardBorderClass = stats.critical > 0 ? 'border-red-400 pulse-border-critical' : stats.high > 0 ? 'border-orange-500' : stats.medium > 0 ? 'border-yellow-400' : 'border-yt-border';
 
   return (
     <div className={`bg-yt-bg-secondary rounded-lg border-2 ${cardBorderClass} overflow-hidden hover:shadow-xl transition-all`}>
@@ -365,7 +365,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
               {!airport.isMainBase && (
                 <button
                   onClick={() => setShowOrderModal(true)}
-                  className="px-2.5 py-1.5 rounded text-xs font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1 transition-all"
+                  className="px-2.5 py-1.5 rounded text-xs font-medium bg-green-400 text-white hover:bg-green-400/80 flex items-center gap-1 transition-all"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Rifornimento</span>
@@ -404,7 +404,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                           </div>
                         </div>
                         <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide ${
-                          mission.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                          mission.status === 'pending' ? 'bg-yellow-400/20 text-yellow-400' :
                           mission.status === 'accepted' ? 'bg-yt-accent/20 text-yt-accent' :
                           'bg-yt-bg-primary/50 text-yt-text-secondary'
                         }`}>
@@ -480,7 +480,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                           <button
                             onClick={() => setMissionStates(prev => ({ ...prev, [mission.id]: { ...state, showAccept: true } }))}
                             disabled={state.loading}
-                            className="flex-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-yt-bg-tertiary text-white rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                            className="flex-1 px-3 py-1.5 bg-green-400 hover:bg-green-400/80 disabled:bg-yt-bg-tertiary text-white rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5"
                           >
                             <CheckCircle className="w-3.5 h-3.5" />
                             Accetta
@@ -500,7 +500,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                             <button
                               onClick={() => handleAcceptMission(mission.id)}
                               disabled={state.loading}
-                              className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-yt-bg-tertiary text-white rounded text-xs font-bold transition-all"
+                              className="px-3 py-1.5 bg-green-400 hover:bg-green-400/80 disabled:bg-yt-bg-tertiary text-white rounded text-xs font-bold transition-all"
                             >
                               OK
                             </button>
@@ -528,7 +528,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                         <button
                           onClick={() => handleCancelMission(mission.id)}
                           disabled={state.loading}
-                          className="px-3 py-1.5 bg-red-600/80 hover:bg-red-600 disabled:bg-yt-bg-tertiary text-white rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                          className="px-3 py-1.5 bg-red-400 hover:bg-red-400/80 disabled:bg-yt-bg-tertiary text-white rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5"
                         >
                           <XCircle className="w-3.5 h-3.5" />
                           <span className="hidden sm:inline">Annulla</span>
@@ -646,7 +646,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
       {/* Order Creation Modal */}
       {showOrderModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setShowOrderModal(false)}>
-          <div className="bg-yt-bg-secondary rounded-lg p-5 max-w-md w-full mx-4 border-2 border-green-500 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-yt-bg-secondary rounded-lg p-5 max-w-md w-full mx-4 border-2 border-green-400 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-yt-text-primary flex items-center gap-2">
                 <Plus className="w-5 h-5 text-green-400" />
@@ -670,7 +670,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                 <select
                   value={selectedWeapon}
                   onChange={(e) => handleWeaponSelect(e.target.value)}
-                  className="w-full bg-yt-bg-primary text-yt-text-primary border border-yt-border rounded px-3 py-2 text-sm focus:outline-none focus:border-green-500 transition-all"
+                  className="w-full bg-yt-bg-primary text-yt-text-primary border border-yt-border rounded px-3 py-2 text-sm focus:outline-none focus:border-green-400 transition-all"
                 >
                   <option value="">-- Seleziona --</option>
                   {weapons.map((weapon, idx) => {
@@ -700,7 +700,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                   value={orderQuantity}
                   onChange={(e) => setOrderQuantity(parseInt(e.target.value) || 0)}
                   min="1"
-                  className="w-full bg-yt-bg-primary text-yt-text-primary border border-yt-border rounded px-3 py-2 text-sm focus:outline-none focus:border-green-500 transition-all"
+                  className="w-full bg-yt-bg-primary text-yt-text-primary border border-yt-border rounded px-3 py-2 text-sm focus:outline-none focus:border-green-400 transition-all"
                   placeholder="100"
                 />
               </div>
@@ -709,7 +709,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={handleCreateOrder}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm transition-all"
+                  className="flex-1 bg-green-400 hover:bg-green-400/80 text-white font-bold py-2 px-4 rounded text-sm transition-all"
                 >
                   Crea Ordine
                 </button>

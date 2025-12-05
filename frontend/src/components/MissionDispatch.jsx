@@ -18,13 +18,13 @@ function getWeaponDisplayName(weaponId) {
 function PriorityBadge({ currentQuantity }) {
   let color, text;
   if (currentQuantity <= 5) {
-    color = 'bg-red-500/20 text-red-400 border-red-500';
+    color = 'bg-red-400/20 text-red-400 border-red-400';
     text = 'CRITICA';
   } else if (currentQuantity <= 20) {
     color = 'bg-orange-500/20 text-orange-400 border-orange-500';
     text = 'ALTA';
   } else {
-    color = 'bg-yellow-500/20 text-yellow-400 border-yellow-500';
+    color = 'bg-yellow-400/20 text-yellow-400 border-yellow-400';
     text = 'MEDIA';
   }
 
@@ -150,7 +150,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
           </div>
           <div>
             {mission.status === 'pending' && (
-              <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-xs font-bold">IN ATTESA</span>
+              <span className="px-2 py-0.5 bg-yellow-400/20 text-yellow-400 rounded text-xs font-bold">IN ATTESA</span>
             )}
             {mission.status === 'accepted' && (
               <span className="px-2 py-0.5 bg-yt-accent/20 text-yt-accent rounded text-xs font-bold">ACCETTATA</span>
@@ -256,7 +256,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
           <button
             onClick={() => setShowAccept(true)}
             disabled={loading}
-            className="flex-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-yt-bg-tertiary disabled:text-yt-text-secondary text-white rounded text-sm font-bold transition-all flex items-center justify-center gap-1.5"
+            className="flex-1 px-3 py-1.5 bg-green-400 hover:bg-green-400/80 disabled:bg-yt-bg-tertiary disabled:text-yt-text-secondary text-white rounded text-sm font-bold transition-all flex items-center justify-center gap-1.5"
           >
             <CheckCircle className="w-4 h-4" />
             Accetta
@@ -276,7 +276,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
             <button
               onClick={handleAccept}
               disabled={loading}
-              className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-yt-bg-tertiary text-white rounded text-sm font-bold transition-all"
+              className="px-3 py-1.5 bg-green-400 hover:bg-green-400/80 disabled:bg-yt-bg-tertiary text-white rounded text-sm font-bold transition-all"
             >
               OK
             </button>
@@ -304,7 +304,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
         <button
           onClick={handleCancel}
           disabled={loading}
-          className="px-3 py-1.5 bg-red-600/80 hover:bg-red-600 disabled:bg-yt-bg-tertiary text-white rounded text-sm font-bold transition-all flex items-center justify-center gap-1.5"
+          className="px-3 py-1.5 bg-red-400 hover:bg-red-400/80 disabled:bg-yt-bg-tertiary text-white rounded text-sm font-bold transition-all flex items-center justify-center gap-1.5"
         >
           <XCircle className="w-4 h-4" />
           <span className="hidden sm:inline">Annulla</span>

@@ -75,21 +75,21 @@ export default function Dashboard({ airports, missions, stats, onMissionsUpdate 
           value={stats.criticalAirports || 0}
           icon={AlertTriangle}
           color="text-red-400"
-          bgColor="bg-red-500/20"
+          bgColor="bg-red-400/20"
         />
         <StatsCard
           title="Missioni"
           value={stats.activeMissions || 0}
           icon={Package}
           color="text-yellow-400"
-          bgColor="bg-yellow-500/20"
+          bgColor="bg-yellow-400/20"
         />
         <StatsCard
           title="Accettate"
           value={stats.acceptedMissions || 0}
           icon={Activity}
           color="text-green-400"
-          bgColor="bg-green-500/20"
+          bgColor="bg-green-400/20"
         />
       </div>
 
@@ -129,7 +129,7 @@ export default function Dashboard({ airports, missions, stats, onMissionsUpdate 
             {isFileSystemAccessSupported() && (
               <button
                 onClick={handleSelectPDFDirectory}
-                className="px-3 py-2 rounded text-sm font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1.5 transition-all"
+                className="px-3 py-2 rounded text-sm font-medium bg-green-400 text-white hover:bg-green-400/80 flex items-center gap-1.5 transition-all"
                 title="Seleziona la directory dove salvare i PDF delle chart"
               >
                 <FolderOpen className="w-4 h-4" />

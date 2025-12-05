@@ -122,7 +122,7 @@ function MissionCard({ mission, airport, onHover, onSelect, isHighlighted, isSel
         </div>
         <div>
           <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide ${
-            isPending ? 'bg-yellow-500/20 text-yellow-400' : 'bg-yt-accent/20 text-yt-accent'
+            isPending ? 'bg-yellow-400/20 text-yellow-400' : 'bg-yt-accent/20 text-yt-accent'
           }`}>
             {isPending ? 'Attesa' : 'Accettata'}
           </span>
@@ -189,7 +189,7 @@ function MissionPolyline({ mission, sourceAirport, destAirport, isHighlighted, i
           </div>
           <div className="mt-1">
             <span className={`px-2 py-1 rounded text-xs ${
-              isPending ? 'bg-blue-500/20 text-blue-600' : 'bg-red-500/20 text-red-600'
+              isPending ? 'bg-blue-500/20 text-blue-600' : 'bg-red-400/20 text-red-400'
             }`}>
               {mission.status.toUpperCase()}
             </span>
@@ -367,7 +367,7 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
                         </div>
                         {missionCount > 0 && (
                           <div className="mt-2 text-xs">
-                            <span className="px-2 py-1 bg-red-500 text-white rounded">
+                            <span className="px-2 py-1 bg-red-400 text-white rounded">
                               {missionCount} missioni attive
                             </span>
                           </div>
