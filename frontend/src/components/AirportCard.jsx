@@ -378,11 +378,11 @@ export default function AirportCard({ airport, missions = [] }) {
                   <Droplet className="w-3.5 h-3.5" />
                   Liquids
                 </h4>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-3 h-96">
                   {liquids.map((liquid, idx) => (
-                    <div key={idx} className="bg-yt-bg-tertiary p-3 rounded border border-yt-border">
-                      <div className="text-xs text-yt-text-secondary mb-1">Type {liquid.item}</div>
-                      <div className="text-lg font-bold text-yt-text-primary">{liquid.quantity.toLocaleString()}</div>
+                    <div key={idx} className="bg-yt-bg-tertiary p-4 rounded border border-yt-border flex flex-col justify-center items-center">
+                      <div className="text-sm text-yt-text-secondary mb-2">Type {liquid.item}</div>
+                      <div className="text-2xl font-bold text-yt-text-primary">{liquid.quantity.toLocaleString()}</div>
                     </div>
                   ))}
                 </div>
