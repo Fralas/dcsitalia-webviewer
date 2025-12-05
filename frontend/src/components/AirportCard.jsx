@@ -278,14 +278,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
               <Plane className="w-5 h-5 text-yt-accent" />
             )}
             <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-yt-text-primary">{airport.displayName || airport.name}</h3>
-                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${
-                  isHeliport ? 'bg-cyan-500/20 text-cyan-400' : 'bg-yt-accent/20 text-yt-accent'
-                }`}>
-                  {isHeliport ? '🚁' : '✈️'}
-                </span>
-              </div>
+              <h3 className="text-base font-bold text-yt-text-primary">{airport.displayName || airport.name}</h3>
               {airport.isMainBase && (
                 <span className="text-xs text-fuchsia-400 font-semibold">⭐ Base</span>
               )}

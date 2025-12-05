@@ -140,9 +140,11 @@ function App() {
           <div className="flex items-center justify-between">
             {/* Logo compatto */}
             <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-yt-accent/20 rounded">
-                <Plane className="w-6 h-6 text-yt-accent" />
-              </div>
+              <img
+                src="/img/DCS_ITALIA_FULL.png"
+                alt="DCS Italia"
+                className="h-10 w-auto object-contain"
+              />
               <div>
                 <h1 className="text-lg font-bold text-yt-text-primary">DCS Warehouse</h1>
                 <p className="text-xs text-yt-text-secondary">Gestione Logistica</p>
