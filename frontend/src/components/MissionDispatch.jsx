@@ -128,14 +128,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
             )}
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-bold text-white">{airport?.displayName || airport?.name || 'Aeroporto Sconosciuto'}</h3>
-              <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                isHeliport ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'
-              }`}>
-                {isHeliport ? '🚁' : '✈️'}
-              </span>
-            </div>
+            <h3 className="text-lg font-bold text-white">{airport?.displayName || airport?.name || 'Aeroporto Sconosciuto'}</h3>
             <div className="flex items-center gap-2 text-sm text-gray-400">
               <Clock className="w-4 h-4" />
               <span>Creata {timeAgo}</span>
@@ -216,7 +209,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
             <div className="flex items-center gap-2 text-sm bg-slate-800/50 px-3 py-2 rounded mt-2">
               {mission.recommended_aircraft === 'helicopter' && (
                 <>
-                  <span className="text-2xl">🚁</span>
+                  <Helicopter className="w-4 h-4 text-purple-400" />
                   <span className="text-gray-400">Velivolo Consigliato:</span>
                   <span className="text-purple-400 font-semibold">Elicottero</span>
                 </>
