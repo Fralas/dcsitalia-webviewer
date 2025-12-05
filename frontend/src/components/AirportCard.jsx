@@ -175,33 +175,33 @@ export default function AirportCard({ airport, missions = [] }) {
   });
 
   const airportMissions = missions.filter(m => m.airport_id === airport.id);
-  const cardBorderClass = stats.critical > 0 ? 'border-red-500 pulse-border-critical' : stats.high > 0 ? 'border-orange-500' : stats.medium > 0 ? 'border-yellow-500' : 'border-gray-700';
+  const cardBorderClass = stats.critical > 0 ? 'border-red-500 pulse-border-critical' : stats.high > 0 ? 'border-orange-500' : stats.medium > 0 ? 'border-yellow-500' : 'border-yt-border';
 
   return (
-    <div className={`bg-slate-800 rounded-lg border-2 ${cardBorderClass} overflow-hidden hover:shadow-xl transition-shadow`}>
+    <div className={`bg-yt-bg-secondary rounded-lg border-2 ${cardBorderClass} overflow-hidden hover:shadow-xl transition-all`}>
       {/* Header */}
       <div
-        className="p-4 cursor-pointer hover:bg-slate-700/50 transition-colors"
+        className="p-3 cursor-pointer hover:bg-yt-bg-tertiary/50 transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             {isHeliport ? (
-              <Helicopter className="w-6 h-6 text-purple-400" />
+              <Helicopter className="w-5 h-5 text-purple-400" />
             ) : (
-              <Plane className="w-6 h-6 text-blue-400" />
+              <Plane className="w-5 h-5 text-yt-accent" />
             )}
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold text-white">{airport.displayName || airport.name}</h3>
-                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                  isHeliport ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'
+                <h3 className="text-base font-bold text-yt-text-primary">{airport.displayName || airport.name}</h3>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${
+                  isHeliport ? 'bg-purple-500/20 text-purple-400' : 'bg-yt-accent/20 text-yt-accent'
                 }`}>
-                  {isHeliport ? '🚁 ELIPORTO' : '✈️ AEROPORTO'}
+                  {isHeliport ? '🚁' : '✈️'}
                 </span>
               </div>
               {airport.isMainBase && (
-                <span className="text-xs text-yellow-400 font-semibold">⭐ BASE PRINCIPALE</span>
+                <span className="text-xs text-yellow-400 font-semibold">⭐ Base</span>
               )}
             </div>
           </div>
@@ -236,52 +236,52 @@ export default function AirportCard({ airport, missions = [] }) {
 
       {/* Expanded Content */}
       {expanded && (
-        <div className="border-t border-gray-700">
-          {/* Filters */}
-          <div className="p-4 bg-slate-900/50 flex gap-2 justify-between items-center">
-            <div className="flex gap-2">
+        <div className="border-t border-yt-border">
+          {/* Filters - compatti stile YouTube */}
+          <div className="p-3 bg-yt-bg-primary flex gap-2 justify-between items-center flex-wrap">
+            <div className="flex gap-1.5">
               <button
                 onClick={() => setFilter('all')}
-                className={`px-3 py-1 rounded text-sm ${filter === 'all' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+                className={`px-2.5 py-1.5 rounded text-xs font-medium transition-all ${filter === 'all' ? 'bg-yt-accent text-white' : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'}`}
               >
                 Tutte ({weapons.length})
               </button>
               <button
                 onClick={() => setFilter('important')}
-                className={`px-3 py-1 rounded text-sm ${filter === 'important' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+                className={`px-2.5 py-1.5 rounded text-xs font-medium transition-all ${filter === 'important' ? 'bg-yt-accent text-white' : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'}`}
               >
                 Importanti ({weapons.filter(w => isImportantWeapon(w.item, isHeliport)).length})
               </button>
               <button
                 onClick={() => setFilter('critical')}
-                className={`px-3 py-1 rounded text-sm ${filter === 'critical' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+                className={`px-2.5 py-1.5 rounded text-xs font-medium transition-all ${filter === 'critical' ? 'bg-yt-accent text-white' : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'}`}
               >
                 Critiche ({stats.critical})
               </button>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-1.5">
               <button
                 onClick={handleGeneratePDF}
                 disabled={generatingPDF || chartsAvailable === false}
-                className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${
+                className={`px-2.5 py-1.5 rounded text-xs font-medium flex items-center gap-1 transition-all ${
                   generatingPDF
-                    ? 'bg-blue-400 text-white cursor-wait'
+                    ? 'bg-yt-accent/80 text-white cursor-wait'
                     : chartsAvailable === false
-                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                    ? 'bg-yt-bg-tertiary text-yt-text-secondary cursor-not-allowed'
+                    : 'bg-yt-accent text-white hover:bg-yt-accent/80'
                 }`}
                 title={chartsAvailable === false ? 'Nessuna chart disponibile per questo aeroporto' : ''}
               >
-                <FileDown className="w-4 h-4" />
-                {generatingPDF ? 'Generando PDF...' : chartsAvailable === null ? 'Verifica Charts...' : 'Scarica Charts PDF'}
+                <FileDown className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{generatingPDF ? 'PDF...' : chartsAvailable === null ? 'Verifica...' : 'PDF'}</span>
               </button>
               {!airport.isMainBase && (
                 <button
                   onClick={() => setShowOrderModal(true)}
-                  className="px-3 py-1 rounded text-sm bg-green-600 text-white hover:bg-green-700 flex items-center gap-1"
+                  className="px-2.5 py-1.5 rounded text-xs font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1 transition-all"
                 >
-                  <Plus className="w-4 h-4" />
-                  Richiedi Rifornimento
+                  <Plus className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Rifornimento</span>
                 </button>
               )}
             </div>
@@ -289,10 +289,10 @@ export default function AirportCard({ airport, missions = [] }) {
 
           {/* Active Orders Section */}
           {!airport.isMainBase && airportMissions.length > 0 && (
-            <div className="p-4 bg-purple-900/20 border-t border-purple-500/30">
-              <h4 className="text-sm font-bold text-purple-300 mb-2 flex items-center gap-2">
-                <Package className="w-4 h-4" />
-                ORDINI ATTIVI ({airportMissions.length})
+            <div className="p-3 bg-purple-900/10 border-t border-purple-500/20">
+              <h4 className="text-xs font-bold text-purple-400 mb-2 flex items-center gap-1.5 uppercase tracking-wide">
+                <Package className="w-3.5 h-3.5" />
+                Ordini Attivi ({airportMissions.length})
               </h4>
               <div className="space-y-2">
                 {airportMissions.map(mission => {
@@ -300,33 +300,31 @@ export default function AirportCard({ airport, missions = [] }) {
                   const distance = mission.distance_nm ? `${mission.distance_nm}nm` : '-';
 
                   return (
-                    <div key={mission.id} className="bg-slate-800 p-3 rounded">
-                      <div className="flex justify-between items-start mb-2">
+                    <div key={mission.id} className="bg-yt-bg-tertiary p-2.5 rounded">
+                      <div className="flex justify-between items-start mb-1.5">
                         <div className="flex-1">
-                          <div className="font-mono text-sm text-white mb-1">{getWeaponDisplayName(mission.weapon_id)}</div>
-                          <div className="text-xs text-gray-400">
-                            Quantità richiesta: <span className="font-bold text-white">{mission.quantity_needed}</span> |
+                          <div className="font-mono text-xs text-yt-text-primary font-bold mb-0.5">{getWeaponDisplayName(mission.weapon_id)}</div>
+                          <div className="text-xs text-yt-text-secondary">
+                            Richiesta: <span className="font-bold text-yt-text-primary">{mission.quantity_needed}</span> •
                             Attuale: <span className="font-bold text-orange-400">{mission.current_quantity}</span>
                           </div>
                         </div>
                         <div>
-                          <span className={`px-2 py-1 rounded text-xs ${
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${
                             mission.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                            mission.status === 'accepted' ? 'bg-blue-500/20 text-blue-400' :
-                            'bg-gray-500/20 text-gray-400'
+                            mission.status === 'accepted' ? 'bg-yt-accent/20 text-yt-accent' :
+                            'bg-yt-bg-primary/50 text-yt-text-secondary'
                           }`}>
-                            {mission.status.toUpperCase()}
+                            {mission.status === 'pending' ? 'Attesa' : mission.status === 'accepted' ? 'Accettata' : mission.status}
                           </span>
                         </div>
                       </div>
                       {/* Route Information */}
-                      <div className="flex items-center gap-2 text-xs bg-slate-900/50 px-2 py-1 rounded">
-                        <span className="text-blue-400 font-semibold">Da:</span>
-                        <span className="text-white">{sourceName}</span>
-                        <ArrowRight className="w-3 h-3 text-gray-500" />
-                        <span className="text-green-400 font-semibold">A:</span>
-                        <span className="text-white">{airport.displayName || airport.name}</span>
-                        <span className="text-gray-500">•</span>
+                      <div className="flex items-center gap-1.5 text-xs bg-yt-bg-primary px-2 py-1 rounded">
+                        <span className="text-yt-accent font-medium">{sourceName}</span>
+                        <ArrowRight className="w-3 h-3 text-yt-text-secondary" />
+                        <span className="text-green-400 font-medium">{airport.displayName || airport.name}</span>
+                        <span className="text-yt-border">•</span>
                         <span className="text-cyan-400 font-mono">{distance}</span>
                       </div>
                     </div>
@@ -337,31 +335,31 @@ export default function AirportCard({ airport, missions = [] }) {
           )}
 
           {/* Liquids Section */}
-          <div className="p-4 bg-slate-900/30">
-            <h4 className="text-sm font-bold text-gray-400 mb-2 flex items-center gap-2">
-              <Droplet className="w-4 h-4" />
-              LIQUIDS
+          <div className="p-3 bg-yt-bg-primary/50">
+            <h4 className="text-xs font-bold text-yt-text-secondary mb-2 flex items-center gap-1.5 uppercase tracking-wide">
+              <Droplet className="w-3.5 h-3.5" />
+              Liquids
             </h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               {liquids.map((liquid, idx) => (
-                <div key={idx} className="bg-slate-800 p-2 rounded">
-                  <div className="text-xs text-gray-400">Type {liquid.item}</div>
-                  <div className="text-lg font-bold text-white">{liquid.quantity.toLocaleString()}</div>
+                <div key={idx} className="bg-yt-bg-tertiary p-2 rounded">
+                  <div className="text-xs text-yt-text-secondary">Type {liquid.item}</div>
+                  <div className="text-base font-bold text-yt-text-primary">{liquid.quantity.toLocaleString()}</div>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Weapons Section */}
-          <div className="p-4">
-            <h4 className="text-sm font-bold text-gray-400 mb-2 flex items-center gap-2">
-              <Package className="w-4 h-4" />
-              WEAPONS & MUNITIONS
+          <div className="p-3">
+            <h4 className="text-xs font-bold text-yt-text-secondary mb-2 flex items-center gap-1.5 uppercase tracking-wide">
+              <Package className="w-3.5 h-3.5" />
+              Weapons & Munitions
             </h4>
             <div className="max-h-96 overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-slate-800 border-b border-gray-700">
-                  <tr className="text-left text-gray-400">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-yt-bg-secondary border-b border-yt-border">
+                  <tr className="text-left text-yt-text-secondary">
                     <th className="p-2">Weapon</th>
                     <th className="p-2 text-right">Quantity</th>
                     <th className="p-2">Status</th>
@@ -373,9 +371,9 @@ export default function AirportCard({ airport, missions = [] }) {
                     const status = getWeaponStatus(weapon.quantity, isImportant);
 
                     return (
-                      <tr key={idx} className="border-b border-gray-800 hover:bg-slate-700/50">
-                        <td className="p-2 font-mono text-xs">{getWeaponDisplayName(weapon.item)}</td>
-                        <td className="p-2 text-right font-bold">{weapon.quantity}</td>
+                      <tr key={idx} className="border-b border-yt-border hover:bg-yt-bg-tertiary/50 transition-colors">
+                        <td className="p-2 font-mono text-yt-text-primary">{getWeaponDisplayName(weapon.item)}</td>
+                        <td className="p-2 text-right font-bold text-yt-text-primary">{weapon.quantity}</td>
                         <td className="p-2">
                           <StatusBadge status={status} />
                         </td>
@@ -388,16 +386,16 @@ export default function AirportCard({ airport, missions = [] }) {
           </div>
 
           {/* Historical Chart Section */}
-          <div className="p-4 bg-slate-800/50 border-t border-gray-700">
-            <div className="mb-4">
-              <h4 className="text-sm font-bold text-gray-400 mb-3 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4" />
-                ANDAMENTO STORICO (7 giorni)
+          <div className="p-3 bg-yt-bg-primary/50 border-t border-yt-border">
+            <div className="mb-3">
+              <h4 className="text-xs font-bold text-yt-text-secondary mb-2 flex items-center gap-1.5 uppercase tracking-wide">
+                <TrendingUp className="w-3.5 h-3.5" />
+                Andamento Storico (7 giorni)
               </h4>
               <select
                 value={chartWeapon}
                 onChange={(e) => setChartWeapon(e.target.value)}
-                className="w-full bg-slate-900 text-white border border-gray-600 rounded px-3 py-2 focus:outline-none focus:border-blue-500"
+                className="w-full bg-yt-bg-tertiary text-yt-text-primary border border-yt-border rounded px-2.5 py-2 text-xs focus:outline-none focus:border-yt-accent transition-all"
               >
                 <option value="">-- Seleziona un'arma per vedere il grafico --</option>
                 {weapons
@@ -419,13 +417,13 @@ export default function AirportCard({ airport, missions = [] }) {
             )}
 
             {!chartWeapon && (
-              <div className="bg-slate-900/50 rounded-lg p-8 text-center">
-                <TrendingUp className="w-12 h-12 text-gray-600 mx-auto mb-2" />
-                <p className="text-gray-400 text-sm">
-                  Seleziona un'arma dal menu a tendina per visualizzare il grafico storico
+              <div className="bg-yt-bg-tertiary rounded-lg p-6 text-center">
+                <TrendingUp className="w-10 h-10 text-yt-text-secondary mx-auto mb-2 opacity-50" />
+                <p className="text-yt-text-primary text-xs">
+                  Seleziona un'arma dal menu per visualizzare il grafico
                 </p>
-                <p className="text-xs text-gray-500 mt-2">
-                  📊 I dati vengono salvati automaticamente ogni 4 ore
+                <p className="text-[10px] text-yt-text-secondary mt-1.5">
+                  📊 Dati salvati ogni 4 ore
                 </p>
               </div>
             )}
@@ -435,32 +433,32 @@ export default function AirportCard({ airport, missions = [] }) {
 
       {/* Order Creation Modal */}
       {showOrderModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setShowOrderModal(false)}>
-          <div className="bg-slate-800 rounded-lg p-6 max-w-md w-full mx-4 border-2 border-green-500" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setShowOrderModal(false)}>
+          <div className="bg-yt-bg-secondary rounded-lg p-5 max-w-md w-full mx-4 border-2 border-green-500 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              <h3 className="text-lg font-bold text-yt-text-primary flex items-center gap-2">
                 <Plus className="w-5 h-5 text-green-400" />
                 Richiedi Rifornimento
               </h3>
-              <button onClick={() => setShowOrderModal(false)} className="text-gray-400 hover:text-white">
+              <button onClick={() => setShowOrderModal(false)} className="text-yt-text-secondary hover:text-yt-text-primary transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               {/* Airport Info */}
-              <div className="bg-slate-900 p-3 rounded">
-                <div className="text-xs text-gray-400">Aeroporto</div>
-                <div className="text-white font-bold">{airport.displayName || airport.name}</div>
+              <div className="bg-yt-bg-primary p-3 rounded">
+                <div className="text-xs text-yt-text-secondary">Aeroporto</div>
+                <div className="text-yt-text-primary font-bold">{airport.displayName || airport.name}</div>
               </div>
 
               {/* Weapon Selection */}
               <div>
-                <label className="block text-sm text-gray-300 mb-2">Seleziona Arma</label>
+                <label className="block text-xs text-yt-text-secondary mb-1.5 font-medium">Seleziona Arma</label>
                 <select
                   value={selectedWeapon}
                   onChange={(e) => handleWeaponSelect(e.target.value)}
-                  className="w-full bg-slate-900 text-white border border-gray-600 rounded px-3 py-2 focus:outline-none focus:border-green-500"
+                  className="w-full bg-yt-bg-primary text-yt-text-primary border border-yt-border rounded px-3 py-2 text-sm focus:outline-none focus:border-green-500 transition-all"
                 >
                   <option value="">-- Seleziona --</option>
                   {weapons.map((weapon, idx) => {
@@ -477,10 +475,10 @@ export default function AirportCard({ airport, missions = [] }) {
 
               {/* Quantity Input */}
               <div>
-                <label className="block text-sm text-gray-300 mb-2">
+                <label className="block text-xs text-yt-text-secondary mb-1.5 font-medium">
                   Quantità da Ordinare
                   {selectedWeapon && (
-                    <span className="text-xs text-gray-500 ml-2">
+                    <span className="text-xs text-yt-text-secondary/60 ml-2">
                       (Suggerito: {getSuggestedQuantity(selectedWeapon)})
                     </span>
                   )}
@@ -490,22 +488,22 @@ export default function AirportCard({ airport, missions = [] }) {
                   value={orderQuantity}
                   onChange={(e) => setOrderQuantity(parseInt(e.target.value) || 0)}
                   min="1"
-                  className="w-full bg-slate-900 text-white border border-gray-600 rounded px-3 py-2 focus:outline-none focus:border-green-500"
+                  className="w-full bg-yt-bg-primary text-yt-text-primary border border-yt-border rounded px-3 py-2 text-sm focus:outline-none focus:border-green-500 transition-all"
                   placeholder="100"
                 />
               </div>
 
               {/* Buttons */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 pt-2">
                 <button
                   onClick={handleCreateOrder}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm transition-all"
                 >
                   Crea Ordine
                 </button>
                 <button
                   onClick={() => setShowOrderModal(false)}
-                  className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
+                  className="flex-1 bg-yt-bg-tertiary hover:bg-yt-border text-yt-text-primary font-bold py-2 px-4 rounded text-sm transition-all"
                 >
                   Annulla
                 </button>
