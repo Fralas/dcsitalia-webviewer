@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { isImportantWeapon } from '../config/rules.config.js';
 import { getAirportById } from '../config/airports.config.js';
+import { calculateTotalWeight } from '../config/weaponWeights.config.js';
 
 const DATA_DIR = './data/historical';
 const SNAPSHOTS_FILE = path.join(DATA_DIR, 'snapshots.json');
@@ -168,6 +169,9 @@ export function createMission(airportId, weaponId, quantityNeeded, currentQuanti
   const createdAt = Date.now();
   const expiresAt = createdAt + (expiryHours * 60 * 60 * 1000);
 
+  // Calculate total weight for the cargo
+  const totalWeightLbs = calculateTotalWeight(weaponId, quantityNeeded);
+
   missions.push({
     id: missionId,
     airport_id: airportId, // Destination (recipient)
@@ -176,6 +180,7 @@ export function createMission(airportId, weaponId, quantityNeeded, currentQuanti
     weapon_id: weaponId,
     quantity_needed: quantityNeeded,
     current_quantity: currentQuantity,
+    total_weight_lbs: totalWeightLbs, // Total cargo weight in pounds
     status: 'pending',
     recommended_aircraft: recommendedAircraft, // 'helicopter', 'airplane', or 'airdrop'
     created_at: createdAt,

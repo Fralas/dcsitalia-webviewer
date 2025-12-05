@@ -2,9 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Map as MapIcon, Plane, ArrowRight } from 'lucide-react';
+import { Map as MapIcon, Plane, ArrowRight, Weight } from 'lucide-react';
 import { getAirportName } from '../config/airports';
 import airports from '../config/airports';
+import { formatWeight } from '../utils/weightFormatter';
 
 /**
  * Get weapon display name
@@ -109,6 +110,12 @@ function MissionCard({ mission, airport, onHover, onSelect, isHighlighted, isSel
           <div className="text-xs text-gray-400">
             Qty: <span className="font-bold text-white">{mission.quantity_needed}</span>
           </div>
+          {mission.total_weight_lbs && mission.total_weight_lbs > 0 && (
+            <div className="flex items-center gap-1 text-xs text-cyan-400 mt-1">
+              <Weight className="w-3 h-3" />
+              <span className="font-mono">{formatWeight(mission.total_weight_lbs)}</span>
+            </div>
+          )}
         </div>
         <div>
           <span className={`px-2 py-1 rounded text-xs ${

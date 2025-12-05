@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plane, Clock, User, CheckCircle, XCircle, AlertTriangle, Package, ArrowRight } from 'lucide-react';
+import { Plane, Clock, User, CheckCircle, XCircle, AlertTriangle, Package, ArrowRight, Weight } from 'lucide-react';
 import * as api from '../services/api';
 import { getAirportName } from '../config/airports';
 import airports from '../config/airports';
+import { formatWeight } from '../utils/weightFormatter';
 
 /**
  * Get weapon display name
@@ -172,6 +173,17 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
             </div>
           </div>
         </div>
+
+        {/* Cargo Weight */}
+        {mission.total_weight_lbs && mission.total_weight_lbs > 0 && (
+          <div className="mt-3 pt-3 border-t border-gray-700">
+            <div className="flex items-center gap-2 text-sm bg-slate-800/50 px-3 py-2 rounded">
+              <Weight className="w-4 h-4 text-cyan-400" />
+              <span className="text-gray-400">Peso Carico:</span>
+              <span className="text-cyan-400 font-bold font-mono">{formatWeight(mission.total_weight_lbs)}</span>
+            </div>
+          </div>
+        )}
 
         {/* Route Information */}
         <div className="mt-3 pt-3 border-t border-gray-700">
