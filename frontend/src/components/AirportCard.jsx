@@ -334,67 +334,59 @@ export default function AirportCard({ airport, missions = [] }) {
             </div>
           )}
 
-          {/* Liquids Section - più colonne per sfruttare spazio */}
-          <div className="p-3 bg-yt-bg-primary/50">
-            <h4 className="text-xs font-bold text-yt-text-secondary mb-2 flex items-center gap-1.5 uppercase tracking-wide">
-              <Droplet className="w-3.5 h-3.5" />
-              Liquids
-            </h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2">
-              {liquids.map((liquid, idx) => (
-                <div key={idx} className="bg-yt-bg-tertiary p-2 rounded">
-                  <div className="text-xs text-yt-text-secondary">Type {liquid.item}</div>
-                  <div className="text-base font-bold text-yt-text-primary">{liquid.quantity.toLocaleString()}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Weapons Section - layout a colonne per sfruttare spazio */}
+          {/* Weapons & Liquids Section - Split Layout */}
           <div className="p-3">
-            <h4 className="text-xs font-bold text-yt-text-secondary mb-2 flex items-center gap-1.5 uppercase tracking-wide">
-              <Package className="w-3.5 h-3.5" />
-              Weapons & Munitions
-            </h4>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Left Column: Weapons in single scrollbar */}
+              <div>
+                <h4 className="text-xs font-bold text-yt-text-secondary mb-2 flex items-center gap-1.5 uppercase tracking-wide">
+                  <Package className="w-3.5 h-3.5" />
+                  Weapons & Munitions
+                </h4>
+                <div className="max-h-96 overflow-y-auto border border-yt-border rounded">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-yt-bg-secondary border-b border-yt-border z-10">
+                      <tr className="text-left text-yt-text-secondary">
+                        <th className="p-2">Weapon</th>
+                        <th className="p-2 text-right">Qty</th>
+                        <th className="p-2">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredWeapons.map((weapon, idx) => {
+                        const isImportant = isImportantWeapon(weapon.item, isHeliport);
+                        const status = getWeaponStatus(weapon.quantity, isImportant);
 
-            {/* Layout a griglia su schermi grandi per ottimizzare spazio */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              {/* Suddividi weapons in 2 colonne */}
-              {[0, 1].map(colIndex => {
-                const startIdx = Math.floor(filteredWeapons.length / 2) * colIndex;
-                const endIdx = colIndex === 0 ? Math.floor(filteredWeapons.length / 2) : filteredWeapons.length;
-                const columnWeapons = filteredWeapons.slice(startIdx, endIdx);
+                        return (
+                          <tr key={idx} className="border-b border-yt-border hover:bg-yt-bg-tertiary/50 transition-colors">
+                            <td className="p-2 font-mono text-yt-text-primary">{getWeaponDisplayName(weapon.item)}</td>
+                            <td className="p-2 text-right font-bold text-yt-text-primary">{weapon.quantity}</td>
+                            <td className="p-2">
+                              <StatusBadge status={status} />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-                return columnWeapons.length > 0 ? (
-                  <div key={colIndex} className="max-h-96 overflow-y-auto">
-                    <table className="w-full text-xs">
-                      <thead className="sticky top-0 bg-yt-bg-secondary border-b border-yt-border z-10">
-                        <tr className="text-left text-yt-text-secondary">
-                          <th className="p-2">Weapon</th>
-                          <th className="p-2 text-right">Qty</th>
-                          <th className="p-2">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {columnWeapons.map((weapon, idx) => {
-                          const isImportant = isImportantWeapon(weapon.item, isHeliport);
-                          const status = getWeaponStatus(weapon.quantity, isImportant);
-
-                          return (
-                            <tr key={startIdx + idx} className="border-b border-yt-border hover:bg-yt-bg-tertiary/50 transition-colors">
-                              <td className="p-2 font-mono text-yt-text-primary">{getWeaponDisplayName(weapon.item)}</td>
-                              <td className="p-2 text-right font-bold text-yt-text-primary">{weapon.quantity}</td>
-                              <td className="p-2">
-                                <StatusBadge status={status} />
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : null;
-              })}
+              {/* Right Column: Liquids in 2x2 block */}
+              <div>
+                <h4 className="text-xs font-bold text-yt-text-secondary mb-2 flex items-center gap-1.5 uppercase tracking-wide">
+                  <Droplet className="w-3.5 h-3.5" />
+                  Liquids
+                </h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {liquids.map((liquid, idx) => (
+                    <div key={idx} className="bg-yt-bg-tertiary p-3 rounded border border-yt-border">
+                      <div className="text-xs text-yt-text-secondary mb-1">Type {liquid.item}</div>
+                      <div className="text-lg font-bold text-yt-text-primary">{liquid.quantity.toLocaleString()}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
