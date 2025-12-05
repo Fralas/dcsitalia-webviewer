@@ -470,6 +470,33 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                         <span className="text-yt-text-primary font-mono flex-shrink-0">{distance}</span>
                       </div>
 
+                      {/* Recommended Aircraft */}
+                      {mission.recommended_aircraft && (
+                        <div className="flex items-center gap-1.5 text-xs bg-yt-bg-tertiary px-2 py-1.5 rounded mb-2">
+                          {mission.recommended_aircraft === 'helicopter' && (
+                            <>
+                              <Helicopter className="w-3.5 h-3.5 text-cyan-400" />
+                              <span className="text-yt-text-secondary">Consigliato:</span>
+                              <span className="text-cyan-400 font-medium">Elicottero</span>
+                            </>
+                          )}
+                          {mission.recommended_aircraft === 'airplane' && (
+                            <>
+                              <Plane className="w-3.5 h-3.5 text-yt-accent" />
+                              <span className="text-yt-text-secondary">Consigliato:</span>
+                              <span className="text-yt-accent font-medium">C-130</span>
+                            </>
+                          )}
+                          {mission.recommended_aircraft === 'airdrop' && (
+                            <>
+                              <Package className="w-3.5 h-3.5 text-orange-400" />
+                              <span className="text-yt-text-secondary">Consigliato:</span>
+                              <span className="text-orange-400 font-medium">Airdrop</span>
+                            </>
+                          )}
+                        </div>
+                      )}
+
                       {/* Pilot info for accepted missions */}
                       {mission.status === 'accepted' && mission.accepted_by && (
                         <div className="flex items-center gap-1.5 text-xs bg-yt-bg-tertiary px-2 py-1.5 rounded mb-2">
