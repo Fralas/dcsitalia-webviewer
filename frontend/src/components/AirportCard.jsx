@@ -249,7 +249,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
     filteredWeapons = weapons.filter(w => isImportantWeapon(w.item, isHeliport));
   }
 
-  // Sort by status (critical first)
+  // Sort by status (critical first), then by quantity (lowest first)
   filteredWeapons = [...filteredWeapons].sort((a, b) => {
     const isImportantA = isImportantWeapon(a.item, isHeliport);
     const isImportantB = isImportantWeapon(b.item, isHeliport);
@@ -257,7 +257,14 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
     const statusB = getWeaponStatus(b.quantity, isImportantB);
 
     const priority = { critical: 0, high: 1, medium: 2, ok: 3, normal: 4 };
-    return priority[statusA] - priority[statusB];
+    const priorityDiff = priority[statusA] - priority[statusB];
+
+    // If same priority, sort by quantity (lowest first)
+    if (priorityDiff === 0) {
+      return a.quantity - b.quantity;
+    }
+
+    return priorityDiff;
   });
 
   const airportMissions = missions.filter(m => m.airport_id === airport.id);
