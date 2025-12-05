@@ -381,7 +381,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                 <Package className="w-4 h-4" />
                 ORDINI ATTIVI ({airportMissions.length})
               </h4>
-              <div className="space-y-3">
+              <div className={`grid gap-3 ${airportMissions.length === 1 ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
                 {airportMissions.map(mission => {
                   const sourceName = mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Main Base';
                   const sourceAirport = mission.source_airport_id ? airports.find(a => a.id === mission.source_airport_id) : null;
@@ -480,7 +480,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                           <button
                             onClick={() => setMissionStates(prev => ({ ...prev, [mission.id]: { ...state, showAccept: true } }))}
                             disabled={state.loading}
-                            className="flex-1 px-3 py-1.5 bg-green-400 hover:bg-green-400/80 disabled:bg-yt-bg-tertiary text-white rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                            className="flex-1 px-3 py-1.5 bg-green-400/20 text-green-400 border border-green-400/50 hover:bg-green-400/30 disabled:bg-yt-bg-tertiary disabled:text-yt-text-secondary disabled:border-yt-border rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5"
                           >
                             <CheckCircle className="w-3.5 h-3.5" />
                             Accetta
@@ -500,7 +500,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                             <button
                               onClick={() => handleAcceptMission(mission.id)}
                               disabled={state.loading}
-                              className="px-3 py-1.5 bg-green-400 hover:bg-green-400/80 disabled:bg-yt-bg-tertiary text-white rounded text-xs font-bold transition-all"
+                              className="px-3 py-1.5 bg-green-400/20 text-green-400 border border-green-400/50 hover:bg-green-400/30 disabled:bg-yt-bg-tertiary disabled:text-yt-text-secondary disabled:border-yt-border rounded text-xs font-bold transition-all"
                             >
                               OK
                             </button>
@@ -528,7 +528,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                         <button
                           onClick={() => handleCancelMission(mission.id)}
                           disabled={state.loading}
-                          className="px-3 py-1.5 bg-red-400 hover:bg-red-400/80 disabled:bg-yt-bg-tertiary text-white rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                          className="px-3 py-1.5 bg-red-400/20 text-red-400 border border-red-400/50 hover:bg-red-400/30 disabled:bg-yt-bg-tertiary disabled:text-yt-text-secondary disabled:border-yt-border rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5"
                         >
                           <XCircle className="w-3.5 h-3.5" />
                           <span className="hidden sm:inline">Annulla</span>
