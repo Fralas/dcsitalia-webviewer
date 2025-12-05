@@ -25,7 +25,7 @@ function StatsCard({ title, value, icon: Icon, color, bgColor }) {
 /**
  * Dashboard Component
  */
-export default function Dashboard({ airports, missions, stats }) {
+export default function Dashboard({ airports, missions, stats, onMissionsUpdate }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('name'); // name, critical
 
@@ -154,6 +154,7 @@ export default function Dashboard({ airports, missions, stats }) {
               key={airport.id}
               airport={airport}
               missions={missions}
+              onMissionsUpdate={onMissionsUpdate}
             />
           ))
         )}

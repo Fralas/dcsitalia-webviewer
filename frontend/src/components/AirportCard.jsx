@@ -1,17 +1,47 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Helicopter, Plus, X, TrendingUp, ArrowRight, FileDown } from 'lucide-react';
-import { createOrder } from '../services/api';
+import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Helicopter, Plus, X, TrendingUp, ArrowRight, FileDown, Weight, Clock, User, XCircle } from 'lucide-react';
+import * as api from '../services/api';
 import WeaponChart from './WeaponChart';
 import { getAirportName } from '../config/airports';
 import airports from '../config/airports';
 import { generateChartsPDF, checkChartsAvailable } from '../utils/pdfGenerator';
 import { isImportantWeapon } from '../config/weapons';
+import { formatWeight } from '../utils/weightFormatter';
 
 /**
  * Get weapon display name (remove prefix)
  */
 function getWeaponDisplayName(weaponId) {
   return weaponId.replace(/^weapons\.(missiles|bombs|nurs|containers|droptanks|torpedoes|adapters)\./, '');
+}
+
+/**
+ * Get time ago string
+ */
+function getTimeAgo(timestamp) {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  if (seconds < 60) return `${seconds}s fa`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m fa`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h fa`;
+  const days = Math.floor(hours / 24);
+  return `${days}g fa`;
+}
+
+/**
+ * Get time remaining string
+ */
+function getTimeRemaining(timestamp) {
+  const seconds = Math.floor((timestamp - Date.now()) / 1000);
+  if (seconds < 0) return 'SCADUTA';
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `${days}g`;
 }
 
 /**
@@ -58,7 +88,7 @@ function StatusBadge({ status }) {
 /**
  * Airport Card Component
  */
-export default function AirportCard({ airport, missions = [] }) {
+export default function AirportCard({ airport, missions = [], onMissionsUpdate }) {
   const [expanded, setExpanded] = useState(false);
   const [filter, setFilter] = useState('all'); // all, critical, important
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -67,6 +97,9 @@ export default function AirportCard({ airport, missions = [] }) {
   const [chartWeapon, setChartWeapon] = useState(''); // For the historical chart
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [chartsAvailable, setChartsAvailable] = useState(null); // null = not checked, true/false = has charts
+
+  // Mission management states
+  const [missionStates, setMissionStates] = useState({}); // { missionId: { userName, showAccept, loading } }
 
   if (!airport || !airport.data) {
     return null;
@@ -110,13 +143,65 @@ export default function AirportCard({ airport, missions = [] }) {
     }
 
     try {
-      await createOrder(airport.id, selectedWeapon, orderQuantity);
+      await api.createOrder(airport.id, selectedWeapon, orderQuantity);
       setShowOrderModal(false);
       setSelectedWeapon('');
       setOrderQuantity(100);
       alert('Ordine creato con successo!');
+      if (onMissionsUpdate) onMissionsUpdate();
     } catch (error) {
       alert('Errore nella creazione dell\'ordine: ' + error.message);
+    }
+  };
+
+  // Handle mission accept
+  const handleAcceptMission = async (missionId) => {
+    const state = missionStates[missionId] || {};
+    if (!state.userName?.trim()) {
+      alert('Inserisci il tuo nome');
+      return;
+    }
+
+    setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: true } }));
+    try {
+      await api.acceptMission(missionId, state.userName);
+      setMissionStates(prev => ({ ...prev, [missionId]: { userName: '', showAccept: false, loading: false } }));
+      if (onMissionsUpdate) onMissionsUpdate();
+    } catch (error) {
+      alert(`Errore nell'accettare la missione: ${error.message}`);
+      setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: false } }));
+    }
+  };
+
+  // Handle mission complete
+  const handleCompleteMission = async (missionId) => {
+    if (!confirm('Segnare questa missione come completata?')) return;
+
+    const state = missionStates[missionId] || {};
+    setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: true } }));
+    try {
+      await api.completeMission(missionId);
+      setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: false } }));
+      if (onMissionsUpdate) onMissionsUpdate();
+    } catch (error) {
+      alert(`Errore nel completare la missione: ${error.message}`);
+      setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: false } }));
+    }
+  };
+
+  // Handle mission cancel
+  const handleCancelMission = async (missionId) => {
+    if (!confirm('Annullare questa missione?')) return;
+
+    const state = missionStates[missionId] || {};
+    setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: true } }));
+    try {
+      await api.cancelMission(missionId);
+      setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: false } }));
+      if (onMissionsUpdate) onMissionsUpdate();
+    } catch (error) {
+      alert(`Errore nell'annullare la missione: ${error.message}`);
+      setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: false } }));
     }
   };
 
@@ -288,70 +373,165 @@ export default function AirportCard({ airport, missions = [] }) {
             </div>
           </div>
 
-          {/* Active Orders Section - Design precedente più visibile e compatto orizzontalmente */}
+          {/* Active Orders Section - Expanded with full mission management */}
           {!airport.isMainBase && airportMissions.length > 0 && (
             <div className="p-3 bg-fuchsia-500/10 border-t-2 border-fuchsia-500/40">
-              <h4 className="text-sm font-bold text-fuchsia-300 mb-2 flex items-center gap-2">
+              <h4 className="text-sm font-bold text-fuchsia-300 mb-3 flex items-center gap-2">
                 <Package className="w-4 h-4" />
                 ORDINI ATTIVI ({airportMissions.length})
               </h4>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+              <div className="space-y-3">
                 {airportMissions.map(mission => {
                   const sourceName = mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Main Base';
                   const sourceAirport = mission.source_airport_id ? airports.find(a => a.id === mission.source_airport_id) : null;
                   const distance = mission.distance_nm ? `${mission.distance_nm}nm` : '-';
+                  const timeAgo = getTimeAgo(mission.created_at);
+                  const expiresIn = getTimeRemaining(mission.expires_at);
+                  const state = missionStates[mission.id] || { userName: '', showAccept: false, loading: false };
 
                   return (
-                    <div key={mission.id} className="bg-yt-bg-secondary p-2.5 rounded border border-fuchsia-500/30">
-                      <div className="flex justify-between items-start mb-1.5">
+                    <div key={mission.id} className="bg-yt-bg-secondary p-3 rounded-lg border-2 border-fuchsia-500/30">
+                      {/* Header with weapon and status */}
+                      <div className="flex justify-between items-start mb-2">
                         <div className="flex-1 min-w-0">
-                          <div className="font-mono text-xs text-yt-text-primary font-bold mb-0.5 truncate">{getWeaponDisplayName(mission.weapon_id)}</div>
-                          <div className="text-[10px] text-yt-text-secondary">
-                            Qty: <span className="font-bold text-yt-text-primary">{mission.quantity_needed}</span> •
-                            Att: <span className="font-bold text-orange-400">{mission.current_quantity}</span>
+                          <div className="font-mono text-sm text-yt-text-primary font-bold mb-1 truncate">{getWeaponDisplayName(mission.weapon_id)}</div>
+                          <div className="flex items-center gap-2 text-xs">
+                            <Clock className="w-3 h-3 text-yt-text-secondary" />
+                            <span className="text-yt-text-secondary">{timeAgo}</span>
+                            <span className="text-yt-border">•</span>
+                            <span className="text-yellow-400 font-medium">⏰ {expiresIn}</span>
                           </div>
                         </div>
-                        <div className="flex-shrink-0 ml-2">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                            mission.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                            mission.status === 'accepted' ? 'bg-yt-accent/20 text-yt-accent' :
-                            'bg-yt-bg-primary/50 text-yt-text-secondary'
-                          }`}>
-                            {mission.status === 'pending' ? 'ATT' : mission.status === 'accepted' ? 'ACC' : mission.status.toUpperCase().substring(0, 3)}
-                          </span>
-                        </div>
+                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide ${
+                          mission.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                          mission.status === 'accepted' ? 'bg-yt-accent/20 text-yt-accent' :
+                          'bg-yt-bg-primary/50 text-yt-text-secondary'
+                        }`}>
+                          {mission.status === 'pending' ? 'IN ATTESA' : mission.status === 'accepted' ? 'ACCETTATA' : mission.status.toUpperCase()}
+                        </span>
                       </div>
-                      {/* Route Information - compatta */}
-                      <div className="flex items-center gap-1 text-[10px] bg-yt-bg-primary px-1.5 py-1 rounded">
+
+                      {/* Quantities and weight */}
+                      <div className="bg-yt-bg-tertiary rounded p-2 mb-2">
+                        <div className="flex gap-2 mb-2">
+                          <div className="flex-1 bg-yt-bg-primary rounded p-1.5 text-center">
+                            <div className="text-[10px] text-yt-text-secondary mb-0.5">Scorte</div>
+                            <div className="text-base font-bold text-red-400">{mission.current_quantity}</div>
+                          </div>
+                          <div className="flex-1 bg-yt-bg-primary rounded p-1.5 text-center">
+                            <div className="text-[10px] text-yt-text-secondary mb-0.5">Richieste</div>
+                            <div className="text-base font-bold text-green-400">{mission.quantity_needed}</div>
+                          </div>
+                        </div>
+                        {mission.total_weight_lbs && mission.total_weight_lbs > 0 && (
+                          <div className="flex items-center gap-1.5 justify-center text-xs text-yt-text-primary">
+                            <Weight className="w-3.5 h-3.5" />
+                            <span className="font-mono font-medium">{formatWeight(mission.total_weight_lbs)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Route Information */}
+                      <div className="flex items-center gap-1 text-xs bg-yt-bg-tertiary px-2 py-1.5 rounded mb-2 flex-wrap">
                         {!sourceAirport ? (
                           <span className="text-fuchsia-400 font-medium truncate">{sourceName}</span>
                         ) : sourceAirport.isMainBase ? (
                           <span className="text-fuchsia-400 font-medium truncate">{sourceName}</span>
                         ) : sourceAirport.isHeliport ? (
                           <>
-                            <Helicopter className="w-3 h-3 text-cyan-400 flex-shrink-0" />
+                            <Helicopter className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
                             <span className="text-cyan-400 font-medium truncate">{sourceName}</span>
                           </>
                         ) : (
                           <>
-                            <Plane className="w-3 h-3 text-yt-accent flex-shrink-0" />
+                            <Plane className="w-3.5 h-3.5 text-yt-accent flex-shrink-0" />
                             <span className="text-yt-accent font-medium truncate">{sourceName}</span>
                           </>
                         )}
-                        <ArrowRight className="w-3 h-3 text-yt-text-secondary flex-shrink-0" />
+                        <ArrowRight className="w-3.5 h-3.5 text-yt-text-secondary flex-shrink-0" />
                         {isHeliport ? (
                           <>
-                            <Helicopter className="w-3 h-3 text-cyan-400 flex-shrink-0" />
+                            <Helicopter className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
                             <span className="text-cyan-400 font-medium truncate">{airport.displayName || airport.name}</span>
                           </>
                         ) : (
                           <>
-                            <Plane className="w-3 h-3 text-yt-accent flex-shrink-0" />
+                            <Plane className="w-3.5 h-3.5 text-yt-accent flex-shrink-0" />
                             <span className="text-yt-accent font-medium truncate">{airport.displayName || airport.name}</span>
                           </>
                         )}
                         <span className="text-yt-border flex-shrink-0">•</span>
                         <span className="text-yt-text-primary font-mono flex-shrink-0">{distance}</span>
+                      </div>
+
+                      {/* Pilot info for accepted missions */}
+                      {mission.status === 'accepted' && mission.accepted_by && (
+                        <div className="flex items-center gap-1.5 text-xs bg-yt-bg-tertiary px-2 py-1.5 rounded mb-2">
+                          <User className="w-3.5 h-3.5 text-yt-text-secondary" />
+                          <span className="text-yt-text-secondary">Pilota:</span>
+                          <span className="text-yt-text-primary font-bold">{mission.accepted_by}</span>
+                        </div>
+                      )}
+
+                      {/* Action buttons */}
+                      <div className="flex gap-2">
+                        {mission.status === 'pending' && !state.showAccept && (
+                          <button
+                            onClick={() => setMissionStates(prev => ({ ...prev, [mission.id]: { ...state, showAccept: true } }))}
+                            disabled={state.loading}
+                            className="flex-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-yt-bg-tertiary text-white rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            Accetta
+                          </button>
+                        )}
+
+                        {mission.status === 'pending' && state.showAccept && (
+                          <div className="flex-1 flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="Nome pilota..."
+                              value={state.userName}
+                              onChange={(e) => setMissionStates(prev => ({ ...prev, [mission.id]: { ...state, userName: e.target.value } }))}
+                              className="flex-1 px-2 py-1.5 bg-yt-bg-primary border border-yt-border rounded text-yt-text-primary text-xs focus:border-yt-accent focus:outline-none"
+                              disabled={state.loading}
+                            />
+                            <button
+                              onClick={() => handleAcceptMission(mission.id)}
+                              disabled={state.loading}
+                              className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-yt-bg-tertiary text-white rounded text-xs font-bold transition-all"
+                            >
+                              OK
+                            </button>
+                            <button
+                              onClick={() => setMissionStates(prev => ({ ...prev, [mission.id]: { ...state, showAccept: false } }))}
+                              disabled={state.loading}
+                              className="px-3 py-1.5 bg-yt-bg-tertiary hover:bg-yt-border text-yt-text-primary rounded text-xs transition-all"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
+
+                        {mission.status === 'accepted' && (
+                          <button
+                            onClick={() => handleCompleteMission(mission.id)}
+                            disabled={state.loading}
+                            className="flex-1 px-3 py-1.5 bg-yt-accent hover:bg-yt-accent/80 disabled:bg-yt-bg-tertiary text-white rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            Completa
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => handleCancelMission(mission.id)}
+                          disabled={state.loading}
+                          className="px-3 py-1.5 bg-red-600/80 hover:bg-red-600 disabled:bg-yt-bg-tertiary text-white rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Annulla</span>
+                        </button>
                       </div>
                     </div>
                   );
