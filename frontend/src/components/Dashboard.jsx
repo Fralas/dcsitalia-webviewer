@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Package, AlertTriangle, Plane, Activity, FolderOpen } from 'lucide-react';
 import AirportCard from './AirportCard';
 import { selectPDFDirectory, isFileSystemAccessSupported } from '../utils/fileSystemAccess';
+import { isImportantWeapon } from '../config/weapons';
 
 /**
  * Stats Card Component - YouTube Style
@@ -49,11 +50,30 @@ export default function Dashboard({ airports, missions, stats, onMissionsUpdate 
 
   if (sortBy === 'critical') {
     filteredAirports = filteredAirports.sort((a, b) => {
-      const getCriticalCount = (airport) => {
+      const getPriorityScore = (airport) => {
         if (!airport.data || !airport.data.weapons) return 0;
-        return airport.data.weapons.filter(w => w.quantity <= 5).length;
+
+        const isHeliport = airport.name && airport.name.toLowerCase().includes('farp');
+        let score = 0;
+
+        airport.data.weapons.forEach(w => {
+          const important = isImportantWeapon(w.item, isHeliport);
+          if (!important) return;
+
+          // Calculate priority score (higher = more urgent)
+          if (w.quantity <= 5) {
+            score += 1000; // CRITICAL
+          } else if (w.quantity <= 20) {
+            score += 100; // HIGH
+          } else if (w.quantity <= 40) {
+            score += 10; // MEDIUM
+          }
+        });
+
+        return score;
       };
-      return getCriticalCount(b) - getCriticalCount(a);
+
+      return getPriorityScore(b) - getPriorityScore(a);
     });
   } else {
     filteredAirports = filteredAirports.sort((a, b) => a.name.localeCompare(b.name));
