@@ -404,11 +404,25 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                           </div>
                         </div>
                         <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide ${
-                          mission.status === 'pending' ? 'bg-yellow-400/20 text-yellow-400' :
-                          mission.status === 'accepted' ? 'bg-yt-accent/20 text-yt-accent' :
-                          'bg-yt-bg-primary/50 text-yt-text-secondary'
+                          mission.status === 'pending'
+                            ? mission.current_quantity <= 5
+                              ? 'bg-red-400/20 text-red-400 border border-red-400/50'
+                              : mission.current_quantity <= 20
+                              ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
+                              : 'bg-yellow-400/20 text-yellow-400 border border-yellow-400/50'
+                            : mission.status === 'accepted'
+                            ? 'bg-yt-accent/20 text-yt-accent'
+                            : 'bg-yt-bg-primary/50 text-yt-text-secondary'
                         }`}>
-                          {mission.status === 'pending' ? 'IN ATTESA' : mission.status === 'accepted' ? 'ACCETTATA' : mission.status.toUpperCase()}
+                          {mission.status === 'pending'
+                            ? mission.current_quantity <= 5
+                              ? 'CRITICA'
+                              : mission.current_quantity <= 20
+                              ? 'ALTA'
+                              : 'MEDIA'
+                            : mission.status === 'accepted'
+                            ? 'ACCETTATA'
+                            : mission.status.toUpperCase()}
                         </span>
                       </div>
 
