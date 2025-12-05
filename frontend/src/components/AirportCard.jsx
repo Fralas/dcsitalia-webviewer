@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Helicopter, Plus, X, TrendingUp, ArrowRight, FileDown } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Plus, X, TrendingUp, ArrowRight, FileDown } from 'lucide-react';
 import { createOrder } from '../services/api';
 import WeaponChart from './WeaponChart';
 import { getAirportName } from '../config/airports';
@@ -187,7 +187,7 @@ export default function AirportCard({ airport, missions = [] }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {isHeliport ? (
-              <Helicopter className="w-6 h-6 text-purple-400" />
+              <div className="w-6 h-6 flex items-center justify-center text-2xl">🚁</div>
             ) : (
               <Plane className="w-6 h-6 text-blue-400" />
             )}
