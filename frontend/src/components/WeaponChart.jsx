@@ -29,9 +29,9 @@ function CustomTooltip({ active, payload }) {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
-      <div className="bg-slate-800 border border-gray-600 rounded p-3 shadow-lg">
-        <p className="text-xs text-gray-400 mb-1">{formatDate(data.timestamp)}</p>
-        <p className="text-lg font-bold text-white">Quantità: {data.quantity}</p>
+      <div className="bg-yt-bg-tertiary border border-yt-border rounded p-3 shadow-lg">
+        <p className="text-xs text-yt-text-secondary mb-1">{formatDate(data.timestamp)}</p>
+        <p className="text-lg font-bold text-yt-text-primary">Quantità: {data.quantity}</p>
       </div>
     );
   }
@@ -86,18 +86,18 @@ export default function WeaponChart({ airportId, weaponId, days = 7 }) {
 
   if (loading) {
     return (
-      <div className="bg-slate-900/50 rounded-lg p-8 text-center">
-        <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
-        <p className="text-gray-400 text-sm">Caricamento dati...</p>
+      <div className="bg-yt-bg-secondary rounded-lg p-8 text-center">
+        <div className="animate-spin w-8 h-8 border-4 border-yt-accent border-t-transparent rounded-full mx-auto mb-2"></div>
+        <p className="text-yt-text-secondary text-sm">Caricamento dati...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-slate-900/50 rounded-lg p-8 text-center">
+      <div className="bg-yt-bg-secondary rounded-lg p-8 text-center">
         <p className="text-yellow-400">{error}</p>
-        <p className="text-xs text-gray-500 mt-2">
+        <p className="text-xs text-yt-text-secondary mt-2">
           I dati vengono salvati ogni 4 ore. Attendi il prossimo snapshot.
         </p>
       </div>
@@ -106,8 +106,8 @@ export default function WeaponChart({ airportId, weaponId, days = 7 }) {
 
   if (chartData.length === 0) {
     return (
-      <div className="bg-slate-900/50 rounded-lg p-8 text-center">
-        <p className="text-gray-400">Seleziona un'arma per vedere il grafico</p>
+      <div className="bg-yt-bg-secondary rounded-lg p-8 text-center">
+        <p className="text-yt-text-secondary">Seleziona un'arma per vedere il grafico</p>
       </div>
     );
   }
@@ -122,16 +122,16 @@ export default function WeaponChart({ airportId, weaponId, days = 7 }) {
   const changePercent = quantities[0] !== 0 ? ((change / quantities[0]) * 100).toFixed(1) : 0;
 
   return (
-    <div className="bg-slate-900/50 rounded-lg p-4">
+    <div className="bg-yt-bg-secondary rounded-lg p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-blue-400" />
-          <h4 className="text-lg font-bold text-white">
+          <TrendingUp className="w-5 h-5 text-yt-accent" />
+          <h4 className="text-lg font-bold text-yt-text-primary">
             {getWeaponDisplayName(weaponId)}
           </h4>
         </div>
-        <div className="flex items-center gap-2 text-gray-400 text-sm">
+        <div className="flex items-center gap-2 text-yt-text-secondary text-sm">
           <Calendar className="w-4 h-4" />
           <span>Ultimi {days} giorni</span>
         </div>
@@ -139,24 +139,24 @@ export default function WeaponChart({ airportId, weaponId, days = 7 }) {
 
       {/* Statistics */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-        <div className="bg-slate-800 rounded p-2">
-          <div className="text-xs text-gray-400">Attuale</div>
-          <div className="text-lg font-bold text-white">{currentQty}</div>
+        <div className="bg-yt-bg-tertiary rounded p-2">
+          <div className="text-xs text-yt-text-secondary">Attuale</div>
+          <div className="text-lg font-bold text-yt-text-primary">{currentQty}</div>
         </div>
-        <div className="bg-slate-800 rounded p-2">
-          <div className="text-xs text-gray-400">Media</div>
-          <div className="text-lg font-bold text-blue-400">{avgQty}</div>
+        <div className="bg-yt-bg-tertiary rounded p-2">
+          <div className="text-xs text-yt-text-secondary">Media</div>
+          <div className="text-lg font-bold text-yt-accent">{avgQty}</div>
         </div>
-        <div className="bg-slate-800 rounded p-2">
-          <div className="text-xs text-gray-400">Min</div>
+        <div className="bg-yt-bg-tertiary rounded p-2">
+          <div className="text-xs text-yt-text-secondary">Min</div>
           <div className="text-lg font-bold text-red-400">{minQty}</div>
         </div>
-        <div className="bg-slate-800 rounded p-2">
-          <div className="text-xs text-gray-400">Max</div>
+        <div className="bg-yt-bg-tertiary rounded p-2">
+          <div className="text-xs text-yt-text-secondary">Max</div>
           <div className="text-lg font-bold text-green-400">{maxQty}</div>
         </div>
-        <div className="bg-slate-800 rounded p-2">
-          <div className="text-xs text-gray-400">Variazione</div>
+        <div className="bg-yt-bg-tertiary rounded p-2">
+          <div className="text-xs text-yt-text-secondary">Variazione</div>
           <div className={`text-lg font-bold ${change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {change >= 0 ? '+' : ''}{change} ({changePercent}%)
           </div>
@@ -164,30 +164,30 @@ export default function WeaponChart({ airportId, weaponId, days = 7 }) {
       </div>
 
       {/* Chart */}
-      <div className="bg-slate-800 rounded-lg p-4">
+      <div className="bg-yt-bg-tertiary rounded-lg p-4">
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#3F3F3F" />
             <XAxis
               dataKey="date"
-              stroke="#9CA3AF"
-              tick={{ fill: '#9CA3AF', fontSize: 12 }}
+              stroke="#AAAAAA"
+              tick={{ fill: '#AAAAAA', fontSize: 12 }}
               angle={-45}
               textAnchor="end"
               height={80}
             />
             <YAxis
-              stroke="#9CA3AF"
-              tick={{ fill: '#9CA3AF', fontSize: 12 }}
+              stroke="#AAAAAA"
+              tick={{ fill: '#AAAAAA', fontSize: 12 }}
             />
             <Tooltip content={<CustomTooltip />} />
             <Legend />
             <Line
               type="monotone"
               dataKey="quantity"
-              stroke="#3B82F6"
+              stroke="#3EA6FF"
               strokeWidth={2}
-              dot={{ fill: '#3B82F6', r: 4 }}
+              dot={{ fill: '#3EA6FF', r: 4 }}
               activeDot={{ r: 6 }}
               name="Quantità"
             />
@@ -195,7 +195,7 @@ export default function WeaponChart({ airportId, weaponId, days = 7 }) {
         </ResponsiveContainer>
       </div>
 
-      <div className="mt-3 text-xs text-gray-500 text-center">
+      <div className="mt-3 text-xs text-yt-text-secondary text-center">
         📊 Dati raccolti ogni 4 ore • {chartData.length} punti dati
       </div>
     </div>

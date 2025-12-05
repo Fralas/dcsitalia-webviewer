@@ -300,12 +300,6 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                 <span className="font-bold">{stats.medium}</span>
               </div>
             )}
-            {airportMissions.length > 0 && (
-              <div className="px-2 py-1 bg-fuchsia-500/20 text-fuchsia-400 rounded text-sm font-bold flex items-center gap-1.5">
-                {airportMissions.length}
-                <Package className="w-4 h-4" />
-              </div>
-            )}
             {expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
           </div>
         </div>
