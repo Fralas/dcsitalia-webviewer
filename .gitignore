@@ -1,0 +1,11 @@
+node_modules/
+dist/
+build/
+*.log
+.env
+.DS_Store
+# Data files (JSON storage)
+data/historical/*.json
+# No longer used (switched from SQLite to JSON)
+*.db
+*.sqlite

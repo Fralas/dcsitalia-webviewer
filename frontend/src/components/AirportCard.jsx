@@ -1,0 +1,508 @@
+import { useState, useEffect } from 'react';
+import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Plus, X, TrendingUp, ArrowRight, FileDown } from 'lucide-react';
+import { createOrder } from '../services/api';
+import WeaponChart from './WeaponChart';
+import { getAirportName } from '../config/airports';
+import { generateChartsPDF, checkChartsAvailable } from '../utils/pdfGenerator';
+import { isImportantWeapon } from '../config/weapons';
+
+/**
+ * Get weapon display name (remove prefix)
+ */
+function getWeaponDisplayName(weaponId) {
+  return weaponId.replace(/^weapons\.(missiles|bombs|nurs|containers|droptanks|torpedoes|adapters)\./, '');
+}
+
+/**
+ * Get status for weapon quantity
+ */
+function getWeaponStatus(quantity, isImportant) {
+  if (!isImportant) return 'normal';
+  if (quantity <= 5) return 'critical';
+  if (quantity <= 20) return 'high';
+  if (quantity <= 50) return 'medium';
+  return 'ok';
+}
+
+/**
+ * Status badge component
+ */
+function StatusBadge({ status }) {
+  const styles = {
+    critical: 'bg-red-500/20 text-red-400 border-red-500/50',
+    high: 'bg-orange-500/20 text-orange-400 border-orange-500/50',
+    medium: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50',
+    ok: 'bg-green-500/20 text-green-400 border-green-500/50',
+    normal: 'bg-gray-500/20 text-gray-400 border-gray-500/50',
+  };
+
+  const icons = {
+    critical: AlertTriangle,
+    high: AlertCircle,
+    medium: AlertCircle,
+    ok: CheckCircle,
+    normal: Package,
+  };
+
+  const Icon = icons[status];
+
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs border ${styles[status]}`}>
+      <Icon className="w-3 h-3" />
+      {status.toUpperCase()}
+    </span>
+  );
+}
+
+/**
+ * Airport Card Component
+ */
+export default function AirportCard({ airport, missions = [] }) {
+  const [expanded, setExpanded] = useState(false);
+  const [filter, setFilter] = useState('all'); // all, critical, important
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [selectedWeapon, setSelectedWeapon] = useState('');
+  const [orderQuantity, setOrderQuantity] = useState(100);
+  const [chartWeapon, setChartWeapon] = useState(''); // For the historical chart
+  const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [chartsAvailable, setChartsAvailable] = useState(null); // null = not checked, true/false = has charts
+
+  if (!airport || !airport.data) {
+    return null;
+  }
+
+  // Check if charts are available when card is expanded
+  useEffect(() => {
+    if (expanded && chartsAvailable === null) {
+      checkChartsAvailable(airport.id).then(setChartsAvailable);
+    }
+  }, [expanded, airport.id, chartsAvailable]);
+
+  const { weapons = [], liquids = [] } = airport.data;
+
+  // Get suggested quantity based on priority
+  const getSuggestedQuantity = (weaponId) => {
+    const weapon = weapons.find(w => w.item === weaponId);
+    if (!weapon) return 100;
+
+    const quantity = weapon.quantity;
+    if (quantity <= 5) return 150;  // CRITICAL
+    if (quantity <= 20) return 100; // HIGH
+    if (quantity <= 50) return 50;  // MEDIUM
+    return 100; // Default
+  };
+
+  // Handle weapon selection
+  const handleWeaponSelect = (weaponId) => {
+    setSelectedWeapon(weaponId);
+    if (weaponId) {
+      const suggestedQty = getSuggestedQuantity(weaponId);
+      setOrderQuantity(suggestedQty);
+    }
+  };
+
+  // Handle order creation
+  const handleCreateOrder = async () => {
+    if (!selectedWeapon || orderQuantity <= 0) {
+      alert('Seleziona un\'arma e inserisci una quantità valida');
+      return;
+    }
+
+    try {
+      await createOrder(airport.id, selectedWeapon, orderQuantity);
+      setShowOrderModal(false);
+      setSelectedWeapon('');
+      setOrderQuantity(100);
+      alert('Ordine creato con successo!');
+    } catch (error) {
+      alert('Errore nella creazione dell\'ordine: ' + error.message);
+    }
+  };
+
+  // Handle PDF generation
+  const handleGeneratePDF = async () => {
+    setGeneratingPDF(true);
+    try {
+      await generateChartsPDF(airport.id, airport.displayName || airport.name);
+    } catch (error) {
+      console.error('PDF generation error:', error);
+    } finally {
+      setGeneratingPDF(false);
+    }
+  };
+
+  // Check if this airport is a heliport
+  const isHeliport = airport.isHeliport || false;
+
+  // Calculate stats
+  const stats = {
+    critical: 0,
+    high: 0,
+    medium: 0,
+    ok: 0,
+  };
+
+  weapons.forEach(weapon => {
+    const isImportant = isImportantWeapon(weapon.item, isHeliport);
+    const status = getWeaponStatus(weapon.quantity, isImportant);
+    if (status === 'critical') stats.critical++;
+    else if (status === 'high') stats.high++;
+    else if (status === 'medium') stats.medium++;
+    else if (isImportant) stats.ok++;
+  });
+
+  // Filter weapons
+  let filteredWeapons = weapons;
+  if (filter === 'critical') {
+    filteredWeapons = weapons.filter(w => {
+      const isImportant = isImportantWeapon(w.item, isHeliport);
+      const status = getWeaponStatus(w.quantity, isImportant);
+      return status === 'critical';
+    });
+  } else if (filter === 'important') {
+    filteredWeapons = weapons.filter(w => isImportantWeapon(w.item, isHeliport));
+  }
+
+  // Sort by status (critical first)
+  filteredWeapons = [...filteredWeapons].sort((a, b) => {
+    const isImportantA = isImportantWeapon(a.item, isHeliport);
+    const isImportantB = isImportantWeapon(b.item, isHeliport);
+    const statusA = getWeaponStatus(a.quantity, isImportantA);
+    const statusB = getWeaponStatus(b.quantity, isImportantB);
+
+    const priority = { critical: 0, high: 1, medium: 2, ok: 3, normal: 4 };
+    return priority[statusA] - priority[statusB];
+  });
+
+  const airportMissions = missions.filter(m => m.airport_id === airport.id);
+  const cardBorderClass = stats.critical > 0 ? 'border-red-500 pulse-border-critical' : stats.high > 0 ? 'border-orange-500' : stats.medium > 0 ? 'border-yellow-500' : 'border-gray-700';
+
+  return (
+    <div className={`bg-slate-800 rounded-lg border-2 ${cardBorderClass} overflow-hidden hover:shadow-xl transition-shadow`}>
+      {/* Header */}
+      <div
+        className="p-4 cursor-pointer hover:bg-slate-700/50 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Plane className="w-6 h-6 text-blue-400" />
+            <div>
+              <h3 className="text-lg font-bold text-white">{airport.displayName || airport.name}</h3>
+              {airport.isMainBase && (
+                <span className="text-xs text-blue-400 font-semibold">BASE PRINCIPALE</span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {stats.critical > 0 && (
+              <div className="flex items-center gap-1 text-red-400">
+                <AlertTriangle className="w-5 h-5" />
+                <span className="font-bold">{stats.critical}</span>
+              </div>
+            )}
+            {stats.high > 0 && (
+              <div className="flex items-center gap-1 text-orange-400">
+                <AlertCircle className="w-5 h-5" />
+                <span className="font-bold">{stats.high}</span>
+              </div>
+            )}
+            {stats.medium > 0 && (
+              <div className="flex items-center gap-1 text-yellow-400">
+                <AlertCircle className="w-5 h-5" />
+                <span className="font-bold">{stats.medium}</span>
+              </div>
+            )}
+            {airportMissions.length > 0 && (
+              <div className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-sm font-bold">
+                {airportMissions.length} ordini
+              </div>
+            )}
+            {expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </div>
+        </div>
+      </div>
+
+      {/* Expanded Content */}
+      {expanded && (
+        <div className="border-t border-gray-700">
+          {/* Filters */}
+          <div className="p-4 bg-slate-900/50 flex gap-2 justify-between items-center">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setFilter('all')}
+                className={`px-3 py-1 rounded text-sm ${filter === 'all' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+              >
+                Tutte ({weapons.length})
+              </button>
+              <button
+                onClick={() => setFilter('important')}
+                className={`px-3 py-1 rounded text-sm ${filter === 'important' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+              >
+                Importanti ({weapons.filter(w => isImportantWeapon(w.item, isHeliport)).length})
+              </button>
+              <button
+                onClick={() => setFilter('critical')}
+                className={`px-3 py-1 rounded text-sm ${filter === 'critical' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+              >
+                Critiche ({stats.critical})
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleGeneratePDF}
+                disabled={generatingPDF || chartsAvailable === false}
+                className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${
+                  generatingPDF
+                    ? 'bg-blue-400 text-white cursor-wait'
+                    : chartsAvailable === false
+                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+                title={chartsAvailable === false ? 'Nessuna chart disponibile per questo aeroporto' : ''}
+              >
+                <FileDown className="w-4 h-4" />
+                {generatingPDF ? 'Generando PDF...' : chartsAvailable === null ? 'Verifica Charts...' : 'Scarica Charts PDF'}
+              </button>
+              {!airport.isMainBase && (
+                <button
+                  onClick={() => setShowOrderModal(true)}
+                  className="px-3 py-1 rounded text-sm bg-green-600 text-white hover:bg-green-700 flex items-center gap-1"
+                >
+                  <Plus className="w-4 h-4" />
+                  Richiedi Rifornimento
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Active Orders Section */}
+          {!airport.isMainBase && airportMissions.length > 0 && (
+            <div className="p-4 bg-purple-900/20 border-t border-purple-500/30">
+              <h4 className="text-sm font-bold text-purple-300 mb-2 flex items-center gap-2">
+                <Package className="w-4 h-4" />
+                ORDINI ATTIVI ({airportMissions.length})
+              </h4>
+              <div className="space-y-2">
+                {airportMissions.map(mission => {
+                  const sourceName = mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Main Base';
+                  const distance = mission.distance_nm ? `${mission.distance_nm}nm` : '-';
+
+                  return (
+                    <div key={mission.id} className="bg-slate-800 p-3 rounded">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1">
+                          <div className="font-mono text-sm text-white mb-1">{getWeaponDisplayName(mission.weapon_id)}</div>
+                          <div className="text-xs text-gray-400">
+                            Quantità richiesta: <span className="font-bold text-white">{mission.quantity_needed}</span> |
+                            Attuale: <span className="font-bold text-orange-400">{mission.current_quantity}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            mission.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                            mission.status === 'accepted' ? 'bg-blue-500/20 text-blue-400' :
+                            'bg-gray-500/20 text-gray-400'
+                          }`}>
+                            {mission.status.toUpperCase()}
+                          </span>
+                        </div>
+                      </div>
+                      {/* Route Information */}
+                      <div className="flex items-center gap-2 text-xs bg-slate-900/50 px-2 py-1 rounded">
+                        <span className="text-blue-400 font-semibold">Da:</span>
+                        <span className="text-white">{sourceName}</span>
+                        <ArrowRight className="w-3 h-3 text-gray-500" />
+                        <span className="text-green-400 font-semibold">A:</span>
+                        <span className="text-white">{airport.displayName || airport.name}</span>
+                        <span className="text-gray-500">•</span>
+                        <span className="text-cyan-400 font-mono">{distance}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Liquids Section */}
+          <div className="p-4 bg-slate-900/30">
+            <h4 className="text-sm font-bold text-gray-400 mb-2 flex items-center gap-2">
+              <Droplet className="w-4 h-4" />
+              LIQUIDS
+            </h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {liquids.map((liquid, idx) => (
+                <div key={idx} className="bg-slate-800 p-2 rounded">
+                  <div className="text-xs text-gray-400">Type {liquid.item}</div>
+                  <div className="text-lg font-bold text-white">{liquid.quantity.toLocaleString()}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Weapons Section */}
+          <div className="p-4">
+            <h4 className="text-sm font-bold text-gray-400 mb-2 flex items-center gap-2">
+              <Package className="w-4 h-4" />
+              WEAPONS & MUNITIONS
+            </h4>
+            <div className="max-h-96 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-slate-800 border-b border-gray-700">
+                  <tr className="text-left text-gray-400">
+                    <th className="p-2">Weapon</th>
+                    <th className="p-2 text-right">Quantity</th>
+                    <th className="p-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredWeapons.map((weapon, idx) => {
+                    const isImportant = isImportantWeapon(weapon.item, isHeliport);
+                    const status = getWeaponStatus(weapon.quantity, isImportant);
+
+                    return (
+                      <tr key={idx} className="border-b border-gray-800 hover:bg-slate-700/50">
+                        <td className="p-2 font-mono text-xs">{getWeaponDisplayName(weapon.item)}</td>
+                        <td className="p-2 text-right font-bold">{weapon.quantity}</td>
+                        <td className="p-2">
+                          <StatusBadge status={status} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Historical Chart Section */}
+          <div className="p-4 bg-slate-800/50 border-t border-gray-700">
+            <div className="mb-4">
+              <h4 className="text-sm font-bold text-gray-400 mb-3 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" />
+                ANDAMENTO STORICO (7 giorni)
+              </h4>
+              <select
+                value={chartWeapon}
+                onChange={(e) => setChartWeapon(e.target.value)}
+                className="w-full bg-slate-900 text-white border border-gray-600 rounded px-3 py-2 focus:outline-none focus:border-blue-500"
+              >
+                <option value="">-- Seleziona un'arma per vedere il grafico --</option>
+                {weapons
+                  .filter(w => isImportantWeapon(w.item, isHeliport))
+                  .map((weapon, idx) => (
+                    <option key={idx} value={weapon.item}>
+                      {getWeaponDisplayName(weapon.item)} (Attuale: {weapon.quantity})
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            {chartWeapon && (
+              <WeaponChart
+                airportId={airport.id}
+                weaponId={chartWeapon}
+                days={7}
+              />
+            )}
+
+            {!chartWeapon && (
+              <div className="bg-slate-900/50 rounded-lg p-8 text-center">
+                <TrendingUp className="w-12 h-12 text-gray-600 mx-auto mb-2" />
+                <p className="text-gray-400 text-sm">
+                  Seleziona un'arma dal menu a tendina per visualizzare il grafico storico
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  📊 I dati vengono salvati automaticamente ogni 4 ore
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Order Creation Modal */}
+      {showOrderModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setShowOrderModal(false)}>
+          <div className="bg-slate-800 rounded-lg p-6 max-w-md w-full mx-4 border-2 border-green-500" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <Plus className="w-5 h-5 text-green-400" />
+                Richiedi Rifornimento
+              </h3>
+              <button onClick={() => setShowOrderModal(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Airport Info */}
+              <div className="bg-slate-900 p-3 rounded">
+                <div className="text-xs text-gray-400">Aeroporto</div>
+                <div className="text-white font-bold">{airport.displayName || airport.name}</div>
+              </div>
+
+              {/* Weapon Selection */}
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Seleziona Arma</label>
+                <select
+                  value={selectedWeapon}
+                  onChange={(e) => handleWeaponSelect(e.target.value)}
+                  className="w-full bg-slate-900 text-white border border-gray-600 rounded px-3 py-2 focus:outline-none focus:border-green-500"
+                >
+                  <option value="">-- Seleziona --</option>
+                  {weapons.map((weapon, idx) => {
+                    const status = getWeaponStatus(weapon.quantity, isImportantWeapon(weapon.item, isHeliport));
+                    const priorityLabel = status === 'critical' ? '🔴 CRITICAL' : status === 'high' ? '🟠 HIGH' : status === 'medium' ? '🟡 MEDIUM' : '';
+                    return (
+                      <option key={idx} value={weapon.item}>
+                        {getWeaponDisplayName(weapon.item)} (Attuale: {weapon.quantity}) {priorityLabel}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {/* Quantity Input */}
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">
+                  Quantità da Ordinare
+                  {selectedWeapon && (
+                    <span className="text-xs text-gray-500 ml-2">
+                      (Suggerito: {getSuggestedQuantity(selectedWeapon)})
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="number"
+                  value={orderQuantity}
+                  onChange={(e) => setOrderQuantity(parseInt(e.target.value) || 0)}
+                  min="1"
+                  className="w-full bg-slate-900 text-white border border-gray-600 rounded px-3 py-2 focus:outline-none focus:border-green-500"
+                  placeholder="100"
+                />
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCreateOrder}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+                >
+                  Crea Ordine
+                </button>
+                <button
+                  onClick={() => setShowOrderModal(false)}
+                  className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
+                >
+                  Annulla
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
