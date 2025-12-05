@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Plus, X, TrendingUp, ArrowRight, FileDown } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Helicopter, Plus, X, TrendingUp, ArrowRight, FileDown } from 'lucide-react';
 import { createOrder } from '../services/api';
 import WeaponChart from './WeaponChart';
 import { getAirportName } from '../config/airports';
@@ -186,11 +186,22 @@ export default function AirportCard({ airport, missions = [] }) {
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Plane className="w-6 h-6 text-blue-400" />
+            {isHeliport ? (
+              <Helicopter className="w-6 h-6 text-purple-400" />
+            ) : (
+              <Plane className="w-6 h-6 text-blue-400" />
+            )}
             <div>
-              <h3 className="text-lg font-bold text-white">{airport.displayName || airport.name}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-bold text-white">{airport.displayName || airport.name}</h3>
+                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                  isHeliport ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'
+                }`}>
+                  {isHeliport ? '🚁 ELIPORTO' : '✈️ AEROPORTO'}
+                </span>
+              </div>
               {airport.isMainBase && (
-                <span className="text-xs text-blue-400 font-semibold">BASE PRINCIPALE</span>
+                <span className="text-xs text-yellow-400 font-semibold">⭐ BASE PRINCIPALE</span>
               )}
             </div>
           </div>

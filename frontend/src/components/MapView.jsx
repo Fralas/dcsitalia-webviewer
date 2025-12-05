@@ -2,9 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Map as MapIcon, Plane, ArrowRight } from 'lucide-react';
+import { Map as MapIcon, Plane, Helicopter, ArrowRight, Weight } from 'lucide-react';
 import { getAirportName } from '../config/airports';
 import airports from '../config/airports';
+import { formatWeight } from '../utils/weightFormatter';
 
 /**
  * Get weapon display name
@@ -33,9 +34,10 @@ function FitBounds({ positions }) {
 /**
  * Custom airport icon
  */
-const createAirportIcon = (isMainBase, missionCount) => {
+const createAirportIcon = (isMainBase, missionCount, isHeliport) => {
   const color = isMainBase ? '#facc15' : '#3b82f6';
   const size = isMainBase ? 16 : 12;
+  const icon = isHeliport ? '🚁' : '✈️';
 
   return L.divIcon({
     className: 'custom-airport-marker',
@@ -53,7 +55,7 @@ const createAirportIcon = (isMainBase, missionCount) => {
           font-size: 14px;
           box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         ">
-          ✈️
+          ${icon}
         </div>
         ${missionCount > 0 ? `
           <div style="
@@ -108,6 +110,12 @@ function MissionCard({ mission, airport, onHover, onSelect, isHighlighted, isSel
           <div className="text-xs text-gray-400">
             Qty: <span className="font-bold text-white">{mission.quantity_needed}</span>
           </div>
+          {mission.total_weight_lbs && mission.total_weight_lbs > 0 && (
+            <div className="flex items-center gap-1 text-xs text-cyan-400 mt-1">
+              <Weight className="w-3 h-3" />
+              <span className="font-mono">{formatWeight(mission.total_weight_lbs)}</span>
+            </div>
+          )}
         </div>
         <div>
           <span className={`px-2 py-1 rounded text-xs ${
@@ -267,7 +275,7 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
           </div>
 
           {/* Legend */}
-          <div className="mt-4 flex gap-6 text-sm">
+          <div className="mt-4 flex flex-wrap gap-6 text-sm">
             <div className="flex items-center gap-2">
               <div className="w-12 h-0.5 border-t-2 border-dashed border-blue-400"></div>
               <span className="text-gray-300">Pending</span>
@@ -277,8 +285,12 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
               <span className="text-gray-300">Accepted</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-blue-600"></div>
+              <span className="text-lg">✈️</span>
               <span className="text-gray-300">Aeroporto</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🚁</span>
+              <span className="text-gray-300">Eliporto</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded-full bg-yellow-400 border-2 border-yellow-500"></div>
@@ -332,14 +344,19 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
                   <Marker
                     key={airport.id}
                     position={[airport.coordinates.lat, airport.coordinates.lon]}
-                    icon={createAirportIcon(airport.isMainBase, missionCount)}
+                    icon={createAirportIcon(airport.isMainBase, missionCount, airport.isHeliport)}
                   >
                     <Popup>
                       <div className="text-sm">
                         <div className="font-bold text-base">{airport.displayName}</div>
-                        {airport.isMainBase && (
-                          <div className="text-yellow-600 text-xs font-semibold">MAIN BASE</div>
-                        )}
+                        <div className="flex items-center gap-2 mt-1">
+                          {airport.isMainBase && (
+                            <span className="text-yellow-600 text-xs font-semibold">MAIN BASE</span>
+                          )}
+                          <span className="text-blue-600 text-xs font-semibold">
+                            {airport.isHeliport ? '🚁 ELIPORTO' : '✈️ AEROPORTO'}
+                          </span>
+                        </div>
                         <div className="text-gray-600 text-xs mt-1">
                           {airport.coordinates.lat.toFixed(6)}°N, {airport.coordinates.lon.toFixed(6)}°E
                         </div>
