@@ -112,144 +112,142 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
   return (
     <div
       ref={cardRef}
-      className={`bg-slate-800 rounded-lg border-2 p-4 transition-all duration-500 ${
-        mission.status === 'accepted' ? 'border-blue-500' : 'border-gray-700'
+      className={`bg-yt-bg-secondary rounded-lg border-2 p-3 transition-all duration-300 hover:border-yt-border ${
+        mission.status === 'accepted' ? 'border-yt-accent/50' : 'border-yt-border'
       } ${
-        isHighlighted ? 'ring-4 ring-yellow-400 shadow-lg shadow-yellow-400/50 scale-105' : ''
+        isHighlighted ? 'ring-4 ring-yellow-400 shadow-lg shadow-yellow-400/50 scale-[1.02]' : ''
       }`}
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <div className={`p-2 rounded ${isHeliport ? 'bg-purple-500/20' : 'bg-blue-500/20'}`}>
+      {/* Header compatto con info principali */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 flex-1">
+          <div className={`p-1.5 rounded ${isHeliport ? 'bg-purple-500/20' : 'bg-yt-accent/20'}`}>
             {isHeliport ? (
-              <Helicopter className="w-6 h-6 text-purple-400" />
+              <Helicopter className="w-5 h-5 text-purple-400" />
             ) : (
-              <Plane className="w-6 h-6 text-blue-400" />
+              <Plane className="w-5 h-5 text-yt-accent" />
             )}
           </div>
-          <div>
-            <h3 className="text-lg font-bold text-white">{airport?.displayName || airport?.name || 'Aeroporto Sconosciuto'}</h3>
-            <div className="flex items-center gap-2 text-sm text-gray-400">
-              <Clock className="w-4 h-4" />
-              <span>Creata {timeAgo}</span>
-              <span className="text-gray-600">•</span>
-              <span className="text-yellow-400">Scade tra {expiresIn}</span>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-base font-bold text-yt-text-primary truncate">{airport?.displayName || airport?.name || 'Aeroporto Sconosciuto'}</h3>
+            <div className="flex items-center gap-1.5 text-xs text-yt-text-secondary">
+              <Clock className="w-3 h-3" />
+              <span>{timeAgo}</span>
+              <span className="text-yt-border">•</span>
+              <span className="text-yellow-400 font-medium">⏰ {expiresIn}</span>
             </div>
           </div>
         </div>
         <PriorityBadge currentQuantity={mission.current_quantity} />
       </div>
 
-      <div className="bg-slate-900/50 rounded p-3 mb-3">
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <div className="text-gray-400 mb-1">Arma</div>
-            <div className="font-mono text-white font-bold">{getWeaponDisplayName(mission.weapon_id)}</div>
+      {/* Weapon e quantità - focus principale */}
+      <div className="bg-yt-bg-tertiary rounded p-2.5 mb-2">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex-1">
+            <div className="text-xs text-yt-text-secondary mb-0.5">Arma Richiesta</div>
+            <div className="font-mono text-sm text-yt-text-primary font-bold">{getWeaponDisplayName(mission.weapon_id)}</div>
           </div>
           <div>
-            <div className="text-gray-400 mb-1">Scorte Attuali</div>
-            <div className="text-2xl font-bold text-red-400">{mission.current_quantity}</div>
-          </div>
-          <div>
-            <div className="text-gray-400 mb-1">Quantità Richiesta</div>
-            <div className="text-2xl font-bold text-green-400">{mission.quantity_needed}</div>
-          </div>
-          <div>
-            <div className="text-gray-400 mb-1">Stato</div>
-            <div className="flex items-center gap-1">
-              {mission.status === 'pending' && (
-                <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs font-bold">IN ATTESA</span>
-              )}
-              {mission.status === 'accepted' && (
-                <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-bold">ACCETTATA</span>
-              )}
-            </div>
+            {mission.status === 'pending' && (
+              <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-xs font-bold">IN ATTESA</span>
+            )}
+            {mission.status === 'accepted' && (
+              <span className="px-2 py-0.5 bg-yt-accent/20 text-yt-accent rounded text-xs font-bold">ACCETTATA</span>
+            )}
           </div>
         </div>
 
-        {/* Cargo Weight */}
-        {mission.total_weight_lbs && mission.total_weight_lbs > 0 && (
-          <div className="mt-3 pt-3 border-t border-gray-700">
-            <div className="flex items-center gap-2 text-sm bg-slate-800/50 px-3 py-2 rounded">
-              <Weight className="w-4 h-4 text-cyan-400" />
-              <span className="text-gray-400">Peso Carico:</span>
-              <span className="text-cyan-400 font-bold font-mono">{formatWeight(mission.total_weight_lbs)}</span>
-            </div>
+        <div className="flex gap-3">
+          <div className="flex-1 bg-yt-bg-primary rounded p-2 text-center">
+            <div className="text-xs text-yt-text-secondary mb-0.5">Scorte</div>
+            <div className="text-xl font-bold text-red-400">{mission.current_quantity}</div>
           </div>
-        )}
-
-        {/* Route Information */}
-        <div className="mt-3 pt-3 border-t border-gray-700">
-          <div className="flex items-center gap-2 text-sm bg-slate-800/50 px-3 py-2 rounded">
-            {sourceAirport?.isHeliport ? (
-              <Helicopter className="w-4 h-4 text-purple-400" />
-            ) : (
-              <Plane className="w-4 h-4 text-blue-400" />
-            )}
-            <span className="text-blue-400 font-semibold">Da:</span>
-            <span className="text-white">{mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Base Principale'}</span>
-            <ArrowRight className="w-4 h-4 text-gray-500" />
-            {isHeliport ? (
-              <Helicopter className="w-4 h-4 text-purple-400" />
-            ) : (
-              <Plane className="w-4 h-4 text-green-400" />
-            )}
-            <span className="text-green-400 font-semibold">A:</span>
-            <span className="text-white">{airport?.displayName || airport?.name || 'Sconosciuto'}</span>
-            {mission.distance_nm && (
-              <>
-                <span className="text-gray-500">•</span>
-                <span className="text-cyan-400 font-mono">{mission.distance_nm}nm</span>
-              </>
-            )}
+          <div className="flex-1 bg-yt-bg-primary rounded p-2 text-center">
+            <div className="text-xs text-yt-text-secondary mb-0.5">Richieste</div>
+            <div className="text-xl font-bold text-green-400">{mission.quantity_needed}</div>
           </div>
+        </div>
 
-          {/* Recommended Aircraft */}
-          {mission.recommended_aircraft && (
-            <div className="flex items-center gap-2 text-sm bg-slate-800/50 px-3 py-2 rounded mt-2">
-              {mission.recommended_aircraft === 'helicopter' && (
-                <>
-                  <Helicopter className="w-4 h-4 text-purple-400" />
-                  <span className="text-gray-400">Velivolo Consigliato:</span>
-                  <span className="text-purple-400 font-semibold">Elicottero</span>
-                </>
-              )}
-              {mission.recommended_aircraft === 'airplane' && (
-                <>
-                  <Plane className="w-4 h-4 text-blue-400" />
-                  <span className="text-gray-400">Velivolo Consigliato:</span>
-                  <span className="text-blue-400 font-semibold">Aereo (C-130)</span>
-                </>
-              )}
-              {mission.recommended_aircraft === 'airdrop' && (
-                <>
-                  <Package className="w-4 h-4 text-orange-400" />
-                  <span className="text-gray-400">Velivolo Consigliato:</span>
-                  <span className="text-orange-400 font-semibold">Aereo - Airdrop (senza atterraggio)</span>
-                </>
-              )}
-            </div>
+      </div>
+
+      {/* Route e info missione - compatto */}
+      <div className="bg-yt-bg-tertiary rounded p-2 mb-2 text-xs">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {sourceAirport?.isHeliport ? (
+            <Helicopter className="w-3.5 h-3.5 text-purple-400" />
+          ) : (
+            <Plane className="w-3.5 h-3.5 text-yt-accent" />
+          )}
+          <span className="text-yt-accent font-medium">{mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Base Principale'}</span>
+          <ArrowRight className="w-3.5 h-3.5 text-yt-text-secondary" />
+          {isHeliport ? (
+            <Helicopter className="w-3.5 h-3.5 text-purple-400" />
+          ) : (
+            <Plane className="w-3.5 h-3.5 text-green-400" />
+          )}
+          <span className="text-green-400 font-medium">{airport?.displayName || airport?.name || 'Sconosciuto'}</span>
+          {mission.distance_nm && (
+            <>
+              <span className="text-yt-border">•</span>
+              <span className="text-cyan-400 font-mono font-medium">{mission.distance_nm}nm</span>
+            </>
+          )}
+          {mission.total_weight_lbs && mission.total_weight_lbs > 0 && (
+            <>
+              <span className="text-yt-border">•</span>
+              <Weight className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="text-cyan-400 font-mono font-medium">{formatWeight(mission.total_weight_lbs)}</span>
+            </>
           )}
         </div>
 
+        {/* Recommended Aircraft */}
+        {mission.recommended_aircraft && (
+          <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-yt-border">
+            {mission.recommended_aircraft === 'helicopter' && (
+              <>
+                <Helicopter className="w-3.5 h-3.5 text-purple-400" />
+                <span className="text-yt-text-secondary">Consigliato:</span>
+                <span className="text-purple-400 font-medium">Elicottero</span>
+              </>
+            )}
+            {mission.recommended_aircraft === 'airplane' && (
+              <>
+                <Plane className="w-3.5 h-3.5 text-yt-accent" />
+                <span className="text-yt-text-secondary">Consigliato:</span>
+                <span className="text-yt-accent font-medium">C-130</span>
+              </>
+            )}
+            {mission.recommended_aircraft === 'airdrop' && (
+              <>
+                <Package className="w-3.5 h-3.5 text-orange-400" />
+                <span className="text-yt-text-secondary">Consigliato:</span>
+                <span className="text-orange-400 font-medium">Airdrop</span>
+              </>
+            )}
+          </div>
+        )}
+
         {mission.status === 'accepted' && mission.accepted_by && (
-          <div className="mt-3 pt-3 border-t border-gray-700 flex items-center gap-2 text-sm">
-            <User className="w-4 h-4 text-gray-400" />
-            <span className="text-gray-400">Accettata da:</span>
-            <span className="text-white font-bold">{mission.accepted_by}</span>
+          <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-yt-border">
+            <User className="w-3.5 h-3.5 text-yt-text-secondary" />
+            <span className="text-yt-text-secondary">Pilota:</span>
+            <span className="text-yt-text-primary font-bold">{mission.accepted_by}</span>
           </div>
         )}
       </div>
 
+      {/* Azioni - compatte */}
       <div className="flex gap-2">
         {mission.status === 'pending' && !showAccept && (
           <button
             onClick={() => setShowAccept(true)}
             disabled={loading}
-            className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded font-bold transition-colors flex items-center justify-center gap-2"
+            className="flex-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-yt-bg-tertiary disabled:text-yt-text-secondary text-white rounded text-sm font-bold transition-all flex items-center justify-center gap-1.5"
           >
             <CheckCircle className="w-4 h-4" />
-            Accetta Missione
+            Accetta
           </button>
         )}
 
@@ -260,22 +258,22 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
               placeholder="Il tuo nome..."
               value={userName}
               onChange={(e) => setUserName(e.target.value)}
-              className="flex-1 px-3 py-2 bg-slate-900 border border-gray-700 rounded text-white"
+              className="flex-1 px-2 py-1.5 bg-yt-bg-primary border border-yt-border rounded text-yt-text-primary text-sm focus:border-yt-accent focus:outline-none"
               disabled={loading}
             />
             <button
               onClick={handleAccept}
               disabled={loading}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded font-bold transition-colors"
+              className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-yt-bg-tertiary text-white rounded text-sm font-bold transition-all"
             >
-              Conferma
+              OK
             </button>
             <button
               onClick={() => setShowAccept(false)}
               disabled={loading}
-              className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
+              className="px-3 py-1.5 bg-yt-bg-tertiary hover:bg-yt-border text-yt-text-primary rounded text-sm transition-all"
             >
-              Annulla
+              ✕
             </button>
           </div>
         )}
@@ -284,20 +282,20 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
           <button
             onClick={handleComplete}
             disabled={loading}
-            className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded font-bold transition-colors flex items-center justify-center gap-2"
+            className="flex-1 px-3 py-1.5 bg-yt-accent hover:bg-yt-accent/80 disabled:bg-yt-bg-tertiary text-white rounded text-sm font-bold transition-all flex items-center justify-center gap-1.5"
           >
             <CheckCircle className="w-4 h-4" />
-            Completa Missione
+            Completa
           </button>
         )}
 
         <button
           onClick={handleCancel}
           disabled={loading}
-          className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white rounded font-bold transition-colors flex items-center justify-center gap-2"
+          className="px-3 py-1.5 bg-red-600/80 hover:bg-red-600 disabled:bg-yt-bg-tertiary text-white rounded text-sm font-bold transition-all flex items-center justify-center gap-1.5"
         >
           <XCircle className="w-4 h-4" />
-          Annulla
+          <span className="hidden sm:inline">Annulla</span>
         </button>
       </div>
     </div>
@@ -323,67 +321,80 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
   };
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="bg-slate-800 rounded-lg p-6 border border-gray-700">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-purple-500/20 rounded-lg">
-              <Package className="w-8 h-8 text-purple-400" />
+    <div className="space-y-3">
+      {/* Header compatto stile YouTube */}
+      <div className="bg-yt-bg-secondary rounded-lg p-4 border border-yt-border">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-purple-500/20 rounded">
+              <Package className="w-6 h-6 text-purple-400" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-white">Gestione Missioni</h2>
-              <p className="text-gray-400">Gestisci le missioni di rifornimento</p>
+              <h2 className="text-xl font-bold text-yt-text-primary">Gestione Missioni</h2>
+              <p className="text-xs text-yt-text-secondary">Missioni di rifornimento attive</p>
             </div>
           </div>
-          <div className="flex gap-4">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-yellow-400">{stats.pending}</div>
-              <div className="text-xs text-gray-400">In Attesa</div>
+          {/* Stats compatte */}
+          <div className="flex gap-3">
+            <div className="text-center bg-yt-bg-tertiary rounded px-3 py-1.5">
+              <div className="text-2xl font-bold text-yellow-400">{stats.pending}</div>
+              <div className="text-[10px] text-yt-text-secondary uppercase tracking-wide">Attesa</div>
             </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-blue-400">{stats.accepted}</div>
-              <div className="text-xs text-gray-400">Accettate</div>
+            <div className="text-center bg-yt-bg-tertiary rounded px-3 py-1.5">
+              <div className="text-2xl font-bold text-yt-accent">{stats.accepted}</div>
+              <div className="text-[10px] text-yt-text-secondary uppercase tracking-wide">Accettate</div>
             </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-red-400">{stats.critical}</div>
-              <div className="text-xs text-gray-400">Critiche</div>
+            <div className="text-center bg-yt-bg-tertiary rounded px-3 py-1.5">
+              <div className="text-2xl font-bold text-red-400">{stats.critical}</div>
+              <div className="text-[10px] text-yt-text-secondary uppercase tracking-wide">Critiche</div>
             </div>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-2">
+        {/* Filters - compatti stile YouTube tabs */}
+        <div className="flex gap-1 border-b border-yt-border -mb-4 pb-0">
           <button
             onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded font-bold ${filter === 'all' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+            className={`px-4 py-2 text-sm font-medium transition-all ${
+              filter === 'all'
+                ? 'text-yt-text-primary border-b-2 border-yt-accent'
+                : 'text-yt-text-secondary hover:text-yt-text-primary'
+            }`}
           >
             Tutte ({stats.pending + stats.accepted})
           </button>
           <button
             onClick={() => setFilter('pending')}
-            className={`px-4 py-2 rounded font-bold ${filter === 'pending' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+            className={`px-4 py-2 text-sm font-medium transition-all ${
+              filter === 'pending'
+                ? 'text-yt-text-primary border-b-2 border-yt-accent'
+                : 'text-yt-text-secondary hover:text-yt-text-primary'
+            }`}
           >
             In Attesa ({stats.pending})
           </button>
           <button
             onClick={() => setFilter('accepted')}
-            className={`px-4 py-2 rounded font-bold ${filter === 'accepted' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+            className={`px-4 py-2 text-sm font-medium transition-all ${
+              filter === 'accepted'
+                ? 'text-yt-text-primary border-b-2 border-yt-accent'
+                : 'text-yt-text-secondary hover:text-yt-text-primary'
+            }`}
           >
             Accettate ({stats.accepted})
           </button>
         </div>
       </div>
 
-      {/* Missions List */}
+      {/* Missions List - compatta */}
       {filteredMissions.length === 0 ? (
-        <div className="bg-slate-800 rounded-lg p-12 text-center border border-gray-700">
-          <Package className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-          <p className="text-xl text-gray-400">Nessuna missione disponibile</p>
-          <p className="text-sm text-gray-500 mt-2">Le missioni appariranno qui quando le scorte saranno basse</p>
+        <div className="bg-yt-bg-secondary rounded-lg p-8 text-center border border-yt-border">
+          <Package className="w-12 h-12 text-yt-text-secondary mx-auto mb-3 opacity-50" />
+          <p className="text-base text-yt-text-primary font-medium">Nessuna missione disponibile</p>
+          <p className="text-xs text-yt-text-secondary mt-1">Le missioni appariranno qui quando le scorte saranno basse</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {filteredMissions.map(mission => (
             <MissionCard
               key={mission.id}
