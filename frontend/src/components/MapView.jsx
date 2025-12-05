@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Map as MapIcon, Plane, ArrowRight, Weight } from 'lucide-react';
+import { Map as MapIcon, Plane, Helicopter, ArrowRight, Weight } from 'lucide-react';
 import { getAirportName } from '../config/airports';
 import airports from '../config/airports';
 import { formatWeight } from '../utils/weightFormatter';

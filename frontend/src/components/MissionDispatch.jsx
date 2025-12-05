@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plane, Clock, User, CheckCircle, XCircle, AlertTriangle, Package, ArrowRight, Weight } from 'lucide-react';
+import { Plane, Helicopter, Clock, User, CheckCircle, XCircle, AlertTriangle, Package, ArrowRight, Weight } from 'lucide-react';
 import * as api from '../services/api';
 import { getAirportName } from '../config/airports';
 import airports from '../config/airports';
@@ -122,7 +122,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded ${isHeliport ? 'bg-purple-500/20' : 'bg-blue-500/20'}`}>
             {isHeliport ? (
-              <div className="w-6 h-6 flex items-center justify-center text-xl">🚁</div>
+              <Helicopter className="w-6 h-6 text-purple-400" />
             ) : (
               <Plane className="w-6 h-6 text-blue-400" />
             )}
@@ -189,7 +189,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
         <div className="mt-3 pt-3 border-t border-gray-700">
           <div className="flex items-center gap-2 text-sm bg-slate-800/50 px-3 py-2 rounded">
             {sourceAirport?.isHeliport ? (
-              <span className="text-sm">🚁</span>
+              <Helicopter className="w-4 h-4 text-purple-400" />
             ) : (
               <Plane className="w-4 h-4 text-blue-400" />
             )}
@@ -197,7 +197,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
             <span className="text-white">{mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Base Principale'}</span>
             <ArrowRight className="w-4 h-4 text-gray-500" />
             {isHeliport ? (
-              <span className="text-sm">🚁</span>
+              <Helicopter className="w-4 h-4 text-purple-400" />
             ) : (
               <Plane className="w-4 h-4 text-green-400" />
             )}
