@@ -141,7 +141,7 @@ function App() {
             {/* Logo compatto */}
             <div className="flex items-center gap-2">
               <img
-                src="/img/DCS_ITALIA_FULL.png"
+                src="/img/DCS_ITALIA_ICON.png"
                 alt="DCS Italia"
                 className="h-10 w-auto object-contain"
               />
