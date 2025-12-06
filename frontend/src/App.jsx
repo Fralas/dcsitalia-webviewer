@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plane, Package, Activity, AlertCircle, Map, Shield } from 'lucide-react';
 import Dashboard from './components/Dashboard';
-import MissionDispatch from './components/MissionDispatch';
 import MapView from './components/MapView';
 import AdminPanel from './components/AdminPanel';
 import * as api from './services/api';
@@ -174,22 +173,6 @@ function App() {
                   <span className="hidden sm:inline">Dashboard</span>
                 </button>
                 <button
-                  onClick={() => setCurrentView('missions')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all relative ${
-                    currentView === 'missions'
-                      ? 'bg-yt-bg-tertiary text-yt-text-primary'
-                      : 'text-yt-text-secondary hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary'
-                  }`}
-                >
-                  <Package className="w-4 h-4" />
-                  <span className="hidden sm:inline">Missioni</span>
-                  {stats.activeMissions > 0 && (
-                    <span className="absolute -top-1 -right-1 px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full font-bold min-w-[18px] text-center">
-                      {stats.activeMissions}
-                    </span>
-                  )}
-                </button>
-                <button
                   onClick={() => setCurrentView('map')}
                   className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
                     currentView === 'map'
@@ -224,14 +207,7 @@ function App() {
             airports={airports}
             missions={missions}
             stats={stats}
-          />
-        )}
-        {currentView === 'missions' && (
-          <MissionDispatch
-            missions={missions}
-            airports={Object.values(airports)}
-            onUpdate={handleMissionUpdate}
-            highlightedMissionId={highlightedMissionId}
+            onMissionsUpdate={handleMissionUpdate}
           />
         )}
         {currentView === 'map' && (
@@ -239,9 +215,8 @@ function App() {
             missions={missions}
             airportsData={Object.values(airports)}
             onNavigateToMissions={(missionId) => {
-              setHighlightedMissionId(missionId);
-              setCurrentView('missions');
-              setTimeout(() => setHighlightedMissionId(null), 3000);
+              // Missions view removed - navigate to dashboard instead
+              setCurrentView('dashboard');
             }}
           />
         )}
