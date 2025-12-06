@@ -365,6 +365,211 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
             </div>
           </div>
 
+          {/* Active Orders Section - Expanded with full mission management */}
+          {!airport.isMainBase && airportMissions.length > 0 && (
+            <div className="p-3 bg-fuchsia-500/10 border-t-2 border-fuchsia-500/40">
+              <h4 className="text-sm font-bold text-fuchsia-300 mb-3 flex items-center gap-2">
+                <Package className="w-4 h-4" />
+                ORDINI ATTIVI ({airportMissions.length})
+              </h4>
+              <div className={`grid gap-3 ${airportMissions.length === 1 ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
+                {airportMissions.map(mission => {
+                  const sourceName = mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Main Base';
+                  const sourceAirport = mission.source_airport_id ? airports.find(a => a.id === mission.source_airport_id) : null;
+                  const distance = mission.distance_nm ? `${mission.distance_nm}nm` : '-';
+                  const timeAgo = getTimeAgo(mission.created_at);
+                  const expiresIn = getTimeRemaining(mission.expires_at);
+                  const state = missionStates[mission.id] || { userName: '', showAccept: false, loading: false };
+
+                  return (
+                    <div key={mission.id} className="bg-yt-bg-secondary p-3 rounded-lg border-2 border-fuchsia-500/30">
+                      {/* Header with weapon and status */}
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-mono text-sm text-yt-text-primary font-bold mb-1 truncate">{getWeaponDisplayName(mission.weapon_id)}</div>
+                          <div className="flex items-center gap-2 text-xs">
+                            <Clock className="w-3 h-3 text-yt-text-secondary" />
+                            <span className="text-yt-text-secondary">{timeAgo}</span>
+                            <span className="text-yt-border">•</span>
+                            <span className="text-yellow-400 font-medium">⏰ {expiresIn}</span>
+                          </div>
+                        </div>
+                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide ${
+                          mission.status === 'pending'
+                            ? mission.current_quantity <= 5
+                              ? 'bg-red-400/20 text-red-400 border border-red-400/50'
+                              : mission.current_quantity <= 20
+                              ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
+                              : 'bg-yellow-400/20 text-yellow-400 border border-yellow-400/50'
+                            : mission.status === 'accepted'
+                            ? 'bg-yt-accent/20 text-yt-accent'
+                            : 'bg-yt-bg-primary/50 text-yt-text-secondary'
+                        }`}>
+                          {mission.status === 'pending'
+                            ? mission.current_quantity <= 5
+                              ? 'CRITICA'
+                              : mission.current_quantity <= 20
+                              ? 'ALTA'
+                              : 'MEDIA'
+                            : mission.status === 'accepted'
+                            ? 'ACCETTATA'
+                            : mission.status.toUpperCase()}
+                        </span>
+                      </div>
+
+                      {/* Quantities and weight */}
+                      <div className="bg-yt-bg-tertiary rounded p-2 mb-2">
+                        <div className="flex gap-2 mb-2">
+                          <div className="flex-1 bg-yt-bg-primary rounded p-1.5 text-center">
+                            <div className="text-[10px] text-yt-text-secondary mb-0.5">Scorte</div>
+                            <div className="text-base font-bold text-red-400">{mission.current_quantity}</div>
+                          </div>
+                          <div className="flex-1 bg-yt-bg-primary rounded p-1.5 text-center">
+                            <div className="text-[10px] text-yt-text-secondary mb-0.5">Richieste</div>
+                            <div className="text-base font-bold text-green-400">{mission.quantity_needed}</div>
+                          </div>
+                        </div>
+                        {mission.total_weight_lbs && mission.total_weight_lbs > 0 && (
+                          <div className="flex items-center gap-1.5 justify-center text-xs text-yt-text-primary">
+                            <Weight className="w-3.5 h-3.5" />
+                            <span className="font-mono font-medium">{formatWeight(mission.total_weight_lbs)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Route Information */}
+                      <div className="flex items-center gap-1 text-xs bg-yt-bg-tertiary px-2 py-1.5 rounded mb-2 flex-wrap">
+                        {!sourceAirport ? (
+                          <span className="text-fuchsia-400 font-medium truncate">{sourceName}</span>
+                        ) : sourceAirport.isMainBase ? (
+                          <span className="text-fuchsia-400 font-medium truncate">{sourceName}</span>
+                        ) : sourceAirport.isHeliport ? (
+                          <>
+                            <Helicopter className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+                            <span className="text-cyan-400 font-medium truncate">{sourceName}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plane className="w-3.5 h-3.5 text-yt-accent flex-shrink-0" />
+                            <span className="text-yt-accent font-medium truncate">{sourceName}</span>
+                          </>
+                        )}
+                        <ArrowRight className="w-3.5 h-3.5 text-yt-text-secondary flex-shrink-0" />
+                        {isHeliport ? (
+                          <>
+                            <Helicopter className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+                            <span className="text-cyan-400 font-medium truncate">{airport.displayName || airport.name}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plane className="w-3.5 h-3.5 text-yt-accent flex-shrink-0" />
+                            <span className="text-yt-accent font-medium truncate">{airport.displayName || airport.name}</span>
+                          </>
+                        )}
+                        <span className="text-yt-border flex-shrink-0">•</span>
+                        <span className="text-yt-text-primary font-mono flex-shrink-0">{distance}</span>
+
+                        {/* Recommended Aircraft inline */}
+                        {mission.recommended_aircraft && (
+                          <>
+                            <span className="text-yt-border flex-shrink-0">•</span>
+                            {mission.recommended_aircraft === 'helicopter' && (
+                              <>
+                                <Helicopter className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+                                <span className="text-cyan-400 font-medium flex-shrink-0">Elicottero</span>
+                              </>
+                            )}
+                            {mission.recommended_aircraft === 'airplane' && (
+                              <>
+                                <Plane className="w-3.5 h-3.5 text-yt-accent flex-shrink-0" />
+                                <span className="text-yt-accent font-medium flex-shrink-0">C-130</span>
+                              </>
+                            )}
+                            {mission.recommended_aircraft === 'airdrop' && (
+                              <>
+                                <Package className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
+                                <span className="text-orange-400 font-medium flex-shrink-0">Airdrop</span>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </div>
+
+                      {/* Pilot info for accepted missions */}
+                      {mission.status === 'accepted' && mission.accepted_by && (
+                        <div className="flex items-center gap-1.5 text-xs bg-yt-bg-tertiary px-2 py-1.5 rounded mb-2">
+                          <User className="w-3.5 h-3.5 text-yt-text-secondary" />
+                          <span className="text-yt-text-secondary">Pilota:</span>
+                          <span className="text-yt-text-primary font-bold">{mission.accepted_by}</span>
+                        </div>
+                      )}
+
+                      {/* Action buttons */}
+                      <div className="flex gap-2">
+                        {mission.status === 'pending' && !state.showAccept && (
+                          <button
+                            onClick={() => setMissionStates(prev => ({ ...prev, [mission.id]: { ...state, showAccept: true } }))}
+                            disabled={state.loading}
+                            className="flex-1 px-3 py-1.5 bg-green-400/20 text-green-400 border border-green-400/50 hover:bg-green-400/30 disabled:bg-yt-bg-tertiary disabled:text-yt-text-secondary disabled:border-yt-border rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            Accetta
+                          </button>
+                        )}
+
+                        {mission.status === 'pending' && state.showAccept && (
+                          <div className="flex-1 flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="Nome pilota..."
+                              value={state.userName}
+                              onChange={(e) => setMissionStates(prev => ({ ...prev, [mission.id]: { ...state, userName: e.target.value } }))}
+                              className="flex-1 px-2 py-1.5 bg-yt-bg-primary border border-yt-border rounded text-yt-text-primary text-xs focus:border-yt-accent focus:outline-none"
+                              disabled={state.loading}
+                            />
+                            <button
+                              onClick={() => handleAcceptMission(mission.id)}
+                              disabled={state.loading}
+                              className="px-3 py-1.5 bg-green-400/20 text-green-400 border border-green-400/50 hover:bg-green-400/30 disabled:bg-yt-bg-tertiary disabled:text-yt-text-secondary disabled:border-yt-border rounded text-xs font-bold transition-all"
+                            >
+                              OK
+                            </button>
+                            <button
+                              onClick={() => setMissionStates(prev => ({ ...prev, [mission.id]: { ...state, showAccept: false } }))}
+                              disabled={state.loading}
+                              className="px-3 py-1.5 bg-yt-bg-tertiary hover:bg-yt-border text-yt-text-primary rounded text-xs transition-all"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
+
+                        {mission.status === 'accepted' && (
+                          <button
+                            onClick={() => handleCompleteMission(mission.id)}
+                            disabled={state.loading}
+                            className="flex-1 px-3 py-1.5 bg-yt-accent hover:bg-yt-accent/80 disabled:bg-yt-bg-tertiary text-white rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            Completa
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => handleCancelMission(mission.id)}
+                          disabled={state.loading}
+                          className="px-3 py-1.5 bg-red-400/20 text-red-400 border border-red-400/50 hover:bg-red-400/30 disabled:bg-yt-bg-tertiary disabled:text-yt-text-secondary disabled:border-yt-border rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Annulla</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Weapons & Liquids Section - Split Layout */}
           <div className="p-3">
