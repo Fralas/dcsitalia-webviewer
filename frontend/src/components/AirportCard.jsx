@@ -383,55 +383,8 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
 
                   return (
                     <div key={mission.id} className="bg-yt-bg-secondary p-3 rounded-lg border-2 border-fuchsia-500/30">
-                      {/* Header with time and priority */}
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex items-center gap-2 flex-1">
-                          <Clock className="w-4 h-4 text-yt-text-secondary" />
-                          <span className="text-sm text-yt-text-secondary">{timeAgo}</span>
-                        </div>
-                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide ${
-                          mission.status === 'pending'
-                            ? mission.current_quantity <= 5
-                              ? 'bg-red-400/20 text-red-400 border border-red-400/50'
-                              : mission.current_quantity <= 20
-                              ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
-                              : 'bg-yellow-400/20 text-yellow-400 border border-yellow-400/50'
-                            : mission.status === 'accepted'
-                            ? 'bg-yt-accent/20 text-yt-accent'
-                            : 'bg-yt-bg-primary/50 text-yt-text-secondary'
-                        }`}>
-                          {mission.status === 'pending'
-                            ? mission.current_quantity <= 5
-                              ? 'CRITICA'
-                              : mission.current_quantity <= 20
-                              ? 'ALTA'
-                              : 'MEDIA'
-                            : mission.status === 'accepted'
-                            ? 'ACCETTATA'
-                            : mission.status.toUpperCase()}
-                        </span>
-                      </div>
-
-                      {/* Weapon name - title style */}
+                      {/* Weapon name - title style at top */}
                       <h3 className="text-lg font-bold text-yt-text-primary mb-2 font-mono">{getWeaponDisplayName(mission.weapon_id)}</h3>
-
-                      {/* Quantities and weight - compact layout */}
-                      <div className="flex gap-2 mb-2">
-                        <div className="flex-1 bg-yt-bg-tertiary rounded p-1.5 text-center">
-                          <div className="text-[10px] text-yt-text-secondary mb-0.5">Scorte</div>
-                          <div className="text-base font-bold text-red-400">{mission.current_quantity}</div>
-                        </div>
-                        <div className="flex-1 bg-yt-bg-tertiary rounded p-1.5 text-center">
-                          <div className="text-[10px] text-yt-text-secondary mb-0.5">Richieste</div>
-                          <div className="text-base font-bold text-green-400">{mission.quantity_needed}</div>
-                        </div>
-                        {mission.total_weight_lbs && mission.total_weight_lbs > 0 && (
-                          <div className="flex-[2] bg-yt-bg-tertiary rounded p-1.5 flex items-center justify-center gap-1.5">
-                            <Weight className="w-4 h-4 text-yt-text-primary" />
-                            <span className="text-base font-bold text-yt-text-primary font-mono">{formatWeight(mission.total_weight_lbs)}</span>
-                          </div>
-                        )}
-                      </div>
 
                       {/* Route Information */}
                       <div className="flex items-center gap-1 text-xs bg-yt-bg-tertiary px-2 py-1.5 rounded mb-2 flex-wrap">
@@ -489,6 +442,53 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                             )}
                           </>
                         )}
+                      </div>
+
+                      {/* Quantities and weight - compact layout */}
+                      <div className="flex gap-2 mb-2">
+                        <div className="flex-1 bg-yt-bg-tertiary rounded p-1.5 text-center">
+                          <div className="text-[10px] text-yt-text-secondary mb-0.5">Scorte</div>
+                          <div className="text-base font-bold text-red-400">{mission.current_quantity}</div>
+                        </div>
+                        <div className="flex-1 bg-yt-bg-tertiary rounded p-1.5 text-center">
+                          <div className="text-[10px] text-yt-text-secondary mb-0.5">Richieste</div>
+                          <div className="text-base font-bold text-green-400">{mission.quantity_needed}</div>
+                        </div>
+                        {mission.total_weight_lbs && mission.total_weight_lbs > 0 && (
+                          <div className="flex-[2] bg-yt-bg-tertiary rounded p-1.5 flex items-center justify-center gap-1.5">
+                            <Weight className="w-4 h-4 text-yt-text-primary" />
+                            <span className="text-base font-bold text-yt-text-primary font-mono">{formatWeight(mission.total_weight_lbs)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Time and priority */}
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center gap-2 flex-1">
+                          <Clock className="w-4 h-4 text-yt-text-secondary" />
+                          <span className="text-sm text-yt-text-secondary">{timeAgo}</span>
+                        </div>
+                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide ${
+                          mission.status === 'pending'
+                            ? mission.current_quantity <= 5
+                              ? 'bg-red-400/20 text-red-400 border border-red-400/50'
+                              : mission.current_quantity <= 20
+                              ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
+                              : 'bg-yellow-400/20 text-yellow-400 border border-yellow-400/50'
+                            : mission.status === 'accepted'
+                            ? 'bg-yt-accent/20 text-yt-accent'
+                            : 'bg-yt-bg-primary/50 text-yt-text-secondary'
+                        }`}>
+                          {mission.status === 'pending'
+                            ? mission.current_quantity <= 5
+                              ? 'CRITICA'
+                              : mission.current_quantity <= 20
+                              ? 'ALTA'
+                              : 'MEDIA'
+                            : mission.status === 'accepted'
+                            ? 'ACCETTATA'
+                            : mission.status.toUpperCase()}
+                        </span>
                       </div>
 
                       {/* Pilot info for accepted missions */}
