@@ -121,54 +121,31 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
       {/* Header compatto con info principali */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2 flex-1">
-          <div className={`p-1.5 rounded ${isHeliport ? 'bg-cyan-500/20' : 'bg-yt-accent/20'}`}>
-            {isHeliport ? (
-              <Helicopter className="w-5 h-5 text-cyan-400" />
-            ) : (
-              <Plane className="w-5 h-5 text-yt-accent" />
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-base font-bold text-yt-text-primary truncate">{airport?.displayName || airport?.name || 'Aeroporto Sconosciuto'}</h3>
-            <div className="flex items-center gap-1.5 text-xs text-yt-text-secondary">
-              <Clock className="w-3 h-3" />
-              <span>{timeAgo}</span>
-              <span className="text-yt-border">•</span>
-              <span className="text-yellow-400 font-medium">⏰ {expiresIn}</span>
-            </div>
-          </div>
+          <Clock className="w-4 h-4 text-yt-text-secondary" />
+          <span className="text-sm text-yt-text-secondary">{timeAgo}</span>
         </div>
         <PriorityBadge currentQuantity={mission.current_quantity} />
       </div>
 
-      {/* Weapon e quantità - focus principale */}
-      <div className="bg-yt-bg-tertiary rounded p-2.5 mb-2">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex-1">
-            <div className="text-xs text-yt-text-secondary mb-0.5">Arma Richiesta</div>
-            <div className="font-mono text-sm text-yt-text-primary font-bold">{getWeaponDisplayName(mission.weapon_id)}</div>
-          </div>
-          <div>
-            {mission.status === 'pending' && (
-              <span className="px-2 py-0.5 bg-yellow-400/20 text-yellow-400 rounded text-xs font-bold">IN ATTESA</span>
-            )}
-            {mission.status === 'accepted' && (
-              <span className="px-2 py-0.5 bg-yt-accent/20 text-yt-accent rounded text-xs font-bold">ACCETTATA</span>
-            )}
-          </div>
-        </div>
+      {/* Weapon name - title style */}
+      <h3 className="text-lg font-bold text-yt-text-primary mb-2 font-mono">{getWeaponDisplayName(mission.weapon_id)}</h3>
 
-        <div className="flex gap-3">
-          <div className="flex-1 bg-yt-bg-primary rounded p-2 text-center">
-            <div className="text-xs text-yt-text-secondary mb-0.5">Scorte</div>
-            <div className="text-xl font-bold text-red-400">{mission.current_quantity}</div>
-          </div>
-          <div className="flex-1 bg-yt-bg-primary rounded p-2 text-center">
-            <div className="text-xs text-yt-text-secondary mb-0.5">Richieste</div>
-            <div className="text-xl font-bold text-green-400">{mission.quantity_needed}</div>
-          </div>
+      {/* Quantities and weight - compact layout */}
+      <div className="flex gap-2 mb-2">
+        <div className="flex-1 bg-yt-bg-tertiary rounded p-1.5 text-center">
+          <div className="text-[10px] text-yt-text-secondary mb-0.5">Scorte</div>
+          <div className="text-base font-bold text-red-400">{mission.current_quantity}</div>
         </div>
-
+        <div className="flex-1 bg-yt-bg-tertiary rounded p-1.5 text-center">
+          <div className="text-[10px] text-yt-text-secondary mb-0.5">Richieste</div>
+          <div className="text-base font-bold text-green-400">{mission.quantity_needed}</div>
+        </div>
+        {mission.total_weight_lbs && mission.total_weight_lbs > 0 && (
+          <div className="flex-[2] bg-yt-bg-tertiary rounded p-1.5 flex items-center justify-center gap-1.5">
+            <Weight className="w-4 h-4 text-yt-text-primary" />
+            <span className="text-base font-bold text-yt-text-primary font-mono">{formatWeight(mission.total_weight_lbs)}</span>
+          </div>
+        )}
       </div>
 
       {/* Route e info missione - compatto */}
@@ -203,13 +180,6 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
             <>
               <span className="text-yt-border">•</span>
               <span className="text-yt-text-primary font-mono font-medium">{mission.distance_nm}nm</span>
-            </>
-          )}
-          {mission.total_weight_lbs && mission.total_weight_lbs > 0 && (
-            <>
-              <span className="text-yt-border">•</span>
-              <Weight className="w-3.5 h-3.5 text-yt-text-primary" />
-              <span className="text-yt-text-primary font-mono font-medium">{formatWeight(mission.total_weight_lbs)}</span>
             </>
           )}
         </div>
