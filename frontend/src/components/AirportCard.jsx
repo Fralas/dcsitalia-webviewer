@@ -315,30 +315,6 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
       {/* Expanded Content */}
       {expanded && (
         <div className="border-t border-yt-border">
-          {/* Filters - compatti stile YouTube */}
-          <div className="p-3 bg-yt-bg-primary flex gap-2 justify-between items-center flex-wrap">
-            <div className="flex gap-1.5">
-              <button
-                onClick={() => setFilter('all')}
-                className={`px-2.5 py-1.5 rounded text-xs font-medium transition-all ${filter === 'all' ? 'bg-yt-accent text-white' : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'}`}
-              >
-                Tutte ({weapons.length})
-              </button>
-              <button
-                onClick={() => setFilter('important')}
-                className={`px-2.5 py-1.5 rounded text-xs font-medium transition-all ${filter === 'important' ? 'bg-yt-accent text-white' : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'}`}
-              >
-                Importanti ({weapons.filter(w => isImportantWeapon(w.item, isHeliport)).length})
-              </button>
-              <button
-                onClick={() => setFilter('critical')}
-                className={`px-2.5 py-1.5 rounded text-xs font-medium transition-all ${filter === 'critical' ? 'bg-yt-accent text-white' : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'}`}
-              >
-                Critiche ({stats.critical})
-              </button>
-            </div>
-          </div>
-
           {/* Active Orders Section - Expanded with full mission management */}
           {!airport.isMainBase && airportMissions.length > 0 && (
             <div className="p-3 bg-fuchsia-500/10 border-t-2 border-fuchsia-500/40">
