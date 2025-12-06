@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plane, Package, Activity, AlertCircle, Map, Shield } from 'lucide-react';
 import Dashboard from './components/Dashboard';
-import MissionDispatch from './components/MissionDispatch';
 import MapView from './components/MapView';
 import AdminPanel from './components/AdminPanel';
 import * as api from './services/api';
@@ -105,10 +104,10 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-dcs-darker flex items-center justify-center">
+      <div className="min-h-screen bg-yt-bg-primary flex items-center justify-center">
         <div className="text-center">
-          <Activity className="w-16 h-16 text-blue-400 animate-spin mx-auto mb-4" />
-          <p className="text-xl text-gray-400">Loading DCS Warehouse Viewer...</p>
+          <Activity className="w-16 h-16 text-yt-accent animate-spin mx-auto mb-4" />
+          <p className="text-xl text-yt-text-secondary">Loading DCS Warehouse Viewer...</p>
         </div>
       </div>
     );
@@ -116,14 +115,14 @@ function App() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-dcs-darker flex items-center justify-center">
+      <div className="min-h-screen bg-yt-bg-primary flex items-center justify-center">
         <div className="text-center max-w-md">
           <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
           <p className="text-xl text-red-400 mb-2">Error Loading Data</p>
-          <p className="text-gray-400 mb-4">{error}</p>
+          <p className="text-yt-text-secondary mb-4">{error}</p>
           <button
             onClick={loadData}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold"
+            className="px-6 py-2 bg-yt-accent hover:bg-yt-accent/80 text-white rounded font-bold transition-all"
           >
             Retry
           </button>
@@ -133,84 +132,82 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-dcs-darker">
-      {/* Header */}
-      <header className="bg-slate-900 border-b border-gray-800 sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
+    <div className="min-h-screen bg-yt-bg-primary">
+      {/* Header - Compatto stile YouTube */}
+      <header className="bg-yt-bg-secondary border-b border-yt-border sticky top-0 z-50 shadow-lg">
+        <div className="container mx-auto px-4 py-2">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-500/20 rounded-lg">
-                <Plane className="w-8 h-8 text-blue-400" />
-              </div>
+            {/* Logo compatto */}
+            <div className="flex items-center gap-2">
+              <img
+                src="/img/DCS_ITALIA_ICON.png"
+                alt="DCS Italia"
+                className="h-10 w-auto object-contain"
+              />
               <div>
-                <h1 className="text-2xl font-bold text-white">DCS Warehouse Viewer</h1>
-                <p className="text-sm text-gray-400">Sistema di Gestione Logistica</p>
+                <h1 className="text-lg font-bold text-yt-text-primary">DCS Warehouse</h1>
+                <p className="text-xs text-yt-text-secondary">Gestione Logistica</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
-              {/* Connection Status */}
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${connectionStatus === 'connected' ? 'bg-green-400' : connectionStatus === 'disconnected' ? 'bg-red-400' : 'bg-yellow-400'}`} />
-                <span className="text-sm text-gray-400 capitalize">
-                  {connectionStatus === 'connected' ? 'connesso' : connectionStatus === 'disconnected' ? 'disconnesso' : 'connessione...'}
+            <div className="flex items-center gap-3">
+              {/* Connection Status - compatto */}
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-yt-bg-tertiary rounded">
+                <div className={`w-1.5 h-1.5 rounded-full ${connectionStatus === 'connected' ? 'bg-green-400' : connectionStatus === 'disconnected' ? 'bg-red-400' : 'bg-yellow-400'}`} />
+                <span className="text-xs text-yt-text-secondary">
+                  {connectionStatus === 'connected' ? 'online' : connectionStatus === 'disconnected' ? 'offline' : 'connecting...'}
                 </span>
               </div>
 
-              {/* Navigation */}
-              <button
-                onClick={() => setCurrentView('dashboard')}
-                className={`px-4 py-2 rounded font-bold flex items-center gap-2 ${currentView === 'dashboard' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-gray-300 hover:bg-slate-700'}`}
-              >
-                <Plane className="w-4 h-4" />
-                Dashboard
-              </button>
-              <button
-                onClick={() => setCurrentView('missions')}
-                className={`px-4 py-2 rounded font-bold flex items-center gap-2 ${currentView === 'missions' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-gray-300 hover:bg-slate-700'}`}
-              >
-                <Package className="w-4 h-4" />
-                Missioni
-                {stats.activeMissions > 0 && (
-                  <span className="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
-                    {stats.activeMissions}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setCurrentView('map')}
-                className={`px-4 py-2 rounded font-bold flex items-center gap-2 ${currentView === 'map' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-gray-300 hover:bg-slate-700'}`}
-              >
-                <Map className="w-4 h-4" />
-                Mappa
-              </button>
-              <button
-                onClick={() => setCurrentView('admin')}
-                className={`px-4 py-2 rounded font-bold flex items-center gap-2 ${currentView === 'admin' ? 'bg-red-600 text-white' : 'bg-slate-800 text-gray-300 hover:bg-slate-700'}`}
-              >
-                <Shield className="w-4 h-4" />
-                Admin
-              </button>
+              {/* Navigation - compatta e moderna */}
+              <nav className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentView('dashboard')}
+                  className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
+                    currentView === 'dashboard'
+                      ? 'bg-yt-bg-tertiary text-yt-text-primary'
+                      : 'text-yt-text-secondary hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary'
+                  }`}
+                >
+                  <Plane className="w-4 h-4" />
+                  <span className="hidden sm:inline">Dashboard</span>
+                </button>
+                <button
+                  onClick={() => setCurrentView('map')}
+                  className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
+                    currentView === 'map'
+                      ? 'bg-yt-bg-tertiary text-yt-text-primary'
+                      : 'text-yt-text-secondary hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary'
+                  }`}
+                >
+                  <Map className="w-4 h-4" />
+                  <span className="hidden sm:inline">Mappa</span>
+                </button>
+                <button
+                  onClick={() => setCurrentView('admin')}
+                  className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
+                    currentView === 'admin'
+                      ? 'bg-red-500/20 text-red-400'
+                      : 'text-yt-text-secondary hover:bg-red-500/10 hover:text-red-400'
+                  }`}
+                >
+                  <Shield className="w-4 h-4" />
+                  <span className="hidden sm:inline">Admin</span>
+                </button>
+              </nav>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className={currentView === 'map' || currentView === 'admin' ? '' : 'container mx-auto px-4 py-6'}>
+      {/* Main Content - padding ridotto */}
+      <main className={currentView === 'map' || currentView === 'admin' ? '' : 'container mx-auto px-4 py-4'}>
         {currentView === 'dashboard' && (
           <Dashboard
             airports={airports}
             missions={missions}
             stats={stats}
-          />
-        )}
-        {currentView === 'missions' && (
-          <MissionDispatch
-            missions={missions}
-            airports={Object.values(airports)}
-            onUpdate={handleMissionUpdate}
-            highlightedMissionId={highlightedMissionId}
+            onMissionsUpdate={handleMissionUpdate}
           />
         )}
         {currentView === 'map' && (
@@ -218,10 +215,8 @@ function App() {
             missions={missions}
             airportsData={Object.values(airports)}
             onNavigateToMissions={(missionId) => {
-              setHighlightedMissionId(missionId);
-              setCurrentView('missions');
-              // Reset highlighted mission after navigation
-              setTimeout(() => setHighlightedMissionId(null), 3000);
+              // Missions view removed - navigate to dashboard instead
+              setCurrentView('dashboard');
             }}
           />
         )}
@@ -230,10 +225,10 @@ function App() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="bg-slate-900 border-t border-gray-800 mt-12">
-        <div className="container mx-auto px-4 py-4 text-center text-sm text-gray-400">
-          <p>DCS Italia Warehouse Viewer v1.0 | Real-time logistics management for DCS World</p>
+      {/* Footer - compatto */}
+      <footer className="bg-yt-bg-secondary border-t border-yt-border mt-8">
+        <div className="container mx-auto px-4 py-3 text-center text-xs text-yt-text-secondary">
+          <p>DCS Italia Warehouse Viewer v1.0 • Real-time logistics management</p>
         </div>
       </footer>
     </div>

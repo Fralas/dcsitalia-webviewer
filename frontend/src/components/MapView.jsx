@@ -35,9 +35,11 @@ function FitBounds({ positions }) {
  * Custom airport icon
  */
 const createAirportIcon = (isMainBase, missionCount, isHeliport) => {
-  const color = isMainBase ? '#facc15' : '#3b82f6';
+  const color = isMainBase ? '#e879f9' : isHeliport ? '#22d3ee' : '#3b82f6';
   const size = isMainBase ? 16 : 12;
-  const icon = isHeliport ? '🚁' : '✈️';
+  const iconSvg = isHeliport
+    ? `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v-1a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1m-4 0h4m-4 0v1.5m4-1.5v1.5m3-6.5h-3L11 9V4a1 1 0 0 0-2 0v5L7 6H4l4 5v3H6l-2 2v2h4v-1h8v1h4v-2l-2-2h-2v-3l4-5h-3z"/></svg>`
+    : `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>`;
 
   return L.divIcon({
     className: 'custom-airport-marker',
@@ -47,15 +49,15 @@ const createAirportIcon = (isMainBase, missionCount, isHeliport) => {
           width: ${size * 2}px;
           height: ${size * 2}px;
           background: ${color};
-          border: 3px solid ${isMainBase ? '#fbbf24' : '#2563eb'};
+          border: 3px solid ${isMainBase ? '#d946ef' : isHeliport ? '#06b6d4' : '#2563eb'};
           border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 14px;
+          color: #1e293b;
           box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         ">
-          ${icon}
+          ${iconSvg}
         </div>
         ${missionCount > 0 ? `
           <div style="
@@ -93,51 +95,52 @@ function MissionCard({ mission, airport, onHover, onSelect, isHighlighted, isSel
 
   return (
     <div
-      className={`bg-slate-800 p-3 rounded border-2 transition-all cursor-pointer ${
+      className={`bg-yt-bg-secondary p-3 rounded-lg border-2 transition-all cursor-pointer ${
         isSelected
-          ? 'border-yellow-400 shadow-lg shadow-yellow-400/30 scale-105'
+          ? 'border-fuchsia-400 shadow-lg shadow-fuchsia-400/30 scale-[1.02]'
           : isHighlighted
-          ? 'border-yellow-400 shadow-lg shadow-yellow-400/20'
-          : isPending ? 'border-blue-500/30' : 'border-red-500/30'
+          ? 'border-yt-accent shadow-lg shadow-yt-accent/20'
+          : 'border-yt-border hover:border-yt-border/50'
       }`}
       onMouseEnter={() => onHover(mission.id)}
       onMouseLeave={() => onHover(null)}
       onClick={() => onSelect(mission.id)}
     >
       <div className="flex justify-between items-start mb-2">
-        <div className="flex-1">
-          <div className="font-mono text-xs text-white mb-1">{getWeaponDisplayName(mission.weapon_id)}</div>
-          <div className="text-xs text-gray-400">
-            Qty: <span className="font-bold text-white">{mission.quantity_needed}</span>
+        <div className="flex-1 min-w-0">
+          <div className="font-mono text-sm text-yt-text-primary font-bold mb-1 truncate">{getWeaponDisplayName(mission.weapon_id)}</div>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-yt-text-secondary">Qty:</span>
+            <span className="font-bold text-yt-text-primary bg-yt-bg-tertiary px-1.5 py-0.5 rounded">{mission.quantity_needed}</span>
           </div>
           {mission.total_weight_lbs && mission.total_weight_lbs > 0 && (
-            <div className="flex items-center gap-1 text-xs text-cyan-400 mt-1">
-              <Weight className="w-3 h-3" />
-              <span className="font-mono">{formatWeight(mission.total_weight_lbs)}</span>
+            <div className="flex items-center gap-1.5 text-xs text-yt-text-primary mt-1.5">
+              <Weight className="w-3.5 h-3.5" />
+              <span className="font-mono font-medium">{formatWeight(mission.total_weight_lbs)}</span>
             </div>
           )}
         </div>
         <div>
-          <span className={`px-2 py-1 rounded text-xs ${
-            isPending ? 'bg-blue-500/20 text-blue-400' : 'bg-red-500/20 text-red-400'
+          <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide ${
+            isPending ? 'bg-yellow-400/20 text-yellow-400' : 'bg-yt-accent/20 text-yt-accent'
           }`}>
-            {isPending ? 'PENDING' : 'ACCEPTED'}
+            {isPending ? 'Attesa' : 'Accettata'}
           </span>
         </div>
       </div>
 
-      {/* Route */}
-      <div className="flex items-center gap-1 text-xs bg-slate-900/50 px-2 py-1 rounded">
-        <span className="text-blue-400">{sourceName}</span>
-        <ArrowRight className="w-3 h-3 text-gray-500" />
-        <span className="text-green-400">{airport?.displayName}</span>
-        <span className="text-gray-500">•</span>
-        <span className="text-cyan-400 font-mono">{distance}</span>
+      {/* Route - più grande e leggibile */}
+      <div className="flex items-center gap-1.5 text-xs bg-yt-bg-tertiary px-2.5 py-2 rounded">
+        <span className="text-yt-accent font-medium truncate">{sourceName}</span>
+        <ArrowRight className="w-3.5 h-3.5 text-yt-text-secondary flex-shrink-0" />
+        <span className="text-yt-accent font-medium truncate">{airport?.displayName}</span>
+        <span className="text-yt-border flex-shrink-0">•</span>
+        <span className="text-yt-text-primary font-mono font-medium flex-shrink-0">{distance}</span>
       </div>
 
       {isSelected && (
-        <div className="mt-2 pt-2 border-t border-yellow-400/30 text-xs text-yellow-400 text-center">
-          👆 Clicca di nuovo per andare alla pagina Missions
+        <div className="mt-2 pt-2 border-t border-fuchsia-400/30 text-xs text-fuchsia-400 text-center font-medium">
+          👆 Clicca di nuovo per aprire la pagina Missioni
         </div>
       )}
     </div>
@@ -164,7 +167,7 @@ function MissionPolyline({ mission, sourceAirport, destAirport, isHighlighted, i
     <Polyline
       positions={positions}
       pathOptions={{
-        color: isSelected ? '#facc15' : isPending ? '#60a5fa' : '#f87171',
+        color: isSelected ? '#e879f9' : isPending ? '#60a5fa' : '#f87171',
         weight: isSelected ? 5 : isHighlighted ? 4 : baseWeight,
         opacity: isSelected ? 1 : isHighlighted ? 1 : baseOpacity,
         dashArray: isPending ? '10, 10' : undefined,
@@ -186,7 +189,7 @@ function MissionPolyline({ mission, sourceAirport, destAirport, isHighlighted, i
           </div>
           <div className="mt-1">
             <span className={`px-2 py-1 rounded text-xs ${
-              isPending ? 'bg-blue-500/20 text-blue-600' : 'bg-red-500/20 text-red-600'
+              isPending ? 'bg-blue-500/20 text-blue-600' : 'bg-red-400/20 text-red-400'
             }`}>
               {mission.status.toUpperCase()}
             </span>
@@ -260,48 +263,50 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="bg-slate-800 rounded-lg p-6 border border-gray-700 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-500/20 rounded-lg">
-              <MapIcon className="w-8 h-8 text-blue-400" />
+    <div className="min-h-screen bg-yt-bg-primary p-4">
+      <div className="max-w-[1800px] mx-auto">
+        {/* Header compatto stile YouTube */}
+        <div className="bg-yt-bg-secondary rounded-lg p-4 border border-yt-border mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-yt-accent/20 rounded">
+                <MapIcon className="w-6 h-6 text-yt-accent" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-yt-text-primary">Mappa delle Rotte</h1>
+                <p className="text-xs text-yt-text-secondary">Visualizzazione geografica delle missioni attive</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">Mappa delle Rotte</h1>
-              <p className="text-gray-400">Visualizzazione geografica delle missioni di rifornimento</p>
-            </div>
-          </div>
 
-          {/* Legend */}
-          <div className="mt-4 flex flex-wrap gap-6 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-12 h-0.5 border-t-2 border-dashed border-blue-400"></div>
-              <span className="text-gray-300">Pending</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-12 h-0.5 bg-red-400"></div>
-              <span className="text-gray-300">Accepted</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-lg">✈️</span>
-              <span className="text-gray-300">Aeroporto</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-lg">🚁</span>
-              <span className="text-gray-300">Eliporto</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-yellow-400 border-2 border-yellow-500"></div>
-              <span className="text-gray-300">Main Base</span>
+            {/* Legend compatta */}
+            <div className="flex items-center gap-4 text-xs">
+              <div className="flex items-center gap-1.5">
+                <div className="w-8 h-0.5 border-t-2 border-dashed border-yellow-400"></div>
+                <span className="text-yt-text-secondary">Attesa</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-8 h-0.5 bg-red-400"></div>
+                <span className="text-yt-text-secondary">Accettata</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Plane className="w-4 h-4 text-yt-accent" />
+                <span className="text-yt-text-secondary">Airport</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Helicopter className="w-4 h-4 text-cyan-400" />
+                <span className="text-yt-text-secondary">Heliport</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-fuchsia-400 border-2 border-fuchsia-500"></div>
+                <span className="text-yt-text-secondary">Base</span>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Map */}
-          <div className="lg:col-span-2 bg-slate-800 rounded-lg overflow-hidden border border-gray-700" style={{ height: '700px' }}>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+          {/* Map - più largo */}
+          <div className="lg:col-span-3 bg-yt-bg-secondary rounded-lg overflow-hidden border border-yt-border" style={{ height: '750px' }}>
             <MapContainer
               center={center}
               zoom={10}
@@ -351,10 +356,10 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
                         <div className="font-bold text-base">{airport.displayName}</div>
                         <div className="flex items-center gap-2 mt-1">
                           {airport.isMainBase && (
-                            <span className="text-yellow-600 text-xs font-semibold">MAIN BASE</span>
+                            <span className="text-fuchsia-600 text-xs font-semibold">MAIN BASE</span>
                           )}
-                          <span className="text-blue-600 text-xs font-semibold">
-                            {airport.isHeliport ? '🚁 ELIPORTO' : '✈️ AEROPORTO'}
+                          <span className={`text-xs font-semibold ${airport.isHeliport ? 'text-cyan-600' : 'text-blue-600'}`}>
+                            {airport.isHeliport ? 'ELIPORTO' : 'AEROPORTO'}
                           </span>
                         </div>
                         <div className="text-gray-600 text-xs mt-1">
@@ -362,7 +367,7 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
                         </div>
                         {missionCount > 0 && (
                           <div className="mt-2 text-xs">
-                            <span className="px-2 py-1 bg-red-500 text-white rounded">
+                            <span className="px-2 py-1 bg-red-400 text-white rounded">
                               {missionCount} missioni attive
                             </span>
                           </div>
@@ -375,18 +380,18 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
             </MapContainer>
           </div>
 
-          {/* Mission List Sidebar */}
-          <div className="bg-slate-800 rounded-lg p-4 border border-gray-700">
-            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <Plane className="w-5 h-5 text-blue-400" />
-              Missioni Attive ({missions.length})
+          {/* Mission List Sidebar - più larga */}
+          <div className="lg:col-span-1 bg-yt-bg-secondary rounded-lg p-3 border border-yt-border flex flex-col">
+            <h3 className="text-base font-bold text-yt-text-primary mb-3 flex items-center gap-2 px-1">
+              <Plane className="w-5 h-5 text-yt-accent" />
+              Missioni ({missions.length})
             </h3>
 
-            <div className="space-y-2 max-h-[640px] overflow-y-auto">
+            <div className="space-y-2 flex-1 overflow-y-auto pr-1" style={{ maxHeight: '690px' }}>
               {missions.length === 0 ? (
-                <div className="text-center py-8">
-                  <Plane className="w-12 h-12 text-gray-600 mx-auto mb-2" />
-                  <p className="text-gray-400 text-sm">Nessuna missione attiva</p>
+                <div className="text-center py-12">
+                  <Plane className="w-10 h-10 text-yt-text-secondary mx-auto mb-2 opacity-50" />
+                  <p className="text-yt-text-secondary text-sm">Nessuna missione</p>
                 </div>
               ) : (
                 missions.map(mission => {

@@ -2,20 +2,21 @@ import { useState } from 'react';
 import { Package, AlertTriangle, Plane, Activity, FolderOpen } from 'lucide-react';
 import AirportCard from './AirportCard';
 import { selectPDFDirectory, isFileSystemAccessSupported } from '../utils/fileSystemAccess';
+import { isImportantWeapon } from '../config/weapons';
 
 /**
- * Stats Card Component
+ * Stats Card Component - YouTube Style
  */
-function StatsCard({ title, value, icon: Icon, color }) {
+function StatsCard({ title, value, icon: Icon, color, bgColor }) {
   return (
-    <div className="bg-slate-800 rounded-lg p-4 border border-gray-700">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-gray-400 mb-1">{title}</p>
-          <p className={`text-3xl font-bold ${color}`}>{value}</p>
+    <div className="bg-yt-bg-secondary rounded-lg p-4 border border-yt-border hover:border-yt-border/50 transition-all">
+      <div className="flex items-center gap-3">
+        <div className={`p-2.5 rounded ${bgColor}`}>
+          <Icon className={`w-6 h-6 ${color}`} />
         </div>
-        <div className={`p-3 rounded-lg ${color.replace('text-', 'bg-')}/20`}>
-          <Icon className={`w-8 h-8 ${color}`} />
+        <div className="flex-1">
+          <p className="text-xs text-yt-text-secondary uppercase tracking-wide mb-0.5">{title}</p>
+          <p className={`text-2xl font-bold ${color}`}>{value}</p>
         </div>
       </div>
     </div>
@@ -25,7 +26,7 @@ function StatsCard({ title, value, icon: Icon, color }) {
 /**
  * Dashboard Component
  */
-export default function Dashboard({ airports, missions, stats }) {
+export default function Dashboard({ airports, missions, stats, onMissionsUpdate }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('name'); // name, critical
 
@@ -49,91 +50,123 @@ export default function Dashboard({ airports, missions, stats }) {
 
   if (sortBy === 'critical') {
     filteredAirports = filteredAirports.sort((a, b) => {
-      const getCriticalCount = (airport) => {
+      const getPriorityScore = (airport) => {
         if (!airport.data || !airport.data.weapons) return 0;
-        return airport.data.weapons.filter(w => w.quantity <= 5).length;
+
+        const isHeliport = airport.name && airport.name.toLowerCase().includes('farp');
+        let score = 0;
+
+        airport.data.weapons.forEach(w => {
+          const important = isImportantWeapon(w.item, isHeliport);
+          if (!important) return;
+
+          // Calculate priority score (higher = more urgent)
+          if (w.quantity <= 5) {
+            score += 1000; // CRITICAL
+          } else if (w.quantity <= 20) {
+            score += 100; // HIGH
+          } else if (w.quantity <= 40) {
+            score += 10; // MEDIUM
+          }
+        });
+
+        return score;
       };
-      return getCriticalCount(b) - getCriticalCount(a);
+
+      return getPriorityScore(b) - getPriorityScore(a);
     });
   } else {
     filteredAirports = filteredAirports.sort((a, b) => a.name.localeCompare(b.name));
   }
 
   return (
-    <div className="space-y-6">
-      {/* Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="space-y-4">
+      {/* Stats Row - Compatta e moderna */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         <StatsCard
-          title="Aeroporti Totali"
+          title="Aeroporti"
           value={stats.totalAirports || 0}
           icon={Plane}
-          color="text-blue-400"
+          color="text-yt-accent"
+          bgColor="bg-yt-accent/20"
         />
         <StatsCard
-          title="Aeroporti Critici"
+          title="Critici"
           value={stats.criticalAirports || 0}
           icon={AlertTriangle}
           color="text-red-400"
+          bgColor="bg-red-400/20"
         />
         <StatsCard
-          title="Missioni Attive"
+          title="Missioni"
           value={stats.activeMissions || 0}
           icon={Package}
           color="text-yellow-400"
+          bgColor="bg-yellow-400/20"
         />
         <StatsCard
-          title="Missioni Accettate"
+          title="Accettate"
           value={stats.acceptedMissions || 0}
           icon={Activity}
           color="text-green-400"
+          bgColor="bg-green-400/20"
         />
       </div>
 
-      {/* Controls */}
-      <div className="bg-slate-800 rounded-lg p-4 border border-gray-700">
-        <div className="flex flex-col md:flex-row gap-4">
+      {/* Controls - Compatte stile YouTube */}
+      <div className="bg-yt-bg-secondary rounded-lg p-3 border border-yt-border">
+        <div className="flex flex-col sm:flex-row gap-2">
           <div className="flex-1">
             <input
               type="text"
-              placeholder="Cerca aeroporti..."
+              placeholder="🔍 Cerca aeroporti..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 bg-slate-900 border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              className="w-full px-3 py-2 bg-yt-bg-primary border border-yt-border rounded text-yt-text-primary placeholder-yt-text-secondary text-sm focus:outline-none focus:border-yt-accent transition-all"
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <button
               onClick={() => setSortBy('name')}
-              className={`px-4 py-2 rounded font-bold ${sortBy === 'name' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+              className={`px-3 py-2 rounded text-sm font-medium transition-all ${
+                sortBy === 'name'
+                  ? 'bg-yt-accent text-white'
+                  : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'
+              }`}
             >
-              Ordina per Nome
+              📝 Nome
             </button>
             <button
               onClick={() => setSortBy('critical')}
-              className={`px-4 py-2 rounded font-bold ${sortBy === 'critical' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+              className={`px-3 py-2 rounded text-sm font-medium transition-all ${
+                sortBy === 'critical'
+                  ? 'bg-yt-accent text-white'
+                  : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'
+              }`}
             >
-              Ordina per Criticità
+              ⚠️ Criticità
             </button>
             {isFileSystemAccessSupported() && (
               <button
                 onClick={handleSelectPDFDirectory}
-                className="px-4 py-2 rounded font-bold bg-green-600 text-white hover:bg-green-700 flex items-center gap-2"
+                className="px-3 py-2 rounded text-sm font-medium bg-green-400 text-white hover:bg-green-400/80 flex items-center gap-1.5 transition-all"
                 title="Seleziona la directory dove salvare i PDF delle chart"
               >
                 <FolderOpen className="w-4 h-4" />
-                Directory PDF
+                <span className="hidden sm:inline">PDF</span>
               </button>
             )}
           </div>
         </div>
       </div>
 
-      {/* Airports Grid */}
-      <div className="grid grid-cols-1 gap-4">
+      {/* Airports Grid - compatta */}
+      <div className="grid grid-cols-1 gap-3">
         {filteredAirports.length === 0 ? (
-          <div className="bg-slate-800 rounded-lg p-12 text-center border border-gray-700">
-            <Plane className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-            <p className="text-xl text-gray-400">Nessun aeroporto trovato</p>
+          <div className="bg-yt-bg-secondary rounded-lg p-12 text-center border border-yt-border">
+            <Plane className="w-12 h-12 text-yt-text-secondary mx-auto mb-3 opacity-50" />
+            <p className="text-lg text-yt-text-primary font-medium">Nessun aeroporto trovato</p>
+            <p className="text-sm text-yt-text-secondary mt-1">Prova a modificare i filtri di ricerca</p>
           </div>
         ) : (
           filteredAirports.map(airport => (
@@ -141,6 +174,7 @@ export default function Dashboard({ airports, missions, stats }) {
               key={airport.id}
               airport={airport}
               missions={missions}
+              onMissionsUpdate={onMissionsUpdate}
             />
           ))
         )}
