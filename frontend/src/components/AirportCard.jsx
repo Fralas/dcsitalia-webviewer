@@ -383,16 +383,11 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
 
                   return (
                     <div key={mission.id} className="bg-yt-bg-secondary p-3 rounded-lg border-2 border-fuchsia-500/30">
-                      {/* Header with weapon and status */}
+                      {/* Header with time and priority */}
                       <div className="flex justify-between items-start mb-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="font-mono text-sm text-yt-text-primary font-bold mb-1 truncate">{getWeaponDisplayName(mission.weapon_id)}</div>
-                          <div className="flex items-center gap-2 text-xs">
-                            <Clock className="w-3 h-3 text-yt-text-secondary" />
-                            <span className="text-yt-text-secondary">{timeAgo}</span>
-                            <span className="text-yt-border">•</span>
-                            <span className="text-yellow-400 font-medium">⏰ {expiresIn}</span>
-                          </div>
+                        <div className="flex items-center gap-2 flex-1">
+                          <Clock className="w-4 h-4 text-yt-text-secondary" />
+                          <span className="text-sm text-yt-text-secondary">{timeAgo}</span>
                         </div>
                         <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide ${
                           mission.status === 'pending'
@@ -417,22 +412,23 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                         </span>
                       </div>
 
-                      {/* Quantities and weight */}
-                      <div className="bg-yt-bg-tertiary rounded p-2 mb-2">
-                        <div className="flex gap-2 mb-2">
-                          <div className="flex-1 bg-yt-bg-primary rounded p-1.5 text-center">
-                            <div className="text-[10px] text-yt-text-secondary mb-0.5">Scorte</div>
-                            <div className="text-base font-bold text-red-400">{mission.current_quantity}</div>
-                          </div>
-                          <div className="flex-1 bg-yt-bg-primary rounded p-1.5 text-center">
-                            <div className="text-[10px] text-yt-text-secondary mb-0.5">Richieste</div>
-                            <div className="text-base font-bold text-green-400">{mission.quantity_needed}</div>
-                          </div>
+                      {/* Weapon name - title style */}
+                      <h3 className="text-lg font-bold text-yt-text-primary mb-2 font-mono">{getWeaponDisplayName(mission.weapon_id)}</h3>
+
+                      {/* Quantities and weight - compact layout */}
+                      <div className="flex gap-2 mb-2">
+                        <div className="flex-1 bg-yt-bg-tertiary rounded p-1.5 text-center">
+                          <div className="text-[10px] text-yt-text-secondary mb-0.5">Scorte</div>
+                          <div className="text-base font-bold text-red-400">{mission.current_quantity}</div>
+                        </div>
+                        <div className="flex-1 bg-yt-bg-tertiary rounded p-1.5 text-center">
+                          <div className="text-[10px] text-yt-text-secondary mb-0.5">Richieste</div>
+                          <div className="text-base font-bold text-green-400">{mission.quantity_needed}</div>
                         </div>
                         {mission.total_weight_lbs && mission.total_weight_lbs > 0 && (
-                          <div className="flex items-center gap-1.5 justify-center text-xs text-yt-text-primary">
-                            <Weight className="w-3.5 h-3.5" />
-                            <span className="font-mono font-medium">{formatWeight(mission.total_weight_lbs)}</span>
+                          <div className="flex-[2] bg-yt-bg-tertiary rounded p-1.5 flex items-center justify-center gap-1.5">
+                            <Weight className="w-4 h-4 text-yt-text-primary" />
+                            <span className="text-base font-bold text-yt-text-primary font-mono">{formatWeight(mission.total_weight_lbs)}</span>
                           </div>
                         )}
                       </div>
