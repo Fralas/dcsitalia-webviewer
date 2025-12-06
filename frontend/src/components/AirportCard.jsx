@@ -100,7 +100,6 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
 
   // Mission management states
   const [missionStates, setMissionStates] = useState({}); // { missionId: { userName, showAccept, loading } }
-  const [missionFilter, setMissionFilter] = useState('all'); // all, critical, high, medium
 
   if (!airport || !airport.data) {
     return null;
@@ -338,93 +337,50 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                 Critiche ({stats.critical})
               </button>
             </div>
-            <div className="flex gap-1.5">
-              <button
-                onClick={handleGeneratePDF}
-                disabled={generatingPDF || chartsAvailable === false}
-                className={`px-2.5 py-1.5 rounded text-xs font-medium flex items-center gap-1 transition-all ${
-                  generatingPDF
-                    ? 'bg-yt-accent/80 text-white cursor-wait'
-                    : chartsAvailable === false
-                    ? 'bg-yt-bg-tertiary text-yt-text-secondary cursor-not-allowed'
-                    : 'bg-yt-accent text-white hover:bg-yt-accent/80'
-                }`}
-                title={chartsAvailable === false ? 'Nessuna chart disponibile per questo aeroporto' : ''}
-              >
-                <FileDown className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{generatingPDF ? 'PDF...' : chartsAvailable === null ? 'Verifica...' : 'PDF'}</span>
-              </button>
-              {!airport.isMainBase && (
-                <button
-                  onClick={() => setShowOrderModal(true)}
-                  className="px-2.5 py-1.5 rounded text-xs font-medium bg-green-400 text-white hover:bg-green-400/80 flex items-center gap-1 transition-all"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Rifornimento</span>
-                </button>
-              )}
-            </div>
           </div>
 
           {/* Active Orders Section - Expanded with full mission management */}
           {!airport.isMainBase && airportMissions.length > 0 && (
             <div className="p-3 bg-fuchsia-500/10 border-t-2 border-fuchsia-500/40">
-              <h4 className="text-sm font-bold text-fuchsia-300 mb-3 flex items-center gap-2">
-                <Package className="w-4 h-4" />
-                ORDINI ATTIVI ({airportMissions.length})
-              </h4>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-bold text-fuchsia-300 flex items-center gap-2">
+                  <Package className="w-4 h-4" />
+                  ORDINI ATTIVI ({airportMissions.length})
+                </h4>
 
-              {/* Mission filters */}
-              <div className="flex gap-1.5 mb-3">
-                <button
-                  onClick={() => setMissionFilter('all')}
-                  className={`px-2 py-1 rounded text-xs font-medium transition-all ${
-                    missionFilter === 'all'
-                      ? 'bg-fuchsia-400 text-white'
-                      : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'
-                  }`}
-                >
-                  Tutte
-                </button>
-                <button
-                  onClick={() => setMissionFilter('critical')}
-                  className={`px-2 py-1 rounded text-xs font-medium transition-all ${
-                    missionFilter === 'critical'
-                      ? 'bg-red-400 text-white'
-                      : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'
-                  }`}
-                >
-                  Critiche
-                </button>
-                <button
-                  onClick={() => setMissionFilter('high')}
-                  className={`px-2 py-1 rounded text-xs font-medium transition-all ${
-                    missionFilter === 'high'
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'
-                  }`}
-                >
-                  Alte
-                </button>
-                <button
-                  onClick={() => setMissionFilter('medium')}
-                  className={`px-2 py-1 rounded text-xs font-medium transition-all ${
-                    missionFilter === 'medium'
-                      ? 'bg-yellow-400 text-white'
-                      : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'
-                  }`}
-                >
-                  Medie
-                </button>
+                {/* Action buttons */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleGeneratePDF}
+                    disabled={generatingPDF || chartsAvailable === false}
+                    className={`px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1.5 transition-all ${
+                      generatingPDF
+                        ? 'bg-yt-accent/20 text-yt-accent border border-yt-accent/50 cursor-wait'
+                        : chartsAvailable === false
+                        ? 'bg-yt-bg-tertiary text-yt-text-secondary border border-yt-border cursor-not-allowed'
+                        : 'bg-yt-accent/20 text-yt-accent border border-yt-accent/50 hover:bg-yt-accent/30'
+                    }`}
+                    title={chartsAvailable === false ? 'Nessuna chart disponibile per questo aeroporto' : ''}
+                  >
+                    <FileDown className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">{generatingPDF ? 'PDF...' : chartsAvailable === null ? 'Verifica...' : 'PDF'}</span>
+                  </button>
+                  <button
+                    onClick={() => setShowOrderModal(true)}
+                    className="px-3 py-1.5 bg-green-400/20 text-green-400 border border-green-400/50 hover:bg-green-400/30 rounded text-xs font-bold flex items-center gap-1.5 transition-all"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Rifornimento</span>
+                  </button>
+                </div>
               </div>
 
               <div className={`grid gap-3 ${airportMissions.length === 1 ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
-                {airportMissions.filter(mission => {
-                  if (missionFilter === 'all') return true;
-                  if (missionFilter === 'critical') return mission.current_quantity <= 5;
-                  if (missionFilter === 'high') return mission.current_quantity > 5 && mission.current_quantity <= 20;
-                  if (missionFilter === 'medium') return mission.current_quantity > 20 && mission.current_quantity <= 40;
-                  return true;
+                {airportMissions.sort((a, b) => {
+                  // Sort by priority: CRITICAL > HIGH > MEDIUM
+                  const priorityA = a.current_quantity <= 5 ? 0 : a.current_quantity <= 20 ? 1 : 2;
+                  const priorityB = b.current_quantity <= 5 ? 0 : b.current_quantity <= 20 ? 1 : 2;
+                  return priorityA - priorityB;
                 }).map(mission => {
                   const sourceName = mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Main Base';
                   const sourceAirport = mission.source_airport_id ? airports.find(a => a.id === mission.source_airport_id) : null;
