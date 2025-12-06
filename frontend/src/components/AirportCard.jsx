@@ -100,6 +100,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
 
   // Mission management states
   const [missionStates, setMissionStates] = useState({}); // { missionId: { userName, showAccept, loading } }
+  const [missionFilter, setMissionFilter] = useState('all'); // all, critical, high, medium
 
   if (!airport || !airport.data) {
     return null;
@@ -372,8 +373,59 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                 <Package className="w-4 h-4" />
                 ORDINI ATTIVI ({airportMissions.length})
               </h4>
+
+              {/* Mission filters */}
+              <div className="flex gap-1.5 mb-3">
+                <button
+                  onClick={() => setMissionFilter('all')}
+                  className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                    missionFilter === 'all'
+                      ? 'bg-fuchsia-400 text-white'
+                      : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'
+                  }`}
+                >
+                  Tutte
+                </button>
+                <button
+                  onClick={() => setMissionFilter('critical')}
+                  className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                    missionFilter === 'critical'
+                      ? 'bg-red-400 text-white'
+                      : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'
+                  }`}
+                >
+                  Critiche
+                </button>
+                <button
+                  onClick={() => setMissionFilter('high')}
+                  className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                    missionFilter === 'high'
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'
+                  }`}
+                >
+                  Alte
+                </button>
+                <button
+                  onClick={() => setMissionFilter('medium')}
+                  className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                    missionFilter === 'medium'
+                      ? 'bg-yellow-400 text-white'
+                      : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'
+                  }`}
+                >
+                  Medie
+                </button>
+              </div>
+
               <div className={`grid gap-3 ${airportMissions.length === 1 ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
-                {airportMissions.map(mission => {
+                {airportMissions.filter(mission => {
+                  if (missionFilter === 'all') return true;
+                  if (missionFilter === 'critical') return mission.current_quantity <= 5;
+                  if (missionFilter === 'high') return mission.current_quantity > 5 && mission.current_quantity <= 20;
+                  if (missionFilter === 'medium') return mission.current_quantity > 20 && mission.current_quantity <= 40;
+                  return true;
+                }).map(mission => {
                   const sourceName = mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Main Base';
                   const sourceAirport = mission.source_airport_id ? airports.find(a => a.id === mission.source_airport_id) : null;
                   const distance = mission.distance_nm ? `${mission.distance_nm}nm` : '-';
@@ -383,8 +435,37 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
 
                   return (
                     <div key={mission.id} className="bg-yt-bg-secondary p-3 rounded-lg border-2 border-fuchsia-500/30">
-                      {/* Weapon name - title style at top */}
-                      <h3 className="text-lg font-bold text-yt-text-primary mb-2 font-mono">{getWeaponDisplayName(mission.weapon_id)}</h3>
+                      {/* Header: weapon name, time, and priority */}
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <h3 className="text-lg font-bold text-yt-text-primary font-mono truncate">{getWeaponDisplayName(mission.weapon_id)}</h3>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <Clock className="w-3.5 h-3.5 text-yt-text-secondary" />
+                            <span className="text-xs text-yt-text-secondary">{timeAgo}</span>
+                          </div>
+                        </div>
+                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide flex-shrink-0 ml-2 ${
+                          mission.status === 'pending'
+                            ? mission.current_quantity <= 5
+                              ? 'bg-red-400/20 text-red-400 border border-red-400/50'
+                              : mission.current_quantity <= 20
+                              ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
+                              : 'bg-yellow-400/20 text-yellow-400 border border-yellow-400/50'
+                            : mission.status === 'accepted'
+                            ? 'bg-yt-accent/20 text-yt-accent'
+                            : 'bg-yt-bg-primary/50 text-yt-text-secondary'
+                        }`}>
+                          {mission.status === 'pending'
+                            ? mission.current_quantity <= 5
+                              ? 'CRITICA'
+                              : mission.current_quantity <= 20
+                              ? 'ALTA'
+                              : 'MEDIA'
+                            : mission.status === 'accepted'
+                            ? 'ACCETTATA'
+                            : mission.status.toUpperCase()}
+                        </span>
+                      </div>
 
                       {/* Route Information */}
                       <div className="flex items-center gap-1 text-xs bg-yt-bg-tertiary px-2 py-1.5 rounded mb-2 flex-wrap">
@@ -460,35 +541,6 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                             <span className="text-base font-bold text-yt-text-primary font-mono">{formatWeight(mission.total_weight_lbs)}</span>
                           </div>
                         )}
-                      </div>
-
-                      {/* Time and priority */}
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex items-center gap-2 flex-1">
-                          <Clock className="w-4 h-4 text-yt-text-secondary" />
-                          <span className="text-sm text-yt-text-secondary">{timeAgo}</span>
-                        </div>
-                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide ${
-                          mission.status === 'pending'
-                            ? mission.current_quantity <= 5
-                              ? 'bg-red-400/20 text-red-400 border border-red-400/50'
-                              : mission.current_quantity <= 20
-                              ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
-                              : 'bg-yellow-400/20 text-yellow-400 border border-yellow-400/50'
-                            : mission.status === 'accepted'
-                            ? 'bg-yt-accent/20 text-yt-accent'
-                            : 'bg-yt-bg-primary/50 text-yt-text-secondary'
-                        }`}>
-                          {mission.status === 'pending'
-                            ? mission.current_quantity <= 5
-                              ? 'CRITICA'
-                              : mission.current_quantity <= 20
-                              ? 'ALTA'
-                              : 'MEDIA'
-                            : mission.status === 'accepted'
-                            ? 'ACCETTATA'
-                            : mission.status.toUpperCase()}
-                        </span>
                       </div>
 
                       {/* Pilot info for accepted missions */}
