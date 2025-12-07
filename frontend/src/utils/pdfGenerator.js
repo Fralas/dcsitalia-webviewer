@@ -1,8 +1,10 @@
 import { jsPDF } from 'jspdf';
 import { savePDFToDirectory } from './fileSystemAccess';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-const BASE_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL
+  || (typeof window !== 'undefined' ? `${window.location.origin}/api` : '/api');
+const BASE_URL = import.meta.env.VITE_SOCKET_URL
+  || (typeof window !== 'undefined' ? window.location.origin : '');
 
 /**
  * Check if airport has charts available
