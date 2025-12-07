@@ -51,12 +51,7 @@ const CSV_DIR = process.env.CSV_DIR
 logger.info(`📁 CSV Directory: ${CSV_DIR}`);
 
 // Security Middleware
-app.use(helmet({
-  contentSecurityPolicy: false,
-  crossOriginOpenerPolicy: false,
-  crossOriginEmbedderPolicy: false,
-  crossOriginResourcePolicy: false
-}));
+app.use(helmet());
 
 // CORS
 app.use(cors({
