@@ -1,89 +1,117 @@
 # DCS Italia Warehouse Viewer
 
-A real-time web-based logistics management system for DCS World servers. Monitor warehouse inventory across multiple airports and automatically generate supply missions when critical items are low.
+A real-time, web-based logistics dashboard for DCS World servers. Monitor warehouse inventory across multiple airports, generate supply missions automatically, and keep pilots in sync through live updates. The project was created by Francesco La Barba ("Fralas") and made for the DCS Italia community, but anyone may download and use it free of charge. The DCS Italia community are users—not owners—of the software.
+
+## Table of Contents
+- [Features](#features)
+- [Architecture](#architecture)
+- [Repository Layout](#repository-layout)
+- [Requirements](#requirements)
+- [Quick Start (Development)](#quick-start-development)
+- [Configuration](#configuration)
+- [Data & CSV Files](#data--csv-files)
+- [Scripts](#scripts)
+- [Production Deployment](#production-deployment)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Features
+- Real-time dashboard with expandable airport views
+- Automatic mission generation when critical items are low
+- Mission dispatch workflow with multi-user support
+- Admin-protected controls with session-based authentication
+- Historical data tracking stored in JSON files
+- WebSocket-based live synchronization across clients
+- CSV files are treated as read-only input
 
-- **Real-time Dashboard**: Monitor all airports with expandable detailed views
-- **Automatic Mission Generation**: Creates supply missions when critical weapons fall below threshold
-- **Mission Dispatch System**: Accept and manage logistics missions with multi-user support
-- **Historical Data**: Track inventory trends over time (stored in JSON files)
-- **Live Updates**: WebSocket-based real-time synchronization across all connected clients
-- **Scalable Configuration**: Easy-to-configure system for adding new airports and rules
-- **CSV Read-Only**: CSV files are NEVER modified, only read
+## Architecture
+- **Backend:** Node.js + Express + Socket.io with JSON file storage
+- **Frontend:** React (Vite) + Tailwind CSS
+- **Real-time:** WebSocket events for instant updates across connected clients
+- **Storage:** JSON files for historical snapshots and missions (no database)
 
-## Tech Stack
-
-- **Backend**: Node.js + Express + Socket.io + JSON file storage
-- **Frontend**: React + Vite + Tailwind CSS
-- **Real-time**: WebSocket for live updates
-- **Storage**: JSON files for historical data and missions (NO database)
-
-## Project Structure
-
+## Repository Layout
 ```
 dcsitalia-webviewer/
-├── backend/
+├── backend/                 # Express API, WebSocket server, configuration
 │   └── src/
-│       ├── config/
-│       │   ├── airports.config.js    # Airport configuration
-│       │   └── rules.config.js       # Mission rules and thresholds
-│       ├── services/
-│       │   ├── csvParser.js          # CSV file parser (READ-ONLY)
-│       │   ├── historicalData.js     # JSON file operations
-│       │   └── missionGenerator.js   # Mission generation logic
-│       └── server.js                 # Express server + WebSocket
-├── frontend/
+│       ├── config/          # Airport and mission rule configuration
+│       ├── services/        # CSV parser, historical data, mission generator
+│       └── server.js        # App entry point
+├── frontend/                # React application
 │   └── src/
-│       ├── components/
-│       │   ├── Dashboard.jsx         # Main dashboard
-│       │   ├── AirportCard.jsx       # Airport display card
-│       │   └── MissionDispatch.jsx   # Mission management
-│       ├── services/
-│       │   ├── api.js                # API client
-│       │   └── socket.js             # WebSocket client
-│       └── App.jsx                   # Root component
-├── data/
-│   └── historical/                   # JSON files storage
-│       ├── snapshots.json            # Historical warehouse snapshots
-│       └── missions.json             # Mission records
-├── {Airport}_weapons.csv             # Weapons inventory CSV (READ-ONLY)
-├── {Airport}_liquids.csv             # Fuel inventory CSV (READ-ONLY)
-└── {Airport}_aircraft.csv            # Aircraft inventory CSV (READ-ONLY, not used)
+│       ├── components/      # Dashboard, AirportCard, MissionDispatch
+│       └── services/        # API client, WebSocket client
+├── data/historical/         # JSON history snapshots and missions
+├── csvexample/              # Sample CSV inputs for reference
+├── DEPLOYMENT.md            # Production hardening and hosting guide
+├── TEST_COMMANDS.md         # Useful local testing commands
+└── start.sh                 # Example startup script
 ```
 
-## Installation
+## Requirements
+- Node.js 18+
+- npm 9+
+- CSV exports from your DCS server (see [Data & CSV Files](#data--csv-files))
 
-### Prerequisites
+## Quick Start (Development)
+1. **Install backend and tooling dependencies**
+   ```bash
+   npm install
+   ```
+2. **Install frontend dependencies**
+   ```bash
+   cd frontend
+   npm install
+   cd ..
+   ```
+3. **Provide CSV data** by copying your DCS exports into the project root (see naming rules below). You can start with the examples in `csvexample/` while exploring the UI.
+4. **Configure environment variables** (see [Configuration](#configuration)).
+5. **Run the app with hot reload**
+   ```bash
+   npm run dev
+   ```
+   - Backend: http://localhost:3001
+   - Frontend: http://localhost:3000
 
-- Node.js 18+ installed
-- CSV files from your DCS server in the root directory
-
-### Setup
-
-1. **Install dependencies**:
-
+To build the production frontend bundle and serve it from the backend, run:
 ```bash
-# Install backend dependencies
-npm install
-
-# Install frontend dependencies
-cd frontend
-npm install
-cd ..
+npm run build
+npm start
 ```
 
-2. **Configure airports** (optional):
+## Configuration
 
-Edit `backend/src/config/airports.config.js` to add your airports:
+### Environment Variables
+Create `.env` files in both `backend/` and `frontend/`.
 
+**backend/.env**
+```bash
+PORT=3001
+NODE_ENV=development
+JWT_SECRET=change-me
+ADMIN_PASSWORD=change-me
+FRONTEND_URL=http://localhost:3000
+SESSION_TIMEOUT=24h
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+```
+
+**frontend/.env**
+```bash
+VITE_API_URL=http://localhost:3001/api
+VITE_WS_URL=http://localhost:3001
+```
+
+### Airport Setup
+Configure airports in `backend/src/config/airports.config.js`:
 ```javascript
 export const airports = [
   {
     id: 'adana-sakirpasa',
     name: 'Adana Sakirpasa',
     displayName: 'Adana Sakirpasa',
-    isMainBase: true,  // Set to true for your main supply base
+    isMainBase: true,              // Set to true for your main supply base
     csvPrefix: 'Adana Sakirpasa',  // Must match CSV filename prefix
     coordinates: { lat: 37.0, lon: 35.4 },
   },
@@ -91,186 +119,39 @@ export const airports = [
 ];
 ```
 
-3. **Configure mission rules** (optional):
-
-Edit `backend/src/config/rules.config.js` to customize:
-- Important weapons list
-- Critical thresholds
+### Mission Rules
+Tune mission logic in `backend/src/config/rules.config.js`:
+- `importantWeapons` list
+- `criticalThreshold` and `warningThreshold`
 - Mission expiry times
 - Liquid fuel thresholds
 
-## Running the Application
+## Data & CSV Files
+- Place CSV files in the project root using the format:
+  - `{AirportName}_weapons.csv`
+  - `{AirportName}_liquids.csv`
+  - `{AirportName}_aircraft.csv` (optional)
+- Ensure `csvPrefix` in the airport config matches the CSV filename prefix exactly.
+- CSV files are **never modified** by the application—they are read-only inputs.
 
-### Development Mode (with auto-reload)
+## Scripts
+- `npm run dev` – start backend and frontend with hot reload
+- `npm run dev:backend` – backend only (watch mode)
+- `npm run dev:frontend` – frontend dev server
+- `npm run build` – build the frontend bundle
+- `npm start` – run the backend server (serves built frontend if available)
 
-```bash
-# Run both backend and frontend concurrently
-npm run dev
-```
+## Production Deployment
+Follow the hardening checklist and hosting instructions in [DEPLOYMENT.md](DEPLOYMENT.md). Key steps include setting secure secrets, enabling HTTPS, and running the backend behind a reverse proxy or process manager.
 
-This will start:
-- Backend server on `http://localhost:3001`
-- Frontend dev server on `http://localhost:3000`
-
-### Production Mode
-
-```bash
-# Build frontend
-npm run build
-
-# Start backend (serves built frontend)
-npm start
-```
-
-## Configuration
-
-### Adding New Airports
-
-1. Place CSV files in the root directory with the format:
-   - `{AirportName}_weapons.csv`
-   - `{AirportName}_liquids.csv`
-   - `{AirportName}_aircraft.csv` (optional, not used by system)
-
-2. Add airport configuration to `backend/src/config/airports.config.js`:
-
-```javascript
-{
-  id: 'incirlik',
-  name: 'Incirlik',
-  displayName: 'Incirlik Air Base',
-  isMainBase: false,
-  csvPrefix: 'Incirlik',  // Must match CSV prefix exactly
-  coordinates: { lat: 37.0, lon: 35.4 },
-}
-```
-
-3. Restart the server - the new airport will appear automatically!
-
-### Configuring Important Weapons
-
-Edit the `importantWeapons` array in `backend/src/config/rules.config.js`:
-
-```javascript
-importantWeapons: [
-  'weapons.missiles.AIM_120C',
-  'weapons.missiles.AIM_9X',
-  'weapons.missiles.AGM_65F',
-  // Add more weapons...
-]
-```
-
-### Adjusting Thresholds
-
-In `backend/src/config/rules.config.js`:
-
-```javascript
-criticalThreshold: 20,  // Generate mission below this quantity
-warningThreshold: 50,   // Show warning indicator
-```
-
-## Usage
-
-### Dashboard View
-
-- **Airport Cards**: Click any airport to expand and view detailed inventory
-- **Status Indicators**:
-  - 🔴 Red: Critical (≤5 units)
-  - 🟡 Yellow: Warning (≤20 units)
-  - 🟢 Green: OK (>50 units)
-- **Filters**: View all weapons, only important ones, or only critical items
-- **Sorting**: Sort airports by name or by critical items count
-
-### Mission Dispatch
-
-- **Accept Mission**: Enter your name and accept a pending mission
-- **Complete Mission**: Mark missions as complete when done
-- **Cancel Mission**: Cancel any mission if no longer needed
-- **Real-time Updates**: All users see mission status changes instantly
-
-### Mission Priority
-
-- **CRITICAL**: Current stock ≤5 units
-- **HIGH**: Current stock ≤20 units
-- **MEDIUM**: Current stock >20 units
-
-## API Endpoints
-
-### Airports
-- `GET /api/airports` - Get all airports with current data
-- `GET /api/airports/:id` - Get specific airport
-- `GET /api/airports/:id/history?hours=24` - Get historical data
-
-### Missions
-- `GET /api/missions` - Get all active missions
-- `GET /api/missions/airport/:airportId` - Get airport missions
-- `POST /api/missions/:id/accept` - Accept a mission (body: `{userId}`)
-- `POST /api/missions/:id/complete` - Complete a mission
-- `POST /api/missions/:id/cancel` - Cancel a mission
-
-### Statistics
-- `GET /api/stats` - Get overall statistics
-
-## WebSocket Events
-
-### Client → Server
-None (client only listens)
-
-### Server → Client
-- `data:initial` - Initial data on connection
-- `data:updated` - Airport data updated (CSV file changed)
-- `missions:updated` - Missions list updated
-
-## Remote Access
-
-To allow users outside your network to access the system:
-
-### Option 1: Port Forwarding
-1. Forward port `3001` (backend) and `3000` (frontend) on your router
-2. Give users your public IP: `http://YOUR_PUBLIC_IP:3000`
-
-### Option 2: Reverse Proxy (Recommended)
-Use nginx or Apache to serve the application with SSL
-
-### Option 3: Tunnel Service
-Use services like ngrok, CloudFlare Tunnel, or Tailscale
-
-## File Monitoring
-
-The system automatically watches CSV files for changes:
-- When DCS server updates a CSV file, the system detects it
-- Data is reloaded and all clients are notified via WebSocket
-- New missions are generated if needed
-
-## Data Storage
-
-Historical data is stored in JSON files at `data/historical/`:
-- **snapshots.json**: Inventory snapshots (keeps last 1000 snapshots)
-- **missions.json**: All mission records with status tracking
-
-**IMPORTANT**: CSV files are NEVER modified by this application. They are only read.
-The system only writes to JSON files in the `data/historical/` directory.
-
-## Troubleshooting
-
-### CSV files not detected
-- Check that CSV files are in the root directory
-- Verify the `csvPrefix` in airports config matches the filename exactly
-- Check file permissions
-
-### WebSocket connection failed
-- Ensure port 3001 is not blocked by firewall
-- Check that backend server is running
-- Verify `VITE_SOCKET_URL` environment variable if needed
-
-### Missions not generating
-- Check that weapons are in the `importantWeapons` list
-- Verify quantity is below `criticalThreshold` (default: 20)
-- Check that the airport is not marked as `isMainBase: true`
+## Contributing
+We welcome issues, feature requests, and pull requests from the community. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before you start.
 
 ## License
+This project is licensed under the [DCS Italia Warehouse Viewer License](LICENSE). The license:
+- Credits Francesco La Barba ("Fralas") as the original and sole owner
+- Allows anyone to download and use the software for free personal, non-commercial use
+- Prohibits redistribution, sublicensing, or selling the software or derivative works
 
-MIT License - Created for DCS Italia Community
-
-## Support
-
-For issues or questions, contact the development team or open an issue on the project repository.
+## AI Notice
+Parts of this project were created with the assistance of artificial intelligence tooling. The software may contain mistakes or omissions; please review configurations and outputs before operational use.
