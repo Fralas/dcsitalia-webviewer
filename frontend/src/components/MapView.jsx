@@ -6,6 +6,7 @@ import { Map as MapIcon, Plane, Helicopter, ArrowRight, Weight } from 'lucide-re
 import { getAirportName } from '../config/airports';
 import airports from '../config/airports';
 import { formatWeight } from '../utils/weightFormatter';
+import { t, getStatusLabel } from '../utils/locale';
 
 /**
  * Get weapon display name
@@ -124,7 +125,7 @@ function MissionCard({ mission, airport, onHover, onSelect, isHighlighted, isSel
           <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide ${
             isPending ? 'bg-yellow-400/20 text-yellow-400' : 'bg-yt-accent/20 text-yt-accent'
           }`}>
-            {isPending ? 'Attesa' : 'Accettata'}
+            {isPending ? getStatusLabel('pending') : getStatusLabel('accepted')}
           </span>
         </div>
       </div>
@@ -140,7 +141,7 @@ function MissionCard({ mission, airport, onHover, onSelect, isHighlighted, isSel
 
       {isSelected && (
         <div className="mt-2 pt-2 border-t border-fuchsia-400/30 text-xs text-fuchsia-400 text-center font-medium">
-          👆 Clicca di nuovo per aprire la pagina Missioni
+          {t('mapView.missionCard.clickHint')}
         </div>
       )}
     </div>
@@ -273,8 +274,8 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
                 <MapIcon className="w-6 h-6 text-yt-accent" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-yt-text-primary">Mappa delle Rotte</h1>
-                <p className="text-xs text-yt-text-secondary">Visualizzazione geografica delle missioni attive</p>
+                <h1 className="text-xl font-bold text-yt-text-primary">{t('mapView.title')}</h1>
+                <p className="text-xs text-yt-text-secondary">{t('mapView.subtitle')}</p>
               </div>
             </div>
 
@@ -282,23 +283,23 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
             <div className="flex items-center gap-4 text-xs">
               <div className="flex items-center gap-1.5">
                 <div className="w-8 h-0.5 border-t-2 border-dashed border-yellow-400"></div>
-                <span className="text-yt-text-secondary">Attesa</span>
+                <span className="text-yt-text-secondary">{t('mapView.legend.pending')}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-8 h-0.5 bg-red-400"></div>
-                <span className="text-yt-text-secondary">Accettata</span>
+                <span className="text-yt-text-secondary">{t('mapView.legend.accepted')}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Plane className="w-4 h-4 text-yt-accent" />
-                <span className="text-yt-text-secondary">Airport</span>
+                <span className="text-yt-text-secondary">{t('mapView.legend.airport')}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Helicopter className="w-4 h-4 text-cyan-400" />
-                <span className="text-yt-text-secondary">Heliport</span>
+                <span className="text-yt-text-secondary">{t('mapView.legend.heliport')}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded-full bg-fuchsia-400 border-2 border-fuchsia-500"></div>
-                <span className="text-yt-text-secondary">Base</span>
+                <span className="text-yt-text-secondary">{t('mapView.legend.base')}</span>
               </div>
             </div>
           </div>
@@ -359,7 +360,7 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
                             <span className="text-fuchsia-600 text-xs font-semibold">MAIN BASE</span>
                           )}
                           <span className={`text-xs font-semibold ${airport.isHeliport ? 'text-cyan-600' : 'text-blue-600'}`}>
-                            {airport.isHeliport ? 'ELIPORTO' : 'AEROPORTO'}
+                            {airport.isHeliport ? t('mapView.popup.heliport') : t('mapView.popup.airport')}
                           </span>
                         </div>
                         <div className="text-gray-600 text-xs mt-1">
@@ -368,7 +369,7 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
                         {missionCount > 0 && (
                           <div className="mt-2 text-xs">
                             <span className="px-2 py-1 bg-red-400 text-white rounded">
-                              {missionCount} missioni attive
+                              {t('mapView.popup.missions', { count: missionCount })}
                             </span>
                           </div>
                         )}
@@ -384,14 +385,14 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
           <div className="lg:col-span-1 bg-yt-bg-secondary rounded-lg p-3 border border-yt-border flex flex-col">
             <h3 className="text-base font-bold text-yt-text-primary mb-3 flex items-center gap-2 px-1">
               <Plane className="w-5 h-5 text-yt-accent" />
-              Missioni ({missions.length})
+              {t('mapView.sidebar.heading')} ({missions.length})
             </h3>
 
             <div className="space-y-2 flex-1 overflow-y-auto pr-1" style={{ maxHeight: '690px' }}>
               {missions.length === 0 ? (
                 <div className="text-center py-12">
                   <Plane className="w-10 h-10 text-yt-text-secondary mx-auto mb-2 opacity-50" />
-                  <p className="text-yt-text-secondary text-sm">Nessuna missione</p>
+                  <p className="text-yt-text-secondary text-sm">{t('mapView.sidebar.empty')}</p>
                 </div>
               ) : (
                 missions.map(mission => {

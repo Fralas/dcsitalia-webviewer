@@ -4,6 +4,7 @@ import * as api from '../services/api';
 import { getAirportName } from '../config/airports';
 import airports from '../config/airports';
 import { formatWeight } from '../utils/weightFormatter';
+import { t, formatElapsedTime, formatRemainingTime, getStatusLabel } from '../utils/locale';
 
 /**
  * Get weapon display name
@@ -19,13 +20,13 @@ function PriorityBadge({ currentQuantity }) {
   let color, text;
   if (currentQuantity <= 5) {
     color = 'bg-red-400/20 text-red-400 border-red-400';
-    text = 'CRITICA';
+    text = getStatusLabel('critical');
   } else if (currentQuantity <= 20) {
     color = 'bg-orange-500/20 text-orange-400 border-orange-500';
-    text = 'ALTA';
+    text = getStatusLabel('high');
   } else {
     color = 'bg-yellow-400/20 text-yellow-400 border-yellow-400';
-    text = 'MEDIA';
+    text = getStatusLabel('medium');
   }
 
   return (
@@ -75,35 +76,35 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
       onUpdate();
       setShowAccept(false);
     } catch (error) {
-      alert(`Errore nell'accettare la missione: ${error.message}`);
+      alert(t('airportCard.alerts.acceptError', { message: error.message }));
     } finally {
       setLoading(false);
     }
   };
 
   const handleComplete = async () => {
-    if (!confirm('Segnare questa missione come completata?')) return;
+    if (!confirm(t('general.prompts.confirmComplete'))) return;
 
     setLoading(true);
     try {
       await api.completeMission(mission.id);
       onUpdate();
     } catch (error) {
-      alert(`Errore nel completare la missione: ${error.message}`);
+      alert(t('airportCard.alerts.completeError', { message: error.message }));
     } finally {
       setLoading(false);
     }
   };
 
   const handleCancel = async () => {
-    if (!confirm('Annullare questa missione?')) return;
+    if (!confirm(t('general.prompts.confirmCancel'))) return;
 
     setLoading(true);
     try {
       await api.cancelMission(mission.id);
       onUpdate();
     } catch (error) {
-      alert(`Errore nell'annullare la missione: ${error.message}`);
+      alert(t('airportCard.alerts.cancelError', { message: error.message }));
     } finally {
       setLoading(false);
     }
@@ -133,11 +134,11 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
       {/* Quantities and weight - compact layout */}
       <div className="flex gap-2 mb-2">
         <div className="flex-1 bg-yt-bg-tertiary rounded p-1.5 text-center">
-          <div className="text-[10px] text-yt-text-secondary mb-0.5">Scorte</div>
+          <div className="text-[10px] text-yt-text-secondary mb-0.5">{t('missionDispatch.quantities.stock')}</div>
           <div className="text-base font-bold text-red-400">{mission.current_quantity}</div>
         </div>
         <div className="flex-1 bg-yt-bg-tertiary rounded p-1.5 text-center">
-          <div className="text-[10px] text-yt-text-secondary mb-0.5">Richieste</div>
+          <div className="text-[10px] text-yt-text-secondary mb-0.5">{t('missionDispatch.quantities.requested')}</div>
           <div className="text-base font-bold text-green-400">{mission.quantity_needed}</div>
         </div>
         {mission.total_weight_lbs && mission.total_weight_lbs > 0 && (
@@ -152,7 +153,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
       <div className="bg-yt-bg-tertiary rounded p-2 mb-2 text-xs">
         <div className="flex items-center gap-1.5 flex-wrap">
           {sourceAirport?.isMainBase ? (
-            <span className="text-fuchsia-400 font-medium">{mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Base Principale'}</span>
+            <span className="text-fuchsia-400 font-medium">{mission.source_airport_id ? getAirportName(mission.source_airport_id) : t('airportCard.baseLabel')}</span>
           ) : sourceAirport?.isHeliport ? (
             <>
               <Helicopter className="w-3.5 h-3.5 text-cyan-400" />
@@ -168,12 +169,12 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
           {isHeliport ? (
             <>
               <Helicopter className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="text-cyan-400 font-medium">{airport?.displayName || airport?.name || 'Sconosciuto'}</span>
+              <span className="text-cyan-400 font-medium">{airport?.displayName || airport?.name || t('general.unknown')}</span>
             </>
           ) : (
             <>
               <Plane className="w-3.5 h-3.5 text-yt-accent" />
-              <span className="text-yt-accent font-medium">{airport?.displayName || airport?.name || 'Sconosciuto'}</span>
+              <span className="text-yt-accent font-medium">{airport?.displayName || airport?.name || t('general.unknown')}</span>
             </>
           )}
           {mission.distance_nm && (
@@ -190,22 +191,22 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
             {mission.recommended_aircraft === 'helicopter' && (
               <>
                 <Helicopter className="w-3.5 h-3.5 text-cyan-400" />
-                <span className="text-yt-text-secondary">Consigliato:</span>
-                <span className="text-cyan-400 font-medium">Elicottero</span>
+                <span className="text-yt-text-secondary">{t('missionDispatch.recommended.label')}</span>
+                <span className="text-cyan-400 font-medium">{t('missionDispatch.recommended.helicopter')}</span>
               </>
             )}
             {mission.recommended_aircraft === 'airplane' && (
               <>
                 <Plane className="w-3.5 h-3.5 text-yt-accent" />
-                <span className="text-yt-text-secondary">Consigliato:</span>
-                <span className="text-yt-accent font-medium">C-130</span>
+                <span className="text-yt-text-secondary">{t('missionDispatch.recommended.label')}</span>
+                <span className="text-yt-accent font-medium">{t('missionDispatch.recommended.airplane')}</span>
               </>
             )}
             {mission.recommended_aircraft === 'airdrop' && (
               <>
                 <Package className="w-3.5 h-3.5 text-orange-400" />
-                <span className="text-yt-text-secondary">Consigliato:</span>
-                <span className="text-orange-400 font-medium">Airdrop</span>
+                <span className="text-yt-text-secondary">{t('missionDispatch.recommended.label')}</span>
+                <span className="text-orange-400 font-medium">{t('missionDispatch.recommended.airdrop')}</span>
               </>
             )}
           </div>
@@ -214,7 +215,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
         {mission.status === 'accepted' && mission.accepted_by && (
           <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-yt-border">
             <User className="w-3.5 h-3.5 text-yt-text-secondary" />
-            <span className="text-yt-text-secondary">Pilota:</span>
+            <span className="text-yt-text-secondary">{t('missionDispatch.pilot')}</span>
             <span className="text-yt-text-primary font-bold">{mission.accepted_by}</span>
           </div>
         )}
@@ -229,7 +230,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
             className="flex-1 px-3 py-1.5 bg-green-400 hover:bg-green-400/80 disabled:bg-yt-bg-tertiary disabled:text-yt-text-secondary text-white rounded text-sm font-bold transition-all flex items-center justify-center gap-1.5"
           >
             <CheckCircle className="w-4 h-4" />
-            Accetta
+            {t('missionDispatch.accept')}
           </button>
         )}
 
@@ -237,7 +238,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
           <div className="flex-1 flex gap-2">
             <input
               type="text"
-              placeholder="Il tuo nome..."
+              placeholder={t('missionDispatch.namePlaceholder')}
               value={userName}
               onChange={(e) => setUserName(e.target.value)}
               className="flex-1 px-2 py-1.5 bg-yt-bg-primary border border-yt-border rounded text-yt-text-primary text-sm focus:border-yt-accent focus:outline-none"
@@ -248,7 +249,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
               disabled={loading}
               className="px-3 py-1.5 bg-green-400 hover:bg-green-400/80 disabled:bg-yt-bg-tertiary text-white rounded text-sm font-bold transition-all"
             >
-              OK
+              {t('missionDispatch.ok')}
             </button>
             <button
               onClick={() => setShowAccept(false)}
@@ -267,7 +268,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
             className="flex-1 px-3 py-1.5 bg-yt-accent hover:bg-yt-accent/80 disabled:bg-yt-bg-tertiary text-white rounded text-sm font-bold transition-all flex items-center justify-center gap-1.5"
           >
             <CheckCircle className="w-4 h-4" />
-            Completa
+            {t('missionDispatch.complete')}
           </button>
         )}
 
@@ -277,7 +278,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
           className="px-3 py-1.5 bg-red-400 hover:bg-red-400/80 disabled:bg-yt-bg-tertiary text-white rounded text-sm font-bold transition-all flex items-center justify-center gap-1.5"
         >
           <XCircle className="w-4 h-4" />
-          <span className="hidden sm:inline">Annulla</span>
+          <span className="hidden sm:inline">{t('missionDispatch.cancel')}</span>
         </button>
       </div>
     </div>
@@ -308,30 +309,30 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
       <div className="bg-yt-bg-secondary rounded-lg p-4 border border-yt-border">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-fuchsia-500/20 rounded">
-              <Package className="w-6 h-6 text-fuchsia-400" />
+              <div className="p-2 bg-fuchsia-500/20 rounded">
+                <Package className="w-6 h-6 text-fuchsia-400" />
+              </div>
+              <div>
+              <h2 className="text-xl font-bold text-yt-text-primary">{t('missionDispatch.title')}</h2>
+              <p className="text-xs text-yt-text-secondary">{t('missionDispatch.subtitle')}</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-yt-text-primary">Gestione Missioni</h2>
-              <p className="text-xs text-yt-text-secondary">Missioni di rifornimento attive</p>
+            {/* Stats compatte */}
+            <div className="flex gap-3">
+              <div className="text-center bg-yt-bg-tertiary rounded px-3 py-1.5">
+                <div className="text-2xl font-bold text-yellow-400">{stats.pending}</div>
+              <div className="text-[10px] text-yt-text-secondary uppercase tracking-wide">{t('missionDispatch.stats.pending')}</div>
+              </div>
+              <div className="text-center bg-yt-bg-tertiary rounded px-3 py-1.5">
+                <div className="text-2xl font-bold text-yt-accent">{stats.accepted}</div>
+              <div className="text-[10px] text-yt-text-secondary uppercase tracking-wide">{t('missionDispatch.stats.accepted')}</div>
+              </div>
+              <div className="text-center bg-yt-bg-tertiary rounded px-3 py-1.5">
+                <div className="text-2xl font-bold text-red-400">{stats.critical}</div>
+              <div className="text-[10px] text-yt-text-secondary uppercase tracking-wide">{t('missionDispatch.stats.critical')}</div>
+              </div>
             </div>
           </div>
-          {/* Stats compatte */}
-          <div className="flex gap-3">
-            <div className="text-center bg-yt-bg-tertiary rounded px-3 py-1.5">
-              <div className="text-2xl font-bold text-yellow-400">{stats.pending}</div>
-              <div className="text-[10px] text-yt-text-secondary uppercase tracking-wide">Attesa</div>
-            </div>
-            <div className="text-center bg-yt-bg-tertiary rounded px-3 py-1.5">
-              <div className="text-2xl font-bold text-yt-accent">{stats.accepted}</div>
-              <div className="text-[10px] text-yt-text-secondary uppercase tracking-wide">Accettate</div>
-            </div>
-            <div className="text-center bg-yt-bg-tertiary rounded px-3 py-1.5">
-              <div className="text-2xl font-bold text-red-400">{stats.critical}</div>
-              <div className="text-[10px] text-yt-text-secondary uppercase tracking-wide">Critiche</div>
-            </div>
-          </div>
-        </div>
 
         {/* Filters - compatti stile YouTube tabs */}
         <div className="flex gap-1 border-b border-yt-border -mb-4 pb-0">
@@ -343,7 +344,7 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
                 : 'text-yt-text-secondary hover:text-yt-text-primary'
             }`}
           >
-            Tutte ({stats.pending + stats.accepted})
+            {t('missionDispatch.filters.all')} ({stats.pending + stats.accepted})
           </button>
           <button
             onClick={() => setFilter('pending')}
@@ -353,7 +354,7 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
                 : 'text-yt-text-secondary hover:text-yt-text-primary'
             }`}
           >
-            In Attesa ({stats.pending})
+            {t('missionDispatch.filters.pending')} ({stats.pending})
           </button>
           <button
             onClick={() => setFilter('accepted')}
@@ -363,7 +364,7 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
                 : 'text-yt-text-secondary hover:text-yt-text-primary'
             }`}
           >
-            Accettate ({stats.accepted})
+            {t('missionDispatch.filters.accepted')} ({stats.accepted})
           </button>
         </div>
       </div>
@@ -372,8 +373,8 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
       {filteredMissions.length === 0 ? (
         <div className="bg-yt-bg-secondary rounded-lg p-8 text-center border border-yt-border">
           <Package className="w-12 h-12 text-yt-text-secondary mx-auto mb-3 opacity-50" />
-          <p className="text-base text-yt-text-primary font-medium">Nessuna missione disponibile</p>
-          <p className="text-xs text-yt-text-secondary mt-1">Le missioni appariranno qui quando le scorte saranno basse</p>
+          <p className="text-base text-yt-text-primary font-medium">{t('missionDispatch.emptyTitle')}</p>
+          <p className="text-xs text-yt-text-secondary mt-1">{t('missionDispatch.emptySubtitle')}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -396,27 +397,12 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
  * Utility: Get time ago string
  */
 function getTimeAgo(timestamp) {
-  const seconds = Math.floor((Date.now() - timestamp) / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return formatElapsedTime(timestamp, 'missionDispatch.timeAgo');
 }
 
 /**
  * Utility: Get time remaining string
  */
 function getTimeRemaining(timestamp) {
-  const seconds = Math.floor((timestamp - Date.now()) / 1000);
-  if (seconds < 0) return 'EXPIRED';
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `${days}d`;
+  return formatRemainingTime(timestamp, 'missionDispatch.timeRemaining');
 }

@@ -7,6 +7,7 @@ import airports from '../config/airports';
 import { generateChartsPDF, checkChartsAvailable } from '../utils/pdfGenerator';
 import { isImportantWeapon } from '../config/weapons';
 import { formatWeight } from '../utils/weightFormatter';
+import { t, formatElapsedTime, formatRemainingTime, getStatusLabel } from '../utils/locale';
 
 /**
  * Get weapon display name (remove prefix)
@@ -19,29 +20,11 @@ function getWeaponDisplayName(weaponId) {
  * Get time ago string
  */
 function getTimeAgo(timestamp) {
-  const seconds = Math.floor((Date.now() - timestamp) / 1000);
-  if (seconds < 60) return `${seconds}s fa`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m fa`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h fa`;
-  const days = Math.floor(hours / 24);
-  return `${days}g fa`;
+  return formatElapsedTime(timestamp, 'airportCard.elapsed');
 }
 
-/**
- * Get time remaining string
- */
 function getTimeRemaining(timestamp) {
-  const seconds = Math.floor((timestamp - Date.now()) / 1000);
-  if (seconds < 0) return 'SCADUTA';
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `${days}g`;
+  return formatRemainingTime(timestamp, 'airportCard.remaining');
 }
 
 /**
@@ -80,7 +63,7 @@ function StatusBadge({ status }) {
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs border ${styles[status]}`}>
       <Icon className="w-3 h-3" />
-      {status.toUpperCase()}
+      {getStatusLabel(status)}
     </span>
   );
 }
@@ -138,7 +121,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
   // Handle order creation
   const handleCreateOrder = async () => {
     if (!selectedWeapon || orderQuantity <= 0) {
-      alert('Seleziona un\'arma e inserisci una quantità valida');
+      alert(t('airportCard.alerts.selectWeapon'));
       return;
     }
 
@@ -147,10 +130,10 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
       setShowOrderModal(false);
       setSelectedWeapon('');
       setOrderQuantity(100);
-      alert('Ordine creato con successo!');
+      alert(t('airportCard.alerts.orderSuccess'));
       if (onMissionsUpdate) onMissionsUpdate();
     } catch (error) {
-      alert('Errore nella creazione dell\'ordine: ' + error.message);
+      alert(t('airportCard.alerts.orderError', { message: error.message }));
     }
   };
 
@@ -158,7 +141,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
   const handleAcceptMission = async (missionId) => {
     const state = missionStates[missionId] || {};
     if (!state.userName?.trim()) {
-      alert('Inserisci il tuo nome');
+      alert(t('airportCard.alerts.enterName'));
       return;
     }
 
@@ -168,14 +151,14 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
       setMissionStates(prev => ({ ...prev, [missionId]: { userName: '', showAccept: false, loading: false } }));
       if (onMissionsUpdate) onMissionsUpdate();
     } catch (error) {
-      alert(`Errore nell'accettare la missione: ${error.message}`);
+      alert(t('airportCard.alerts.acceptError', { message: error.message }));
       setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: false } }));
     }
   };
 
   // Handle mission complete
   const handleCompleteMission = async (missionId) => {
-    if (!confirm('Segnare questa missione come completata?')) return;
+    if (!confirm(t('general.prompts.confirmComplete'))) return;
 
     const state = missionStates[missionId] || {};
     setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: true } }));
@@ -184,14 +167,14 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
       setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: false } }));
       if (onMissionsUpdate) onMissionsUpdate();
     } catch (error) {
-      alert(`Errore nel completare la missione: ${error.message}`);
+      alert(t('airportCard.alerts.completeError', { message: error.message }));
       setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: false } }));
     }
   };
 
   // Handle mission cancel
   const handleCancelMission = async (missionId) => {
-    if (!confirm('Annullare questa missione?')) return;
+    if (!confirm(t('general.prompts.confirmCancel'))) return;
 
     const state = missionStates[missionId] || {};
     setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: true } }));
@@ -200,7 +183,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
       setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: false } }));
       if (onMissionsUpdate) onMissionsUpdate();
     } catch (error) {
-      alert(`Errore nell'annullare la missione: ${error.message}`);
+      alert(t('airportCard.alerts.cancelError', { message: error.message }));
       setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: false } }));
     }
   };
@@ -321,7 +304,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-sm font-bold text-fuchsia-300 flex items-center gap-2">
                   <Package className="w-4 h-4" />
-                  ORDINI ATTIVI ({airportMissions.length})
+                  {t('airportCard.activeOrders')} ({airportMissions.length})
                 </h4>
 
                 {/* Action buttons */}
@@ -336,17 +319,17 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                         ? 'bg-yt-bg-tertiary text-yt-text-secondary border border-yt-border cursor-not-allowed'
                         : 'bg-yt-accent/20 text-yt-accent border border-yt-accent/50 hover:bg-yt-accent/30'
                     }`}
-                    title={chartsAvailable === false ? 'Nessuna chart disponibile per questo aeroporto' : ''}
+                    title={chartsAvailable === false ? t('airportCard.pdfUnavailable') : ''}
                   >
                     <FileDown className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">{generatingPDF ? 'PDF...' : chartsAvailable === null ? 'Verifica...' : 'PDF'}</span>
+                    <span className="hidden sm:inline">{generatingPDF ? 'PDF...' : chartsAvailable === null ? t('general.loading') : 'PDF'}</span>
                   </button>
                   <button
                     onClick={() => setShowOrderModal(true)}
                     className="px-3 py-1.5 bg-green-400/20 text-green-400 border border-green-400/50 hover:bg-green-400/30 rounded text-xs font-bold flex items-center gap-1.5 transition-all"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Rifornimento</span>
+                    <span className="hidden sm:inline">{t('airportCard.refuel')}</span>
                   </button>
                 </div>
               </div>
@@ -389,12 +372,12 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                         }`}>
                           {mission.status === 'pending'
                             ? mission.current_quantity <= 5
-                              ? 'CRITICA'
+                              ? getStatusLabel('critical')
                               : mission.current_quantity <= 20
-                              ? 'ALTA'
-                              : 'MEDIA'
+                              ? getStatusLabel('high')
+                              : getStatusLabel('medium')
                             : mission.status === 'accepted'
-                            ? 'ACCETTATA'
+                            ? getStatusLabel('accepted')
                             : mission.status.toUpperCase()}
                         </span>
                       </div>
@@ -432,39 +415,39 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                         <span className="text-yt-text-primary font-mono flex-shrink-0">{distance}</span>
 
                         {/* Recommended Aircraft inline */}
-                        {mission.recommended_aircraft && (
-                          <>
-                            <span className="text-yt-border flex-shrink-0">•</span>
-                            {mission.recommended_aircraft === 'helicopter' && (
-                              <>
-                                <Helicopter className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
-                                <span className="text-cyan-400 font-medium flex-shrink-0">Elicottero</span>
-                              </>
-                            )}
-                            {mission.recommended_aircraft === 'airplane' && (
-                              <>
-                                <Plane className="w-3.5 h-3.5 text-yt-accent flex-shrink-0" />
-                                <span className="text-yt-accent font-medium flex-shrink-0">C-130</span>
-                              </>
-                            )}
-                            {mission.recommended_aircraft === 'airdrop' && (
-                              <>
-                                <Package className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
-                                <span className="text-orange-400 font-medium flex-shrink-0">Airdrop</span>
-                              </>
-                            )}
-                          </>
-                        )}
+                          {mission.recommended_aircraft && (
+                            <>
+                              <span className="text-yt-border flex-shrink-0">•</span>
+                              {mission.recommended_aircraft === 'helicopter' && (
+                                <>
+                                  <Helicopter className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+                                  <span className="text-cyan-400 font-medium flex-shrink-0">{t('airportCard.recommended.helicopter')}</span>
+                                </>
+                              )}
+                              {mission.recommended_aircraft === 'airplane' && (
+                                <>
+                                  <Plane className="w-3.5 h-3.5 text-yt-accent flex-shrink-0" />
+                                  <span className="text-yt-accent font-medium flex-shrink-0">{t('airportCard.recommended.airplane')}</span>
+                                </>
+                              )}
+                              {mission.recommended_aircraft === 'airdrop' && (
+                                <>
+                                  <Package className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
+                                  <span className="text-orange-400 font-medium flex-shrink-0">{t('airportCard.recommended.airdrop')}</span>
+                                </>
+                              )}
+                            </>
+                          )}
                       </div>
 
                       {/* Quantities and weight - compact layout */}
                       <div className="flex gap-2 mb-2">
                         <div className="flex-1 bg-yt-bg-tertiary rounded p-1.5 text-center">
-                          <div className="text-[10px] text-yt-text-secondary mb-0.5">Scorte</div>
+                          <div className="text-[10px] text-yt-text-secondary mb-0.5">{t('airportCard.filters.stocks')}</div>
                           <div className="text-base font-bold text-red-400">{mission.current_quantity}</div>
                         </div>
                         <div className="flex-1 bg-yt-bg-tertiary rounded p-1.5 text-center">
-                          <div className="text-[10px] text-yt-text-secondary mb-0.5">Richieste</div>
+                          <div className="text-[10px] text-yt-text-secondary mb-0.5">{t('airportCard.filters.requested')}</div>
                           <div className="text-base font-bold text-green-400">{mission.quantity_needed}</div>
                         </div>
                         {mission.total_weight_lbs && mission.total_weight_lbs > 0 && (
@@ -479,7 +462,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                       {mission.status === 'accepted' && mission.accepted_by && (
                         <div className="flex items-center gap-1.5 text-xs bg-yt-bg-tertiary px-2 py-1.5 rounded mb-2">
                           <User className="w-3.5 h-3.5 text-yt-text-secondary" />
-                          <span className="text-yt-text-secondary">Pilota:</span>
+                          <span className="text-yt-text-secondary">{t('airportCard.orders.pilot')}</span>
                           <span className="text-yt-text-primary font-bold">{mission.accepted_by}</span>
                         </div>
                       )}
@@ -493,7 +476,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                             className="flex-1 px-3 py-1.5 bg-green-400/20 text-green-400 border border-green-400/50 hover:bg-green-400/30 disabled:bg-yt-bg-tertiary disabled:text-yt-text-secondary disabled:border-yt-border rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5"
                           >
                             <CheckCircle className="w-3.5 h-3.5" />
-                            Accetta
+                            {t('general.buttons.accept')}
                           </button>
                         )}
 
@@ -501,7 +484,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                           <div className="flex-1 flex gap-2">
                             <input
                               type="text"
-                              placeholder="Nome pilota..."
+                              placeholder={t('general.form.pilotName')}
                               value={state.userName}
                               onChange={(e) => setMissionStates(prev => ({ ...prev, [mission.id]: { ...state, userName: e.target.value } }))}
                               className="flex-1 px-2 py-1.5 bg-yt-bg-primary border border-yt-border rounded text-yt-text-primary text-xs focus:border-yt-accent focus:outline-none"
@@ -531,7 +514,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                             className="flex-1 px-3 py-1.5 bg-yt-accent hover:bg-yt-accent/80 disabled:bg-yt-bg-tertiary text-white rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5"
                           >
                             <CheckCircle className="w-3.5 h-3.5" />
-                            Completa
+                            {t('general.buttons.complete')}
                           </button>
                         )}
 
@@ -541,7 +524,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                           className="px-3 py-1.5 bg-red-400/20 text-red-400 border border-red-400/50 hover:bg-red-400/30 disabled:bg-yt-bg-tertiary disabled:text-yt-text-secondary disabled:border-yt-border rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5"
                         >
                           <XCircle className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Annulla</span>
+                          <span className="hidden sm:inline">{t('general.buttons.cancel')}</span>
                         </button>
                       </div>
                     </div>
@@ -558,15 +541,15 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
               <div>
                 <h4 className="text-xs font-bold text-yt-text-secondary mb-2 flex items-center gap-1.5 uppercase tracking-wide">
                   <Package className="w-3.5 h-3.5" />
-                  Weapons & Munitions
+                  {t('airportCard.headers.weapons')}
                 </h4>
                 <div className="max-h-96 overflow-y-auto border border-yt-border rounded">
                   <table className="w-full text-xs">
                     <thead className="sticky top-0 bg-yt-bg-secondary border-b border-yt-border z-10">
                       <tr className="text-left text-yt-text-secondary">
-                        <th className="p-2">Weapon</th>
-                        <th className="p-2 text-right">Qty</th>
-                        <th className="p-2">Status</th>
+                        <th className="p-2">{t('airportCard.headers.weapon')}</th>
+                        <th className="p-2 text-right">{t('airportCard.headers.quantity')}</th>
+                        <th className="p-2">{t('airportCard.headers.status')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -593,12 +576,12 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
               <div>
                 <h4 className="text-xs font-bold text-yt-text-secondary mb-2 flex items-center gap-1.5 uppercase tracking-wide">
                   <Droplet className="w-3.5 h-3.5" />
-                  Liquids
+                  {t('airportCard.headers.liquids')}
                 </h4>
                 <div className="grid grid-cols-2 gap-3 h-96">
                   {liquids.map((liquid, idx) => (
                     <div key={idx} className="bg-yt-bg-tertiary p-4 rounded border border-yt-border flex flex-col justify-center items-center">
-                      <div className="text-sm text-yt-text-secondary mb-2">Type {liquid.item}</div>
+                      <div className="text-sm text-yt-text-secondary mb-2">{`${t('airportCard.headers.type')} ${liquid.item}`}</div>
                       <div className="text-2xl font-bold text-yt-text-primary">{liquid.quantity.toLocaleString()}</div>
                     </div>
                   ))}
@@ -612,19 +595,19 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
             <div className="mb-3">
               <h4 className="text-xs font-bold text-yt-text-secondary mb-2 flex items-center gap-1.5 uppercase tracking-wide">
                 <TrendingUp className="w-3.5 h-3.5" />
-                Andamento Storico (7 giorni)
+                {t('airportCard.headers.historical')}
               </h4>
               <select
                 value={chartWeapon}
                 onChange={(e) => setChartWeapon(e.target.value)}
                 className="w-full bg-yt-bg-tertiary text-yt-text-primary border border-yt-border rounded px-2.5 py-2 text-xs focus:outline-none focus:border-yt-accent transition-all"
               >
-                <option value="">-- Seleziona un'arma per vedere il grafico --</option>
+                <option value="">{t('airportCard.headers.selectWeapon')}</option>
                 {weapons
                   .filter(w => isImportantWeapon(w.item, isHeliport))
                   .map((weapon, idx) => (
                     <option key={idx} value={weapon.item}>
-                      {getWeaponDisplayName(weapon.item)} (Attuale: {weapon.quantity})
+                      {getWeaponDisplayName(weapon.item)} ({t('airportCard.headers.quantity')}: {weapon.quantity})
                     </option>
                   ))}
               </select>
@@ -641,12 +624,8 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
             {!chartWeapon && (
               <div className="bg-yt-bg-tertiary rounded-lg p-6 text-center">
                 <TrendingUp className="w-10 h-10 text-yt-text-secondary mx-auto mb-2 opacity-50" />
-                <p className="text-yt-text-primary text-xs">
-                  Seleziona un'arma dal menu per visualizzare il grafico
-                </p>
-                <p className="text-[10px] text-yt-text-secondary mt-1.5">
-                  📊 Dati salvati ogni 4 ore
-                </p>
+                <p className="text-yt-text-primary text-xs">{t('airportCard.headers.selectWeaponInfo')}</p>
+                <p className="text-[10px] text-yt-text-secondary mt-1.5">{t('airportCard.headers.dataFrequency')}</p>
               </div>
             )}
           </div>
@@ -660,7 +639,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-yt-text-primary flex items-center gap-2">
                 <Plus className="w-5 h-5 text-green-400" />
-                Richiedi Rifornimento
+                {t('airportCard.modal.title')}
               </h3>
               <button onClick={() => setShowOrderModal(false)} className="text-yt-text-secondary hover:text-yt-text-primary transition-colors">
                 <X className="w-5 h-5" />
@@ -670,25 +649,25 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
             <div className="space-y-3">
               {/* Airport Info */}
               <div className="bg-yt-bg-primary p-3 rounded">
-                <div className="text-xs text-yt-text-secondary">Aeroporto</div>
+                <div className="text-xs text-yt-text-secondary">{t('airportCard.modal.airport')}</div>
                 <div className="text-yt-text-primary font-bold">{airport.displayName || airport.name}</div>
               </div>
 
               {/* Weapon Selection */}
               <div>
-                <label className="block text-xs text-yt-text-secondary mb-1.5 font-medium">Seleziona Arma</label>
+                <label className="block text-xs text-yt-text-secondary mb-1.5 font-medium">{t('airportCard.modal.selectWeapon')}</label>
                 <select
                   value={selectedWeapon}
                   onChange={(e) => handleWeaponSelect(e.target.value)}
                   className="w-full bg-yt-bg-primary text-yt-text-primary border border-yt-border rounded px-3 py-2 text-sm focus:outline-none focus:border-green-400 transition-all"
                 >
-                  <option value="">-- Seleziona --</option>
+                  <option value="">{t('airportCard.modal.selectWeapon')}</option>
                   {weapons.map((weapon, idx) => {
                     const status = getWeaponStatus(weapon.quantity, isImportantWeapon(weapon.item, isHeliport));
                     const priorityLabel = status === 'critical' ? '🔴 CRITICAL' : status === 'high' ? '🟠 HIGH' : status === 'medium' ? '🟡 MEDIUM' : '';
                     return (
                       <option key={idx} value={weapon.item}>
-                        {getWeaponDisplayName(weapon.item)} (Attuale: {weapon.quantity}) {priorityLabel}
+                        {getWeaponDisplayName(weapon.item)} ({t('airportCard.headers.quantity')}: {weapon.quantity}) {priorityLabel}
                       </option>
                     );
                   })}
@@ -698,10 +677,10 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
               {/* Quantity Input */}
               <div>
                 <label className="block text-xs text-yt-text-secondary mb-1.5 font-medium">
-                  Quantità da Ordinare
+                  {t('airportCard.modal.quantityLabel')}
                   {selectedWeapon && (
                     <span className="text-xs text-yt-text-secondary/60 ml-2">
-                      (Suggerito: {getSuggestedQuantity(selectedWeapon)})
+                      ({t('airportCard.modal.suggested', { value: getSuggestedQuantity(selectedWeapon) })})
                     </span>
                   )}
                 </label>
@@ -721,13 +700,13 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
                   onClick={handleCreateOrder}
                   className="flex-1 bg-green-400 hover:bg-green-400/80 text-white font-bold py-2 px-4 rounded text-sm transition-all"
                 >
-                  Crea Ordine
+                  {t('airportCard.orderButton')}
                 </button>
                 <button
                   onClick={() => setShowOrderModal(false)}
                   className="flex-1 bg-yt-bg-tertiary hover:bg-yt-border text-yt-text-primary font-bold py-2 px-4 rounded text-sm transition-all"
                 >
-                  Annulla
+                  {t('airportCard.cancelButton')}
                 </button>
               </div>
             </div>
