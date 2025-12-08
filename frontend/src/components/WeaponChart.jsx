@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { TrendingUp, Calendar } from 'lucide-react';
 import { getWeaponHistory } from '../services/api';
+import { t } from '../utils/locale';
 
 /**
  * Get weapon display name (remove prefix)
@@ -31,7 +32,7 @@ function CustomTooltip({ active, payload }) {
     return (
       <div className="bg-yt-bg-tertiary border border-yt-border rounded p-3 shadow-lg">
         <p className="text-xs text-yt-text-secondary mb-1">{formatDate(data.timestamp)}</p>
-        <p className="text-lg font-bold text-yt-text-primary">Quantità: {data.quantity}</p>
+        <p className="text-lg font-bold text-yt-text-primary">{t('weaponChart.quantityLabel', { value: data.quantity })}</p>
       </div>
     );
   }
@@ -63,7 +64,7 @@ export default function WeaponChart({ airportId, weaponId, days = 7 }) {
       const response = await getWeaponHistory(airportId, weaponId, days);
 
       if (!response.history || response.history.length === 0) {
-        setError('Nessun dato disponibile per questa arma');
+        setError(t('weaponChart.noData'));
         setChartData([]);
         return;
       }
@@ -78,7 +79,7 @@ export default function WeaponChart({ airportId, weaponId, days = 7 }) {
       setChartData(formattedData);
     } catch (err) {
       console.error('Error loading weapon history:', err);
-      setError('Errore nel caricamento dei dati');
+      setError(t('weaponChart.errorLoading'));
     } finally {
       setLoading(false);
     }
@@ -88,7 +89,7 @@ export default function WeaponChart({ airportId, weaponId, days = 7 }) {
     return (
       <div className="bg-yt-bg-secondary rounded-lg p-8 text-center">
         <div className="animate-spin w-8 h-8 border-4 border-yt-accent border-t-transparent rounded-full mx-auto mb-2"></div>
-        <p className="text-yt-text-secondary text-sm">Caricamento dati...</p>
+        <p className="text-yt-text-secondary text-sm">{t('weaponChart.loading')}</p>
       </div>
     );
   }
@@ -97,9 +98,7 @@ export default function WeaponChart({ airportId, weaponId, days = 7 }) {
     return (
       <div className="bg-yt-bg-secondary rounded-lg p-8 text-center">
         <p className="text-yellow-400">{error}</p>
-        <p className="text-xs text-yt-text-secondary mt-2">
-          I dati vengono salvati ogni 4 ore. Attendi il prossimo snapshot.
-        </p>
+        <p className="text-xs text-yt-text-secondary mt-2">{t('weaponChart.snapshotInfo')}</p>
       </div>
     );
   }
@@ -107,7 +106,7 @@ export default function WeaponChart({ airportId, weaponId, days = 7 }) {
   if (chartData.length === 0) {
     return (
       <div className="bg-yt-bg-secondary rounded-lg p-8 text-center">
-        <p className="text-yt-text-secondary">Seleziona un'arma per vedere il grafico</p>
+        <p className="text-yt-text-secondary">{t('weaponChart.selectWeapon')}</p>
       </div>
     );
   }
@@ -133,30 +132,30 @@ export default function WeaponChart({ airportId, weaponId, days = 7 }) {
         </div>
         <div className="flex items-center gap-2 text-yt-text-secondary text-sm">
           <Calendar className="w-4 h-4" />
-          <span>Ultimi {days} giorni</span>
+          <span>{t('weaponChart.stats.lastDays', { days })}</span>
         </div>
       </div>
 
       {/* Statistics */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
         <div className="bg-yt-bg-tertiary rounded p-2">
-          <div className="text-xs text-yt-text-secondary">Attuale</div>
+          <div className="text-xs text-yt-text-secondary">{t('weaponChart.stats.current')}</div>
           <div className="text-lg font-bold text-yt-text-primary">{currentQty}</div>
         </div>
         <div className="bg-yt-bg-tertiary rounded p-2">
-          <div className="text-xs text-yt-text-secondary">Media</div>
+          <div className="text-xs text-yt-text-secondary">{t('weaponChart.stats.average')}</div>
           <div className="text-lg font-bold text-yt-accent">{avgQty}</div>
         </div>
         <div className="bg-yt-bg-tertiary rounded p-2">
-          <div className="text-xs text-yt-text-secondary">Min</div>
+          <div className="text-xs text-yt-text-secondary">{t('weaponChart.stats.min')}</div>
           <div className="text-lg font-bold text-red-400">{minQty}</div>
         </div>
         <div className="bg-yt-bg-tertiary rounded p-2">
-          <div className="text-xs text-yt-text-secondary">Max</div>
+          <div className="text-xs text-yt-text-secondary">{t('weaponChart.stats.max')}</div>
           <div className="text-lg font-bold text-green-400">{maxQty}</div>
         </div>
         <div className="bg-yt-bg-tertiary rounded p-2">
-          <div className="text-xs text-yt-text-secondary">Variazione</div>
+          <div className="text-xs text-yt-text-secondary">{t('weaponChart.stats.change')}</div>
           <div className={`text-lg font-bold ${change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {change >= 0 ? '+' : ''}{change} ({changePercent}%)
           </div>
@@ -189,14 +188,14 @@ export default function WeaponChart({ airportId, weaponId, days = 7 }) {
               strokeWidth={2}
               dot={{ fill: '#3EA6FF', r: 4 }}
               activeDot={{ r: 6 }}
-              name="Quantità"
+              name={t('airportCard.headers.quantity')}
             />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
       <div className="mt-3 text-xs text-yt-text-secondary text-center">
-        📊 Dati raccolti ogni 4 ore • {chartData.length} punti dati
+        {t('weaponChart.dataPoints', { count: chartData.length })}
       </div>
     </div>
   );

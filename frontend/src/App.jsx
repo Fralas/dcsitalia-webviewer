@@ -5,6 +5,7 @@ import MapView from './components/MapView';
 import AdminPanel from './components/AdminPanel';
 import * as api from './services/api';
 import socketService from './services/socket';
+import { t } from './utils/locale';
 
 function App() {
   const [currentView, setCurrentView] = useState('dashboard'); // dashboard, missions
@@ -107,7 +108,7 @@ function App() {
       <div className="min-h-screen bg-yt-bg-primary flex items-center justify-center">
         <div className="text-center">
           <Activity className="w-16 h-16 text-yt-accent animate-spin mx-auto mb-4" />
-          <p className="text-xl text-yt-text-secondary">Loading DCS Warehouse Viewer...</p>
+          <p className="text-xl text-yt-text-secondary">{t('general.loading')}</p>
         </div>
       </div>
     );
@@ -118,13 +119,13 @@ function App() {
       <div className="min-h-screen bg-yt-bg-primary flex items-center justify-center">
         <div className="text-center max-w-md">
           <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-          <p className="text-xl text-red-400 mb-2">Error Loading Data</p>
+          <p className="text-xl text-red-400 mb-2">{t('general.errorTitle')}</p>
           <p className="text-yt-text-secondary mb-4">{error}</p>
           <button
             onClick={loadData}
             className="px-6 py-2 bg-yt-accent hover:bg-yt-accent/80 text-white rounded font-bold transition-all"
           >
-            Retry
+            {t('general.retry')}
           </button>
         </div>
       </div>
@@ -145,8 +146,8 @@ function App() {
                 className="h-10 w-auto object-contain"
               />
               <div>
-                <h1 className="text-lg font-bold text-yt-text-primary">DCS Warehouse</h1>
-                <p className="text-xs text-yt-text-secondary">Gestione Logistica</p>
+                <h1 className="text-lg font-bold text-yt-text-primary">{t('general.appTitle')}</h1>
+                <p className="text-xs text-yt-text-secondary">{t('general.appSubtitle')}</p>
               </div>
             </div>
 
@@ -155,7 +156,11 @@ function App() {
               <div className="flex items-center gap-1.5 px-2 py-1 bg-yt-bg-tertiary rounded">
                 <div className={`w-1.5 h-1.5 rounded-full ${connectionStatus === 'connected' ? 'bg-green-400' : connectionStatus === 'disconnected' ? 'bg-red-400' : 'bg-yellow-400'}`} />
                 <span className="text-xs text-yt-text-secondary">
-                  {connectionStatus === 'connected' ? 'online' : connectionStatus === 'disconnected' ? 'offline' : 'connecting...'}
+                  {connectionStatus === 'connected'
+                    ? t('general.connection.online')
+                    : connectionStatus === 'disconnected'
+                      ? t('general.connection.offline')
+                      : t('general.connection.connecting')}
                 </span>
               </div>
 
@@ -170,7 +175,7 @@ function App() {
                   }`}
                 >
                   <Plane className="w-4 h-4" />
-                  <span className="hidden sm:inline">Dashboard</span>
+                  <span className="hidden sm:inline">{t('general.navigation.dashboard')}</span>
                 </button>
                 <button
                   onClick={() => setCurrentView('map')}
@@ -181,7 +186,7 @@ function App() {
                   }`}
                 >
                   <Map className="w-4 h-4" />
-                  <span className="hidden sm:inline">Mappa</span>
+                  <span className="hidden sm:inline">{t('general.navigation.map')}</span>
                 </button>
                 <button
                   onClick={() => setCurrentView('admin')}
@@ -192,7 +197,7 @@ function App() {
                   }`}
                 >
                   <Shield className="w-4 h-4" />
-                  <span className="hidden sm:inline">Admin</span>
+                  <span className="hidden sm:inline">{t('general.navigation.admin')}</span>
                 </button>
               </nav>
             </div>

@@ -3,6 +3,7 @@ import { Package, AlertTriangle, Plane, Activity, FolderOpen } from 'lucide-reac
 import AirportCard from './AirportCard';
 import { selectPDFDirectory, isFileSystemAccessSupported } from '../utils/fileSystemAccess';
 import { isImportantWeapon } from '../config/weapons';
+import { t } from '../utils/locale';
 
 /**
  * Stats Card Component - YouTube Style
@@ -34,11 +35,7 @@ export default function Dashboard({ airports, missions, stats, onMissionsUpdate 
   const handleSelectPDFDirectory = async () => {
     const success = await selectPDFDirectory();
     if (success) {
-      alert(
-        'Directory PDF configurata con successo!\n\n' +
-        'Tutti i PDF verranno ora salvati nella directory selezionata.\n' +
-        'La directory verrà ricordata per le prossime sessioni.'
-      );
+      alert(`${t('dashboard.pdfTooltip')}\n\n${t('dashboard.emptySubtitle')}`);
     }
   };
 
@@ -84,28 +81,28 @@ export default function Dashboard({ airports, missions, stats, onMissionsUpdate 
       {/* Stats Row - Compatta e moderna */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         <StatsCard
-          title="Aeroporti"
+          title={t('dashboard.stats.airports')}
           value={stats.totalAirports || 0}
           icon={Plane}
           color="text-yt-accent"
           bgColor="bg-yt-accent/20"
         />
         <StatsCard
-          title="Critici"
+          title={t('dashboard.stats.critical')}
           value={stats.criticalAirports || 0}
           icon={AlertTriangle}
           color="text-red-400"
           bgColor="bg-red-400/20"
         />
         <StatsCard
-          title="Missioni"
+          title={t('dashboard.stats.missions')}
           value={stats.activeMissions || 0}
           icon={Package}
           color="text-yellow-400"
           bgColor="bg-yellow-400/20"
         />
         <StatsCard
-          title="Accettate"
+          title={t('dashboard.stats.accepted')}
           value={stats.acceptedMissions || 0}
           icon={Activity}
           color="text-green-400"
@@ -119,7 +116,7 @@ export default function Dashboard({ airports, missions, stats, onMissionsUpdate 
           <div className="flex-1">
             <input
               type="text"
-              placeholder="🔍 Cerca aeroporti..."
+              placeholder={t('dashboard.searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full px-3 py-2 bg-yt-bg-primary border border-yt-border rounded text-yt-text-primary placeholder-yt-text-secondary text-sm focus:outline-none focus:border-yt-accent transition-all"
@@ -134,7 +131,7 @@ export default function Dashboard({ airports, missions, stats, onMissionsUpdate 
                   : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'
               }`}
             >
-              📝 Nome
+              {t('dashboard.sortByName')}
             </button>
             <button
               onClick={() => setSortBy('critical')}
@@ -144,13 +141,13 @@ export default function Dashboard({ airports, missions, stats, onMissionsUpdate 
                   : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'
               }`}
             >
-              ⚠️ Criticità
+              {t('dashboard.sortByCriticality')}
             </button>
             {isFileSystemAccessSupported() && (
               <button
                 onClick={handleSelectPDFDirectory}
                 className="px-3 py-2 rounded text-sm font-medium bg-green-400 text-white hover:bg-green-400/80 flex items-center gap-1.5 transition-all"
-                title="Seleziona la directory dove salvare i PDF delle chart"
+                title={t('dashboard.pdfTooltip')}
               >
                 <FolderOpen className="w-4 h-4" />
                 <span className="hidden sm:inline">PDF</span>
@@ -165,8 +162,8 @@ export default function Dashboard({ airports, missions, stats, onMissionsUpdate 
         {filteredAirports.length === 0 ? (
           <div className="bg-yt-bg-secondary rounded-lg p-12 text-center border border-yt-border">
             <Plane className="w-12 h-12 text-yt-text-secondary mx-auto mb-3 opacity-50" />
-            <p className="text-lg text-yt-text-primary font-medium">Nessun aeroporto trovato</p>
-            <p className="text-sm text-yt-text-secondary mt-1">Prova a modificare i filtri di ricerca</p>
+            <p className="text-lg text-yt-text-primary font-medium">{t('dashboard.emptyTitle')}</p>
+            <p className="text-sm text-yt-text-secondary mt-1">{t('dashboard.emptySubtitle')}</p>
           </div>
         ) : (
           filteredAirports.map(airport => (
