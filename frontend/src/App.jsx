@@ -16,6 +16,8 @@ function App() {
   const [error, setError] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [highlightedMissionId, setHighlightedMissionId] = useState(null);
+  const [selectedAirportId, setSelectedAirportId] = useState(null);
+  const [selectedAirportToken, setSelectedAirportToken] = useState(0);
 
   // Load initial data
   useEffect(() => {
@@ -213,6 +215,8 @@ function App() {
             missions={missions}
             stats={stats}
             onMissionsUpdate={handleMissionUpdate}
+            selectedAirportId={selectedAirportId}
+            selectedAirportToken={selectedAirportToken}
           />
         )}
         {currentView === 'map' && (
@@ -220,7 +224,10 @@ function App() {
             missions={missions}
             airportsData={Object.values(airports)}
             onNavigateToMissions={(missionId) => {
-              // Missions view removed - navigate to dashboard instead
+              const mission = missions.find((m) => m.id === missionId);
+              setHighlightedMissionId(missionId);
+              setSelectedAirportId(mission?.airport_id || null);
+              setSelectedAirportToken(Date.now());
               setCurrentView('dashboard');
             }}
           />

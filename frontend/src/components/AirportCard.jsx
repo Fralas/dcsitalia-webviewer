@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Helicopter, Plus, X, TrendingUp, ArrowRight, FileDown, Weight, Clock, User, XCircle } from 'lucide-react';
 import * as api from '../services/api';
 import WeaponChart from './WeaponChart';
@@ -71,7 +71,7 @@ function StatusBadge({ status }) {
 /**
  * Airport Card Component
  */
-export default function AirportCard({ airport, missions = [], onMissionsUpdate }) {
+export default function AirportCard({ airport, missions = [], onMissionsUpdate, shouldExpand, expandToken }) {
   const [expanded, setExpanded] = useState(false);
   const [filter, setFilter] = useState('all'); // all, critical, important
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -84,6 +84,8 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
   // Mission management states
   const [missionStates, setMissionStates] = useState({}); // { missionId: { userName, showAccept, loading } }
 
+  const cardRef = useRef(null);
+
   if (!airport || !airport.data) {
     return null;
   }
@@ -94,6 +96,14 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
       checkChartsAvailable(airport.id).then(setChartsAvailable);
     }
   }, [expanded, airport.id, chartsAvailable]);
+
+  // Expand and scroll into view when a mission is selected from the map
+  useEffect(() => {
+    if (shouldExpand) {
+      setExpanded(true);
+      cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [shouldExpand, expandToken]);
 
   const { weapons = [], liquids = [] } = airport.data;
 
@@ -251,10 +261,11 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate }
   });
 
   const airportMissions = missions.filter(m => m.airport_id === airport.id);
-  const cardBorderClass = stats.critical > 0 ? 'border-red-400 pulse-border-critical' : stats.high > 0 ? 'border-orange-500' : stats.medium > 0 ? 'border-yellow-400' : 'border-yt-border';
-
   return (
-    <div className={`bg-yt-bg-secondary rounded-lg border-2 ${cardBorderClass} overflow-hidden hover:shadow-xl transition-all`}>
+    <div
+      ref={cardRef}
+      className="bg-yt-bg-secondary rounded-lg border-2 border-yt-border overflow-hidden hover:shadow-xl transition-all"
+    >
       {/* Header */}
       <div
         className="p-3 cursor-pointer hover:bg-yt-bg-tertiary/50 transition-colors"
