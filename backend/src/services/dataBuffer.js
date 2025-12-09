@@ -37,8 +37,8 @@ export function writeBuffer(data, bufferFilePath) {
   fs.renameSync(tempPath, targetPath);
 }
 
-export function syncFromCsv(airports, csvDir, bufferFilePath) {
-  const data = csvParser.parseAllAirports(airports, csvDir);
+export async function syncFromCsv(airports, csvDir, bufferFilePath) {
+  const data = await csvParser.parseAllAirports(airports, csvDir);
   writeBuffer(data, bufferFilePath);
   return data;
 }

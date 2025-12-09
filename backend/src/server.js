@@ -79,6 +79,8 @@ app.use(express.json());
 // Store current data in memory
 let currentData = {};
 let dataRefreshInProgress = false;
+let refreshQueued = false;
+let refreshPromise = Promise.resolve(currentData);
 
 // Buffer file location (optional override via environment variable)
 const BUFFER_FILE_PATH = process.env.BUFFER_FILE_PATH
@@ -122,7 +124,7 @@ function processData(data) {
   return currentData;
 }
 
-function loadFromBuffer() {
+async function loadFromBuffer() {
   const bufferedData = dataBuffer.readBuffer(BUFFER_FILE_PATH);
 
   if (bufferedData) {
@@ -134,24 +136,39 @@ function loadFromBuffer() {
   return refreshDataFromCsv('buffer-missing');
 }
 
-function refreshDataFromCsv(reason = 'manual') {
-  if (dataRefreshInProgress) {
-    console.log('⏳ Data refresh already in progress, skipping concurrent run.');
-    return currentData;
-  }
-
+async function executeRefresh(reason = 'manual') {
   dataRefreshInProgress = true;
   try {
     console.log(`📊 Loading airport data from CSV (${reason})...`);
-    const data = dataBuffer.syncFromCsv(airports, CSV_DIR, BUFFER_FILE_PATH);
+    const data = await dataBuffer.syncFromCsv(airports, CSV_DIR, BUFFER_FILE_PATH);
     processData(data);
+    io.emit('data:updated', currentData);
     return currentData;
   } catch (error) {
     console.error('Error refreshing data from CSV:', error.message);
     return currentData;
   } finally {
     dataRefreshInProgress = false;
+    if (refreshQueued) {
+      refreshQueued = false;
+      return refreshDataFromCsv('queued');
+    }
   }
+}
+
+function refreshDataFromCsv(reason = 'manual') {
+  if (dataRefreshInProgress) {
+    if (!refreshQueued) {
+      refreshQueued = true;
+      console.log('🔁 Refresh in progress, queueing another run.');
+    } else {
+      console.log('⏭️  Refresh already queued; ignoring additional trigger.');
+    }
+    return refreshPromise;
+  }
+
+  refreshPromise = executeRefresh(reason);
+  return refreshPromise;
 }
 
 // ==================== API ROUTES ====================
@@ -721,11 +738,9 @@ const watcher = chokidar.watch('*.csv', {
 watcher.on('change', (filename) => {
   console.log(`📝 CSV file changed: ${filename}`);
 
-  // Reload data
-  refreshDataFromCsv('file-change');
-
-  // Broadcast update to all connected clients
-  io.emit('data:updated', currentData);
+  refreshDataFromCsv('file-change').catch((error) => {
+    logger.error('Watcher refresh failed:', error);
+  });
 });
 
 watcher.on('error', (error) => {
@@ -748,14 +763,15 @@ setInterval(() => {
 // Check for new orders every 5 minutes (automatic polling)
 setInterval(() => {
   console.log('⏰ 5-minute check: Scanning for critical weapons...');
-  refreshDataFromCsv('scheduled');
-  io.emit('data:updated', currentData);
+  refreshDataFromCsv('scheduled').catch((error) => {
+    logger.error('Scheduled refresh failed:', error);
+  });
 }, 5 * 60 * 1000); // Every 5 minutes
 
 // ==================== START SERVER ====================
 
 // Load initial data
-loadFromBuffer();
+await loadFromBuffer();
 
 httpServer.listen(PORT, () => {
   logger.info(`
