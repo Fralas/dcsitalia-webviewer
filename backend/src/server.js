@@ -13,7 +13,7 @@ import fs from 'fs';
 
 import airports, { getAirportById } from './config/airports.config.js';
 import { isImportantWeapon, getPriority, getSupplyQuantityForPriority } from './config/rules.config.js';
-import * as csvParser from './services/csvParser.js';
+import * as dataBuffer from './services/dataBuffer.js';
 import * as historicalData from './services/historicalData.js';
 import * as missionGenerator from './services/missionGenerator.js';
 import { findBestSourceAirport, determineRecommendedAircraft } from './services/missionGenerator.js';
@@ -78,16 +78,26 @@ app.use(express.json());
 
 // Store current data in memory
 let currentData = {};
+let dataRefreshInProgress = false;
+
+// Buffer file location (optional override via environment variable)
+const BUFFER_FILE_PATH = process.env.BUFFER_FILE_PATH
+  ? path.resolve(process.env.BUFFER_FILE_PATH)
+  : path.resolve(process.cwd(), 'data-buffer.json');
 
 /**
  * Load all airport data
  */
-function loadAllData() {
-  console.log('📊 Loading airport data...');
-  const data = csvParser.parseAllAirports(airports, CSV_DIR);
+function processData(data) {
+  const airportDataMap = data?.data || data;
+
+  if (!airportDataMap) {
+    console.warn('⚠️  No data available to process.');
+    return currentData;
+  }
 
   // Save snapshots to historical database
-  Object.entries(data).forEach(([airportId, airportData]) => {
+  Object.entries(airportDataMap).forEach(([airportId, airportData]) => {
     if (airportData.data && airportData.data.weapons) {
       historicalData.saveSnapshot(airportId, airportData.data);
 
@@ -95,7 +105,7 @@ function loadAllData() {
       const newMissions = missionGenerator.checkAndGenerateMissions(
         airportId,
         airportData.data.weapons,
-        data // Pass all airports data for donor selection
+        airportDataMap // Pass all airports data for donor selection
       );
 
       if (newMissions.length > 0) {
@@ -108,8 +118,40 @@ function loadAllData() {
     }
   });
 
-  currentData = data;
-  return data;
+  currentData = airportDataMap;
+  return currentData;
+}
+
+function loadFromBuffer() {
+  const bufferedData = dataBuffer.readBuffer(BUFFER_FILE_PATH);
+
+  if (bufferedData) {
+    console.log('📂 Loaded data from buffer file.');
+    return processData(bufferedData);
+  }
+
+  console.warn('⚠️  Buffer file missing or unreadable. Loading directly from CSV.');
+  return refreshDataFromCsv('buffer-missing');
+}
+
+function refreshDataFromCsv(reason = 'manual') {
+  if (dataRefreshInProgress) {
+    console.log('⏳ Data refresh already in progress, skipping concurrent run.');
+    return currentData;
+  }
+
+  dataRefreshInProgress = true;
+  try {
+    console.log(`📊 Loading airport data from CSV (${reason})...`);
+    const data = dataBuffer.syncFromCsv(airports, CSV_DIR, BUFFER_FILE_PATH);
+    processData(data);
+    return currentData;
+  } catch (error) {
+    console.error('Error refreshing data from CSV:', error.message);
+    return currentData;
+  } finally {
+    dataRefreshInProgress = false;
+  }
 }
 
 // ==================== API ROUTES ====================
@@ -680,7 +722,7 @@ watcher.on('change', (filename) => {
   console.log(`📝 CSV file changed: ${filename}`);
 
   // Reload data
-  loadAllData();
+  refreshDataFromCsv('file-change');
 
   // Broadcast update to all connected clients
   io.emit('data:updated', currentData);
@@ -706,14 +748,14 @@ setInterval(() => {
 // Check for new orders every 5 minutes (automatic polling)
 setInterval(() => {
   console.log('⏰ 5-minute check: Scanning for critical weapons...');
-  loadAllData();
+  refreshDataFromCsv('scheduled');
   io.emit('data:updated', currentData);
 }, 5 * 60 * 1000); // Every 5 minutes
 
 // ==================== START SERVER ====================
 
 // Load initial data
-loadAllData();
+loadFromBuffer();
 
 httpServer.listen(PORT, () => {
   logger.info(`
