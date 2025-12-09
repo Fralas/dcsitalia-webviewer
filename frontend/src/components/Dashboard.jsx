@@ -27,7 +27,7 @@ function StatsCard({ title, value, icon: Icon, color, bgColor }) {
 /**
  * Dashboard Component
  */
-export default function Dashboard({ airports, missions, stats, onMissionsUpdate }) {
+export default function Dashboard({ airports, missions, stats, onMissionsUpdate, selectedAirportId, selectedAirportToken }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('name'); // name, critical
 
@@ -172,6 +172,8 @@ export default function Dashboard({ airports, missions, stats, onMissionsUpdate 
               airport={airport}
               missions={missions}
               onMissionsUpdate={onMissionsUpdate}
+              shouldExpand={airport.id === selectedAirportId}
+              expandToken={selectedAirportToken}
             />
           ))
         )}
