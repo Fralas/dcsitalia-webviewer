@@ -111,7 +111,7 @@ export const airports = [
     name: 'Kuweires',
     displayName: 'Kuweires',
     isMainBase: false,
-    isHeliport: true,
+    isHeliport: false,
     herculesBase: false,
     csvPrefix: 'Kuweires',
     coordinates: { lat: 36.181944, lon: 37.576667 }, // 36°10'55"N, 37°34'36"E
