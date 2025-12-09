@@ -13,15 +13,11 @@ import path from 'path';
  * @param {string} filePath - Path to CSV file
  * @returns {Array} Array of {item, quantity} objects
  */
-export function parseCSV(filePath) {
+export async function parseCSV(filePath) {
   try {
-    if (!fs.existsSync(filePath)) {
-      console.warn(`CSV file not found: ${filePath}`);
-      return [];
-    }
-
     // READ-ONLY: Only reading CSV files, never writing
-    const content = fs.readFileSync(filePath, 'utf-8');
+    await fs.promises.access(filePath, fs.constants.F_OK);
+    const content = await fs.promises.readFile(filePath, 'utf-8');
     const lines = content.split('\n').filter(line => line.trim());
 
     return lines.map(line => {
@@ -32,7 +28,11 @@ export function parseCSV(filePath) {
       };
     }).filter(entry => entry.item && entry.item !== ''); // Filter empty items
   } catch (error) {
-    console.error(`Error parsing CSV ${filePath}:`, error.message);
+    if (error.code === 'ENOENT') {
+      console.warn(`CSV file not found: ${filePath}`);
+    } else {
+      console.error(`Error parsing CSV ${filePath}:`, error.message);
+    }
     return [];
   }
 }
@@ -43,12 +43,14 @@ export function parseCSV(filePath) {
  * @param {string} dataDir - Directory containing CSV files
  * @returns {Object} Object with weapons and liquids data
  */
-export function getAirportData(csvPrefix, dataDir = './') {
+export async function getAirportData(csvPrefix, dataDir = './') {
   const weaponsPath = path.join(dataDir, `${csvPrefix}_weapons.csv`);
   const liquidsPath = path.join(dataDir, `${csvPrefix}_liquids.csv`);
 
-  const weapons = parseCSV(weaponsPath);
-  const liquids = parseCSV(liquidsPath);
+  const [weapons, liquids] = await Promise.all([
+    parseCSV(weaponsPath),
+    parseCSV(liquidsPath)
+  ]);
 
   return {
     weapons,
@@ -63,26 +65,25 @@ export function getAirportData(csvPrefix, dataDir = './') {
  * @param {string} dataDir - Directory containing CSV files
  * @returns {Object} Object with all airports data
  */
-export function parseAllAirports(airports, dataDir = './') {
-  const result = {};
-
-  airports.forEach(airport => {
+export async function parseAllAirports(airports, dataDir = './') {
+  const entries = await Promise.all(airports.map(async (airport) => {
     try {
-      result[airport.id] = {
-        ...airport,
-        data: getAirportData(airport.csvPrefix, dataDir),
-      };
+      const data = await getAirportData(airport.csvPrefix, dataDir);
+      return [airport.id, { ...airport, data }];
     } catch (error) {
       console.error(`Error loading data for ${airport.name}:`, error.message);
-      result[airport.id] = {
-        ...airport,
-        data: { weapons: [], liquids: [], timestamp: Date.now() },
-        error: error.message,
-      };
+      return [
+        airport.id,
+        {
+          ...airport,
+          data: { weapons: [], liquids: [], timestamp: Date.now() },
+          error: error.message,
+        }
+      ];
     }
-  });
+  }));
 
-  return result;
+  return Object.fromEntries(entries);
 }
 
 export default {
