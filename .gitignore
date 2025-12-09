@@ -9,3 +9,4 @@ data/historical/*.json
 # No longer used (switched from SQLite to JSON)
 *.db
 *.sqlite
+data-buffer.json
