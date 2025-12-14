@@ -384,14 +384,14 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
           {/* Mission List Sidebar - più larga */}
           <div className="lg:col-span-1 bg-yt-bg-secondary rounded-lg p-3 border border-yt-border flex flex-col">
             <h3 className="text-base font-bold text-yt-text-primary mb-3 flex items-center gap-2 px-1">
-              <Plane className="w-5 h-5 text-yt-accent" />
+              <Package className="w-5 h-5 text-yt-accent" />
               {t('mapView.sidebar.heading')} ({missions.length})
             </h3>
 
             <div className="space-y-2 flex-1 overflow-y-auto pr-1" style={{ maxHeight: '690px' }}>
               {missions.length === 0 ? (
                 <div className="text-center py-12">
-                  <Plane className="w-10 h-10 text-yt-text-secondary mx-auto mb-2 opacity-50" />
+                  <Package className="w-10 h-10 text-yt-text-secondary mx-auto mb-2 opacity-50" />
                   <p className="text-yt-text-secondary text-sm">{t('mapView.sidebar.empty')}</p>
                 </div>
               ) : (

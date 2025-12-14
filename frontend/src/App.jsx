@@ -6,6 +6,7 @@ import AdminPanel from './components/AdminPanel';
 import * as api from './services/api';
 import socketService from './services/socket';
 import { t } from './utils/locale';
+import logoImg from '../img/DCS_ITALIA_ICON.png';
 
 function App() {
   const [currentView, setCurrentView] = useState('dashboard'); // dashboard, missions
@@ -143,7 +144,7 @@ function App() {
             {/* Logo compatto */}
             <div className="flex items-center gap-2">
               <img
-                src="/img/DCS_ITALIA_ICON.png"
+                src={logoImg}
                 alt="DCS Italia"
                 className="h-10 w-auto object-contain"
               />
@@ -154,18 +155,6 @@ function App() {
             </div>
 
             <div className="flex items-center gap-3">
-              {/* Connection Status - compatto */}
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-yt-bg-tertiary rounded">
-                <div className={`w-1.5 h-1.5 rounded-full ${connectionStatus === 'connected' ? 'bg-green-400' : connectionStatus === 'disconnected' ? 'bg-red-400' : 'bg-yellow-400'}`} />
-                <span className="text-xs text-yt-text-secondary">
-                  {connectionStatus === 'connected'
-                    ? t('general.connection.online')
-                    : connectionStatus === 'disconnected'
-                      ? t('general.connection.offline')
-                      : t('general.connection.connecting')}
-                </span>
-              </div>
-
               {/* Navigation - compatta e moderna */}
               <nav className="flex items-center gap-1">
                 <button

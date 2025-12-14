@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Helicopter, Plus, X, TrendingUp, ArrowRight, FileDown, Weight, Clock, User, XCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Helicopter, Plus, X, TrendingUp, ArrowRight, FileDown, Weight, Clock, User, XCircle, Search } from 'lucide-react';
 import * as api from '../services/api';
 import WeaponChart from './WeaponChart';
 import { getAirportName } from '../config/airports';
@@ -80,6 +80,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
   const [chartWeapon, setChartWeapon] = useState(''); // For the historical chart
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [chartsAvailable, setChartsAvailable] = useState(null); // null = not checked, true/false = has charts
+  const [weaponSearchTerm, setWeaponSearchTerm] = useState(''); // For weapon search
 
   // Mission management states
   const [missionStates, setMissionStates] = useState({}); // { missionId: { userName, showAccept, loading } }
@@ -240,6 +241,23 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
     });
   } else if (filter === 'important') {
     filteredWeapons = weapons.filter(w => isImportantWeapon(w.item, isHeliport));
+  }
+
+  // Apply weapon search filter
+  if (weaponSearchTerm.trim()) {
+    const searchLower = weaponSearchTerm.toLowerCase();
+    filteredWeapons = filteredWeapons.filter(w => {
+      const displayName = getWeaponDisplayName(w.item).toLowerCase();
+      return displayName.includes(searchLower);
+    });
+
+    // Auto-select weapon in chart when filtered to single result
+    if (filteredWeapons.length === 1) {
+      const singleWeapon = filteredWeapons[0];
+      if (isImportantWeapon(singleWeapon.item, isHeliport) && chartWeapon !== singleWeapon.item) {
+        setChartWeapon(singleWeapon.item);
+      }
+    }
   }
 
   // Sort by status (critical first), then by quantity (lowest first)
@@ -554,6 +572,17 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                   <Package className="w-3.5 h-3.5" />
                   {t('airportCard.headers.weapons')}
                 </h4>
+                {/* Weapon Search Bar */}
+                <div className="mb-2 relative">
+                  <input
+                    type="text"
+                    placeholder="Cerca arma..."
+                    value={weaponSearchTerm}
+                    onChange={(e) => setWeaponSearchTerm(e.target.value)}
+                    className="w-full px-3 py-2 pl-9 bg-yt-bg-primary border border-yt-border rounded text-yt-text-primary placeholder-yt-text-secondary text-sm focus:outline-none focus:border-yt-accent transition-all"
+                  />
+                  <Search className="w-4 h-4 text-yt-text-secondary absolute left-2.5 top-1/2 -translate-y-1/2" />
+                </div>
                 <div className="max-h-96 overflow-y-auto border border-yt-border rounded">
                   <table className="w-full text-xs">
                     <thead className="sticky top-0 bg-yt-bg-secondary border-b border-yt-border z-10">
@@ -567,9 +596,24 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                       {filteredWeapons.map((weapon, idx) => {
                         const isImportant = isImportantWeapon(weapon.item, isHeliport);
                         const status = getWeaponStatus(weapon.quantity, isImportant);
+                        const isSelected = chartWeapon === weapon.item;
 
                         return (
-                          <tr key={idx} className="border-b border-yt-border hover:bg-yt-bg-tertiary/50 transition-colors">
+                          <tr
+                            key={idx}
+                            onClick={() => {
+                              if (isImportant) {
+                                setChartWeapon(weapon.item);
+                              }
+                            }}
+                            className={`border-b border-yt-border transition-colors ${
+                              isImportant
+                                ? 'cursor-pointer hover:bg-yt-bg-tertiary/50'
+                                : 'opacity-60'
+                            } ${
+                              isSelected ? 'bg-yt-accent/20' : ''
+                            }`}
+                          >
                             <td className="p-2 font-mono text-yt-text-primary">{getWeaponDisplayName(weapon.item)}</td>
                             <td className="p-2 text-right font-bold text-yt-text-primary">{weapon.quantity}</td>
                             <td className="p-2">
@@ -608,20 +652,6 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                 <TrendingUp className="w-3.5 h-3.5" />
                 {t('airportCard.headers.historical')}
               </h4>
-              <select
-                value={chartWeapon}
-                onChange={(e) => setChartWeapon(e.target.value)}
-                className="w-full bg-yt-bg-tertiary text-yt-text-primary border border-yt-border rounded px-2.5 py-2 text-xs focus:outline-none focus:border-yt-accent transition-all"
-              >
-                <option value="">{t('airportCard.headers.selectWeapon')}</option>
-                {weapons
-                  .filter(w => isImportantWeapon(w.item, isHeliport))
-                  .map((weapon, idx) => (
-                    <option key={idx} value={weapon.item}>
-                      {getWeaponDisplayName(weapon.item)} ({t('airportCard.headers.quantity')}: {weapon.quantity})
-                    </option>
-                  ))}
-              </select>
             </div>
 
             {chartWeapon && (
