@@ -47,30 +47,45 @@ export default function Dashboard({ airports, missions, stats, onMissionsUpdate,
 
   if (sortBy === 'critical') {
     filteredAirports = filteredAirports.sort((a, b) => {
-      const getPriorityScore = (airport) => {
-        if (!airport.data || !airport.data.weapons) return 0;
+      const getPriorityInfo = (airport) => {
+        if (!airport.data || !airport.data.weapons) return { level: 4, count: 0 };
 
         const isHeliport = airport.name && airport.name.toLowerCase().includes('farp');
-        let score = 0;
+        let criticalCount = 0;
+        let highCount = 0;
+        let mediumCount = 0;
 
         airport.data.weapons.forEach(w => {
           const important = isImportantWeapon(w.item, isHeliport);
           if (!important) return;
 
-          // Calculate priority score (higher = more urgent)
+          // Count weapons by priority level
           if (w.quantity <= 5) {
-            score += 1000; // CRITICAL
+            criticalCount++;
           } else if (w.quantity <= 20) {
-            score += 100; // HIGH
+            highCount++;
           } else if (w.quantity <= 40) {
-            score += 10; // MEDIUM
+            mediumCount++;
           }
         });
 
-        return score;
+        // Return highest priority level (lower number = higher priority) and count
+        if (criticalCount > 0) return { level: 1, count: criticalCount };
+        if (highCount > 0) return { level: 2, count: highCount };
+        if (mediumCount > 0) return { level: 3, count: mediumCount };
+        return { level: 4, count: 0 };
       };
 
-      return getPriorityScore(b) - getPriorityScore(a);
+      const priorityA = getPriorityInfo(a);
+      const priorityB = getPriorityInfo(b);
+
+      // First sort by priority level (lower = more critical)
+      if (priorityA.level !== priorityB.level) {
+        return priorityA.level - priorityB.level;
+      }
+
+      // If same level, sort by count (higher count first)
+      return priorityB.count - priorityA.count;
     });
   } else {
     filteredAirports = filteredAirports.sort((a, b) => a.name.localeCompare(b.name));
