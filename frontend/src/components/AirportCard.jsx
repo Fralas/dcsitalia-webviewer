@@ -338,37 +338,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
       {/* Expanded Content */}
       {expanded && (
         <div className="border-t border-yt-border">
-          {/* Action buttons - Always visible for non-main bases */}
-          {!airport.isMainBase && (
-            <div className="p-3 border-t border-yt-border bg-yt-bg-tertiary/30">
-              <div className="flex gap-2 justify-end">
-                <button
-                  onClick={handleGeneratePDF}
-                  disabled={generatingPDF || chartsAvailable === false}
-                  className={`px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1.5 transition-all ${
-                    generatingPDF
-                      ? 'bg-yt-accent/20 text-yt-accent border border-yt-accent/50 cursor-wait'
-                      : chartsAvailable === false
-                      ? 'bg-yt-bg-tertiary text-yt-text-secondary border border-yt-border cursor-not-allowed'
-                      : 'bg-yt-accent/20 text-yt-accent border border-yt-accent/50 hover:bg-yt-accent/30'
-                  }`}
-                  title={chartsAvailable === false ? t('airportCard.pdfUnavailable') : ''}
-                >
-                  <FileDown className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">{generatingPDF ? 'PDF...' : chartsAvailable === null ? t('general.loading') : 'PDF'}</span>
-                </button>
-                <button
-                  onClick={() => setShowOrderModal(true)}
-                  className="px-3 py-1.5 bg-green-400/20 text-green-400 border border-green-400/50 hover:bg-green-400/30 rounded text-xs font-bold flex items-center gap-1.5 transition-all"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">{t('airportCard.refuel')}</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Active Orders Section - Only when there are missions */}
+          {/* Active Orders Section - When there are missions */}
           {!airport.isMainBase && airportMissions.length > 0 && (
             <div className="p-3 bg-fuchsia-500/10 border-t-2 border-fuchsia-500/40">
               <div className="flex items-center justify-between mb-3">
@@ -376,6 +346,32 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                   <Package className="w-4 h-4" />
                   {t('airportCard.activeOrders')} ({airportMissions.length})
                 </h4>
+
+                {/* Action buttons */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleGeneratePDF}
+                    disabled={generatingPDF || chartsAvailable === false}
+                    className={`px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1.5 transition-all ${
+                      generatingPDF
+                        ? 'bg-yt-accent/20 text-yt-accent border border-yt-accent/50 cursor-wait'
+                        : chartsAvailable === false
+                        ? 'bg-yt-bg-tertiary text-yt-text-secondary border border-yt-border cursor-not-allowed'
+                        : 'bg-yt-accent/20 text-yt-accent border border-yt-accent/50 hover:bg-yt-accent/30'
+                    }`}
+                    title={chartsAvailable === false ? t('airportCard.pdfUnavailable') : ''}
+                  >
+                    <FileDown className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">{generatingPDF ? 'PDF...' : chartsAvailable === null ? t('general.loading') : 'PDF'}</span>
+                  </button>
+                  <button
+                    onClick={() => setShowOrderModal(true)}
+                    className="px-3 py-1.5 bg-green-400/20 text-green-400 border border-green-400/50 hover:bg-green-400/30 rounded text-xs font-bold flex items-center gap-1.5 transition-all"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">{t('airportCard.refuel')}</span>
+                  </button>
+                </div>
               </div>
 
               <div className={`grid gap-3 ${airportMissions.length === 1 ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
@@ -574,6 +570,36 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* Action buttons - When there are NO missions */}
+          {!airport.isMainBase && airportMissions.length === 0 && (
+            <div className="p-3 border-t border-yt-border bg-yt-bg-tertiary/30">
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={handleGeneratePDF}
+                  disabled={generatingPDF || chartsAvailable === false}
+                  className={`px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1.5 transition-all ${
+                    generatingPDF
+                      ? 'bg-yt-accent/20 text-yt-accent border border-yt-accent/50 cursor-wait'
+                      : chartsAvailable === false
+                      ? 'bg-yt-bg-tertiary text-yt-text-secondary border border-yt-border cursor-not-allowed'
+                      : 'bg-yt-accent/20 text-yt-accent border border-yt-accent/50 hover:bg-yt-accent/30'
+                  }`}
+                  title={chartsAvailable === false ? t('airportCard.pdfUnavailable') : ''}
+                >
+                  <FileDown className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{generatingPDF ? 'PDF...' : chartsAvailable === null ? t('general.loading') : 'PDF'}</span>
+                </button>
+                <button
+                  onClick={() => setShowOrderModal(true)}
+                  className="px-3 py-1.5 bg-green-400/20 text-green-400 border border-green-400/50 hover:bg-green-400/30 rounded text-xs font-bold flex items-center gap-1.5 transition-all"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{t('airportCard.refuel')}</span>
+                </button>
               </div>
             </div>
           )}
