@@ -314,10 +314,10 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
               style={{ height: '100%', width: '100%' }}
               scrollWheelZoom={true}
             >
-              {/* OpenStreetMap tiles */}
+              {/* CyclOSM tiles */}
               <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="https://github.com/cyclosm/cyclosm-cartocss-style/releases">CyclOSM</a>'
+                url="https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png"
               />
 
               {/* Fit bounds to show all airports */}
