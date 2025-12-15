@@ -574,8 +574,8 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
             </div>
           )}
 
-          {/* Action buttons - When there are NO missions */}
-          {!airport.isMainBase && airportMissions.length === 0 && (
+          {/* Action buttons - When there are NO missions OR is main base */}
+          {(airport.isMainBase || airportMissions.length === 0) && (
             <div className="p-3 border-t border-yt-border bg-yt-bg-tertiary/30">
               <div className="flex gap-2 justify-end">
                 <button
