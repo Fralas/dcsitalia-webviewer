@@ -5,7 +5,7 @@ import WeaponChart from './WeaponChart';
 import { getAirportName } from '../config/airports';
 import airports from '../config/airports';
 import { generateChartsPDF, checkChartsAvailable } from '../utils/pdfGenerator';
-import { isImportantWeapon } from '../config/weapons';
+import { isImportantWeapon, importantWeaponsAirports, importantWeaponsHeliports } from '../config/weapons';
 import { formatWeight } from '../utils/weightFormatter';
 import { t, formatElapsedTime, formatRemainingTime, getStatusLabel } from '../utils/locale';
 
@@ -214,7 +214,12 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
   // Check if this airport is a heliport
   const isHeliport = airport.isHeliport || false;
 
-  // Calculate stats
+  // Get list of ALL important weapons for this base type (same logic as backend)
+  const allImportantWeapons = isHeliport
+    ? importantWeaponsHeliports
+    : [...importantWeaponsAirports, ...importantWeaponsHeliports];
+
+  // Calculate stats including missing/zero quantity weapons
   const stats = {
     critical: 0,
     high: 0,
@@ -222,13 +227,19 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
     ok: 0,
   };
 
-  weapons.forEach(weapon => {
-    const isImportant = isImportantWeapon(weapon.item, isHeliport);
-    const status = getWeaponStatus(weapon.quantity, isImportant);
+  // Check each important weapon (including those missing or at 0)
+  allImportantWeapons.forEach(weaponId => {
+    // Find weapon in current inventory
+    const weaponData = weapons.find(w => w.item === weaponId);
+    const currentQuantity = weaponData ? weaponData.quantity : 0;
+
+    // Calculate status
+    const status = getWeaponStatus(currentQuantity, true); // true = isImportant
+
     if (status === 'critical') stats.critical++;
     else if (status === 'high') stats.high++;
     else if (status === 'medium') stats.medium++;
-    else if (isImportant) stats.ok++;
+    else stats.ok++;
   });
 
   // Filter weapons
