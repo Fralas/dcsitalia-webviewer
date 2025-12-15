@@ -21,31 +21,36 @@ export function checkAndGenerateMissions(recipientAirportId, recipientWeapons, a
 
   const generatedMissions = [];
 
-  recipientWeapons.forEach(weapon => {
-    // Check if weapon is important for this type of base (airport vs heliport)
-    if (!isImportantWeapon(weapon.item, recipientAirport.isHeliport)) {
-      return;
-    }
+  // Get list of all important weapons for this base type
+  const importantWeapons = recipientAirport.isHeliport
+    ? missionRules.importantWeaponsHeliports
+    : [...missionRules.importantWeaponsAirports, ...missionRules.importantWeaponsHeliports];
+
+  // Check each important weapon (including those missing or at 0)
+  importantWeapons.forEach(weaponId => {
+    // Find weapon in current inventory
+    const weaponData = recipientWeapons.find(w => w.item === weaponId);
+    const currentQuantity = weaponData ? weaponData.quantity : 0;
 
     // Check if quantity is below medium threshold (generates for CRITICAL, HIGH, MEDIUM)
-    if (weapon.quantity > missionRules.mediumThreshold) {
+    if (currentQuantity > missionRules.mediumThreshold) {
       return;
     }
 
     // Check if a mission already exists for this weapon
-    if (historicalData.missionExistsForWeapon(recipientAirportId, weapon.item)) {
-      console.log(`Mission already exists for ${weapon.item} at ${recipientAirportId}`);
+    if (historicalData.missionExistsForWeapon(recipientAirportId, weaponId)) {
+      console.log(`Mission already exists for ${weaponId} at ${recipientAirportId}`);
       return;
     }
 
     // Calculate priority and quantity needed
-    const priority = getPriority(weapon.quantity);
+    const priority = getPriority(currentQuantity);
     const quantityNeeded = getSupplyQuantityForPriority(priority);
 
     // Find best donor for this weapon
     const bestSource = findBestSourceAirport({
       recipientAirport,
-      weaponId: weapon.item,
+      weaponId: weaponId,
       quantityNeeded,
       allAirportsData,
     });
@@ -64,9 +69,9 @@ export function checkAndGenerateMissions(recipientAirportId, recipientWeapons, a
     // Create mission with source airport and recommended aircraft
     const missionId = historicalData.createMission(
       recipientAirportId,
-      weapon.item,
+      weaponId,
       quantityNeeded,
-      weapon.quantity,
+      currentQuantity,
       missionRules.mission.missionExpiry,
       bestSource.airportId,
       bestSource.distance,
@@ -75,7 +80,7 @@ export function checkAndGenerateMissions(recipientAirportId, recipientWeapons, a
 
     console.log(`✈️  Generated ${priority.toUpperCase()} mission ${missionId}`);
     console.log(`   Route: ${bestSource.airportName} → ${recipientAirport.displayName} (${bestSource.distance}nm)`);
-    console.log(`   Weapon: ${weapon.item} (current: ${weapon.quantity}, needed: ${quantityNeeded})`);
+    console.log(`   Weapon: ${weaponId} (current: ${currentQuantity}, needed: ${quantityNeeded})`);
     console.log(`   Recommended: ${recommendedAircraft.toUpperCase()}`);
 
     generatedMissions.push(missionId);
