@@ -78,11 +78,17 @@ export const importantWeaponsHeliports = [
  * @param {string} weaponId - The weapon ID to check
  * @param {boolean} isHeliport - Whether the airport is a heliport
  * @returns {boolean} - True if the weapon is important for this type of base
+ *
+ * Logic:
+ * - Heliports: Only show heliport weapons
+ * - Airports: Show BOTH airport and heliport weapons (since they can support both fixed and rotary wing)
  */
 export function isImportantWeapon(weaponId, isHeliport = false) {
   if (isHeliport) {
+    // Heliports only have heliport weapons
     return importantWeaponsHeliports.includes(weaponId);
   } else {
-    return importantWeaponsAirports.includes(weaponId);
+    // Airports have both airport and heliport weapons
+    return importantWeaponsAirports.includes(weaponId) || importantWeaponsHeliports.includes(weaponId);
   }
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Package, AlertTriangle, Plane, Activity, FolderOpen } from 'lucide-react';
+import { Package, AlertTriangle, Plane, Activity, FolderOpen, ArrowDownAZ, TriangleAlert } from 'lucide-react';
 import AirportCard from './AirportCard';
 import { selectPDFDirectory, isFileSystemAccessSupported } from '../utils/fileSystemAccess';
 import { isImportantWeapon } from '../config/weapons';
@@ -98,8 +98,8 @@ export default function Dashboard({ airports, missions, stats, onMissionsUpdate,
           title={t('dashboard.stats.missions')}
           value={stats.activeMissions || 0}
           icon={Package}
-          color="text-yellow-400"
-          bgColor="bg-yellow-400/20"
+          color="text-fuchsia-400"
+          bgColor="bg-fuchsia-400/20"
         />
         <StatsCard
           title={t('dashboard.stats.accepted')}
@@ -125,23 +125,25 @@ export default function Dashboard({ airports, missions, stats, onMissionsUpdate,
           <div className="flex gap-2 flex-wrap">
             <button
               onClick={() => setSortBy('name')}
-              className={`px-3 py-2 rounded text-sm font-medium transition-all ${
+              className={`px-3 py-2 rounded text-sm font-medium transition-all flex items-center gap-1.5 ${
                 sortBy === 'name'
                   ? 'bg-yt-accent text-white'
                   : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'
               }`}
+              title={t('dashboard.sortByName')}
             >
-              {t('dashboard.sortByName')}
+              <ArrowDownAZ className="w-4 h-4" />
             </button>
             <button
               onClick={() => setSortBy('critical')}
-              className={`px-3 py-2 rounded text-sm font-medium transition-all ${
+              className={`px-3 py-2 rounded text-sm font-medium transition-all flex items-center gap-1.5 ${
                 sortBy === 'critical'
                   ? 'bg-yt-accent text-white'
                   : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'
               }`}
+              title={t('dashboard.sortByCriticality')}
             >
-              {t('dashboard.sortByCriticality')}
+              <TriangleAlert className="w-4 h-4" />
             </button>
             {isFileSystemAccessSupported() && (
               <button

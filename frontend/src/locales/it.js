@@ -53,9 +53,9 @@ export default {
       missions: 'Missioni',
       accepted: 'Accettate'
     },
-    searchPlaceholder: '🔍 Cerca aeroporti...',
-    sortByName: '📝 Nome',
-    sortByCriticality: '⚠️ Criticità',
+    searchPlaceholder: 'Cerca aeroporti...',
+    sortByName: 'Nome',
+    sortByCriticality: 'Criticità',
     pdfTooltip: 'Seleziona la directory dove salvare i PDF delle chart',
     emptyTitle: 'Nessun aeroporto trovato',
     emptySubtitle: 'Prova a modificare i filtri di ricerca'
