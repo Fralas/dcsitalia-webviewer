@@ -1,9 +1,9 @@
 AIRBASE_STATUS = {
     ["Abu al-Duhur"] = false,
     ["Adana Sakirpasa"] = true,
-    ["Aleppo"] = false,
+    ["Aleppo"] = true,
     ["Bassel Al-Assad"] = false,
-    ["Gaziantep"] = false,
+    ["Gaziantep"] = true,
     ["Hatay"] = false,
     ["Incirlik"] = true,
     ["Jirah"] = false,

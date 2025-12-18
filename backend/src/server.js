@@ -21,6 +21,8 @@ import { generateToken } from './utils/jwt.js';
 import { authenticateToken, requireAdmin } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import logger from './utils/logger.js';
+import * as airbaseStatusParser from './services/airbaseStatusParser.js';
+import * as airbaseStatusManager from './services/airbaseStatusManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -49,6 +51,10 @@ const CSV_DIR = process.env.CSV_DIR
   : path.resolve(__dirname, '../../');
 
 logger.info(`📁 CSV Directory: ${CSV_DIR}`);
+
+// Airbase status - loaded from airbase_status.lua
+const AIRBASE_STATUS_FILE = path.resolve(CSV_DIR, 'airbase_status.lua');
+let airbaseStatus = {};
 
 // Security Middleware
 app.use(helmet({
@@ -88,6 +94,26 @@ const BUFFER_FILE_PATH = process.env.BUFFER_FILE_PATH
   : path.resolve(process.cwd(), 'data-buffer.json');
 
 /**
+ * Load airbase status from airbase_status.lua file
+ */
+function loadAirbaseStatus() {
+  try {
+    airbaseStatus = airbaseStatusParser.parseAirbaseStatus(AIRBASE_STATUS_FILE);
+    console.log(`🏠 Airbase status loaded: ${Object.keys(airbaseStatus).length} airbases`);
+
+    // Update the airbase status manager (used by missionGenerator)
+    airbaseStatusManager.updateAirbaseStatus(airbaseStatus);
+
+    // Broadcast updated status to all connected clients
+    io.emit('airbase:status', airbaseStatus);
+  } catch (error) {
+    console.error('❌ Error loading airbase status:', error.message);
+    airbaseStatus = {}; // Reset to empty if error
+    airbaseStatusManager.updateAirbaseStatus({});
+  }
+}
+
+/**
  * Load all airport data
  */
 function processData(data) {
@@ -98,8 +124,12 @@ function processData(data) {
     return currentData;
   }
 
-  // Save snapshots to historical database
+  // Add isActive field to each airport based on airbase status
   Object.entries(airportDataMap).forEach(([airportId, airportData]) => {
+    // Add isActive field
+    airportData.isActive = airportData.isMainBase ||
+                           airbaseStatusManager.isAirbaseActive(airportData.name);
+
     if (airportData.data && airportData.data.weapons) {
       historicalData.saveSnapshot(airportId, airportData.data);
 
@@ -140,7 +170,11 @@ async function executeRefresh(reason = 'manual') {
   dataRefreshInProgress = true;
   try {
     console.log(`📊 Loading airport data from CSV (${reason})...`);
-    const data = await dataBuffer.syncFromCsv(airports, CSV_DIR, BUFFER_FILE_PATH);
+    // Get only active airports for data loading
+    const activeAirports = airbaseStatusManager.getActiveAirports();
+    console.log(`   Loading data for ${activeAirports.length} active airports`);
+
+    const data = await dataBuffer.syncFromCsv(activeAirports, CSV_DIR, BUFFER_FILE_PATH);
     processData(data);
     io.emit('data:updated', currentData);
     return currentData;
@@ -300,8 +334,9 @@ app.post('/api/missions/:id/cancel', (req, res) => {
  */
 app.get('/api/stats', (req, res) => {
   const missions = historicalData.getActiveMissions();
+  const activeAirports = airbaseStatusManager.getActiveAirports();
   const stats = {
-    totalAirports: airports.length,
+    totalAirports: activeAirports.length,
     activeMissions: missions.filter(m => m.status === 'pending').length,
     acceptedMissions: missions.filter(m => m.status === 'accepted').length,
     criticalAirports: 0,
@@ -413,10 +448,10 @@ app.post('/api/test/generate-mission', (req, res) => {
     return res.status(400).json({ error: 'airportId and weaponId are required' });
   }
 
-  // Check if airport exists
-  const airport = airports.find(a => a.id === airportId);
+  // Check if airport exists and is active
+  const airport = airbaseStatusManager.getActiveAirportById(airportId);
   if (!airport) {
-    return res.status(404).json({ error: 'Airport not found' });
+    return res.status(404).json({ error: 'Airport not found or not active' });
   }
 
   // Check if mission already exists
@@ -469,8 +504,9 @@ app.post('/api/test/generate-random-missions', (req, res) => {
 
   let targetAirport = airportId;
   if (!targetAirport) {
-    // Pick random non-main-base airport
-    const nonMainBases = airports.filter(a => !a.isMainBase);
+    // Pick random non-main-base airport from active airports only
+    const activeAirports = airbaseStatusManager.getActiveAirports();
+    const nonMainBases = activeAirports.filter(a => !a.isMainBase);
     if (nonMainBases.length === 0) {
       return res.status(400).json({ error: 'No non-main-base airports available' });
     }
@@ -530,10 +566,10 @@ app.post('/api/airports/:id/create-order', (req, res) => {
     return res.status(400).json({ error: 'weaponId is required' });
   }
 
-  // Check if airport exists
-  const airport = airports.find(a => a.id === airportId);
+  // Check if airport exists and is active
+  const airport = airbaseStatusManager.getActiveAirportById(airportId);
   if (!airport) {
-    return res.status(404).json({ error: 'Airport not found' });
+    return res.status(404).json({ error: 'Airport not found or not active' });
   }
 
   // Check if it's the main base
@@ -625,9 +661,10 @@ app.post('/api/debug/generate-orders', authenticateToken, requireAdmin, (req, re
   console.log('🔧 DEBUG: Force generating orders for all airports...');
 
   const results = [];
+  const activeAirports = airbaseStatusManager.getActiveAirports();
 
-  // Loop through all airports
-  airports.forEach(airport => {
+  // Loop through all active airports
+  activeAirports.forEach(airport => {
     if (airport.isMainBase) {
       results.push({
         airportId: airport.id,
@@ -747,6 +784,32 @@ watcher.on('error', (error) => {
   console.error('File watcher error:', error);
 });
 
+// Watch airbase_status.lua file for changes
+const airbaseStatusWatcher = chokidar.watch(AIRBASE_STATUS_FILE, {
+  persistent: true,
+  ignoreInitial: true,
+  awaitWriteFinish: {
+    stabilityThreshold: 1000,
+    pollInterval: 100
+  }
+});
+
+airbaseStatusWatcher.on('change', () => {
+  console.log('🏠 Airbase status file changed, reloading...');
+
+  // Reload airbase status
+  loadAirbaseStatus();
+
+  // Refresh airport data with new active airports list
+  refreshDataFromCsv('airbase-status-change').catch((error) => {
+    logger.error('Airbase status watcher refresh failed:', error);
+  });
+});
+
+airbaseStatusWatcher.on('error', (error) => {
+  console.error('Airbase status file watcher error:', error);
+});
+
 // ==================== SCHEDULED TASKS ====================
 
 // Clean up expired missions every 5 minutes
@@ -770,10 +833,14 @@ setInterval(() => {
 
 // ==================== START SERVER ====================
 
+// Load airbase status first
+loadAirbaseStatus();
+
 // Load initial data
 await loadFromBuffer();
 
 httpServer.listen(PORT, () => {
+  const activeAirports = airbaseStatusManager.getActiveAirports();
   logger.info(`
 ╔═══════════════════════════════════════════════════════╗
 ║   🎮 DCS Warehouse Viewer Server                     ║
@@ -781,7 +848,7 @@ httpServer.listen(PORT, () => {
 ║   Server running on: http://localhost:${PORT}         ║
 ║   Environment: ${process.env.NODE_ENV || 'development'}                    ║
 ║   CSV Directory: ${CSV_DIR.substring(0, 35)}...      ║
-║   Airports loaded: ${airports.length}                          ║
+║   Airports: ${activeAirports.length}/${airports.length} active                    ║
 ║                                                       ║
 ║   API: http://localhost:${PORT}/api/airports         ║
 ║   Missions: http://localhost:${PORT}/api/missions    ║
@@ -868,11 +935,25 @@ app.get('/api/admin/config/rules', authenticateToken, requireAdmin, (req, res) =
 });
 
 /**
- * GET /api/admin/config/airports - Get airports configuration (requires authentication)
+ * GET /api/admin/config/airports - Get airports configuration with status (requires authentication)
  */
 app.get('/api/admin/config/airports', authenticateToken, requireAdmin, (req, res) => {
   try {
-    res.json(airports);
+    const airbaseStatusData = airbaseStatusManager.getAirbaseStatus();
+    const airportsWithStatus = airports.map(airport => ({
+      ...airport,
+      isActive: airport.isMainBase || airbaseStatusManager.isAirbaseActive(airport.name)
+    }));
+
+    res.json({
+      airports: airportsWithStatus,
+      statusFile: airbaseStatusData,
+      summary: {
+        total: airports.length,
+        active: airportsWithStatus.filter(a => a.isActive).length,
+        inactive: airportsWithStatus.filter(a => !a.isActive).length
+      }
+    });
   } catch (error) {
     console.error('Error in /api/admin/config/airports:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -907,6 +988,7 @@ app.use(errorHandler);
 process.on('SIGTERM', () => {
   console.log('👋 Shutting down gracefully...');
   watcher.close();
+  airbaseStatusWatcher.close();
   httpServer.close(() => {
     console.log('✅ Server closed');
     process.exit(0);
