@@ -136,7 +136,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-yt-bg-primary">
+    <div className="min-h-screen bg-yt-bg-primary flex flex-col">
       {/* Header - Compatto stile YouTube */}
       <header className="bg-yt-bg-secondary border-b border-yt-border sticky top-0 z-50 shadow-lg">
         <div className="container mx-auto px-4 py-2">
@@ -197,7 +197,7 @@ function App() {
       </header>
 
       {/* Main Content - padding ridotto */}
-      <main className={currentView === 'map' || currentView === 'admin' ? '' : 'container mx-auto px-4 py-4'}>
+      <main className={`flex-1 ${currentView === 'map' || currentView === 'admin' ? '' : 'container mx-auto px-4 py-4'}`}>
         {currentView === 'dashboard' && (
           <Dashboard
             airports={airports}
