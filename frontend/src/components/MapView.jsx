@@ -209,7 +209,11 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
   const [selectedMission, setSelectedMission] = useState(null);
 
   // Memoize airports calculations to prevent re-renders
-  const validAirports = useMemo(() => airports.filter(a => a.coordinates), []);
+  // Filter by coordinates AND by active status
+  const validAirports = useMemo(() => {
+    const airportsList = airportsData ? Object.values(airportsData) : airports;
+    return airportsList.filter(a => a.coordinates && a.isActive !== false);
+  }, [airportsData]);
 
   const center = useMemo(() =>
     validAirports.length > 0

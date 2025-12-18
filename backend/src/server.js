@@ -124,8 +124,12 @@ function processData(data) {
     return currentData;
   }
 
-  // Save snapshots to historical database
+  // Add isActive field to each airport based on airbase status
   Object.entries(airportDataMap).forEach(([airportId, airportData]) => {
+    // Add isActive field
+    airportData.isActive = airportData.isMainBase ||
+                           airbaseStatusManager.isAirbaseActive(airportData.name);
+
     if (airportData.data && airportData.data.weapons) {
       historicalData.saveSnapshot(airportId, airportData.data);
 

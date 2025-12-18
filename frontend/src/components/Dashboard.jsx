@@ -42,6 +42,8 @@ export default function Dashboard({ airports, missions, stats, onMissionsUpdate,
   // Filter and sort airports
   let filteredAirports = Object.values(airports).filter(airport => {
     if (!airport || !airport.name) return false;
+    // Filter out inactive airports
+    if (airport.isActive === false) return false;
     return airport.name.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
