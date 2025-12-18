@@ -53,7 +53,7 @@ const CSV_DIR = process.env.CSV_DIR
 logger.info(`📁 CSV Directory: ${CSV_DIR}`);
 
 // Airbase status - loaded from airbase_status.lua
-const AIRBASE_STATUS_FILE = path.resolve(CSV_DIR, 'csvexample/airbase_status.lua');
+const AIRBASE_STATUS_FILE = path.resolve(CSV_DIR, 'airbase_status.lua');
 let airbaseStatus = {};
 
 // Security Middleware
