@@ -2,6 +2,7 @@ import { missionRules, isImportantWeapon, getPriority, getSupplyQuantityForPrior
 import { airports, getMainBase, getAirportById } from '../config/airports.config.js';
 import * as historicalData from './historicalData.js';
 import { calculateDistance, findBestDonor } from '../utils/distanceCalculator.js';
+import * as airbaseStatusManager from './airbaseStatusManager.js';
 
 /**
  * Check weapons and generate missions with smart donor selection
@@ -108,10 +109,11 @@ export function findBestSourceAirport({ recipientAirport, weaponId, quantityNeed
   // Calculate distance from main base to recipient
   const mainBaseDistance = calculateDistance(mainBase.coordinates, recipientAirport.coordinates);
 
-  // Find potential donors
+  // Find potential donors (only from active airports)
   const potentialDonors = [];
+  const activeAirports = airbaseStatusManager.getActiveAirports();
 
-  airports.forEach(airport => {
+  activeAirports.forEach(airport => {
     // Skip recipient airport and main base
     if (airport.id === recipientAirport.id || airport.isMainBase) {
       return;
