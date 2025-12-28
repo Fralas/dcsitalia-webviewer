@@ -52,8 +52,8 @@ const CSV_DIR = process.env.CSV_DIR
 
 logger.info(`📁 CSV Directory: ${CSV_DIR}`);
 
-// Airbase status - loaded from airbase_status.lua
-const AIRBASE_STATUS_FILE = path.resolve(CSV_DIR, 'airbase_status.lua');
+// Airbase status - loaded from airbases_status.lua
+const AIRBASE_STATUS_FILE = 'C:\\Users\\DCS ITALIA\\Saved Games\\DCS.server1\\Score_save\\airbases_status.lua';
 let airbaseStatus = {};
 
 // Security Middleware
