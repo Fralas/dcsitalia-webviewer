@@ -126,8 +126,9 @@ function processData(data) {
 
   // Add isActive field to each airport based on airbase status
   Object.entries(airportDataMap).forEach(([airportId, airportData]) => {
-    // Add isActive field
+    // Add isActive field (carriers are always active)
     airportData.isActive = airportData.isMainBase ||
+                           airportData.isCarrier ||
                            airbaseStatusManager.isAirbaseActive(airportData.name);
 
     if (airportData.data && airportData.data.weapons) {
@@ -345,12 +346,13 @@ app.get('/api/stats', (req, res) => {
   // Count airports with critical weapons (quantity <= 5)
   Object.values(currentData).forEach(airport => {
     if (airport.data && airport.data.weapons) {
-      // Get airport config to check if it's a heliport
+      // Get airport config to check if it's a heliport or carrier
       const airportConfig = getAirportById(airport.id);
       const isHeliport = airportConfig?.isHeliport || false;
+      const isCarrier = airportConfig?.isCarrier || false;
 
       const hasCritical = airport.data.weapons.some(w =>
-        isImportantWeapon(w.item, isHeliport) && w.quantity <= 5
+        isImportantWeapon(w.item, isHeliport, isCarrier) && w.quantity <= 5
       );
       if (hasCritical) stats.criticalAirports++;
     }
@@ -942,7 +944,7 @@ app.get('/api/admin/config/airports', authenticateToken, requireAdmin, (req, res
     const airbaseStatusData = airbaseStatusManager.getAirbaseStatus();
     const airportsWithStatus = airports.map(airport => ({
       ...airport,
-      isActive: airport.isMainBase || airbaseStatusManager.isAirbaseActive(airport.name)
+      isActive: airport.isMainBase || airport.isCarrier || airbaseStatusManager.isAirbaseActive(airport.name)
     }));
 
     res.json({

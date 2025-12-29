@@ -4,6 +4,7 @@ import AirportCard from './AirportCard';
 import { selectPDFDirectory, isFileSystemAccessSupported } from '../utils/fileSystemAccess';
 import { isImportantWeapon } from '../config/weapons';
 import { t } from '../utils/locale';
+import airportsConfig from '../config/airports';
 
 /**
  * Stats Card Component - YouTube Style
@@ -52,13 +53,17 @@ export default function Dashboard({ airports, missions, stats, onMissionsUpdate,
       const getPriorityInfo = (airport) => {
         if (!airport.data || !airport.data.weapons) return { level: 4, count: 0 };
 
-        const isHeliport = airport.name && airport.name.toLowerCase().includes('farp');
+        // Get airport config to check if it's a heliport or carrier
+        const config = airportsConfig.find(a => a.id === airport.id);
+        const isHeliport = config?.isHeliport || false;
+        const isCarrier = config?.isCarrier || false;
+
         let criticalCount = 0;
         let highCount = 0;
         let mediumCount = 0;
 
         airport.data.weapons.forEach(w => {
-          const important = isImportantWeapon(w.item, isHeliport);
+          const important = isImportantWeapon(w.item, isHeliport, isCarrier);
           if (!important) return;
 
           // Count weapons by priority level

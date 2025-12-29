@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Helicopter, Plus, X, TrendingUp, ArrowRight, FileDown, Weight, Clock, User, XCircle, Search } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Helicopter, Anchor, Plus, X, TrendingUp, ArrowRight, FileDown, Weight, Clock, User, XCircle, Search } from 'lucide-react';
 import * as api from '../services/api';
 import WeaponChart from './WeaponChart';
 import { getAirportName } from '../config/airports';
 import airports from '../config/airports';
 import { generateChartsPDF, checkChartsAvailable } from '../utils/pdfGenerator';
-import { isImportantWeapon, importantWeaponsAirports, importantWeaponsHeliports } from '../config/weapons';
+import { isImportantWeapon, importantWeaponsAirports, importantWeaponsHeliports, importantWeaponsCarriers } from '../config/weapons';
 import { formatWeight } from '../utils/weightFormatter';
 import { t, formatElapsedTime, formatRemainingTime, getStatusLabel } from '../utils/locale';
 
@@ -211,11 +211,14 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
     }
   };
 
-  // Check if this airport is a heliport
+  // Check if this airport is a heliport or carrier
   const isHeliport = airport.isHeliport || false;
+  const isCarrier = airport.isCarrier || false;
 
   // Get list of ALL important weapons for this base type (same logic as backend)
-  const allImportantWeapons = isHeliport
+  const allImportantWeapons = isCarrier
+    ? importantWeaponsCarriers
+    : isHeliport
     ? importantWeaponsHeliports
     : [...importantWeaponsAirports, ...importantWeaponsHeliports];
 
@@ -246,12 +249,12 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
   let filteredWeapons = weapons;
   if (filter === 'critical') {
     filteredWeapons = weapons.filter(w => {
-      const isImportant = isImportantWeapon(w.item, isHeliport);
+      const isImportant = isImportantWeapon(w.item, isHeliport, isCarrier);
       const status = getWeaponStatus(w.quantity, isImportant);
       return status === 'critical';
     });
   } else if (filter === 'important') {
-    filteredWeapons = weapons.filter(w => isImportantWeapon(w.item, isHeliport));
+    filteredWeapons = weapons.filter(w => isImportantWeapon(w.item, isHeliport, isCarrier));
   }
 
   // Apply weapon search filter
@@ -265,7 +268,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
     // Auto-select weapon in chart when filtered to single result
     if (filteredWeapons.length === 1) {
       const singleWeapon = filteredWeapons[0];
-      if (isImportantWeapon(singleWeapon.item, isHeliport) && chartWeapon !== singleWeapon.item) {
+      if (isImportantWeapon(singleWeapon.item, isHeliport, isCarrier) && chartWeapon !== singleWeapon.item) {
         setChartWeapon(singleWeapon.item);
       }
     }
@@ -273,8 +276,8 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
 
   // Sort by status (critical first), then by quantity (lowest first)
   filteredWeapons = [...filteredWeapons].sort((a, b) => {
-    const isImportantA = isImportantWeapon(a.item, isHeliport);
-    const isImportantB = isImportantWeapon(b.item, isHeliport);
+    const isImportantA = isImportantWeapon(a.item, isHeliport, isCarrier);
+    const isImportantB = isImportantWeapon(b.item, isHeliport, isCarrier);
     const statusA = getWeaponStatus(a.quantity, isImportantA);
     const statusB = getWeaponStatus(b.quantity, isImportantB);
 
@@ -302,7 +305,9 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            {isHeliport ? (
+            {isCarrier ? (
+              <Anchor className="w-5 h-5 text-green-500" />
+            ) : isHeliport ? (
               <Helicopter className="w-5 h-5 text-cyan-400" />
             ) : (
               <Plane className={`w-5 h-5 ${airport.isMainBase ? 'text-fuchsia-400' : 'text-yt-accent'}`} />
@@ -428,6 +433,11 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                           <span className="text-fuchsia-400 font-medium truncate">{sourceName}</span>
                         ) : sourceAirport.isMainBase ? (
                           <span className="text-fuchsia-400 font-medium truncate">{sourceName}</span>
+                        ) : sourceAirport.isCarrier ? (
+                          <>
+                            <Anchor className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                            <span className="text-green-500 font-medium truncate">{sourceName}</span>
+                          </>
                         ) : sourceAirport.isHeliport ? (
                           <>
                             <Helicopter className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
@@ -440,7 +450,12 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                           </>
                         )}
                         <ArrowRight className="w-3.5 h-3.5 text-yt-text-secondary flex-shrink-0" />
-                        {isHeliport ? (
+                        {isCarrier ? (
+                          <>
+                            <Anchor className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                            <span className="text-green-500 font-medium truncate">{airport.displayName || airport.name}</span>
+                          </>
+                        ) : isHeliport ? (
                           <>
                             <Helicopter className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
                             <span className="text-cyan-400 font-medium truncate">{airport.displayName || airport.name}</span>
@@ -635,7 +650,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                     </thead>
                     <tbody>
                       {filteredWeapons.map((weapon, idx) => {
-                        const isImportant = isImportantWeapon(weapon.item, isHeliport);
+                        const isImportant = isImportantWeapon(weapon.item, isHeliport, isCarrier);
                         const status = getWeaponStatus(weapon.quantity, isImportant);
                         const isSelected = chartWeapon === weapon.item;
 
@@ -745,7 +760,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                 >
                   <option value="">{t('airportCard.modal.selectWeapon')}</option>
                   {weapons.map((weapon, idx) => {
-                    const status = getWeaponStatus(weapon.quantity, isImportantWeapon(weapon.item, isHeliport));
+                    const status = getWeaponStatus(weapon.quantity, isImportantWeapon(weapon.item, isHeliport, isCarrier));
                     const priorityLabel = status === 'critical' ? '🔴 CRITICAL' : status === 'high' ? '🟠 HIGH' : status === 'medium' ? '🟡 MEDIUM' : '';
                     return (
                       <option key={idx} value={weapon.item}>

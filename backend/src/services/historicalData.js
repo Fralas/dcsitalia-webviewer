@@ -76,9 +76,9 @@ export function saveSnapshot(airportId, data) {
   const snapshots = readSnapshots();
   const airport = getAirportById(airportId);
 
-  // Filter only important weapons for this type of base (airport vs heliport)
+  // Filter only important weapons for this type of base (airport vs heliport vs carrier)
   const importantWeapons = data.weapons ? data.weapons.filter(w =>
-    isImportantWeapon(w.item, airport?.isHeliport || false)
+    isImportantWeapon(w.item, airport?.isHeliport || false, airport?.isCarrier || false)
   ) : [];
 
   snapshots.push({
