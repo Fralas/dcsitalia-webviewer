@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Helicopter, Plus, X, TrendingUp, ArrowRight, FileDown, Weight, Clock, User, XCircle, Search } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Helicopter, Anchor, Plus, X, TrendingUp, ArrowRight, FileDown, Weight, Clock, User, XCircle, Search } from 'lucide-react';
 import * as api from '../services/api';
 import WeaponChart from './WeaponChart';
 import { getAirportName } from '../config/airports';
@@ -305,7 +305,9 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            {isHeliport ? (
+            {isCarrier ? (
+              <Anchor className="w-5 h-5 text-green-500" />
+            ) : isHeliport ? (
               <Helicopter className="w-5 h-5 text-cyan-400" />
             ) : (
               <Plane className={`w-5 h-5 ${airport.isMainBase ? 'text-fuchsia-400' : 'text-yt-accent'}`} />
@@ -431,6 +433,11 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                           <span className="text-fuchsia-400 font-medium truncate">{sourceName}</span>
                         ) : sourceAirport.isMainBase ? (
                           <span className="text-fuchsia-400 font-medium truncate">{sourceName}</span>
+                        ) : sourceAirport.isCarrier ? (
+                          <>
+                            <Anchor className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                            <span className="text-green-500 font-medium truncate">{sourceName}</span>
+                          </>
                         ) : sourceAirport.isHeliport ? (
                           <>
                             <Helicopter className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
@@ -443,7 +450,12 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                           </>
                         )}
                         <ArrowRight className="w-3.5 h-3.5 text-yt-text-secondary flex-shrink-0" />
-                        {isHeliport ? (
+                        {isCarrier ? (
+                          <>
+                            <Anchor className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                            <span className="text-green-500 font-medium truncate">{airport.displayName || airport.name}</span>
+                          </>
+                        ) : isHeliport ? (
                           <>
                             <Helicopter className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
                             <span className="text-cyan-400 font-medium truncate">{airport.displayName || airport.name}</span>
