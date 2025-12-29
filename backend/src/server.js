@@ -126,8 +126,9 @@ function processData(data) {
 
   // Add isActive field to each airport based on airbase status
   Object.entries(airportDataMap).forEach(([airportId, airportData]) => {
-    // Add isActive field
+    // Add isActive field (carriers are always active)
     airportData.isActive = airportData.isMainBase ||
+                           airportData.isCarrier ||
                            airbaseStatusManager.isAirbaseActive(airportData.name);
 
     if (airportData.data && airportData.data.weapons) {
@@ -943,7 +944,7 @@ app.get('/api/admin/config/airports', authenticateToken, requireAdmin, (req, res
     const airbaseStatusData = airbaseStatusManager.getAirbaseStatus();
     const airportsWithStatus = airports.map(airport => ({
       ...airport,
-      isActive: airport.isMainBase || airbaseStatusManager.isAirbaseActive(airport.name)
+      isActive: airport.isMainBase || airport.isCarrier || airbaseStatusManager.isAirbaseActive(airport.name)
     }));
 
     res.json({
