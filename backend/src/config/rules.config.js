@@ -68,28 +68,27 @@ export const missionRules = {
     // Air-to-air missiles for carrier aircraft
     'weapons.missiles.AIM_120C',
     'weapons.missiles.AIM_9X',
+    'weapons.missiles.AIM_9',
     'weapons.missiles.AIM_54C_Mk60',
     'weapons.missiles.AIM_7',
 
     // Air-to-ground missiles for carrier aircraft
-    'weapons.missiles.AGM_65D',
     'weapons.missiles.AGM_65F',
-    'weapons.missiles.AGM_65H',
     'weapons.missiles.AGM_88',
     'weapons.missiles.AGM_154',
     'weapons.missiles.ADM_141A',
+    'weapons.missiles.AGM_84H',
+    'weapons.missiles.AGM_84D',
 
     // Guided bombs for carrier aircraft
     'weapons.bombs.GBU_12',
     'weapons.bombs.GBU_24',
-    'weapons.bombs.GBU_54_V_1B',
     'weapons.bombs.GBU_38',
+    'weapons.bombs.GBU_32_V_2B',
     'weapons.bombs.GBU_31_V_3B',
     'weapons.bombs.GBU_31',
 
-    // Cluster and unguided bombs for carrier aircraft
-    'weapons.bombs.CBU_105',
-    'weapons.bombs.CBU_97',
+    // Unguided bombs for carrier aircraft
     'weapons.bombs.Mk_82',
     'weapons.bombs.Mk_84',
   ],
