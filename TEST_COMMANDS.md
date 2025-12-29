@@ -16,11 +16,11 @@ curl -X POST http://localhost:3001/api/test/generate-random-missions ^
   -d "{\"count\": 10, \"airportId\": \"incirlik\"}"
 ```
 
-### 3️⃣ Genera 10 missioni random per FARP Base
+### 3️⃣ Genera 10 missioni random per FOB Base
 ```bash
 curl -X POST http://localhost:3001/api/test/generate-random-missions ^
   -H "Content-Type: application/json" ^
-  -d "{\"count\": 10, \"airportId\": \"farp-base\"}"
+  -d "{\"count\": 10, \"airportId\": \"fob-base\"}"
 ```
 
 ### 4️⃣ Genera una missione specifica
@@ -36,7 +36,7 @@ curl -X POST http://localhost:3001/api/test/generate-mission ^
 
 - `adana-sakirpasa` - Adana Sakirpasa (BASE PRINCIPALE - non genera missioni)
 - `incirlik` - Incirlik Air Base
-- `farp-base` - FARP Base
+- `fob-base` - FOB Base
 
 ---
 
