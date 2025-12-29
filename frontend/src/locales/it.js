@@ -152,11 +152,13 @@ export default {
       accepted: 'Accettata',
       airport: 'Aeroporto',
       heliport: 'Eliporto',
+      carrier: 'Portaerei',
       base: 'Base'
     },
     popup: {
       heliport: 'ELIPORTO',
       airport: 'AEROPORTO',
+      carrier: 'PORTAEREI',
       missions: '{{count}} missioni attive'
     },
     sidebar: {

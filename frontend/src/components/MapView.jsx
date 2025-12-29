@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Map as MapIcon, Plane, Helicopter, ArrowRight, Weight, Package } from 'lucide-react';
+import { Map as MapIcon, Plane, Helicopter, Anchor, ArrowRight, Weight, Package } from 'lucide-react';
 import { getAirportName } from '../config/airports';
 import airports from '../config/airports';
 import { formatWeight } from '../utils/weightFormatter';
@@ -35,10 +35,12 @@ function FitBounds({ positions }) {
 /**
  * Custom airport icon
  */
-const createAirportIcon = (isMainBase, missionCount, isHeliport) => {
-  const color = isMainBase ? '#e879f9' : isHeliport ? '#22d3ee' : '#3b82f6';
+const createAirportIcon = (isMainBase, missionCount, isHeliport, isCarrier) => {
+  const color = isMainBase ? '#e879f9' : isCarrier ? '#22c55e' : isHeliport ? '#22d3ee' : '#3b82f6';
   const size = isMainBase ? 16 : 12;
-  const iconSvg = isHeliport
+  const iconSvg = isCarrier
+    ? `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"/><path d="M12 22V8M5 12H2a10 10 0 0 0 20 0h-3"/></svg>`
+    : isHeliport
     ? `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v-1a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1m-4 0h4m-4 0v1.5m4-1.5v1.5m3-6.5h-3L11 9V4a1 1 0 0 0-2 0v5L7 6H4l4 5v3H6l-2 2v2h4v-1h8v1h4v-2l-2-2h-2v-3l4-5h-3z"/></svg>`
     : `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>`;
 
@@ -50,7 +52,7 @@ const createAirportIcon = (isMainBase, missionCount, isHeliport) => {
           width: ${size * 2}px;
           height: ${size * 2}px;
           background: ${color};
-          border: 3px solid ${isMainBase ? '#d946ef' : isHeliport ? '#06b6d4' : '#2563eb'};
+          border: 3px solid ${isMainBase ? '#d946ef' : isCarrier ? '#16a34a' : isHeliport ? '#06b6d4' : '#2563eb'};
           border-radius: 50%;
           display: flex;
           align-items: center;
@@ -302,6 +304,10 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
                 <span className="text-yt-text-secondary">{t('mapView.legend.heliport')}</span>
               </div>
               <div className="flex items-center gap-1.5">
+                <Anchor className="w-4 h-4 text-green-500" />
+                <span className="text-yt-text-secondary">{t('mapView.legend.carrier')}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded-full bg-fuchsia-400 border-2 border-fuchsia-500"></div>
                 <span className="text-yt-text-secondary">{t('mapView.legend.base')}</span>
               </div>
@@ -354,7 +360,7 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
                   <Marker
                     key={airport.id}
                     position={[airport.coordinates.lat, airport.coordinates.lon]}
-                    icon={createAirportIcon(airport.isMainBase, missionCount, airport.isHeliport)}
+                    icon={createAirportIcon(airport.isMainBase, missionCount, airport.isHeliport, airport.isCarrier)}
                   >
                     <Popup>
                       <div className="text-sm">
@@ -363,8 +369,8 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
                           {airport.isMainBase && (
                             <span className="text-fuchsia-600 text-xs font-semibold">MAIN BASE</span>
                           )}
-                          <span className={`text-xs font-semibold ${airport.isHeliport ? 'text-cyan-600' : 'text-blue-600'}`}>
-                            {airport.isHeliport ? t('mapView.popup.heliport') : t('mapView.popup.airport')}
+                          <span className={`text-xs font-semibold ${airport.isCarrier ? 'text-green-600' : airport.isHeliport ? 'text-cyan-600' : 'text-blue-600'}`}>
+                            {airport.isCarrier ? t('mapView.popup.carrier') : airport.isHeliport ? t('mapView.popup.heliport') : t('mapView.popup.airport')}
                           </span>
                         </div>
                         <div className="text-gray-600 text-xs mt-1">
