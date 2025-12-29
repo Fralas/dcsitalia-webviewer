@@ -25,6 +25,8 @@ export const missionRules = {
     'weapons.missiles.AGM_88',
     'weapons.missiles.AGM_154',
     'weapons.missiles.ADM_141A',
+    'weapons.missiles.AGR_20A',
+    'weapons.missiles.AGR_20_M282',
 
     // Guided bombs for jets
     'weapons.bombs.GBU_12',
@@ -32,8 +34,7 @@ export const missionRules = {
     'weapons.bombs.GBU_54_V_1B',
     'weapons.bombs.GBU_38',
     'weapons.bombs.GBU_31_V_3B',
-    'weapons.bombs.GBU_31',
-
+  
     // Cluster and unguided bombs for jets
     'weapons.bombs.CBU_105',
     'weapons.bombs.CBU_97',
@@ -49,12 +50,14 @@ export const missionRules = {
     'weapons.missiles.AGM_114K',
     'weapons.missiles.AGM_114',
     'weapons.missiles.Ataka_9M120',
+    
 
     // Rocket pods for helicopters
     'weapons.nurs.C_8OFP2',
     'weapons.nurs.C_13',
+    "weapons.nurs.HYDRA_70_M229",
     'weapons.missiles.AGR_20A',
-    'weapons.missiles.AGR_20_M282',
+
 
     // Air-to-air missiles for helicopters
     'weapons.missiles.Igla_1E',
@@ -86,7 +89,6 @@ export const missionRules = {
     'weapons.bombs.GBU_38',
     'weapons.bombs.GBU_32_V_2B',
     'weapons.bombs.GBU_31_V_3B',
-    'weapons.bombs.GBU_31',
 
     // Unguided bombs for carrier aircraft
     'weapons.bombs.Mk_82',
