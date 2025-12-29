@@ -179,6 +179,19 @@ export const airports = [
     csvPrefix: 'FOB_BASE',
     coordinates: { lat: 37.066944, lon: 35.974722 }, // 37°04'01"N, 35°58'29"E
   },
+
+  // ==== CARRIERS ====
+  {
+    id: 'carrier-1',
+    name: 'CVN_73',
+    displayName: 'CVN-73 George Washington',
+    isMainBase: false,
+    isHeliport: false,
+    isCarrier: true, // This is a carrier
+    herculesBase: false,
+    csvPrefix: 'CVN_73',
+    coordinates: { lat: 36.4475, lon: 34.6219 }, // 36°26'51"N, 34°37'19"E
+  },
 ];
 
 /**
