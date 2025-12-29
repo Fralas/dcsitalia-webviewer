@@ -163,8 +163,8 @@ const airports = [
   // ==== CARRIERS ====
   {
     id: 'carrier-1',
-    name: 'CVN_73',
-    displayName: 'CVN-73 George Washington',
+    name: 'carrier_group',
+    displayName: 'Carrier Group',
     isMainBase: false,
     isHeliport: false,
     isCarrier: true, // This is a carrier
