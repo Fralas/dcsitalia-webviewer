@@ -168,6 +168,88 @@ export const airports = [
     coordinates: { lat: 36.260278, lon: 38.929444 }, // 36°15'37"N, 38°55'46"E
   },
 
+  // ==== CYPRUS AIRPORTS ====
+  {
+    id: 'paphos',
+    name: 'Paphos',
+    displayName: 'Paphos',
+    isMainBase: false,
+    isHeliport: false,
+    herculesBase: true,
+    csvPrefix: 'Paphos',
+    coordinates: { lat: 34.718333, lon: 32.484167 }, // 34°43'06"N, 32°29'03"E
+  },
+  {
+    id: 'akrotiri',
+    name: 'Akrotiri',
+    displayName: 'Akrotiri',
+    isMainBase: false,
+    isHeliport: false,
+    herculesBase: true,
+    csvPrefix: 'Akrotiri',
+    coordinates: { lat: 34.590278, lon: 32.988056 }, // 34°35'25"N, 32°59'17"E
+  },
+  {
+    id: 'pinarbashi',
+    name: 'Pinarbashi',
+    displayName: 'Pinarbashi',
+    isMainBase: false,
+    isHeliport: true,
+    herculesBase: false,
+    csvPrefix: 'Pinarbashi',
+    coordinates: { lat: 35.274444, lon: 33.267778 }, // 35°16'28"N, 33°16'04"E
+  },
+  {
+    id: 'lakatamia',
+    name: 'Lakatamia',
+    displayName: 'Lakatamia',
+    isMainBase: false,
+    isHeliport: true,
+    herculesBase: false,
+    csvPrefix: 'Lakatamia',
+    coordinates: { lat: 35.104444, lon: 33.321667 }, // 35°06'16"N, 33°19'18"E
+  },
+  {
+    id: 'ercan',
+    name: 'Ercan',
+    displayName: 'Ercan',
+    isMainBase: false,
+    isHeliport: false,
+    herculesBase: false,
+    csvPrefix: 'Ercan',
+    coordinates: { lat: 35.155000, lon: 33.502222 }, // 35°09'18"N, 33°30'08"E
+  },
+  {
+    id: 'larnaca',
+    name: 'Larnaca',
+    displayName: 'Larnaca',
+    isMainBase: false,
+    isHeliport: false,
+    herculesBase: true,
+    csvPrefix: 'Larnaca',
+    coordinates: { lat: 34.873611, lon: 33.623611 }, // 34°52'25"N, 33°37'25"E
+  },
+  {
+    id: 'kingsfield',
+    name: 'Kingsfield',
+    displayName: 'Kingsfield',
+    isMainBase: false,
+    isHeliport: false,
+    herculesBase: false,
+    csvPrefix: 'Kingsfield',
+    coordinates: { lat: 35.014722, lon: 33.717222 }, // 35°00'53"N, 33°43'02"E
+  },
+  {
+    id: 'gecitkale',
+    name: 'Gecitkale',
+    displayName: 'Gecitkale',
+    isMainBase: false,
+    isHeliport: false,
+    herculesBase: true,
+    csvPrefix: 'Gecitkale',
+    coordinates: { lat: 35.235833, lon: 33.719444 }, // 35°14'09"N, 33°43'10"E
+  },
+
   // ==== FOB ====
   {
     id: 'fob-base',
