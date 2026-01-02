@@ -194,7 +194,7 @@ export const airports = [
     name: 'Pinarbashi',
     displayName: 'Pinarbashi',
     isMainBase: false,
-    isHeliport: false,
+    isHeliport: true,
     herculesBase: false,
     csvPrefix: 'Pinarbashi',
     coordinates: { lat: 35.274444, lon: 33.267778 }, // 35°16'28"N, 33°16'04"E
@@ -204,7 +204,7 @@ export const airports = [
     name: 'Lakatamia',
     displayName: 'Lakatamia',
     isMainBase: false,
-    isHeliport: false,
+    isHeliport: true,
     herculesBase: false,
     csvPrefix: 'Lakatamia',
     coordinates: { lat: 35.104444, lon: 33.321667 }, // 35°06'16"N, 33°19'18"E
@@ -215,7 +215,7 @@ export const airports = [
     displayName: 'Ercan',
     isMainBase: false,
     isHeliport: false,
-    herculesBase: true,
+    herculesBase: false,
     csvPrefix: 'Ercan',
     coordinates: { lat: 35.155000, lon: 33.502222 }, // 35°09'18"N, 33°30'08"E
   },
@@ -245,7 +245,7 @@ export const airports = [
     displayName: 'Gecitkale',
     isMainBase: false,
     isHeliport: false,
-    herculesBase: false,
+    herculesBase: true,
     csvPrefix: 'Gecitkale',
     coordinates: { lat: 35.235833, lon: 33.719444 }, // 35°14'09"N, 33°43'10"E
   },
