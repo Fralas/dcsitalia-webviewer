@@ -245,8 +245,8 @@ export default function FrontlineMap({ airportsData }) {
                   pathOptions={{
                     color: color,
                     fillColor: color,
-                    fillOpacity: isActive ? 0.7 : 0.25,
-                    opacity: isActive ? 1 : 0.5,
+                    fillOpacity: isActive ? 0.7 : 0.4,
+                    opacity: isActive ? 1 : 0.6,
                     weight: isActive ? 2 : 1,
                   }}
                 >
