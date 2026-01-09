@@ -185,6 +185,15 @@ export async function refreshCombatMissions() {
 }
 
 /**
+ * Clear all combat missions
+ */
+export async function clearCombatMissions() {
+  return fetchAPI('/combat-missions/clear', {
+    method: 'POST',
+  });
+}
+
+/**
  * Get missions for a specific pilot
  */
 export async function getPilotCombatMissions(pilotName) {
@@ -211,5 +220,6 @@ export default {
   completeCombatMission,
   abortCombatMission,
   refreshCombatMissions,
+  clearCombatMissions,
   getPilotCombatMissions,
 };

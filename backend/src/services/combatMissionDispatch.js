@@ -106,9 +106,9 @@ function loadFrontlineZones() {
 
 /**
  * Generate combat missions from active zones
- * Generates missions based on zone status and tasks:
+ * Creates ONE mission per zone (not per task)
  * - NEUTRAL zones: LOGISTICS mission (troop transport)
- * - Other zones: one mission per task
+ * - Other zones: mission with all tasks for that zone
  * @returns {Array} Array of generated combat missions
  */
 export function generateCombatMissions() {
@@ -132,7 +132,7 @@ export function generateCombatMissions() {
         zone_name: zone.name,
         coordinates: zone.coordinates,
         status: zone.status,
-        task_type: 'LOGISTICS', // Special task for NEUTRAL zones (troop transport)
+        tasks: ['LOGISTICS'], // Array with single task for NEUTRAL zones
         priority: priority,
         priority_label: getPriorityLabel(priority),
         is_active: zone.isActive || false,
@@ -147,32 +147,30 @@ export function generateCombatMissions() {
       return;
     }
 
-    // For all other zones, create a mission for each task
+    // For all other zones with tasks, create ONE mission with all tasks
     if (!zone.tasks || zone.tasks.length === 0) {
       return;
     }
 
-    zone.tasks.forEach(taskType => {
-      const missionId = `combat_${Date.now()}_${missionIdCounter++}`;
-      const mission = {
-        id: missionId,
-        zone_id: zone.id,
-        zone_name: zone.name,
-        coordinates: zone.coordinates,
-        status: zone.status,
-        task_type: taskType,
-        priority: priority,
-        priority_label: getPriorityLabel(priority),
-        is_active: zone.isActive || false,
-        assigned_to: null,
-        assigned_aircraft: null,
-        mission_status: 'available', // available | assigned | completed | aborted
-        created_at: Date.now(),
-        assigned_at: null,
-        completed_at: null,
-      };
-      missions.push(mission);
-    });
+    const missionId = `combat_${Date.now()}_${missionIdCounter++}`;
+    const mission = {
+      id: missionId,
+      zone_id: zone.id,
+      zone_name: zone.name,
+      coordinates: zone.coordinates,
+      status: zone.status,
+      tasks: zone.tasks, // Array of all tasks for this zone
+      priority: priority,
+      priority_label: getPriorityLabel(priority),
+      is_active: zone.isActive || false,
+      assigned_to: null,
+      assigned_aircraft: null,
+      mission_status: 'available', // available | assigned | completed | aborted
+      created_at: Date.now(),
+      assigned_at: null,
+      completed_at: null,
+    };
+    missions.push(mission);
   });
 
   // Sort by priority (lower number = higher priority)
@@ -301,6 +299,18 @@ export function getMissionsByPilot(pilotName) {
 export function refreshCombatMissions() {
   console.log('🔄 Refreshing combat missions...');
   return generateCombatMissions();
+}
+
+/**
+ * Clear all combat missions
+ * @returns {number} Number of missions cleared
+ */
+export function clearAllCombatMissions() {
+  const count = combatMissions.length;
+  combatMissions = [];
+  missionIdCounter = 1;
+  console.log(`🗑️  Cleared ${count} combat missions`);
+  return count;
 }
 
 // Initialize missions on module load

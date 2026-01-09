@@ -196,8 +196,13 @@ function AircraftSelectionModal({ mission, onClose, onConfirm, user }) {
             </h3>
           </div>
           <p className="text-sm text-yt-text-secondary">
-            Missione: {mission.zone_name} - {mission.task_type}
+            Missione: {mission.zone_name}
           </p>
+          <div className="flex gap-1.5 mt-2 flex-wrap">
+            {mission.tasks && mission.tasks.map((task, idx) => (
+              <TaskBadge key={idx} taskType={task} />
+            ))}
+          </div>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -309,8 +314,17 @@ function CombatMissionCard({ mission, onUpdate, user }) {
             </h3>
           </div>
           <div className="flex gap-2">
-            <TaskBadge taskType={mission.task_type} />
             <PriorityBadge priority={mission.priority} priorityLabel={mission.priority_label} />
+          </div>
+        </div>
+
+        {/* Tasks */}
+        <div className="mb-3">
+          <p className="text-xs text-yt-text-secondary mb-1">Tasks</p>
+          <div className="flex gap-1.5 flex-wrap">
+            {mission.tasks && mission.tasks.map((task, idx) => (
+              <TaskBadge key={idx} taskType={task} />
+            ))}
           </div>
         </div>
 

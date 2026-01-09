@@ -560,6 +560,20 @@ app.post('/api/combat-missions/refresh', (req, res) => {
 });
 
 /**
+ * POST /api/combat-missions/clear - Clear all combat missions
+ */
+app.post('/api/combat-missions/clear', (req, res) => {
+  const count = combatMissionDispatch.clearAllCombatMissions();
+
+  // Broadcast combat mission update to all clients
+  io.emit('combat-missions:updated', {
+    missions: []
+  });
+
+  res.json({ success: true, clearedCount: count });
+});
+
+/**
  * GET /api/combat-missions/pilot/:pilotName - Get missions for a specific pilot
  */
 app.get('/api/combat-missions/pilot/:pilotName', (req, res) => {
