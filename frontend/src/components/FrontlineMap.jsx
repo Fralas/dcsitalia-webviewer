@@ -141,12 +141,16 @@ export default function FrontlineMap({ airportsData }) {
       BLUE: 0,
       RED: 0,
       UNDER_ATTACK: 0,
-      total: validZones.length
+      total: validZones.length,
+      active: 0
     };
 
     validZones.forEach(zone => {
       if (stats[zone.status] !== undefined) {
         stats[zone.status]++;
+      }
+      if (zone.isActive) {
+        stats.active++;
       }
     });
 
@@ -184,6 +188,10 @@ export default function FrontlineMap({ airportsData }) {
               <div className="flex items-center gap-1.5">
                 <div className="w-4 h-4 rounded-full bg-orange-500 border-2 border-orange-600"></div>
                 <span className="text-yt-text-secondary">Sotto Attacco ({zoneStats.UNDER_ATTACK})</span>
+              </div>
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 rounded border border-green-500/30">
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                <span className="text-green-600 font-semibold">Zone Attive ({zoneStats.active})</span>
               </div>
               <div className="h-4 w-px bg-yt-border"></div>
               <div className="flex items-center gap-1.5">
@@ -226,6 +234,8 @@ export default function FrontlineMap({ airportsData }) {
             {/* Zone markers */}
             {validZones.map(zone => {
               const color = getZoneColor(zone.status);
+              const isActive = zone.isActive;
+              const hasTasks = zone.tasks && zone.tasks.length > 0;
 
               return (
                 <CircleMarker
@@ -235,14 +245,15 @@ export default function FrontlineMap({ airportsData }) {
                   pathOptions={{
                     color: color,
                     fillColor: color,
-                    fillOpacity: 0.6,
-                    weight: 2,
+                    fillOpacity: isActive ? 0.7 : 0.25,
+                    opacity: isActive ? 1 : 0.5,
+                    weight: isActive ? 2 : 1,
                   }}
                 >
                   <Popup>
                     <div className="text-sm">
                       <div className="font-bold text-base">{zone.name}</div>
-                      <div className="mt-1">
+                      <div className="mt-1 flex items-center gap-2">
                         <span
                           className="px-2 py-1 rounded text-xs font-semibold"
                           style={{
@@ -252,8 +263,28 @@ export default function FrontlineMap({ airportsData }) {
                         >
                           {getStatusLabel(zone.status)}
                         </span>
+                        {isActive && (
+                          <span className="px-2 py-1 rounded text-xs font-semibold bg-green-500/20 text-green-600">
+                            ATTIVA
+                          </span>
+                        )}
                       </div>
-                      <div className="text-gray-600 text-xs mt-1 font-mono">
+                      {hasTasks && (
+                        <div className="mt-2 pt-2 border-t border-gray-200">
+                          <div className="text-xs font-semibold text-gray-700 mb-1">Task richieste:</div>
+                          <div className="flex flex-wrap gap-1">
+                            {zone.tasks.map((task, idx) => (
+                              <span
+                                key={idx}
+                                className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium"
+                              >
+                                {task}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <div className="text-gray-600 text-xs mt-2 font-mono">
                         {toDMS(zone.coordinates.lat, true)} {toDMS(zone.coordinates.lon, false)}
                       </div>
                     </div>
