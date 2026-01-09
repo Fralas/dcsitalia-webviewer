@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plane, Helicopter, Clock, User, CheckCircle, XCircle, AlertTriangle, Package, ArrowRight, Weight } from 'lucide-react';
+import { Plane, Helicopter, Clock, User, CheckCircle, XCircle, AlertTriangle, Package, ArrowRight, Weight, LogIn } from 'lucide-react';
 import * as api from '../services/api';
 import { getAirportName } from '../config/airports';
 import airports from '../config/airports';
@@ -37,12 +37,60 @@ function PriorityBadge({ currentQuantity }) {
 }
 
 /**
+ * Login Required Modal
+ */
+function LoginRequiredModal({ onClose, onLogin }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+      ></div>
+
+      {/* Modal */}
+      <div className="relative bg-yt-bg-secondary border-2 border-yt-accent rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl">
+        <div className="text-center">
+          <div className="mx-auto w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mb-4">
+            <LogIn className="w-8 h-8 text-blue-400" />
+          </div>
+
+          <h3 className="text-xl font-bold text-yt-text-primary mb-2">
+            Autenticazione Richiesta
+          </h3>
+
+          <p className="text-yt-text-secondary mb-6">
+            Per accettare una missione devi essere autenticato con il tuo account Discord.
+          </p>
+
+          <div className="flex gap-3">
+            <button
+              onClick={onLogin}
+              className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold transition-all flex items-center justify-center gap-2"
+            >
+              <LogIn className="w-5 h-5" />
+              Login con Discord
+            </button>
+
+            <button
+              onClick={onClose}
+              className="px-4 py-3 bg-yt-bg-tertiary hover:bg-yt-border text-yt-text-primary rounded font-medium transition-all"
+            >
+              Annulla
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Mission Card Component
  */
-function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
+function MissionCard({ mission, airports, onUpdate, isHighlighted, user }) {
   const [loading, setLoading] = useState(false);
-  const [userName, setUserName] = useState('');
-  const [showAccept, setShowAccept] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const cardRef = useRef(null);
 
   const airport = airports.find(a => a.id === mission.airport_id);
@@ -65,21 +113,28 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
   }, [isHighlighted]);
 
   const handleAccept = async () => {
-    if (!userName.trim()) {
-      alert('Inserisci il tuo nome');
+    // Controlla se l'utente è autenticato
+    if (!user) {
+      setShowLoginModal(true);
       return;
     }
+
+    // Usa il nome Discord dell'utente
+    const userName = user.globalName || user.username;
 
     setLoading(true);
     try {
       await api.acceptMission(mission.id, userName);
       onUpdate();
-      setShowAccept(false);
     } catch (error) {
       alert(t('airportCard.alerts.acceptError', { message: error.message }));
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLogin = () => {
+    window.location.href = '/api/auth/discord';
   };
 
   const handleComplete = async () => {
@@ -223,42 +278,15 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
 
       {/* Azioni - compatte */}
       <div className="flex gap-2">
-        {mission.status === 'pending' && !showAccept && (
+        {mission.status === 'pending' && (
           <button
-            onClick={() => setShowAccept(true)}
+            onClick={handleAccept}
             disabled={loading}
             className="flex-1 px-3 py-1.5 bg-green-400 hover:bg-green-400/80 disabled:bg-yt-bg-tertiary disabled:text-yt-text-secondary text-white rounded text-sm font-bold transition-all flex items-center justify-center gap-1.5"
           >
             <CheckCircle className="w-4 h-4" />
             {t('missionDispatch.accept')}
           </button>
-        )}
-
-        {mission.status === 'pending' && showAccept && (
-          <div className="flex-1 flex gap-2">
-            <input
-              type="text"
-              placeholder={t('missionDispatch.namePlaceholder')}
-              value={userName}
-              onChange={(e) => setUserName(e.target.value)}
-              className="flex-1 px-2 py-1.5 bg-yt-bg-primary border border-yt-border rounded text-yt-text-primary text-sm focus:border-yt-accent focus:outline-none"
-              disabled={loading}
-            />
-            <button
-              onClick={handleAccept}
-              disabled={loading}
-              className="px-3 py-1.5 bg-green-400 hover:bg-green-400/80 disabled:bg-yt-bg-tertiary text-white rounded text-sm font-bold transition-all"
-            >
-              {t('missionDispatch.ok')}
-            </button>
-            <button
-              onClick={() => setShowAccept(false)}
-              disabled={loading}
-              className="px-3 py-1.5 bg-yt-bg-tertiary hover:bg-yt-border text-yt-text-primary rounded text-sm transition-all"
-            >
-              ✕
-            </button>
-          </div>
         )}
 
         {mission.status === 'accepted' && (
@@ -281,6 +309,14 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
           <span className="hidden sm:inline">{t('missionDispatch.cancel')}</span>
         </button>
       </div>
+
+      {/* Login Required Modal */}
+      {showLoginModal && (
+        <LoginRequiredModal
+          onClose={() => setShowLoginModal(false)}
+          onLogin={handleLogin}
+        />
+      )}
     </div>
   );
 }
@@ -290,6 +326,27 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted }) {
  */
 export default function MissionDispatch({ missions, airports, onUpdate, highlightedMissionId }) {
   const [filter, setFilter] = useState('all'); // all, pending, accepted
+  const [user, setUser] = useState(null);
+
+  // Check if user is logged in on mount
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const response = await fetch('/api/auth/user', {
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
+      }
+    } catch (error) {
+      console.error('Auth check failed:', error);
+    }
+  };
 
   const filteredMissions = missions.filter(m => {
     if (filter === 'pending') return m.status === 'pending';
@@ -385,6 +442,7 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
               airports={airports}
               onUpdate={onUpdate}
               isHighlighted={mission.id === highlightedMissionId}
+              user={user}
             />
           ))}
         </div>
