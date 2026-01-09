@@ -4,6 +4,7 @@ import Dashboard from './components/Dashboard';
 import MapView from './components/MapView';
 import FrontlineMap from './components/FrontlineMap';
 import AdminPanel from './components/AdminPanel';
+import UserMenu from './components/UserMenu';
 import * as api from './services/api';
 import socketService from './services/socket';
 import { t } from './utils/locale';
@@ -203,6 +204,9 @@ function App() {
                   <span className="hidden sm:inline">{t('general.navigation.admin')}</span>
                 </button>
               </nav>
+
+              {/* User Menu */}
+              <UserMenu />
             </div>
           </div>
         </div>

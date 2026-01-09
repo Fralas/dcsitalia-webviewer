@@ -10,6 +10,8 @@ import chokidar from 'chokidar';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import session from 'express-session';
+import cookieParser from 'cookie-parser';
 
 import airports, { getAirportById } from './config/airports.config.js';
 import { isImportantWeapon, getPriority, getSupplyQuantityForPriority } from './config/rules.config.js';
@@ -23,6 +25,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import logger from './utils/logger.js';
 import * as airbaseStatusParser from './services/airbaseStatusParser.js';
 import * as airbaseStatusManager from './services/airbaseStatusManager.js';
+import * as discordAuth from './services/discordAuth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -81,6 +84,20 @@ const limiter = rateLimit({
 
 app.use(limiter);
 app.use(express.json());
+app.use(cookieParser());
+
+// Session configuration
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'dcs-italia-secret-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+    httpOnly: true,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+  }
+}));
 
 // Store current data in memory
 let currentData = {};
@@ -207,6 +224,120 @@ function refreshDataFromCsv(reason = 'manual') {
 }
 
 // ==================== API ROUTES ====================
+
+// ==================== DISCORD OAUTH ROUTES ====================
+
+/**
+ * GET /api/auth/discord - Initiate Discord OAuth flow
+ */
+app.get('/api/auth/discord', (req, res) => {
+  const clientId = process.env.DISCORD_CLIENT_ID;
+  const redirectUri = process.env.DISCORD_REDIRECT_URI || `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/auth/discord/callback`;
+
+  if (!clientId) {
+    return res.status(500).json({ error: 'Discord OAuth not configured' });
+  }
+
+  // Generate random state for CSRF protection
+  const state = Math.random().toString(36).substring(7);
+  req.session.oauthState = state;
+
+  const authUrl = discordAuth.getDiscordAuthURL(clientId, redirectUri, state);
+  res.redirect(authUrl);
+});
+
+/**
+ * GET /api/auth/discord/callback - Discord OAuth callback
+ */
+app.get('/api/auth/discord/callback', async (req, res) => {
+  const { code, state } = req.query;
+  const clientId = process.env.DISCORD_CLIENT_ID;
+  const clientSecret = process.env.DISCORD_CLIENT_SECRET;
+  const redirectUri = process.env.DISCORD_REDIRECT_URI || `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/auth/discord/callback`;
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+  // Verify state to prevent CSRF
+  if (!state || state !== req.session.oauthState) {
+    return res.redirect(`${frontendUrl}?error=invalid_state`);
+  }
+
+  if (!code) {
+    return res.redirect(`${frontendUrl}?error=no_code`);
+  }
+
+  if (!clientId || !clientSecret) {
+    return res.redirect(`${frontendUrl}?error=oauth_not_configured`);
+  }
+
+  try {
+    // Exchange code for access token
+    const tokenData = await discordAuth.exchangeCode(code, clientId, clientSecret, redirectUri);
+
+    // Get user info
+    const discordUser = await discordAuth.getDiscordUser(tokenData.access_token);
+
+    // Store user in session
+    req.session.user = {
+      id: discordUser.id,
+      username: discordUser.username,
+      discriminator: discordUser.discriminator,
+      avatar: discordUser.avatar,
+      globalName: discordUser.global_name || discordUser.username
+    };
+
+    // Store tokens for potential future use
+    req.session.discordTokens = {
+      accessToken: tokenData.access_token,
+      refreshToken: tokenData.refresh_token,
+      expiresAt: Date.now() + (tokenData.expires_in * 1000)
+    };
+
+    // Clear OAuth state
+    delete req.session.oauthState;
+
+    // Redirect to frontend
+    res.redirect(`${frontendUrl}?login=success`);
+  } catch (error) {
+    console.error('Discord OAuth error:', error);
+    res.redirect(`${frontendUrl}?error=oauth_failed`);
+  }
+});
+
+/**
+ * GET /api/auth/user - Get current authenticated user
+ */
+app.get('/api/auth/user', (req, res) => {
+  if (!req.session.user) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  res.json(req.session.user);
+});
+
+/**
+ * POST /api/auth/logout - Logout current user
+ */
+app.post('/api/auth/logout', async (req, res) => {
+  const tokens = req.session.discordTokens;
+  const clientId = process.env.DISCORD_CLIENT_ID;
+  const clientSecret = process.env.DISCORD_CLIENT_SECRET;
+
+  // Revoke Discord token if available
+  if (tokens && tokens.accessToken && clientId && clientSecret) {
+    await discordAuth.revokeToken(tokens.accessToken, clientId, clientSecret);
+  }
+
+  // Destroy session
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ error: 'Failed to logout' });
+    }
+    res.clearCookie('connect.sid');
+    res.json({ success: true });
+  });
+});
+
+// ==================== DATA ROUTES ====================
 
 /**
  * GET /api/airports - Get all airports with current data
