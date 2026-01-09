@@ -234,7 +234,7 @@ function App() {
           />
         )}
         {currentView === 'frontline' && (
-          <FrontlineMap />
+          <FrontlineMap airportsData={Object.values(airports)} />
         )}
         {currentView === 'admin' && (
           <AdminPanel />

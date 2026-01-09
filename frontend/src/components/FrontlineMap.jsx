@@ -95,15 +95,16 @@ function getStatusLabel(status) {
 /**
  * Frontline Map Component
  */
-export default function FrontlineMap() {
+export default function FrontlineMap({ airportsData }) {
   // Memoize calculations
   const validZones = useMemo(() => {
     return frontlineZones.filter(z => z.coordinates && z.coordinates.lat && z.coordinates.lon);
   }, []);
 
   const validAirports = useMemo(() => {
-    return airports.filter(a => a.coordinates && a.isActive !== false);
-  }, []);
+    const airportsList = airportsData ? airportsData : airports;
+    return airportsList.filter(a => a.coordinates && a.isActive !== false);
+  }, [airportsData]);
 
   const center = useMemo(() =>
     validZones.length > 0
