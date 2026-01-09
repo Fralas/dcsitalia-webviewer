@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Shield, Circle } from 'lucide-react';
+import { Shield, Circle, Plane, Helicopter, Anchor } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
+import airports from '../config/airports';
 import { t } from '../utils/locale';
 
 /**
@@ -21,6 +22,43 @@ function FitBounds({ positions }) {
 
   return null;
 }
+
+/**
+ * Custom airport icon
+ */
+const createAirportIcon = (isMainBase, isHeliport, isCarrier) => {
+  const color = isMainBase ? '#e879f9' : isCarrier ? '#22c55e' : isHeliport ? '#22d3ee' : '#3b82f6';
+  const size = isMainBase ? 16 : 12;
+  const iconSvg = isCarrier
+    ? `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"/><path d="M12 22V8M5 12H2a10 10 0 0 0 20 0h-3"/></svg>`
+    : isHeliport
+    ? `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v-1a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1m-4 0h4m-4 0v1.5m4-1.5v1.5m3-6.5h-3L11 9V4a1 1 0 0 0-2 0v5L7 6H4l4 5v3H6l-2 2v2h4v-1h8v1h4v-2l-2-2h-2v-3l4-5h-3z"/></svg>`
+    : `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>`;
+
+  return L.divIcon({
+    className: 'custom-airport-marker',
+    html: `
+      <div style="position: relative;">
+        <div style="
+          width: ${size * 2}px;
+          height: ${size * 2}px;
+          background: ${color};
+          border: 3px solid ${isMainBase ? '#d946ef' : isCarrier ? '#16a34a' : isHeliport ? '#06b6d4' : '#2563eb'};
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #1e293b;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        ">
+          ${iconSvg}
+        </div>
+      </div>
+    `,
+    iconSize: [size * 2, size * 2],
+    iconAnchor: [size, size],
+  });
+};
 
 /**
  * Get zone color based on status
@@ -63,15 +101,21 @@ export default function FrontlineMap() {
     return frontlineZones.filter(z => z.coordinates && z.coordinates.lat && z.coordinates.lon);
   }, []);
 
+  const validAirports = useMemo(() => {
+    return airports.filter(a => a.coordinates && a.isActive !== false);
+  }, []);
+
   const center = useMemo(() =>
     validZones.length > 0
       ? [validZones[0].coordinates.lat, validZones[0].coordinates.lon]
       : [37.0, 35.5]
   , [validZones]);
 
-  const allPositions = useMemo(() =>
-    validZones.map(z => [z.coordinates.lat, z.coordinates.lon])
-  , [validZones]);
+  const allPositions = useMemo(() => {
+    const zonePositions = validZones.map(z => [z.coordinates.lat, z.coordinates.lon]);
+    const airportPositions = validAirports.map(a => [a.coordinates.lat, a.coordinates.lon]);
+    return [...zonePositions, ...airportPositions];
+  }, [validZones, validAirports]);
 
   // Group zones by status for stats
   const zoneStats = useMemo(() => {
@@ -110,7 +154,7 @@ export default function FrontlineMap() {
             </div>
 
             {/* Legend */}
-            <div className="flex items-center gap-4 text-xs">
+            <div className="flex items-center gap-3 text-xs">
               <div className="flex items-center gap-1.5">
                 <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-blue-600"></div>
                 <span className="text-yt-text-secondary">Zone Blu ({zoneStats.BLUE})</span>
@@ -123,9 +167,22 @@ export default function FrontlineMap() {
                 <div className="w-4 h-4 rounded-full bg-orange-500 border-2 border-orange-600"></div>
                 <span className="text-yt-text-secondary">Sotto Attacco ({zoneStats.UNDER_ATTACK})</span>
               </div>
-              <div className="flex items-center gap-1.5 ml-4 px-3 py-1 bg-yt-bg-tertiary rounded">
-                <Circle className="w-4 h-4 text-yt-accent" />
-                <span className="text-yt-text-primary font-bold">Totale: {zoneStats.total}</span>
+              <div className="h-4 w-px bg-yt-border"></div>
+              <div className="flex items-center gap-1.5">
+                <Plane className="w-4 h-4 text-blue-500" />
+                <span className="text-yt-text-secondary">Aeroporti</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Helicopter className="w-4 h-4 text-cyan-400" />
+                <span className="text-yt-text-secondary">Eliporti</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Anchor className="w-4 h-4 text-green-500" />
+                <span className="text-yt-text-secondary">Portaerei</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-4 h-4 rounded-full bg-fuchsia-400 border-2 border-fuchsia-500"></div>
+                <span className="text-yt-text-secondary">Base Principale</span>
               </div>
             </div>
           </div>
@@ -184,6 +241,34 @@ export default function FrontlineMap() {
                     </div>
                   </Popup>
                 </CircleMarker>
+              );
+            })}
+
+            {/* Airport markers */}
+            {validAirports.map(airport => {
+              return (
+                <Marker
+                  key={airport.id}
+                  position={[airport.coordinates.lat, airport.coordinates.lon]}
+                  icon={createAirportIcon(airport.isMainBase, airport.isHeliport, airport.isCarrier)}
+                >
+                  <Popup>
+                    <div className="text-sm">
+                      <div className="font-bold text-base">{airport.displayName}</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        {airport.isMainBase && (
+                          <span className="text-fuchsia-600 text-xs font-semibold">BASE PRINCIPALE</span>
+                        )}
+                        <span className={`text-xs font-semibold ${airport.isCarrier ? 'text-green-600' : airport.isHeliport ? 'text-cyan-600' : 'text-blue-600'}`}>
+                          {airport.isCarrier ? 'PORTAEREI' : airport.isHeliport ? 'ELIPORTO' : 'AEROPORTO'}
+                        </span>
+                      </div>
+                      <div className="text-gray-600 text-xs mt-1">
+                        {airport.coordinates.lat.toFixed(6)}°N, {airport.coordinates.lon.toFixed(6)}°E
+                      </div>
+                    </div>
+                  </Popup>
+                </Marker>
               );
             })}
           </MapContainer>
