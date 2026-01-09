@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Plane, Package, Activity, AlertCircle, Map, Shield } from 'lucide-react';
+import { Plane, Package, Activity, AlertCircle, Map, Shield, Target } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import MapView from './components/MapView';
+import FrontlineMap from './components/FrontlineMap';
 import AdminPanel from './components/AdminPanel';
+import UserMenu from './components/UserMenu';
 import * as api from './services/api';
 import socketService from './services/socket';
 import { t } from './utils/locale';
@@ -180,6 +182,17 @@ function App() {
                   <span className="hidden sm:inline">{t('general.navigation.map')}</span>
                 </button>
                 <button
+                  onClick={() => setCurrentView('frontline')}
+                  className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
+                    currentView === 'frontline'
+                      ? 'bg-yt-bg-tertiary text-yt-text-primary'
+                      : 'text-yt-text-secondary hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary'
+                  }`}
+                >
+                  <Target className="w-4 h-4" />
+                  <span className="hidden sm:inline">Frontline</span>
+                </button>
+                <button
                   onClick={() => setCurrentView('admin')}
                   className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
                     currentView === 'admin'
@@ -191,13 +204,16 @@ function App() {
                   <span className="hidden sm:inline">{t('general.navigation.admin')}</span>
                 </button>
               </nav>
+
+              {/* User Menu */}
+              <UserMenu />
             </div>
           </div>
         </div>
       </header>
 
       {/* Main Content - padding ridotto */}
-      <main className={`flex-1 ${currentView === 'map' || currentView === 'admin' ? '' : 'container mx-auto px-4 py-4'}`}>
+      <main className={`flex-1 ${currentView === 'map' || currentView === 'frontline' || currentView === 'admin' ? '' : 'container mx-auto px-4 py-4'}`}>
         {currentView === 'dashboard' && (
           <Dashboard
             airports={airports}
@@ -220,6 +236,9 @@ function App() {
               setCurrentView('dashboard');
             }}
           />
+        )}
+        {currentView === 'frontline' && (
+          <FrontlineMap airportsData={Object.values(airports)} />
         )}
         {currentView === 'admin' && (
           <AdminPanel />
