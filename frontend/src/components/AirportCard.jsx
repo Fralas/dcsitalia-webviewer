@@ -8,6 +8,7 @@ import { generateChartsPDF, checkChartsAvailable } from '../utils/pdfGenerator';
 import { isImportantWeapon, importantWeaponsAirports, importantWeaponsHeliports, importantWeaponsCarriers } from '../config/weapons';
 import { formatWeight } from '../utils/weightFormatter';
 import { t, formatElapsedTime, formatRemainingTime, getStatusLabel } from '../utils/locale';
+import { useUser } from '../contexts/UserContext';
 
 /**
  * Get weapon display name (remove prefix)
@@ -134,34 +135,14 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
   // Mission management states
   const [missionStates, setMissionStates] = useState({}); // { missionId: { loading, showLoginModal } }
 
-  // User authentication state
-  const [user, setUser] = useState(null);
+  // Use shared user context
+  const { user } = useUser();
 
   const cardRef = useRef(null);
 
   if (!airport || !airport.data) {
     return null;
   }
-
-  // Check user authentication on mount
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const response = await fetch('/api/auth/user', {
-        credentials: 'include'
-      });
-
-      if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error);
-    }
-  };
 
   // Check if charts are available when card is expanded
   useEffect(() => {

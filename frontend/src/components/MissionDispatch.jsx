@@ -5,6 +5,7 @@ import { getAirportName } from '../config/airports';
 import airports from '../config/airports';
 import { formatWeight } from '../utils/weightFormatter';
 import { t, formatElapsedTime, formatRemainingTime, getStatusLabel } from '../utils/locale';
+import { useUser } from '../contexts/UserContext';
 
 /**
  * Get weapon display name
@@ -326,27 +327,9 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted, user }) {
  */
 export default function MissionDispatch({ missions, airports, onUpdate, highlightedMissionId }) {
   const [filter, setFilter] = useState('all'); // all, pending, accepted
-  const [user, setUser] = useState(null);
 
-  // Check if user is logged in on mount
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const response = await fetch('/api/auth/user', {
-        credentials: 'include'
-      });
-
-      if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error);
-    }
-  };
+  // Use shared user context
+  const { user } = useUser();
 
   const filteredMissions = missions.filter(m => {
     if (filter === 'pending') return m.status === 'pending';
