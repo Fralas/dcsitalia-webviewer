@@ -8,6 +8,23 @@ import airports from '../config/airports';
 import { t } from '../utils/locale';
 
 /**
+ * Convert decimal coordinates to DMS (Degrees, Minutes, Seconds)
+ */
+function toDMS(decimal, isLat) {
+  const absolute = Math.abs(decimal);
+  const degrees = Math.floor(absolute);
+  const minutesDecimal = (absolute - degrees) * 60;
+  const minutes = Math.floor(minutesDecimal);
+  const seconds = Math.round((minutesDecimal - minutes) * 60);
+
+  const direction = isLat
+    ? (decimal >= 0 ? 'N' : 'S')
+    : (decimal >= 0 ? 'E' : 'W');
+
+  return `${degrees}°${minutes.toString().padStart(2, '0')}'${seconds.toString().padStart(2, '0')}"${direction}`;
+}
+
+/**
  * Component to fit bounds of all zones (only on mount)
  */
 function FitBounds({ positions }) {
@@ -236,8 +253,8 @@ export default function FrontlineMap({ airportsData }) {
                           {getStatusLabel(zone.status)}
                         </span>
                       </div>
-                      <div className="text-gray-600 text-xs mt-1">
-                        {zone.coordinates.lat.toFixed(6)}°N, {zone.coordinates.lon.toFixed(6)}°E
+                      <div className="text-gray-600 text-xs mt-1 font-mono">
+                        {toDMS(zone.coordinates.lat, true)} {toDMS(zone.coordinates.lon, false)}
                       </div>
                     </div>
                   </Popup>
@@ -264,8 +281,8 @@ export default function FrontlineMap({ airportsData }) {
                           {airport.isCarrier ? 'PORTAEREI' : airport.isHeliport ? 'ELIPORTO' : 'AEROPORTO'}
                         </span>
                       </div>
-                      <div className="text-gray-600 text-xs mt-1">
-                        {airport.coordinates.lat.toFixed(6)}°N, {airport.coordinates.lon.toFixed(6)}°E
+                      <div className="text-gray-600 text-xs mt-1 font-mono">
+                        {toDMS(airport.coordinates.lat, true)} {toDMS(airport.coordinates.lon, false)}
                       </div>
                     </div>
                   </Popup>
