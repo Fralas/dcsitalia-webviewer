@@ -6,6 +6,7 @@ import { Shield, Circle, Plane, Helicopter, Anchor } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import { t } from '../utils/locale';
+import MissionDispatchPanel from './MissionDispatchPanel';
 
 /**
  * Convert decimal coordinates to DMS (Degrees, Minutes, Seconds)
@@ -82,6 +83,8 @@ const createAirportIcon = (isMainBase, isHeliport, isCarrier) => {
  */
 function getZoneColor(status) {
   switch (status) {
+    case 'NEUTRAL':
+      return '#ffffff'; // White
     case 'BLUE':
       return '#3b82f6'; // Blue
     case 'RED':
@@ -98,6 +101,8 @@ function getZoneColor(status) {
  */
 function getStatusLabel(status) {
   switch (status) {
+    case 'NEUTRAL':
+      return 'Neutrale';
     case 'BLUE':
       return 'Controllata - Blu';
     case 'RED':
@@ -138,6 +143,7 @@ export default function FrontlineMap({ airportsData }) {
   // Group zones by status for stats
   const zoneStats = useMemo(() => {
     const stats = {
+      NEUTRAL: 0,
       BLUE: 0,
       RED: 0,
       UNDER_ATTACK: 0,
@@ -178,6 +184,10 @@ export default function FrontlineMap({ airportsData }) {
             {/* Legend */}
             <div className="flex items-center gap-3 text-xs">
               <div className="flex items-center gap-1.5">
+                <div className="w-4 h-4 rounded-full bg-white border-2 border-gray-400"></div>
+                <span className="text-yt-text-secondary">Zone Neutrali ({zoneStats.NEUTRAL})</span>
+              </div>
+              <div className="flex items-center gap-1.5">
                 <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-blue-600"></div>
                 <span className="text-yt-text-secondary">Zone Blu ({zoneStats.BLUE})</span>
               </div>
@@ -214,6 +224,11 @@ export default function FrontlineMap({ airportsData }) {
           </div>
         </div>
 
+        {/* Mission Dispatch Panel */}
+        <div className="mb-4">
+          <MissionDispatchPanel />
+        </div>
+
         {/* Map */}
         <div className="bg-yt-bg-secondary rounded-lg overflow-hidden border border-yt-border" style={{ height: '800px' }}>
           <MapContainer
@@ -236,6 +251,8 @@ export default function FrontlineMap({ airportsData }) {
               const color = getZoneColor(zone.status);
               const isActive = zone.isActive;
               const hasTasks = zone.tasks && zone.tasks.length > 0;
+              // For neutral zones (white), use a darker border for visibility
+              const borderColor = zone.status === 'NEUTRAL' ? '#6b7280' : color;
 
               return (
                 <CircleMarker
@@ -243,7 +260,7 @@ export default function FrontlineMap({ airportsData }) {
                   center={[zone.coordinates.lat, zone.coordinates.lon]}
                   radius={8}
                   pathOptions={{
-                    color: color,
+                    color: borderColor,
                     fillColor: color,
                     fillOpacity: isActive ? 0.7 : 0.4,
                     opacity: isActive ? 1 : 0.6,

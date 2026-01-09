@@ -26,6 +26,7 @@ import logger from './utils/logger.js';
 import * as airbaseStatusParser from './services/airbaseStatusParser.js';
 import * as airbaseStatusManager from './services/airbaseStatusManager.js';
 import * as discordAuth from './services/discordAuth.js';
+import * as combatMissionDispatch from './services/combatMissionDispatch.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -459,6 +460,111 @@ app.post('/api/missions/:id/cancel', (req, res) => {
   });
 
   res.json({ success: true, message: 'Mission cancelled' });
+});
+
+/**
+ * ============================
+ * COMBAT MISSION ENDPOINTS
+ * ============================
+ */
+
+/**
+ * GET /api/combat-missions - Get all combat missions
+ */
+app.get('/api/combat-missions', (req, res) => {
+  const { status } = req.query;
+  const missions = combatMissionDispatch.getAllCombatMissions(status);
+  res.json(missions);
+});
+
+/**
+ * GET /api/combat-missions/available - Get available combat missions (not assigned)
+ */
+app.get('/api/combat-missions/available', (req, res) => {
+  const missions = combatMissionDispatch.getAvailableCombatMissions();
+  res.json(missions);
+});
+
+/**
+ * POST /api/combat-missions/:id/assign - Assign a combat mission to a pilot
+ */
+app.post('/api/combat-missions/:id/assign', (req, res) => {
+  const { pilotName, aircraft } = req.body;
+
+  if (!pilotName || !aircraft) {
+    return res.status(400).json({ error: 'pilotName and aircraft are required' });
+  }
+
+  const mission = combatMissionDispatch.assignCombatMission(req.params.id, pilotName, aircraft);
+
+  if (!mission) {
+    return res.status(400).json({ error: 'Mission not found or not available' });
+  }
+
+  // Broadcast combat mission update to all clients
+  io.emit('combat-missions:updated', {
+    missions: combatMissionDispatch.getAllCombatMissions()
+  });
+
+  res.json({ success: true, mission });
+});
+
+/**
+ * POST /api/combat-missions/:id/complete - Complete a combat mission
+ */
+app.post('/api/combat-missions/:id/complete', (req, res) => {
+  const mission = combatMissionDispatch.completeCombatMission(req.params.id);
+
+  if (!mission) {
+    return res.status(400).json({ error: 'Mission not found or not assigned' });
+  }
+
+  // Broadcast combat mission update to all clients
+  io.emit('combat-missions:updated', {
+    missions: combatMissionDispatch.getAllCombatMissions()
+  });
+
+  res.json({ success: true, mission });
+});
+
+/**
+ * POST /api/combat-missions/:id/abort - Abort a combat mission
+ */
+app.post('/api/combat-missions/:id/abort', (req, res) => {
+  const mission = combatMissionDispatch.abortCombatMission(req.params.id);
+
+  if (!mission) {
+    return res.status(400).json({ error: 'Mission not found' });
+  }
+
+  // Broadcast combat mission update to all clients
+  io.emit('combat-missions:updated', {
+    missions: combatMissionDispatch.getAllCombatMissions()
+  });
+
+  res.json({ success: true, mission });
+});
+
+/**
+ * POST /api/combat-missions/refresh - Refresh combat missions from zones
+ */
+app.post('/api/combat-missions/refresh', (req, res) => {
+  const missions = combatMissionDispatch.refreshCombatMissions();
+
+  // Broadcast combat mission update to all clients
+  io.emit('combat-missions:updated', {
+    missions: missions
+  });
+
+  res.json({ success: true, count: missions.length, missions });
+});
+
+/**
+ * GET /api/combat-missions/pilot/:pilotName - Get missions for a specific pilot
+ */
+app.get('/api/combat-missions/pilot/:pilotName', (req, res) => {
+  const missions = combatMissionDispatch.getMissionsByPilot(req.params.pilotName);
+  res.json(missions);
 });
 
 /**

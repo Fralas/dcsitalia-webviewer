@@ -132,6 +132,65 @@ export async function debugClearOrders() {
   });
 }
 
+/**
+ * Get all combat missions
+ */
+export async function getCombatMissions(status = null) {
+  const queryParam = status ? `?status=${status}` : '';
+  return fetchAPI(`/combat-missions${queryParam}`);
+}
+
+/**
+ * Get available combat missions (not assigned)
+ */
+export async function getAvailableCombatMissions() {
+  return fetchAPI('/combat-missions/available');
+}
+
+/**
+ * Assign a combat mission to a pilot
+ */
+export async function assignCombatMission(missionId, pilotName, aircraft) {
+  return fetchAPI(`/combat-missions/${missionId}/assign`, {
+    method: 'POST',
+    body: JSON.stringify({ pilotName, aircraft }),
+  });
+}
+
+/**
+ * Complete a combat mission
+ */
+export async function completeCombatMission(missionId) {
+  return fetchAPI(`/combat-missions/${missionId}/complete`, {
+    method: 'POST',
+  });
+}
+
+/**
+ * Abort a combat mission
+ */
+export async function abortCombatMission(missionId) {
+  return fetchAPI(`/combat-missions/${missionId}/abort`, {
+    method: 'POST',
+  });
+}
+
+/**
+ * Refresh combat missions from zones
+ */
+export async function refreshCombatMissions() {
+  return fetchAPI('/combat-missions/refresh', {
+    method: 'POST',
+  });
+}
+
+/**
+ * Get missions for a specific pilot
+ */
+export async function getPilotCombatMissions(pilotName) {
+  return fetchAPI(`/combat-missions/pilot/${encodeURIComponent(pilotName)}`);
+}
+
 export default {
   getAirports,
   getAirport,
@@ -146,4 +205,11 @@ export default {
   getStats,
   debugGenerateOrders,
   debugClearOrders,
+  getCombatMissions,
+  getAvailableCombatMissions,
+  assignCombatMission,
+  completeCombatMission,
+  abortCombatMission,
+  refreshCombatMissions,
+  getPilotCombatMissions,
 };
