@@ -41,6 +41,10 @@ function PriorityBadge({ priority, priorityLabel }) {
 function TaskBadge({ taskType }) {
   let color, label;
   switch (taskType) {
+    case 'LOGISTICS':
+      color = 'bg-green-500/20 text-green-300 border-green-500';
+      label = 'LOGISTICS';
+      break;
     case 'SEAD':
       color = 'bg-purple-500/20 text-purple-300 border-purple-500';
       label = 'SEAD';

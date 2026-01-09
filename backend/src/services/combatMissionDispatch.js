@@ -17,54 +17,54 @@ let missionIdCounter = 1;
  * Lower number = higher priority
  */
 const PRIORITY_LEVELS = {
-  NEUTRAL: 1,           // Massima priorità
-  UNDER_ATTACK: 2,      // Priorità elevata
-  RED_CAS_ONLY: 3,      // Priorità alta
-  RED_CAS_DEAD: 4,      // Priorità media
-  RED_CAS_DEAD_SEAD: 5, // Priorità bassa
+  NEUTRAL_LOGISTICS: 1,  // Massima priorità - missione logistica
+  UNDER_ATTACK: 2,       // Priorità elevata
+  ONE_TASK: 3,           // Priorità alta (1 task)
+  TWO_TASKS: 4,          // Priorità media (2 tasks)
+  THREE_PLUS_TASKS: 5,   // Priorità bassa (3+ tasks)
 };
 
 /**
- * Calculate priority for a zone based on status and tasks
+ * Calculate priority for a zone based on status and number of tasks
  * @param {Object} zone - Zone object from frontlineZones.json
  * @returns {number} Priority level (1 = highest)
  */
 function calculateZonePriority(zone) {
   const { status, tasks = [] } = zone;
 
-  // NEUTRAL zones have maximum priority
+  // NEUTRAL zones generate logistics mission with maximum priority
   if (status === 'NEUTRAL') {
-    return PRIORITY_LEVELS.NEUTRAL;
+    return PRIORITY_LEVELS.NEUTRAL_LOGISTICS;
   }
 
-  // UNDER_ATTACK zones have elevated priority
+  // UNDER_ATTACK zones have elevated priority (regardless of task count)
   if (status === 'UNDER_ATTACK') {
     return PRIORITY_LEVELS.UNDER_ATTACK;
   }
 
-  // RED zones - priority depends on tasks
-  if (status === 'RED') {
-    const hasCAS = tasks.includes('CAS');
-    const hasDEAD = tasks.includes('DEAD');
-    const hasSEAD = tasks.includes('SEAD');
+  // For all other zones (RED, BLUE), priority depends on NUMBER of tasks
+  const taskCount = tasks.length;
 
-    // Only CAS → Priority 3 (alta)
-    if (hasCAS && !hasDEAD && !hasSEAD) {
-      return PRIORITY_LEVELS.RED_CAS_ONLY;
-    }
-
-    // CAS + DEAD → Priority 4 (media)
-    if (hasCAS && hasDEAD && !hasSEAD) {
-      return PRIORITY_LEVELS.RED_CAS_DEAD;
-    }
-
-    // CAS + DEAD + SEAD → Priority 5 (bassa)
-    if (hasCAS && hasDEAD && hasSEAD) {
-      return PRIORITY_LEVELS.RED_CAS_DEAD_SEAD;
-    }
+  // No tasks = no missions
+  if (taskCount === 0) {
+    return 999;
   }
 
-  // Default: no priority (zone doesn't require missions)
+  // 1 task → Priority 3 (alta)
+  if (taskCount === 1) {
+    return PRIORITY_LEVELS.ONE_TASK;
+  }
+
+  // 2 tasks → Priority 4 (media)
+  if (taskCount === 2) {
+    return PRIORITY_LEVELS.TWO_TASKS;
+  }
+
+  // 3+ tasks → Priority 5 (bassa)
+  if (taskCount >= 3) {
+    return PRIORITY_LEVELS.THREE_PLUS_TASKS;
+  }
+
   return 999;
 }
 
@@ -75,15 +75,15 @@ function calculateZonePriority(zone) {
  */
 function getPriorityLabel(priority) {
   switch (priority) {
-    case PRIORITY_LEVELS.NEUTRAL:
+    case PRIORITY_LEVELS.NEUTRAL_LOGISTICS:
       return 'Massima';
     case PRIORITY_LEVELS.UNDER_ATTACK:
       return 'Elevata';
-    case PRIORITY_LEVELS.RED_CAS_ONLY:
+    case PRIORITY_LEVELS.ONE_TASK:
       return 'Alta';
-    case PRIORITY_LEVELS.RED_CAS_DEAD:
+    case PRIORITY_LEVELS.TWO_TASKS:
       return 'Media';
-    case PRIORITY_LEVELS.RED_CAS_DEAD_SEAD:
+    case PRIORITY_LEVELS.THREE_PLUS_TASKS:
       return 'Bassa';
     default:
       return 'Nessuna';
@@ -106,7 +106,9 @@ function loadFrontlineZones() {
 
 /**
  * Generate combat missions from active zones
- * Only generates missions for zones that have tasks and meet priority criteria
+ * Generates missions based on zone status and tasks:
+ * - NEUTRAL zones: LOGISTICS mission (troop transport)
+ * - Other zones: one mission per task
  * @returns {Array} Array of generated combat missions
  */
 export function generateCombatMissions() {
@@ -114,19 +116,42 @@ export function generateCombatMissions() {
   const missions = [];
 
   zones.forEach(zone => {
-    // Only generate missions for zones with tasks
-    if (!zone.tasks || zone.tasks.length === 0) {
-      return;
-    }
-
     const priority = calculateZonePriority(zone);
 
-    // Skip zones with no priority
+    // Skip zones with no priority (no tasks and not NEUTRAL)
     if (priority === 999) {
       return;
     }
 
-    // Create a mission for each task in the zone
+    // NEUTRAL zones get a special LOGISTICS mission for troop transport
+    if (zone.status === 'NEUTRAL') {
+      const missionId = `combat_${Date.now()}_${missionIdCounter++}`;
+      const mission = {
+        id: missionId,
+        zone_id: zone.id,
+        zone_name: zone.name,
+        coordinates: zone.coordinates,
+        status: zone.status,
+        task_type: 'LOGISTICS', // Special task for NEUTRAL zones (troop transport)
+        priority: priority,
+        priority_label: getPriorityLabel(priority),
+        is_active: zone.isActive || false,
+        assigned_to: null,
+        assigned_aircraft: null,
+        mission_status: 'available', // available | assigned | completed | aborted
+        created_at: Date.now(),
+        assigned_at: null,
+        completed_at: null,
+      };
+      missions.push(mission);
+      return;
+    }
+
+    // For all other zones, create a mission for each task
+    if (!zone.tasks || zone.tasks.length === 0) {
+      return;
+    }
+
     zone.tasks.forEach(taskType => {
       const missionId = `combat_${Date.now()}_${missionIdCounter++}`;
       const mission = {
@@ -146,7 +171,6 @@ export function generateCombatMissions() {
         assigned_at: null,
         completed_at: null,
       };
-
       missions.push(mission);
     });
   });
