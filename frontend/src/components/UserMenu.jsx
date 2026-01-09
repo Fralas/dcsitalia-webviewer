@@ -1,35 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { LogIn, LogOut, User, ChevronDown } from 'lucide-react';
+import { useUser } from '../contexts/UserContext';
 
 /**
  * User Menu Component - Discord Authentication
  */
 export default function UserMenu() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { user, loading, setUser } = useUser();
   const [menuOpen, setMenuOpen] = useState(false);
-
-  // Check if user is logged in on mount
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const response = await fetch('/api/auth/user', {
-        credentials: 'include'
-      });
-
-      if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleLogin = () => {
     window.location.href = '/api/auth/discord';

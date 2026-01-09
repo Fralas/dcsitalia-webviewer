@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Helicopter, Anchor, Plus, X, TrendingUp, ArrowRight, FileDown, Weight, Clock, User, XCircle, Search } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Helicopter, Anchor, Plus, X, TrendingUp, ArrowRight, FileDown, Weight, Clock, User, XCircle, Search, LogIn } from 'lucide-react';
 import * as api from '../services/api';
 import WeaponChart from './WeaponChart';
 import { getAirportName } from '../config/airports';
@@ -8,6 +8,7 @@ import { generateChartsPDF, checkChartsAvailable } from '../utils/pdfGenerator';
 import { isImportantWeapon, importantWeaponsAirports, importantWeaponsHeliports, importantWeaponsCarriers } from '../config/weapons';
 import { formatWeight } from '../utils/weightFormatter';
 import { t, formatElapsedTime, formatRemainingTime, getStatusLabel } from '../utils/locale';
+import { useUser } from '../contexts/UserContext';
 
 /**
  * Get weapon display name (remove prefix)
@@ -69,6 +70,55 @@ function StatusBadge({ status }) {
 }
 
 /**
+ * Login Required Modal
+ */
+function LoginRequiredModal({ onClose, onLogin }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+      ></div>
+
+      {/* Modal */}
+      <div className="relative bg-yt-bg-secondary border-2 border-yt-accent rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl">
+        <div className="text-center">
+          <div className="mx-auto w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mb-4">
+            <LogIn className="w-8 h-8 text-blue-400" />
+          </div>
+
+          <h3 className="text-xl font-bold text-yt-text-primary mb-2">
+            Autenticazione Richiesta
+          </h3>
+
+          <p className="text-yt-text-secondary mb-6">
+            Per accettare una missione devi essere autenticato con il tuo account Discord.
+          </p>
+
+          <div className="flex gap-3">
+            <button
+              onClick={onLogin}
+              className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold transition-all flex items-center justify-center gap-2"
+            >
+              <LogIn className="w-5 h-5" />
+              Login con Discord
+            </button>
+
+            <button
+              onClick={onClose}
+              className="px-4 py-3 bg-yt-bg-tertiary hover:bg-yt-border text-yt-text-primary rounded font-medium transition-all"
+            >
+              Annulla
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Airport Card Component
  */
 export default function AirportCard({ airport, missions = [], onMissionsUpdate, shouldExpand, expandToken }) {
@@ -83,7 +133,10 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
   const [weaponSearchTerm, setWeaponSearchTerm] = useState(''); // For weapon search
 
   // Mission management states
-  const [missionStates, setMissionStates] = useState({}); // { missionId: { userName, showAccept, loading } }
+  const [missionStates, setMissionStates] = useState({}); // { missionId: { loading, showLoginModal } }
+
+  // Use shared user context
+  const { user } = useUser();
 
   const cardRef = useRef(null);
 
@@ -150,21 +203,31 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
 
   // Handle mission accept
   const handleAcceptMission = async (missionId) => {
-    const state = missionStates[missionId] || {};
-    if (!state.userName?.trim()) {
-      alert(t('airportCard.alerts.enterName'));
+    // Controlla se l'utente è autenticato
+    if (!user) {
+      const state = missionStates[missionId] || {};
+      setMissionStates(prev => ({ ...prev, [missionId]: { ...state, showLoginModal: true } }));
       return;
     }
 
+    // Usa il nome Discord dell'utente
+    const userName = user.globalName || user.username;
+
+    const state = missionStates[missionId] || {};
     setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: true } }));
     try {
-      await api.acceptMission(missionId, state.userName);
-      setMissionStates(prev => ({ ...prev, [missionId]: { userName: '', showAccept: false, loading: false } }));
+      await api.acceptMission(missionId, userName);
+      setMissionStates(prev => ({ ...prev, [missionId]: { loading: false, showLoginModal: false } }));
       if (onMissionsUpdate) onMissionsUpdate();
     } catch (error) {
       alert(t('airportCard.alerts.acceptError', { message: error.message }));
       setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: false } }));
     }
+  };
+
+  // Handle login redirect
+  const handleLogin = () => {
+    window.location.href = '/api/auth/discord';
   };
 
   // Handle mission complete
@@ -391,7 +454,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                   const distance = mission.distance_nm ? `${mission.distance_nm}nm` : '-';
                   const timeAgo = getTimeAgo(mission.created_at);
                   const expiresIn = getTimeRemaining(mission.expires_at);
-                  const state = missionStates[mission.id] || { userName: '', showAccept: false, loading: false };
+                  const state = missionStates[mission.id] || { loading: false, showLoginModal: false };
 
                   return (
                     <div key={mission.id} className="bg-yt-bg-secondary p-3 rounded-lg border-2 border-fuchsia-500/30">
@@ -524,42 +587,15 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
 
                       {/* Action buttons */}
                       <div className="flex gap-2">
-                        {mission.status === 'pending' && !state.showAccept && (
+                        {mission.status === 'pending' && (
                           <button
-                            onClick={() => setMissionStates(prev => ({ ...prev, [mission.id]: { ...state, showAccept: true } }))}
+                            onClick={() => handleAcceptMission(mission.id)}
                             disabled={state.loading}
                             className="flex-1 px-3 py-1.5 bg-green-400/20 text-green-400 border border-green-400/50 hover:bg-green-400/30 disabled:bg-yt-bg-tertiary disabled:text-yt-text-secondary disabled:border-yt-border rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5"
                           >
                             <CheckCircle className="w-3.5 h-3.5" />
                             {t('general.buttons.accept')}
                           </button>
-                        )}
-
-                        {mission.status === 'pending' && state.showAccept && (
-                          <div className="flex-1 flex gap-2">
-                            <input
-                              type="text"
-                              placeholder={t('general.form.pilotName')}
-                              value={state.userName}
-                              onChange={(e) => setMissionStates(prev => ({ ...prev, [mission.id]: { ...state, userName: e.target.value } }))}
-                              className="flex-1 px-2 py-1.5 bg-yt-bg-primary border border-yt-border rounded text-yt-text-primary text-xs focus:border-yt-accent focus:outline-none"
-                              disabled={state.loading}
-                            />
-                            <button
-                              onClick={() => handleAcceptMission(mission.id)}
-                              disabled={state.loading}
-                              className="px-3 py-1.5 bg-green-400/20 text-green-400 border border-green-400/50 hover:bg-green-400/30 disabled:bg-yt-bg-tertiary disabled:text-yt-text-secondary disabled:border-yt-border rounded text-xs font-bold transition-all"
-                            >
-                              OK
-                            </button>
-                            <button
-                              onClick={() => setMissionStates(prev => ({ ...prev, [mission.id]: { ...state, showAccept: false } }))}
-                              disabled={state.loading}
-                              className="px-3 py-1.5 bg-yt-bg-tertiary hover:bg-yt-border text-yt-text-primary rounded text-xs transition-all"
-                            >
-                              ✕
-                            </button>
-                          </div>
                         )}
 
                         {mission.status === 'accepted' && (
@@ -582,6 +618,14 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                           <span className="hidden sm:inline">{t('general.buttons.cancel')}</span>
                         </button>
                       </div>
+
+                      {/* Login Required Modal */}
+                      {state.showLoginModal && (
+                        <LoginRequiredModal
+                          onClose={() => setMissionStates(prev => ({ ...prev, [mission.id]: { ...state, showLoginModal: false } }))}
+                          onLogin={handleLogin}
+                        />
+                      )}
                     </div>
                   );
                 })}
