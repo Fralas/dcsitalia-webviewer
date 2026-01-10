@@ -511,6 +511,30 @@ app.post('/api/combat-missions/:id/assign', (req, res) => {
 });
 
 /**
+ * POST /api/combat-missions/:id/add-user - Add additional user to an assigned mission
+ */
+app.post('/api/combat-missions/:id/add-user', (req, res) => {
+  const { pilotName, aircraft } = req.body;
+
+  if (!pilotName || !aircraft) {
+    return res.status(400).json({ error: 'pilotName and aircraft are required' });
+  }
+
+  const mission = combatMissionDispatch.addUserToMission(req.params.id, pilotName, aircraft);
+
+  if (!mission) {
+    return res.status(400).json({ error: 'Mission not found, not assigned, or user already added' });
+  }
+
+  // Broadcast combat mission update to all clients
+  io.emit('combat-missions:updated', {
+    missions: combatMissionDispatch.getAllCombatMissions()
+  });
+
+  res.json({ success: true, mission });
+});
+
+/**
  * POST /api/combat-missions/:id/complete - Complete a combat mission
  */
 app.post('/api/combat-missions/:id/complete', (req, res) => {
@@ -580,6 +604,20 @@ app.post('/api/combat-missions/clear', (req, res) => {
 app.get('/api/combat-missions/pilot/:pilotName', (req, res) => {
   const missions = combatMissionDispatch.getMissionsByPilot(req.params.pilotName);
   res.json(missions);
+});
+
+/**
+ * GET /api/mock-users - Get mock users for testing (development only)
+ */
+app.get('/api/mock-users', (req, res) => {
+  const mockUsers = [
+    { id: 'mock_1', globalName: 'Alpha Leader', username: 'alpha_leader', aircraft: 'F-16C' },
+    { id: 'mock_2', globalName: 'Bravo Two', username: 'bravo_two', aircraft: 'F/A-18C' },
+    { id: 'mock_3', globalName: 'Charlie Three', username: 'charlie_three', aircraft: 'A-10C' },
+    { id: 'mock_4', globalName: 'Delta Four', username: 'delta_four', aircraft: 'F-15E' },
+    { id: 'mock_5', globalName: 'Echo Five', username: 'echo_five', aircraft: 'AV-8B' },
+  ];
+  res.json(mockUsers);
 });
 
 /**

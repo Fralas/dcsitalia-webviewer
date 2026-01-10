@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Target, Plane, AlertTriangle, CheckCircle, XCircle, LogIn, ChevronDown, ChevronUp } from 'lucide-react';
+import { Target, Plane, AlertTriangle, CheckCircle, XCircle, LogIn, ChevronDown, ChevronUp, Plus } from 'lucide-react';
 import * as api from '../services/api';
 import { useUser } from '../contexts/UserContext';
 import socketService from '../services/socket';
@@ -247,11 +247,126 @@ function AircraftSelectionModal({ mission, onClose, onConfirm, user }) {
 }
 
 /**
+ * Add User Modal - Select from mock users to add to mission
+ */
+function AddUserModal({ mission, onClose, onConfirm }) {
+  const [mockUsers, setMockUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedUser, setSelectedUser] = useState(null);
+
+  useEffect(() => {
+    const fetchMockUsers = async () => {
+      try {
+        const users = await api.getMockUsers();
+        // Filter out users already assigned to the mission
+        const availableUsers = users.filter(
+          u => !mission.assigned_users.some(au => au.name === u.globalName)
+        );
+        setMockUsers(availableUsers);
+      } catch (error) {
+        console.error('Error fetching mock users:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMockUsers();
+  }, [mission]);
+
+  const handleAddUser = async () => {
+    if (!selectedUser) return;
+
+    setLoading(true);
+    try {
+      await api.addUserToCombatMission(mission.id, selectedUser.globalName, selectedUser.aircraft);
+      onConfirm();
+      onClose();
+    } catch (error) {
+      alert('Errore nell\'aggiungere l\'utente: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+      ></div>
+
+      <div className="relative bg-yt-bg-secondary border-2 border-yt-accent rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl">
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Plus className="w-6 h-6 text-yt-accent" />
+            <h3 className="text-xl font-bold text-yt-text-primary">
+              Aggiungi Pilota
+            </h3>
+          </div>
+          <p className="text-sm text-yt-text-secondary">
+            Missione: {mission.zone_name}
+          </p>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-8 text-yt-text-secondary">
+            Caricamento piloti...
+          </div>
+        ) : mockUsers.length === 0 ? (
+          <div className="text-center py-8 text-yt-text-secondary">
+            Nessun pilota disponibile
+          </div>
+        ) : (
+          <>
+            <div className="mb-4 max-h-64 overflow-y-auto">
+              <div className="space-y-2">
+                {mockUsers.map(user => (
+                  <button
+                    key={user.id}
+                    onClick={() => setSelectedUser(user)}
+                    className={`w-full px-4 py-3 rounded border transition-all text-left ${
+                      selectedUser?.id === user.id
+                        ? 'bg-yt-accent border-yt-accent text-yt-bg-primary'
+                        : 'bg-yt-bg-tertiary border-yt-border text-yt-text-primary hover:border-yt-accent'
+                    }`}
+                  >
+                    <div className="font-semibold">{user.globalName}</div>
+                    <div className="text-sm opacity-75">{user.aircraft}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleAddUser}
+                disabled={loading || !selectedUser}
+                className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded font-bold transition-all flex items-center justify-center gap-2"
+              >
+                <Plus className="w-5 h-5" />
+                {loading ? 'Aggiungendo...' : 'Aggiungi Pilota'}
+              </button>
+
+              <button
+                onClick={onClose}
+                className="px-4 py-3 bg-yt-bg-tertiary hover:bg-yt-border text-yt-text-primary rounded font-medium transition-all"
+              >
+                Annulla
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Combat Mission Card Component
  */
 function CombatMissionCard({ mission, onUpdate, onAccept, user }) {
   const [showAircraftModal, setShowAircraftModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleAccept = () => {
@@ -341,9 +456,29 @@ function CombatMissionCard({ mission, onUpdate, onAccept, user }) {
         {/* Status info se assegnata/completata */}
         {isAssigned && (
           <div className="bg-blue-500/10 border border-blue-500/30 rounded px-2 py-1.5 mb-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-blue-400 font-semibold">Assegnata a:</span>
-              <span className="text-xs text-yt-text-primary">{mission.assigned_to} ({mission.assigned_aircraft})</span>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <span className="text-xs text-blue-400 font-semibold">Assegnata a: </span>
+                <span className="text-xs text-yt-text-primary">
+                  {mission.assigned_users && mission.assigned_users.length > 0
+                    ? mission.assigned_users.map((u, idx) => (
+                        <span key={idx}>
+                          {u.name} ({u.aircraft}){idx < mission.assigned_users.length - 1 ? ', ' : ''}
+                        </span>
+                      ))
+                    : `${mission.assigned_to} (${mission.assigned_aircraft})`
+                  }
+                </span>
+              </div>
+              {user && (user.globalName === mission.assigned_to || user.username === mission.assigned_to) && (
+                <button
+                  onClick={() => setShowAddUserModal(true)}
+                  className="flex-shrink-0 w-6 h-6 bg-blue-600 hover:bg-blue-700 rounded flex items-center justify-center transition-all"
+                  title="Aggiungi pilota"
+                >
+                  <Plus className="w-4 h-4 text-white" />
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -407,6 +542,14 @@ function CombatMissionCard({ mission, onUpdate, onAccept, user }) {
         <LoginRequiredModal
           onClose={() => setShowLoginModal(false)}
           onLogin={handleLogin}
+        />
+      )}
+
+      {showAddUserModal && (
+        <AddUserModal
+          mission={mission}
+          onClose={() => setShowAddUserModal(false)}
+          onConfirm={onUpdate}
         />
       )}
     </>

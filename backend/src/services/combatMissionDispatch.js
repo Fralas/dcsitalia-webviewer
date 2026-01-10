@@ -136,8 +136,9 @@ export function generateCombatMissions() {
         priority: priority,
         priority_label: getPriorityLabel(priority),
         is_active: zone.isActive || false,
-        assigned_to: null,
-        assigned_aircraft: null,
+        assigned_to: null, // Legacy - kept for backwards compatibility
+        assigned_aircraft: null, // Legacy - kept for backwards compatibility
+        assigned_users: [], // Array of { name, aircraft }
         mission_status: 'available', // available | assigned | completed | aborted
         created_at: Date.now(),
         assigned_at: null,
@@ -163,8 +164,9 @@ export function generateCombatMissions() {
       priority: priority,
       priority_label: getPriorityLabel(priority),
       is_active: zone.isActive || false,
-      assigned_to: null,
-      assigned_aircraft: null,
+      assigned_to: null, // Legacy - kept for backwards compatibility
+      assigned_aircraft: null, // Legacy - kept for backwards compatibility
+      assigned_users: [], // Array of { name, aircraft }
       mission_status: 'available', // available | assigned | completed | aborted
       created_at: Date.now(),
       assigned_at: null,
@@ -225,14 +227,50 @@ export function assignCombatMission(missionId, pilotName, aircraft) {
     return null;
   }
 
-  // Assign mission
-  mission.assigned_to = pilotName;
-  mission.assigned_aircraft = aircraft;
+  // Assign mission (legacy fields + new multi-user array)
+  mission.assigned_to = pilotName; // Keep for backwards compatibility
+  mission.assigned_aircraft = aircraft; // Keep for backwards compatibility
+  mission.assigned_users = [{ name: pilotName, aircraft: aircraft }]; // New multi-user support
   mission.mission_status = 'assigned';
   mission.assigned_at = Date.now();
 
   console.log(`✈️  Mission ${missionId} assigned to ${pilotName} (${aircraft})`);
-  console.log(`   Zone: ${mission.zone_name} | Task: ${mission.task_type} | Priority: ${mission.priority_label}`);
+  console.log(`   Zone: ${mission.zone_name} | Tasks: ${mission.tasks.join(', ')} | Priority: ${mission.priority_label}`);
+
+  return mission;
+}
+
+/**
+ * Add additional user to an assigned mission
+ * @param {string} missionId - Mission ID
+ * @param {string} pilotName - Pilot name to add
+ * @param {string} aircraft - Aircraft type
+ * @returns {Object|null} Updated mission or null if not found/invalid
+ */
+export function addUserToMission(missionId, pilotName, aircraft) {
+  const mission = combatMissions.find(m => m.id === missionId);
+
+  if (!mission) {
+    console.error(`Mission ${missionId} not found`);
+    return null;
+  }
+
+  if (mission.mission_status !== 'assigned') {
+    console.error(`Mission ${missionId} is not assigned (status: ${mission.mission_status})`);
+    return null;
+  }
+
+  // Check if user already assigned
+  if (mission.assigned_users.some(u => u.name === pilotName)) {
+    console.error(`${pilotName} is already assigned to mission ${missionId}`);
+    return null;
+  }
+
+  // Add user to mission
+  mission.assigned_users.push({ name: pilotName, aircraft: aircraft });
+
+  console.log(`✈️  Added ${pilotName} (${aircraft}) to mission ${missionId}`);
+  console.log(`   Zone: ${mission.zone_name} | Total pilots: ${mission.assigned_users.length}`);
 
   return mission;
 }
@@ -365,6 +403,7 @@ export function refreshCombatMissions() {
           is_active: zone.isActive || false,
           assigned_to: null,
           assigned_aircraft: null,
+          assigned_users: [],
           mission_status: 'available',
           created_at: Date.now(),
           assigned_at: null,
@@ -389,6 +428,7 @@ export function refreshCombatMissions() {
           is_active: zone.isActive || false,
           assigned_to: null,
           assigned_aircraft: null,
+          assigned_users: [],
           mission_status: 'available',
           created_at: Date.now(),
           assigned_at: null,

@@ -200,6 +200,23 @@ export async function getPilotCombatMissions(pilotName) {
   return fetchAPI(`/combat-missions/pilot/${encodeURIComponent(pilotName)}`);
 }
 
+/**
+ * Add user to an assigned combat mission
+ */
+export async function addUserToCombatMission(missionId, pilotName, aircraft) {
+  return fetchAPI(`/combat-missions/${missionId}/add-user`, {
+    method: 'POST',
+    body: JSON.stringify({ pilotName, aircraft })
+  });
+}
+
+/**
+ * Get mock users for testing
+ */
+export async function getMockUsers() {
+  return fetchAPI('/mock-users');
+}
+
 export default {
   getAirports,
   getAirport,
