@@ -308,47 +308,7 @@ export default function FrontlineMap({ airportsData }) {
                   eventHandlers={{
                     click: () => handleZoneClick(zone.id),
                   }}
-                >
-                  <Popup>
-                    <div className="text-sm">
-                      <div className="font-bold text-base">{zone.name}</div>
-                      <div className="mt-1 flex items-center gap-2">
-                        <span
-                          className="px-2 py-1 rounded text-xs font-semibold"
-                          style={{
-                            backgroundColor: `${color}20`,
-                            color: color
-                          }}
-                        >
-                          {getStatusLabel(zone.status)}
-                        </span>
-                        {isActive && (
-                          <span className="px-2 py-1 rounded text-xs font-semibold bg-green-500/20 text-green-600">
-                            ATTIVA
-                          </span>
-                        )}
-                      </div>
-                      {hasTasks && (
-                        <div className="mt-2 pt-2 border-t border-gray-200">
-                          <div className="text-xs font-semibold text-gray-700 mb-1">Task richieste:</div>
-                          <div className="flex flex-wrap gap-1">
-                            {zone.tasks.map((task, idx) => (
-                              <span
-                                key={idx}
-                                className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium"
-                              >
-                                {task}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      <div className="text-gray-600 text-xs mt-2 font-mono">
-                        {toDMS(zone.coordinates.lat, true)} {toDMS(zone.coordinates.lon, false)}
-                      </div>
-                    </div>
-                  </Popup>
-                </CircleMarker>
+                />
               );
             })}
 
