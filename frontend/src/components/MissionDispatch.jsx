@@ -89,7 +89,7 @@ function LoginRequiredModal({ onClose, onLogin }) {
 /**
  * Mission Card Component
  */
-function MissionCard({ mission, airports, onUpdate, isHighlighted, user }) {
+function MissionCard({ mission, airports, onUpdate, isHighlighted, user, onStatsUpdate }) {
   const [loading, setLoading] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const cardRef = useRef(null);
@@ -145,6 +145,9 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted, user }) {
     try {
       await api.completeMission(mission.id);
       onUpdate();
+      if (user) {
+        onStatsUpdate({ missionsCompleted: 1, ordersCompleted: 1 });
+      }
     } catch (error) {
       alert(t('airportCard.alerts.completeError', { message: error.message }));
     } finally {
@@ -329,7 +332,7 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
   const [filter, setFilter] = useState('all'); // all, pending, accepted
 
   // Use shared user context
-  const { user } = useUser();
+  const { user, incrementStats } = useUser();
 
   const filteredMissions = missions.filter(m => {
     if (filter === 'pending') return m.status === 'pending';
@@ -426,6 +429,7 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
               onUpdate={onUpdate}
               isHighlighted={mission.id === highlightedMissionId}
               user={user}
+              onStatsUpdate={incrementStats}
             />
           ))}
         </div>

@@ -29,6 +29,7 @@ import * as discordAuth from './services/discordAuth.js';
 import * as combatMissionDispatch from './services/combatMissionDispatch.js';
 import * as luaZoneSync from './services/luaZoneSync.js';
 import * as activeUsers from './services/activeUsers.js';
+import * as userProfiles from './services/userProfiles.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -341,6 +342,30 @@ app.post('/api/auth/logout', async (req, res) => {
     res.clearCookie('connect.sid');
     res.json({ success: true });
   });
+});
+
+/**
+ * GET /api/profile - Get current user's profile
+ */
+app.get('/api/profile', (req, res) => {
+  if (!req.session.user) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const profile = userProfiles.getProfile(req.session.user.id);
+  res.json(profile);
+});
+
+/**
+ * PUT /api/profile - Save current user's profile
+ */
+app.put('/api/profile', (req, res) => {
+  if (!req.session.user) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const savedProfile = userProfiles.saveProfile(req.session.user.id, req.body);
+  res.json(savedProfile);
 });
 
 // ==================== DATA ROUTES ====================

@@ -136,7 +136,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
   const [missionStates, setMissionStates] = useState({}); // { missionId: { loading, showLoginModal } }
 
   // Use shared user context
-  const { user } = useUser();
+  const { user, incrementStats } = useUser();
 
   const cardRef = useRef(null);
 
@@ -238,6 +238,9 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
     setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: true } }));
     try {
       await api.completeMission(missionId);
+      if (user) {
+        incrementStats({ missionsCompleted: 1, ordersCompleted: 1 });
+      }
       setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: false } }));
       if (onMissionsUpdate) onMissionsUpdate();
     } catch (error) {

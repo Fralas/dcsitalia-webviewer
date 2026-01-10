@@ -5,10 +5,12 @@ import MapView from './components/MapView';
 import FrontlineMap from './components/FrontlineMap';
 import AdminPanel from './components/AdminPanel';
 import UserMenu from './components/UserMenu';
+import UserProfile from './components/UserProfile';
 import * as api from './services/api';
 import socketService from './services/socket';
 import { t } from './utils/locale';
 import logoImg from '../img/DCS_ITALIA_ICON.png';
+import { useUser } from './contexts/UserContext';
 
 function App() {
   const [currentView, setCurrentView] = useState('dashboard'); // dashboard, missions
@@ -21,6 +23,7 @@ function App() {
   const [highlightedMissionId, setHighlightedMissionId] = useState(null);
   const [selectedAirportId, setSelectedAirportId] = useState(null);
   const [selectedAirportToken, setSelectedAirportToken] = useState(0);
+  const { user } = useUser();
 
   // Load initial data
   useEffect(() => {
@@ -144,7 +147,12 @@ function App() {
         <div className="container mx-auto px-4 py-2">
           <div className="flex items-center justify-between">
             {/* Logo compatto */}
-            <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCurrentView(user ? 'profile' : 'dashboard')}
+              className="flex items-center gap-2 text-left hover:opacity-90 transition-opacity"
+              title={user ? 'Apri profilo' : 'Dashboard'}
+            >
               <img
                 src={logoImg}
                 alt="DCS Italia"
@@ -154,7 +162,7 @@ function App() {
                 <h1 className="text-lg font-bold text-yt-text-primary">{t('general.appTitle')}</h1>
                 <p className="text-xs text-yt-text-secondary">{t('general.appSubtitle')}</p>
               </div>
-            </div>
+            </button>
 
             <div className="flex items-center gap-3">
               {/* Navigation - compatta e moderna */}
@@ -206,7 +214,7 @@ function App() {
               </nav>
 
               {/* User Menu */}
-              <UserMenu />
+              <UserMenu onProfileOpen={() => setCurrentView('profile')} />
             </div>
           </div>
         </div>
@@ -242,6 +250,9 @@ function App() {
         )}
         {currentView === 'admin' && (
           <AdminPanel />
+        )}
+        {currentView === 'profile' && (
+          <UserProfile />
         )}
       </main>
 

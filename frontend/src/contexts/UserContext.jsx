@@ -1,14 +1,34 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { getDefaultUserProfile, loadUserProfile, saveUserProfile } from '../utils/userProfile';
+import * as api from '../services/api';
 
 const UserContext = createContext(null);
 
 export function UserProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState(null);
 
   useEffect(() => {
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    if (user?.id) {
+      const cachedProfile = loadUserProfile(user.id);
+      setProfile(cachedProfile);
+      api.getUserProfile()
+        .then((profileData) => {
+          setProfile(profileData);
+          saveUserProfile(user.id, profileData);
+        })
+        .catch((error) => {
+          console.warn('Profile fetch failed, using local cache:', error);
+        });
+    } else {
+      setProfile(null);
+    }
+  }, [user]);
 
   const checkAuth = async () => {
     try {
@@ -31,8 +51,36 @@ export function UserProvider({ children }) {
     setUser(null);
   };
 
+  const updateProfile = (updater) => {
+    if (!user?.id) return;
+    setProfile(prev => {
+      const baseProfile = prev || getDefaultUserProfile();
+      const nextProfile = typeof updater === 'function' ? updater(baseProfile) : updater;
+      saveUserProfile(user.id, nextProfile);
+      api.saveUserProfile(nextProfile).catch((error) => {
+        console.warn('Profile save failed, kept local cache:', error);
+      });
+      return nextProfile;
+    });
+  };
+
+  const incrementStats = (increments) => {
+    if (!user?.id) return;
+    updateProfile(prev => {
+      const missionsCompleted = prev.stats.missionsCompleted + (increments.missionsCompleted || 0);
+      const ordersCompleted = prev.stats.ordersCompleted + (increments.ordersCompleted || 0);
+      return {
+        ...prev,
+        stats: {
+          missionsCompleted,
+          ordersCompleted,
+        },
+      };
+    });
+  };
+
   return (
-    <UserContext.Provider value={{ user, setUser, loading, logout }}>
+    <UserContext.Provider value={{ user, setUser, loading, logout, profile, updateProfile, incrementStats }}>
       {children}
     </UserContext.Provider>
   );

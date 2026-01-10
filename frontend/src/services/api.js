@@ -224,6 +224,26 @@ export async function getLoggedInUsers() {
   return fetchAPI('/logged-in-users');
 }
 
+/**
+ * Get current user's profile
+ */
+export async function getUserProfile() {
+  return fetchAPI('/profile', {
+    credentials: 'include',
+  });
+}
+
+/**
+ * Save current user's profile
+ */
+export async function saveUserProfile(profile) {
+  return fetchAPI('/profile', {
+    method: 'PUT',
+    body: JSON.stringify(profile),
+    credentials: 'include',
+  });
+}
+
 export default {
   getAirports,
   getAirport,
@@ -246,4 +266,6 @@ export default {
   refreshCombatMissions,
   clearCombatMissions,
   getPilotCombatMissions,
+  getUserProfile,
+  saveUserProfile,
 };

@@ -398,7 +398,7 @@ function AddUserModal({ mission, onClose, onConfirm }) {
 /**
  * Combat Mission Card Component
  */
-function CombatMissionCard({ mission, onUpdate, onAccept, user, isHighlighted, onMissionClick, cardRef }) {
+function CombatMissionCard({ mission, onUpdate, onAccept, user, isHighlighted, onMissionClick, cardRef, onStatsUpdate }) {
   const [showAircraftModal, setShowAircraftModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -430,6 +430,9 @@ function CombatMissionCard({ mission, onUpdate, onAccept, user, isHighlighted, o
     try {
       await api.completeCombatMission(mission.id);
       onUpdate();
+      if (user) {
+        onStatsUpdate({ missionsCompleted: 1, ordersCompleted: 1 });
+      }
     } catch (error) {
       alert('Errore nel completare la missione: ' + error.message);
     } finally {
@@ -639,7 +642,7 @@ export default function MissionDispatchPanel({ selectedZoneId, onMissionClick })
   const [filter, setFilter] = useState('available'); // available | assigned | all
   const [priorityFilter, setPriorityFilter] = useState('all'); // all | 1 | 2 | 3 | 4 | 5
   const [expanded, setExpanded] = useState(true);
-  const { user } = useUser();
+  const { user, incrementStats } = useUser();
 
   // Refs for mission cards to enable scrolling
   const missionRefs = useRef({});
@@ -876,6 +879,7 @@ export default function MissionDispatchPanel({ selectedZoneId, onMissionClick })
                 user={user}
                 isHighlighted={mission.zone_id === selectedZoneId}
                 onMissionClick={onMissionClick}
+                onStatsUpdate={incrementStats}
                 cardRef={(el) => {
                   if (el) {
                     missionRefs.current[mission.zone_id] = el;

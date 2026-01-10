@@ -1,16 +1,23 @@
 import { useState } from 'react';
-import { LogIn, LogOut, User, ChevronDown } from 'lucide-react';
+import { LogIn, LogOut, User, ChevronDown, UserCircle } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 
 /**
  * User Menu Component - Discord Authentication
  */
-export default function UserMenu() {
+export default function UserMenu({ onProfileOpen }) {
   const { user, loading, setUser } = useUser();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const handleLogin = () => {
     window.location.href = '/api/auth/discord';
+  };
+
+  const handleProfileOpen = () => {
+    setMenuOpen(false);
+    if (onProfileOpen) {
+      onProfileOpen();
+    }
   };
 
   const handleLogout = async () => {
@@ -94,6 +101,13 @@ export default function UserMenu() {
                 </div>
               )}
             </div>
+            <button
+              onClick={handleProfileOpen}
+              className="w-full px-3 py-2 text-left text-sm text-yt-text-primary hover:bg-yt-bg-tertiary flex items-center gap-2 transition-all"
+            >
+              <UserCircle className="w-4 h-4" />
+              Profilo
+            </button>
             <button
               onClick={handleLogout}
               className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-yt-bg-tertiary flex items-center gap-2 transition-all rounded-b-lg"
