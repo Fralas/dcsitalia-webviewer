@@ -34,7 +34,7 @@ function FitBounds({ positions }) {
   if (positions.length > 0) {
     setTimeout(() => {
       const bounds = L.latLngBounds(positions);
-      map.fitBounds(bounds, { padding: [50, 50] });
+      map.fitBounds(bounds, { padding: [80, 80] });
     }, 100);
   }
 
@@ -166,9 +166,9 @@ export default function FrontlineMap({ airportsData }) {
   console.log('🗺️ FrontlineMap rendered with', validZones.length, 'zones');
 
   return (
-    <div className="h-screen bg-yt-bg-primary flex flex-col overflow-hidden">
+    <div className="h-full bg-yt-bg-primary flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="bg-yt-bg-secondary p-3 border-b border-yt-border flex-shrink-0">
+      <div className="bg-yt-bg-secondary px-3 py-2 border-b border-yt-border flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-yt-accent/20 rounded">
@@ -224,7 +224,7 @@ export default function FrontlineMap({ airportsData }) {
       </div>
 
       {/* Two-column layout: Map | Missions */}
-      <div className="flex-1 flex gap-4 p-4 overflow-hidden">
+      <div className="flex-1 flex gap-3 p-3 overflow-hidden">
         {/* Map - Left side (45% width) */}
         <div className="flex-[2] bg-yt-bg-secondary rounded-lg overflow-hidden border border-yt-border">
           <MapContainer

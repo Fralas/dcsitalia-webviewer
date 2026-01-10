@@ -245,12 +245,14 @@ function App() {
         )}
       </main>
 
-      {/* Footer - compatto */}
-      <footer className="bg-yt-bg-secondary border-t border-yt-border mt-8">
-        <div className="container mx-auto px-4 py-3 text-center text-xs text-yt-text-secondary">
-          <p>DCS Italia Warehouse Viewer v1.0 • Real-time logistics management</p>
-        </div>
-      </footer>
+      {/* Footer - compatto (hidden on map/frontline/admin views) */}
+      {currentView !== 'map' && currentView !== 'frontline' && currentView !== 'admin' && (
+        <footer className="bg-yt-bg-secondary border-t border-yt-border mt-8">
+          <div className="container mx-auto px-4 py-3 text-center text-xs text-yt-text-secondary">
+            <p>DCS Italia Warehouse Viewer v1.0 • Real-time logistics management</p>
+          </div>
+        </footer>
+      )}
     </div>
   );
 }
