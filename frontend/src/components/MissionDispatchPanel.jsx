@@ -484,10 +484,7 @@ function CombatMissionCard({ mission, onUpdate, onAccept, user }) {
                 {mission.zone_name}
               </h3>
             </div>
-            <div className="flex items-center gap-2">
-              <StatusBadge status={mission.status} />
-              <PriorityBadge priority={mission.priority} priorityLabel={mission.priority_label} />
-            </div>
+            <StatusBadge status={mission.status} />
           </div>
         </div>
 
@@ -626,6 +623,7 @@ export default function MissionDispatchPanel() {
   const [allMissions, setAllMissions] = useState([]); // All missions for counts
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('available'); // available | assigned | all
+  const [priorityFilter, setPriorityFilter] = useState('all'); // all | 1 | 2 | 3 | 4 | 5
   const [expanded, setExpanded] = useState(true);
   const { user } = useUser();
 
@@ -636,10 +634,16 @@ export default function MissionDispatchPanel() {
       const allData = await api.getCombatMissions(null);
       setAllMissions(allData);
 
-      // Apply filter for display
-      const filteredData = filter === 'all'
+      // Apply status filter
+      let filteredData = filter === 'all'
         ? allData
         : allData.filter(m => m.mission_status === filter);
+
+      // Apply priority filter
+      if (priorityFilter !== 'all') {
+        filteredData = filteredData.filter(m => m.priority === parseInt(priorityFilter));
+      }
+
       setMissions(filteredData);
     } catch (error) {
       console.error('Error fetching combat missions:', error);
@@ -661,10 +665,16 @@ export default function MissionDispatchPanel() {
         // Store all missions
         setAllMissions(data.missions);
 
-        // Apply current filter to received missions for display
-        const filteredMissions = filter === 'all'
+        // Apply status filter
+        let filteredMissions = filter === 'all'
           ? data.missions
           : data.missions.filter(m => m.mission_status === filter);
+
+        // Apply priority filter
+        if (priorityFilter !== 'all') {
+          filteredMissions = filteredMissions.filter(m => m.priority === parseInt(priorityFilter));
+        }
+
         setMissions(filteredMissions);
         setLoading(false);
       } else {
@@ -677,10 +687,17 @@ export default function MissionDispatchPanel() {
       clearInterval(interval);
       unsubscribe();
     };
-  }, [filter]);
+  }, [filter, priorityFilter]);
 
   const availableCount = allMissions.filter(m => m.mission_status === 'available').length;
   const assignedCount = allMissions.filter(m => m.mission_status === 'assigned').length;
+
+  // Priority counts
+  const priority1Count = allMissions.filter(m => m.priority === 1).length;
+  const priority2Count = allMissions.filter(m => m.priority === 2).length;
+  const priority3Count = allMissions.filter(m => m.priority === 3).length;
+  const priority4Count = allMissions.filter(m => m.priority === 4).length;
+  const priority5Count = allMissions.filter(m => m.priority === 5).length;
 
   // Handle mission acceptance - switch to assigned filter to show the accepted mission
   const handleMissionAccept = () => {
@@ -713,38 +730,109 @@ export default function MissionDispatchPanel() {
       {expanded && (
         <>
           {/* Filters */}
-          <div className="px-4 pb-3 border-b border-yt-border">
-            <div className="flex gap-2">
-              <button
-                onClick={() => setFilter('available')}
-                className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${
-                  filter === 'available'
-                    ? 'bg-yt-accent text-yt-bg-primary'
-                    : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border'
-                }`}
-              >
-                Disponibili ({availableCount})
-              </button>
-              <button
-                onClick={() => setFilter('assigned')}
-                className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${
-                  filter === 'assigned'
-                    ? 'bg-yt-accent text-yt-bg-primary'
-                    : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border'
-                }`}
-              >
-                Assegnate ({assignedCount})
-              </button>
-              <button
-                onClick={() => setFilter('all')}
-                className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${
-                  filter === 'all'
-                    ? 'bg-yt-accent text-yt-bg-primary'
-                    : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border'
-                }`}
-              >
-                Tutte ({missions.length})
-              </button>
+          <div className="px-4 pb-3 border-b border-yt-border space-y-3">
+            {/* Status filters */}
+            <div>
+              <div className="text-xs font-semibold text-yt-text-secondary mb-2 uppercase tracking-wide">Status</div>
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={() => setFilter('available')}
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${
+                    filter === 'available'
+                      ? 'bg-yt-accent text-yt-bg-primary'
+                      : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border'
+                  }`}
+                >
+                  Disponibili ({availableCount})
+                </button>
+                <button
+                  onClick={() => setFilter('assigned')}
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${
+                    filter === 'assigned'
+                      ? 'bg-yt-accent text-yt-bg-primary'
+                      : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border'
+                  }`}
+                >
+                  Assegnate ({assignedCount})
+                </button>
+                <button
+                  onClick={() => setFilter('all')}
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${
+                    filter === 'all'
+                      ? 'bg-yt-accent text-yt-bg-primary'
+                      : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border'
+                  }`}
+                >
+                  Tutte ({allMissions.length})
+                </button>
+              </div>
+            </div>
+
+            {/* Priority filters */}
+            <div>
+              <div className="text-xs font-semibold text-yt-text-secondary mb-2 uppercase tracking-wide">Priorità</div>
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={() => setPriorityFilter('all')}
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${
+                    priorityFilter === 'all'
+                      ? 'bg-yt-accent text-yt-bg-primary'
+                      : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border'
+                  }`}
+                >
+                  Tutte
+                </button>
+                <button
+                  onClick={() => setPriorityFilter('1')}
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition-all border ${
+                    priorityFilter === '1'
+                      ? 'bg-red-500/20 text-red-400 border-red-500'
+                      : 'bg-yt-bg-tertiary text-yt-text-secondary border-transparent hover:bg-yt-border'
+                  }`}
+                >
+                  Massima ({priority1Count})
+                </button>
+                <button
+                  onClick={() => setPriorityFilter('2')}
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition-all border ${
+                    priorityFilter === '2'
+                      ? 'bg-orange-500/20 text-orange-400 border-orange-500'
+                      : 'bg-yt-bg-tertiary text-yt-text-secondary border-transparent hover:bg-yt-border'
+                  }`}
+                >
+                  Elevata ({priority2Count})
+                </button>
+                <button
+                  onClick={() => setPriorityFilter('3')}
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition-all border ${
+                    priorityFilter === '3'
+                      ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500'
+                      : 'bg-yt-bg-tertiary text-yt-text-secondary border-transparent hover:bg-yt-border'
+                  }`}
+                >
+                  Alta ({priority3Count})
+                </button>
+                <button
+                  onClick={() => setPriorityFilter('4')}
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition-all border ${
+                    priorityFilter === '4'
+                      ? 'bg-blue-500/20 text-blue-400 border-blue-500'
+                      : 'bg-yt-bg-tertiary text-yt-text-secondary border-transparent hover:bg-yt-border'
+                  }`}
+                >
+                  Media ({priority4Count})
+                </button>
+                <button
+                  onClick={() => setPriorityFilter('5')}
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition-all border ${
+                    priorityFilter === '5'
+                      ? 'bg-green-500/20 text-green-400 border-green-500'
+                      : 'bg-yt-bg-tertiary text-yt-text-secondary border-transparent hover:bg-yt-border'
+                  }`}
+                >
+                  Bassa ({priority5Count})
+                </button>
+              </div>
             </div>
           </div>
 
