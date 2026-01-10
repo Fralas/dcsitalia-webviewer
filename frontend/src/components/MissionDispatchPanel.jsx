@@ -249,7 +249,7 @@ function AircraftSelectionModal({ mission, onClose, onConfirm, user }) {
 /**
  * Combat Mission Card Component
  */
-function CombatMissionCard({ mission, onUpdate, user }) {
+function CombatMissionCard({ mission, onUpdate, onAccept, user }) {
   const [showAircraftModal, setShowAircraftModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -264,6 +264,13 @@ function CombatMissionCard({ mission, onUpdate, user }) {
 
   const handleLogin = () => {
     window.location.href = '/api/auth/discord';
+  };
+
+  const handleConfirmAssignment = () => {
+    onUpdate();
+    if (onAccept) {
+      onAccept(); // Notify parent to change filter
+    }
   };
 
   const handleComplete = async () => {
@@ -391,7 +398,7 @@ function CombatMissionCard({ mission, onUpdate, user }) {
         <AircraftSelectionModal
           mission={mission}
           onClose={() => setShowAircraftModal(false)}
-          onConfirm={onUpdate}
+          onConfirm={handleConfirmAssignment}
           user={user}
         />
       )}
@@ -469,6 +476,11 @@ export default function MissionDispatchPanel() {
 
   const availableCount = allMissions.filter(m => m.mission_status === 'available').length;
   const assignedCount = allMissions.filter(m => m.mission_status === 'assigned').length;
+
+  // Handle mission acceptance - switch to assigned filter to show the accepted mission
+  const handleMissionAccept = () => {
+    setFilter('assigned');
+  };
 
   return (
     <div className="bg-yt-bg-secondary rounded-lg border border-yt-border overflow-hidden">
@@ -548,6 +560,7 @@ export default function MissionDispatchPanel() {
                     key={mission.id}
                     mission={mission}
                     onUpdate={fetchMissions}
+                    onAccept={handleMissionAccept}
                     user={user}
                   />
                 ))}
