@@ -293,12 +293,125 @@ export function getMissionsByPilot(pilotName) {
 }
 
 /**
- * Refresh missions by regenerating from zones
- * This will clear current missions and regenerate
+ * Refresh missions by intelligently updating from zones
+ * - Preserves assigned/completed/aborted missions if their zone still exists
+ * - Removes missions for zones that no longer exist
+ * - Adds new missions for new zones
+ * - Regenerates all "available" missions from current zone data
  */
 export function refreshCombatMissions() {
-  console.log('🔄 Refreshing combat missions...');
-  return generateCombatMissions();
+  console.log('🔄 Refreshing combat missions intelligently...');
+
+  // Load updated zones
+  const zones = loadFrontlineZones();
+
+  // Create a map of zone_id -> zone for quick lookup
+  const zoneMap = new Map();
+  zones.forEach(zone => zoneMap.set(zone.id, zone));
+
+  // Separate missions by status
+  const preservedMissions = [];
+  let removedCount = 0;
+
+  // Preserve assigned/completed/aborted missions if their zone still exists
+  combatMissions.forEach(mission => {
+    if (mission.mission_status !== 'available') {
+      // Check if zone still exists
+      if (zoneMap.has(mission.zone_id)) {
+        // Update mission data from current zone state (coordinates, name, status)
+        const zone = zoneMap.get(mission.zone_id);
+        mission.status = zone.status;
+        mission.coordinates = zone.coordinates;
+        mission.zone_name = zone.name;
+        // Keep tasks and priority as they were when assigned
+
+        preservedMissions.push(mission);
+        console.log(`✅ Preserved ${mission.mission_status} mission for ${mission.zone_name} (assigned to ${mission.assigned_to || 'N/A'})`);
+      } else {
+        removedCount++;
+        console.log(`⚠️  Zone ${mission.zone_id} no longer exists, removing ${mission.mission_status} mission ${mission.id}`);
+      }
+    }
+  });
+
+  // Generate new available missions from zones
+  const newAvailableMissions = [];
+
+  zones.forEach(zone => {
+    const priority = calculateZonePriority(zone);
+
+    // Skip zones with no priority (no tasks and not NEUTRAL)
+    if (priority === 999) {
+      return;
+    }
+
+    // Check if there's already a preserved mission for this zone
+    const hasPreservedMission = preservedMissions.some(m => m.zone_id === zone.id);
+
+    // Only create new available mission if no preserved mission exists for this zone
+    if (!hasPreservedMission) {
+      // NEUTRAL zones get a special LOGISTICS mission for troop transport
+      if (zone.status === 'NEUTRAL') {
+        const missionId = `combat_${Date.now()}_${missionIdCounter++}`;
+        const mission = {
+          id: missionId,
+          zone_id: zone.id,
+          zone_name: zone.name,
+          coordinates: zone.coordinates,
+          status: zone.status,
+          tasks: ['LOGISTICS'],
+          priority: priority,
+          priority_label: getPriorityLabel(priority),
+          is_active: zone.isActive || false,
+          assigned_to: null,
+          assigned_aircraft: null,
+          mission_status: 'available',
+          created_at: Date.now(),
+          assigned_at: null,
+          completed_at: null,
+        };
+        newAvailableMissions.push(mission);
+        return;
+      }
+
+      // For all other zones with tasks, create ONE mission with all tasks
+      if (zone.tasks && zone.tasks.length > 0) {
+        const missionId = `combat_${Date.now()}_${missionIdCounter++}`;
+        const mission = {
+          id: missionId,
+          zone_id: zone.id,
+          zone_name: zone.name,
+          coordinates: zone.coordinates,
+          status: zone.status,
+          tasks: zone.tasks,
+          priority: priority,
+          priority_label: getPriorityLabel(priority),
+          is_active: zone.isActive || false,
+          assigned_to: null,
+          assigned_aircraft: null,
+          mission_status: 'available',
+          created_at: Date.now(),
+          assigned_at: null,
+          completed_at: null,
+        };
+        newAvailableMissions.push(mission);
+      }
+    }
+  });
+
+  // Combine preserved and new missions
+  combatMissions = [...preservedMissions, ...newAvailableMissions];
+
+  // Sort by priority (lower number = higher priority)
+  combatMissions.sort((a, b) => a.priority - b.priority);
+
+  console.log(`🎯 Mission refresh complete:`);
+  console.log(`   - Preserved: ${preservedMissions.length} (assigned/completed/aborted)`);
+  console.log(`   - Removed: ${removedCount} (zones no longer exist)`);
+  console.log(`   - New available: ${newAvailableMissions.length}`);
+  console.log(`   - Total: ${combatMissions.length} missions`);
+
+  return combatMissions;
 }
 
 /**
