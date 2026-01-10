@@ -225,8 +225,8 @@ export default function FrontlineMap({ airportsData }) {
 
       {/* Two-column layout: Map | Missions */}
       <div className="flex-1 flex gap-4 p-4 overflow-hidden">
-        {/* Map - Left side (60% width) */}
-        <div className="flex-[3] bg-yt-bg-secondary rounded-lg overflow-hidden border border-yt-border">
+        {/* Map - Left side (45% width) */}
+        <div className="flex-[2] bg-yt-bg-secondary rounded-lg overflow-hidden border border-yt-border">
           <MapContainer
             center={center}
             zoom={10}
@@ -336,8 +336,8 @@ export default function FrontlineMap({ airportsData }) {
           </MapContainer>
         </div>
 
-        {/* Mission Dispatch Panel - Right side (40% width) */}
-        <div className="flex-[2] overflow-hidden">
+        {/* Mission Dispatch Panel - Right side (55% width) */}
+        <div className="flex-[3] overflow-hidden">
           <MissionDispatchPanel />
         </div>
       </div>

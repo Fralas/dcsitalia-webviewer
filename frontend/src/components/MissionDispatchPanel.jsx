@@ -847,7 +847,7 @@ export default function MissionDispatchPanel() {
             Nessuna missione {filter === 'all' ? '' : filter === 'available' ? 'disponibile' : 'assegnata'}
           </div>
         ) : (
-          <div className="grid gap-3 grid-cols-1">
+          <div className="grid gap-3 grid-cols-2">
             {missions.map(mission => (
               <CombatMissionCard
                 key={mission.id}
