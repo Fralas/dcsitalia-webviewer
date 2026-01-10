@@ -26,6 +26,9 @@ import logger from './utils/logger.js';
 import * as airbaseStatusParser from './services/airbaseStatusParser.js';
 import * as airbaseStatusManager from './services/airbaseStatusManager.js';
 import * as discordAuth from './services/discordAuth.js';
+import * as combatMissionDispatch from './services/combatMissionDispatch.js';
+import * as luaZoneSync from './services/luaZoneSync.js';
+import * as activeUsers from './services/activeUsers.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -285,6 +288,9 @@ app.get('/api/auth/discord/callback', async (req, res) => {
       globalName: discordUser.global_name || discordUser.username
     };
 
+    // Register user as active
+    activeUsers.addActiveUser(discordUser);
+
     // Store tokens for potential future use
     req.session.discordTokens = {
       accessToken: tokenData.access_token,
@@ -459,6 +465,187 @@ app.post('/api/missions/:id/cancel', (req, res) => {
   });
 
   res.json({ success: true, message: 'Mission cancelled' });
+});
+
+/**
+ * ============================
+ * COMBAT MISSION ENDPOINTS
+ * ============================
+ */
+
+/**
+ * GET /api/combat-missions - Get all combat missions
+ */
+app.get('/api/combat-missions', (req, res) => {
+  const { status } = req.query;
+  const missions = combatMissionDispatch.getAllCombatMissions(status);
+  res.json(missions);
+});
+
+/**
+ * GET /api/combat-missions/available - Get available combat missions (not assigned)
+ */
+app.get('/api/combat-missions/available', (req, res) => {
+  const missions = combatMissionDispatch.getAvailableCombatMissions();
+  res.json(missions);
+});
+
+/**
+ * POST /api/combat-missions/:id/assign - Assign a combat mission to a pilot
+ */
+app.post('/api/combat-missions/:id/assign', (req, res) => {
+  const { pilotName, aircraft } = req.body;
+
+  if (!pilotName || !aircraft) {
+    return res.status(400).json({ error: 'pilotName and aircraft are required' });
+  }
+
+  const mission = combatMissionDispatch.assignCombatMission(req.params.id, pilotName, aircraft);
+
+  if (!mission) {
+    return res.status(400).json({ error: 'Mission not found or not available' });
+  }
+
+  // Broadcast combat mission update to all clients
+  io.emit('combat-missions:updated', {
+    missions: combatMissionDispatch.getAllCombatMissions()
+  });
+
+  res.json({ success: true, mission });
+});
+
+/**
+ * POST /api/combat-missions/:id/add-user - Add additional user to an assigned mission
+ */
+app.post('/api/combat-missions/:id/add-user', (req, res) => {
+  const { pilotName, aircraft } = req.body;
+
+  if (!pilotName || !aircraft) {
+    return res.status(400).json({ error: 'pilotName and aircraft are required' });
+  }
+
+  const mission = combatMissionDispatch.addUserToMission(req.params.id, pilotName, aircraft);
+
+  if (!mission) {
+    return res.status(400).json({ error: 'Mission not found, not assigned, or user already added' });
+  }
+
+  // Broadcast combat mission update to all clients
+  io.emit('combat-missions:updated', {
+    missions: combatMissionDispatch.getAllCombatMissions()
+  });
+
+  res.json({ success: true, mission });
+});
+
+/**
+ * POST /api/combat-missions/:id/complete - Complete a combat mission
+ */
+app.post('/api/combat-missions/:id/complete', (req, res) => {
+  const mission = combatMissionDispatch.completeCombatMission(req.params.id);
+
+  if (!mission) {
+    return res.status(400).json({ error: 'Mission not found or not assigned' });
+  }
+
+  // Broadcast combat mission update to all clients
+  io.emit('combat-missions:updated', {
+    missions: combatMissionDispatch.getAllCombatMissions()
+  });
+
+  res.json({ success: true, mission });
+});
+
+/**
+ * POST /api/combat-missions/:id/abort - Abort a combat mission
+ */
+app.post('/api/combat-missions/:id/abort', (req, res) => {
+  const mission = combatMissionDispatch.abortCombatMission(req.params.id);
+
+  if (!mission) {
+    return res.status(400).json({ error: 'Mission not found' });
+  }
+
+  // Broadcast combat mission update to all clients
+  io.emit('combat-missions:updated', {
+    missions: combatMissionDispatch.getAllCombatMissions()
+  });
+
+  res.json({ success: true, mission });
+});
+
+/**
+ * POST /api/combat-missions/refresh - Refresh combat missions from zones
+ */
+app.post('/api/combat-missions/refresh', (req, res) => {
+  const missions = combatMissionDispatch.refreshCombatMissions();
+
+  // Broadcast combat mission update to all clients
+  io.emit('combat-missions:updated', {
+    missions: missions
+  });
+
+  res.json({ success: true, count: missions.length, missions });
+});
+
+/**
+ * POST /api/combat-missions/clear - Clear all combat missions
+ */
+app.post('/api/combat-missions/clear', (req, res) => {
+  const count = combatMissionDispatch.clearAllCombatMissions();
+
+  // Broadcast combat mission update to all clients
+  io.emit('combat-missions:updated', {
+    missions: []
+  });
+
+  res.json({ success: true, clearedCount: count });
+});
+
+/**
+ * GET /api/combat-missions/pilot/:pilotName - Get missions for a specific pilot
+ */
+app.get('/api/combat-missions/pilot/:pilotName', (req, res) => {
+  const missions = combatMissionDispatch.getMissionsByPilot(req.params.pilotName);
+  res.json(missions);
+});
+
+/**
+ * GET /api/mock-users - Get mock users for testing (development only)
+ */
+app.get('/api/mock-users', (req, res) => {
+  const mockUsers = [
+    { id: 'mock_1', globalName: 'Alpha Leader', username: 'alpha_leader', aircraft: 'F-16C' },
+    { id: 'mock_2', globalName: 'Bravo Two', username: 'bravo_two', aircraft: 'F/A-18C' },
+    { id: 'mock_3', globalName: 'Charlie Three', username: 'charlie_three', aircraft: 'A-10C' },
+    { id: 'mock_4', globalName: 'Delta Four', username: 'delta_four', aircraft: 'F-15E' },
+    { id: 'mock_5', globalName: 'Echo Five', username: 'echo_five', aircraft: 'AV-8B' },
+  ];
+  res.json(mockUsers);
+});
+
+/**
+ * GET /api/logged-in-users - Get currently logged in users (via Discord OAuth)
+ */
+app.get('/api/logged-in-users', (req, res) => {
+  // Update requesting user's activity if logged in
+  if (req.session?.user?.id) {
+    activeUsers.updateUserActivity(req.session.user.id);
+  }
+
+  const users = activeUsers.getActiveUsers();
+
+  // Format users for consumption (remove sensitive data, add aircraft placeholder)
+  const formattedUsers = users.map(user => ({
+    id: user.id,
+    globalName: user.globalName,
+    username: user.username,
+    avatar: user.avatar,
+    // Aircraft will be specified when adding to mission
+    aircraft: null
+  }));
+
+  res.json(formattedUsers);
 });
 
 /**
@@ -941,6 +1128,23 @@ airbaseStatusWatcher.on('change', () => {
 
 airbaseStatusWatcher.on('error', (error) => {
   console.error('Airbase status file watcher error:', error);
+});
+
+// Watch Lua zone files for changes (Dyzone_Status, ActDyzone_Task, Dyzone_Position)
+const luaZoneWatcher = luaZoneSync.initialize((result) => {
+  if (result.success) {
+    console.log(`🎯 Lua zones synced (${result.count} zones) - regenerating combat missions...`);
+
+    // Regenerate combat missions from updated zones
+    const missions = combatMissionDispatch.refreshCombatMissions();
+
+    // Broadcast updated missions to all clients
+    io.emit('combat-missions:updated', {
+      missions: combatMissionDispatch.getAllCombatMissions()
+    });
+
+    console.log(`✅ Regenerated ${missions.length} combat missions`);
+  }
 });
 
 // ==================== SCHEDULED TASKS ====================

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Lock, Settings, MapPin, Trash2, RefreshCw, Eye, EyeOff, Shield } from 'lucide-react';
+import { Lock, Settings, MapPin, Trash2, RefreshCw, Eye, EyeOff, Shield, Target } from 'lucide-react';
 import { login, logout, isAuthenticated, apiRequest } from '../utils/api';
+import * as api from '../services/api';
 
 /**
  * Admin Panel Component
@@ -94,6 +95,32 @@ export default function AdminPanel() {
       if (error.message.includes('Session expired')) {
         setAuthenticated(false);
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenerateCombatMissions = async () => {
+    setLoading(true);
+    try {
+      const data = await api.refreshCombatMissions();
+      alert(`✅ Generate ${data.count} missioni di combattimento`);
+    } catch (error) {
+      alert(`❌ Errore: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClearCombatMissions = async () => {
+    if (!confirm('Sei sicuro di voler cancellare tutte le missioni di combattimento?')) return;
+
+    setLoading(true);
+    try {
+      const data = await api.clearCombatMissions();
+      alert(`✅ Cancellate ${data.clearedCount} missioni di combattimento`);
+    } catch (error) {
+      alert(`❌ Errore: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -233,27 +260,61 @@ export default function AdminPanel() {
               Strumenti per testare e gestire le missioni del sistema
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <button
-                onClick={handleGenerateOrders}
-                disabled={loading}
-                className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-bold py-4 px-6 rounded transition-colors flex items-center justify-center gap-2"
-              >
-                <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-                Genera Ordini per Tutti gli Aeroporti
-              </button>
+            {/* Supply Orders Section */}
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-blue-400" />
+                Ordini Logistici
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button
+                  onClick={handleGenerateOrders}
+                  disabled={loading}
+                  className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-bold py-4 px-6 rounded transition-colors flex items-center justify-center gap-2"
+                >
+                  <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                  Genera Ordini per Tutti gli Aeroporti
+                </button>
 
-              <button
-                onClick={handleClearOrders}
-                disabled={loading}
-                className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white font-bold py-4 px-6 rounded transition-colors flex items-center justify-center gap-2"
-              >
-                <Trash2 className="w-5 h-5" />
-                Cancella Tutti gli Ordini
-              </button>
+                <button
+                  onClick={handleClearOrders}
+                  disabled={loading}
+                  className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white font-bold py-4 px-6 rounded transition-colors flex items-center justify-center gap-2"
+                >
+                  <Trash2 className="w-5 h-5" />
+                  Cancella Tutti gli Ordini
+                </button>
+              </div>
             </div>
 
-            <div className="mt-6 bg-yellow-500/20 border border-yellow-500 text-yellow-400 px-4 py-3 rounded">
+            {/* Combat Missions Section */}
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                <Target className="w-5 h-5 text-red-400" />
+                Missioni di Combattimento
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button
+                  onClick={handleGenerateCombatMissions}
+                  disabled={loading}
+                  className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-bold py-4 px-6 rounded transition-colors flex items-center justify-center gap-2"
+                >
+                  <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                  Genera Missioni di Combattimento
+                </button>
+
+                <button
+                  onClick={handleClearCombatMissions}
+                  disabled={loading}
+                  className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white font-bold py-4 px-6 rounded transition-colors flex items-center justify-center gap-2"
+                >
+                  <Trash2 className="w-5 h-5" />
+                  Cancella Tutte le Missioni di Combattimento
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-yellow-500/20 border border-yellow-500 text-yellow-400 px-4 py-3 rounded">
               <p className="font-bold">⚠️ Attenzione</p>
               <p className="text-sm mt-1">
                 Queste azioni influenzano tutti gli aeroporti e tutte le missioni attive. Usare con cautela.

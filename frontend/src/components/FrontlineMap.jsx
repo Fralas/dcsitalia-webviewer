@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -6,6 +6,7 @@ import { Shield, Circle, Plane, Helicopter, Anchor } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import { t } from '../utils/locale';
+import MissionDispatchPanel from './MissionDispatchPanel';
 
 /**
  * Convert decimal coordinates to DMS (Degrees, Minutes, Seconds)
@@ -33,9 +34,28 @@ function FitBounds({ positions }) {
   if (positions.length > 0) {
     setTimeout(() => {
       const bounds = L.latLngBounds(positions);
-      map.fitBounds(bounds, { padding: [50, 50] });
+      map.fitBounds(bounds, { padding: [80, 80] });
     }, 100);
   }
+
+  return null;
+}
+
+/**
+ * Component to zoom to a specific zone
+ */
+function ZoomToZone({ coordinates }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (coordinates) {
+      // Pan to the coordinates without changing zoom level
+      map.panTo([coordinates.lat, coordinates.lon], {
+        animate: true,
+        duration: 0.5
+      });
+    }
+  }, [coordinates, map]);
 
   return null;
 }
@@ -82,6 +102,8 @@ const createAirportIcon = (isMainBase, isHeliport, isCarrier) => {
  */
 function getZoneColor(status) {
   switch (status) {
+    case 'NEUTRAL':
+      return '#ffffff'; // White
     case 'BLUE':
       return '#3b82f6'; // Blue
     case 'RED':
@@ -98,6 +120,8 @@ function getZoneColor(status) {
  */
 function getStatusLabel(status) {
   switch (status) {
+    case 'NEUTRAL':
+      return 'Neutrale';
     case 'BLUE':
       return 'Controllata - Blu';
     case 'RED':
@@ -113,6 +137,9 @@ function getStatusLabel(status) {
  * Frontline Map Component
  */
 export default function FrontlineMap({ airportsData }) {
+  // State for selected zone
+  const [selectedZoneId, setSelectedZoneId] = useState(null);
+
   // Memoize calculations
   const validZones = useMemo(() => {
     return frontlineZones.filter(z => z.coordinates && z.coordinates.lat && z.coordinates.lon);
@@ -138,6 +165,7 @@ export default function FrontlineMap({ airportsData }) {
   // Group zones by status for stats
   const zoneStats = useMemo(() => {
     const stats = {
+      NEUTRAL: 0,
       BLUE: 0,
       RED: 0,
       UNDER_ATTACK: 0,
@@ -157,65 +185,86 @@ export default function FrontlineMap({ airportsData }) {
     return stats;
   }, [validZones]);
 
+  // Get selected zone coordinates for zooming
+  const selectedZone = useMemo(() => {
+    if (!selectedZoneId) return null;
+    return validZones.find(z => z.id === selectedZoneId);
+  }, [selectedZoneId, validZones]);
+
+  // Handle mission click - zoom to zone
+  const handleMissionClick = (zoneId) => {
+    setSelectedZoneId(zoneId);
+  };
+
+  // Handle zone marker click - select zone
+  const handleZoneClick = (zoneId) => {
+    setSelectedZoneId(zoneId);
+  };
+
   console.log('🗺️ FrontlineMap rendered with', validZones.length, 'zones');
 
   return (
-    <div className="min-h-screen bg-yt-bg-primary p-4">
-      <div className="max-w-[1800px] mx-auto">
-        {/* Header */}
-        <div className="bg-yt-bg-secondary rounded-lg p-4 border border-yt-border mb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-yt-accent/20 rounded">
-                <Shield className="w-6 h-6 text-yt-accent" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-yt-text-primary">Frontline</h1>
-                <p className="text-xs text-yt-text-secondary">Mappa del fronte - Zone di controllo</p>
-              </div>
+    <div className="h-full bg-yt-bg-primary flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="bg-yt-bg-secondary px-3 py-2 border-b border-yt-border flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-yt-accent/20 rounded">
+              <Shield className="w-5 h-5 text-yt-accent" />
             </div>
+            <div>
+              <h1 className="text-lg font-bold text-yt-text-primary">Frontline</h1>
+              <p className="text-xs text-yt-text-secondary">Mappa del fronte - Zone di controllo</p>
+            </div>
+          </div>
 
-            {/* Legend */}
-            <div className="flex items-center gap-3 text-xs">
-              <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-blue-600"></div>
-                <span className="text-yt-text-secondary">Zone Blu ({zoneStats.BLUE})</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 rounded-full bg-red-500 border-2 border-red-600"></div>
-                <span className="text-yt-text-secondary">Zone Rosse ({zoneStats.RED})</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 rounded-full bg-orange-500 border-2 border-orange-600"></div>
-                <span className="text-yt-text-secondary">Sotto Attacco ({zoneStats.UNDER_ATTACK})</span>
-              </div>
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 rounded border border-green-500/30">
-                <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                <span className="text-green-600 font-semibold">Zone Attive ({zoneStats.active})</span>
-              </div>
-              <div className="h-4 w-px bg-yt-border"></div>
-              <div className="flex items-center gap-1.5">
-                <Plane className="w-4 h-4 text-blue-500" />
-                <span className="text-yt-text-secondary">Aeroporti</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Helicopter className="w-4 h-4 text-cyan-400" />
-                <span className="text-yt-text-secondary">Eliporti</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Anchor className="w-4 h-4 text-green-500" />
-                <span className="text-yt-text-secondary">Portaerei</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 rounded-full bg-fuchsia-400 border-2 border-fuchsia-500"></div>
-                <span className="text-yt-text-secondary">Base Principale</span>
-              </div>
+          {/* Legend */}
+          <div className="flex items-center gap-3 text-xs">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-white border-2 border-gray-400"></div>
+              <span className="text-yt-text-secondary">Neutrali ({zoneStats.NEUTRAL})</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-blue-500 border-2 border-blue-600"></div>
+              <span className="text-yt-text-secondary">Blu ({zoneStats.BLUE})</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-red-500 border-2 border-red-600"></div>
+              <span className="text-yt-text-secondary">Rosse ({zoneStats.RED})</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-orange-500 border-2 border-orange-600"></div>
+              <span className="text-yt-text-secondary">Attacco ({zoneStats.UNDER_ATTACK})</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 rounded border border-green-500/30">
+              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+              <span className="text-green-600 font-semibold">Attive ({zoneStats.active})</span>
+            </div>
+            <div className="h-4 w-px bg-yt-border"></div>
+            <div className="flex items-center gap-1.5">
+              <Plane className="w-3 h-3 text-blue-500" />
+              <span className="text-yt-text-secondary">Aeroporti</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Helicopter className="w-3 h-3 text-cyan-400" />
+              <span className="text-yt-text-secondary">Eliporti</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Anchor className="w-3 h-3 text-green-500" />
+              <span className="text-yt-text-secondary">Portaerei</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-fuchsia-400 border-2 border-fuchsia-500"></div>
+              <span className="text-yt-text-secondary">Base Principale</span>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Map */}
-        <div className="bg-yt-bg-secondary rounded-lg overflow-hidden border border-yt-border" style={{ height: '800px' }}>
+      {/* Two-column layout: Map | Missions */}
+      <div className="flex-1 flex gap-3 p-3 overflow-hidden">
+        {/* Map - Left side (45% width) */}
+        <div className="flex-[2] bg-yt-bg-secondary rounded-lg overflow-hidden border border-yt-border">
           <MapContainer
             center={center}
             zoom={10}
@@ -228,68 +277,38 @@ export default function FrontlineMap({ airportsData }) {
               url="https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png"
             />
 
-            {/* Fit bounds to show all zones */}
-            <FitBounds positions={allPositions} />
+            {/* Fit bounds to show all zones - only on initial mount */}
+            {!selectedZone && <FitBounds positions={allPositions} />}
+
+            {/* Zoom to selected zone */}
+            {selectedZone && <ZoomToZone coordinates={selectedZone.coordinates} />}
 
             {/* Zone markers */}
             {validZones.map(zone => {
               const color = getZoneColor(zone.status);
               const isActive = zone.isActive;
               const hasTasks = zone.tasks && zone.tasks.length > 0;
+              // For neutral zones (white), use a darker border for visibility
+              const borderColor = zone.status === 'NEUTRAL' ? '#6b7280' : color;
+
+              const isSelected = zone.id === selectedZoneId;
 
               return (
                 <CircleMarker
                   key={zone.id}
                   center={[zone.coordinates.lat, zone.coordinates.lon]}
-                  radius={8}
+                  radius={isSelected ? 12 : 8}
                   pathOptions={{
-                    color: color,
+                    color: borderColor,
                     fillColor: color,
-                    fillOpacity: isActive ? 0.7 : 0.4,
-                    opacity: isActive ? 1 : 0.6,
-                    weight: isActive ? 2 : 1,
+                    fillOpacity: isActive || isSelected ? 0.7 : 0.4,
+                    opacity: isActive || isSelected ? 1 : 0.6,
+                    weight: isSelected ? 3 : isActive ? 2 : 1,
                   }}
-                >
-                  <Popup>
-                    <div className="text-sm">
-                      <div className="font-bold text-base">{zone.name}</div>
-                      <div className="mt-1 flex items-center gap-2">
-                        <span
-                          className="px-2 py-1 rounded text-xs font-semibold"
-                          style={{
-                            backgroundColor: `${color}20`,
-                            color: color
-                          }}
-                        >
-                          {getStatusLabel(zone.status)}
-                        </span>
-                        {isActive && (
-                          <span className="px-2 py-1 rounded text-xs font-semibold bg-green-500/20 text-green-600">
-                            ATTIVA
-                          </span>
-                        )}
-                      </div>
-                      {hasTasks && (
-                        <div className="mt-2 pt-2 border-t border-gray-200">
-                          <div className="text-xs font-semibold text-gray-700 mb-1">Task richieste:</div>
-                          <div className="flex flex-wrap gap-1">
-                            {zone.tasks.map((task, idx) => (
-                              <span
-                                key={idx}
-                                className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium"
-                              >
-                                {task}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      <div className="text-gray-600 text-xs mt-2 font-mono">
-                        {toDMS(zone.coordinates.lat, true)} {toDMS(zone.coordinates.lon, false)}
-                      </div>
-                    </div>
-                  </Popup>
-                </CircleMarker>
+                  eventHandlers={{
+                    click: () => handleZoneClick(zone.id),
+                  }}
+                />
               );
             })}
 
@@ -321,6 +340,14 @@ export default function FrontlineMap({ airportsData }) {
               );
             })}
           </MapContainer>
+        </div>
+
+        {/* Mission Dispatch Panel - Right side (55% width) */}
+        <div className="flex-[3] overflow-hidden">
+          <MissionDispatchPanel
+            selectedZoneId={selectedZoneId}
+            onMissionClick={handleMissionClick}
+          />
         </div>
       </div>
     </div>
