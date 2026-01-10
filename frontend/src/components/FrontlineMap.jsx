@@ -44,17 +44,18 @@ function FitBounds({ positions }) {
 /**
  * Component to zoom to a specific zone
  */
-function ZoomToZone({ coordinates, zoomLevel = 13 }) {
+function ZoomToZone({ coordinates }) {
   const map = useMap();
 
   useEffect(() => {
     if (coordinates) {
-      map.setView([coordinates.lat, coordinates.lon], zoomLevel, {
+      // Pan to the coordinates without changing zoom level
+      map.panTo([coordinates.lat, coordinates.lon], {
         animate: true,
         duration: 0.5
       });
     }
-  }, [coordinates, zoomLevel, map]);
+  }, [coordinates, map]);
 
   return null;
 }

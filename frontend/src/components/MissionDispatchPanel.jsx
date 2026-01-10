@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Target, Plane, AlertTriangle, CheckCircle, XCircle, LogIn, ChevronDown, ChevronUp, Plus } from 'lucide-react';
 import * as api from '../services/api';
 import { useUser } from '../contexts/UserContext';
@@ -398,7 +398,7 @@ function AddUserModal({ mission, onClose, onConfirm }) {
 /**
  * Combat Mission Card Component
  */
-function CombatMissionCard({ mission, onUpdate, onAccept, user, isHighlighted, onMissionClick }) {
+function CombatMissionCard({ mission, onUpdate, onAccept, user, isHighlighted, onMissionClick, cardRef }) {
   const [showAircraftModal, setShowAircraftModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -478,6 +478,7 @@ function CombatMissionCard({ mission, onUpdate, onAccept, user, isHighlighted, o
   return (
     <>
       <div
+        ref={cardRef}
         className={`bg-yt-bg-tertiary rounded-lg overflow-hidden border shadow-lg transition-all cursor-pointer ${
           isHighlighted
             ? 'border-yt-accent shadow-yt-accent/50 ring-2 ring-yt-accent'
@@ -640,6 +641,9 @@ export default function MissionDispatchPanel({ selectedZoneId, onMissionClick })
   const [expanded, setExpanded] = useState(true);
   const { user } = useUser();
 
+  // Refs for mission cards to enable scrolling
+  const missionRefs = useRef({});
+
   const fetchMissions = async () => {
     setLoading(true);
     try {
@@ -716,6 +720,16 @@ export default function MissionDispatchPanel({ selectedZoneId, onMissionClick })
   const handleMissionAccept = () => {
     setFilter('assigned');
   };
+
+  // Scroll to highlighted mission when selectedZoneId changes
+  useEffect(() => {
+    if (selectedZoneId && missionRefs.current[selectedZoneId]) {
+      missionRefs.current[selectedZoneId].scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    }
+  }, [selectedZoneId]);
 
   return (
     <div className="h-full bg-yt-bg-secondary rounded-lg border border-yt-border overflow-hidden flex flex-col">
@@ -862,6 +876,11 @@ export default function MissionDispatchPanel({ selectedZoneId, onMissionClick })
                 user={user}
                 isHighlighted={mission.zone_id === selectedZoneId}
                 onMissionClick={onMissionClick}
+                cardRef={(el) => {
+                  if (el) {
+                    missionRefs.current[mission.zone_id] = el;
+                  }
+                }}
               />
             ))}
           </div>
