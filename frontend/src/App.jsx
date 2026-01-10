@@ -138,7 +138,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-yt-bg-primary flex flex-col">
+    <div className="h-screen bg-yt-bg-primary flex flex-col overflow-hidden">
       {/* Header - Compatto stile YouTube */}
       <header className="bg-yt-bg-secondary border-b border-yt-border sticky top-0 z-50 shadow-lg">
         <div className="container mx-auto px-4 py-2">
@@ -213,7 +213,7 @@ function App() {
       </header>
 
       {/* Main Content - padding ridotto */}
-      <main className={`flex-1 ${currentView === 'map' || currentView === 'frontline' || currentView === 'admin' ? '' : 'container mx-auto px-4 py-4'}`}>
+      <main className={`flex-1 ${currentView === 'map' || currentView === 'frontline' || currentView === 'admin' ? 'overflow-hidden' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
         {currentView === 'dashboard' && (
           <Dashboard
             airports={airports}
