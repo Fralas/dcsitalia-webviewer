@@ -456,15 +456,23 @@ function CombatMissionCard({ mission, onUpdate, onAccept, user }) {
   const isCompleted = mission.mission_status === 'completed';
   const isAborted = mission.mission_status === 'aborted';
 
-  // Get priority colors for header
-  let priorityHeaderColor;
-  switch (mission.priority) {
-    case 1: priorityHeaderColor = 'from-red-500/20 to-red-500/5 border-red-500/30'; break;
-    case 2: priorityHeaderColor = 'from-orange-500/20 to-orange-500/5 border-orange-500/30'; break;
-    case 3: priorityHeaderColor = 'from-yellow-500/20 to-yellow-500/5 border-yellow-500/30'; break;
-    case 4: priorityHeaderColor = 'from-blue-500/20 to-blue-500/5 border-blue-500/30'; break;
-    case 5: priorityHeaderColor = 'from-green-500/20 to-green-500/5 border-green-500/30'; break;
-    default: priorityHeaderColor = 'from-gray-500/20 to-gray-500/5 border-gray-500/30';
+  // Get status colors for header gradient
+  let statusHeaderColor;
+  switch (mission.status) {
+    case 'NEUTRAL':
+      statusHeaderColor = 'from-gray-500/20 to-gray-500/5 border-gray-500/30';
+      break;
+    case 'UNDER_ATTACK':
+      statusHeaderColor = 'from-orange-500/20 to-orange-500/5 border-orange-500/30';
+      break;
+    case 'RED':
+      statusHeaderColor = 'from-red-500/20 to-red-500/5 border-red-500/30';
+      break;
+    case 'BLUE':
+      statusHeaderColor = 'from-blue-500/20 to-blue-500/5 border-blue-500/30';
+      break;
+    default:
+      statusHeaderColor = 'from-gray-500/20 to-gray-500/5 border-gray-500/30';
   }
 
   return (
@@ -475,8 +483,8 @@ function CombatMissionCard({ mission, onUpdate, onAccept, user }) {
         isCompleted ? 'border-green-500/50 shadow-green-500/20' :
         'border-red-500/50 shadow-red-500/20'
       }`}>
-        {/* Header con gradiente priorità */}
-        <div className={`bg-gradient-to-r ${priorityHeaderColor} border-b px-3 py-2`}>
+        {/* Header con gradiente status zona */}
+        <div className={`bg-gradient-to-r ${statusHeaderColor} border-b px-3 py-2`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <Target className="w-4 h-4 text-yt-accent flex-shrink-0" />
@@ -484,7 +492,7 @@ function CombatMissionCard({ mission, onUpdate, onAccept, user }) {
                 {mission.zone_name}
               </h3>
             </div>
-            <StatusBadge status={mission.status} />
+            <PriorityBadge priority={mission.priority} priorityLabel={mission.priority_label} />
           </div>
         </div>
 
