@@ -456,112 +456,139 @@ function CombatMissionCard({ mission, onUpdate, onAccept, user }) {
   const isCompleted = mission.mission_status === 'completed';
   const isAborted = mission.mission_status === 'aborted';
 
+  // Get priority colors for header
+  let priorityHeaderColor;
+  switch (mission.priority) {
+    case 1: priorityHeaderColor = 'from-red-500/20 to-red-500/5 border-red-500/30'; break;
+    case 2: priorityHeaderColor = 'from-orange-500/20 to-orange-500/5 border-orange-500/30'; break;
+    case 3: priorityHeaderColor = 'from-yellow-500/20 to-yellow-500/5 border-yellow-500/30'; break;
+    case 4: priorityHeaderColor = 'from-blue-500/20 to-blue-500/5 border-blue-500/30'; break;
+    case 5: priorityHeaderColor = 'from-green-500/20 to-green-500/5 border-green-500/30'; break;
+    default: priorityHeaderColor = 'from-gray-500/20 to-gray-500/5 border-gray-500/30';
+  }
+
   return (
     <>
-      <div className={`bg-yt-bg-tertiary border rounded-lg p-3.5 transition-all ${
-        isAvailable ? 'border-yt-border hover:border-yt-accent' :
-        isAssigned ? 'border-blue-500/50' :
-        isCompleted ? 'border-green-500/50' :
-        'border-red-500/50'
+      <div className={`bg-yt-bg-tertiary rounded-lg overflow-hidden border shadow-lg transition-all ${
+        isAvailable ? 'border-yt-border hover:border-yt-accent hover:shadow-xl' :
+        isAssigned ? 'border-blue-500/50 shadow-blue-500/20' :
+        isCompleted ? 'border-green-500/50 shadow-green-500/20' :
+        'border-red-500/50 shadow-red-500/20'
       }`}>
-        {/* Header compatto */}
-        <div className="flex items-center justify-between mb-2.5">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <Target className="w-4 h-4 text-yt-accent flex-shrink-0" />
-            <h3 className="text-base font-bold text-yt-text-primary truncate">
-              {mission.zone_name}
-            </h3>
-            <StatusBadge status={mission.status} />
+        {/* Header con gradiente priorità */}
+        <div className={`bg-gradient-to-r ${priorityHeaderColor} border-b px-3 py-2`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <Target className="w-4 h-4 text-yt-accent flex-shrink-0" />
+              <h3 className="text-sm font-bold text-yt-text-primary truncate">
+                {mission.zone_name}
+              </h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <StatusBadge status={mission.status} />
+              <PriorityBadge priority={mission.priority} priorityLabel={mission.priority_label} />
+            </div>
           </div>
-          <PriorityBadge priority={mission.priority} priorityLabel={mission.priority_label} />
         </div>
 
-        {/* Tasks e coordinate in riga */}
-        <div className="flex items-center justify-between gap-3 mb-2.5">
-          <div className="flex gap-1 flex-wrap">
+        {/* Body */}
+        <div className="p-3">
+          {/* Tasks */}
+          <div className="flex gap-1.5 flex-wrap mb-3">
             {mission.tasks && mission.tasks.map((task, idx) => (
               <TaskBadge key={idx} taskType={task} />
             ))}
           </div>
-          <div className="text-xs text-yt-text-secondary font-mono whitespace-nowrap">
-            {mission.coordinates.lat.toFixed(2)}°, {mission.coordinates.lon.toFixed(2)}°
-          </div>
-        </div>
 
-        {/* Status info se assegnata/completata */}
-        {isAssigned && (
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded px-2 py-1.5 mb-2.5">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                <Plane className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-                <span className="text-xs text-yt-text-primary">
-                  {mission.assigned_users && mission.assigned_users.length > 0
-                    ? mission.assigned_users.map((u, idx) => (
-                        <span key={idx}>
-                          {u.name} ({u.aircraft}){idx < mission.assigned_users.length - 1 ? ', ' : ''}
-                        </span>
-                      ))
-                    : `${mission.assigned_to} (${mission.assigned_aircraft})`
-                  }
-                </span>
+          {/* Coordinates */}
+          <div className="flex items-center gap-1.5 mb-3 text-xs text-yt-text-secondary">
+            <Target className="w-3 h-3" />
+            <span className="font-mono">{mission.coordinates.lat.toFixed(4)}°, {mission.coordinates.lon.toFixed(4)}°</span>
+          </div>
+
+          {/* Status piloti */}
+          {isAssigned && (
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg px-3 py-2 mb-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <Plane className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                  <div className="text-xs text-yt-text-primary flex-1 min-w-0">
+                    {mission.assigned_users && mission.assigned_users.length > 0
+                      ? mission.assigned_users.map((u, idx) => (
+                          <div key={idx} className="truncate">
+                            <span className="font-semibold">{u.name}</span>
+                            <span className="text-yt-text-secondary ml-1">• {u.aircraft}</span>
+                          </div>
+                        ))
+                      : (
+                          <div className="truncate">
+                            <span className="font-semibold">{mission.assigned_to}</span>
+                            <span className="text-yt-text-secondary ml-1">• {mission.assigned_aircraft}</span>
+                          </div>
+                        )
+                    }
+                  </div>
+                  {user && (user.globalName === mission.assigned_to || user.username === mission.assigned_to) && (
+                    <button
+                      onClick={() => setShowAddUserModal(true)}
+                      className="flex-shrink-0 w-7 h-7 bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center justify-center transition-all"
+                      title="Aggiungi pilota"
+                    >
+                      <Plus className="w-4 h-4 text-white" />
+                    </button>
+                  )}
+                </div>
               </div>
-              {user && (user.globalName === mission.assigned_to || user.username === mission.assigned_to) && (
-                <button
-                  onClick={() => setShowAddUserModal(true)}
-                  className="flex-shrink-0 w-6 h-6 bg-blue-600 hover:bg-blue-700 rounded flex items-center justify-center transition-all"
-                  title="Aggiungi pilota"
-                >
-                  <Plus className="w-4 h-4 text-white" />
-                </button>
-              )}
             </div>
-          </div>
-        )}
+          )}
 
-        {isCompleted && (
-          <div className="bg-green-500/10 border border-green-500/30 rounded px-2 py-1.5 mb-2.5 text-center">
-            <span className="text-xs text-green-400 font-semibold">✓ Completata</span>
-          </div>
-        )}
+          {isCompleted && (
+            <div className="bg-green-500/10 border border-green-500/30 rounded-lg px-3 py-2 mb-3 flex items-center justify-center gap-2">
+              <CheckCircle className="w-4 h-4 text-green-400" />
+              <span className="text-sm text-green-400 font-semibold">Completata</span>
+            </div>
+          )}
 
-        {isAborted && (
-          <div className="bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5 mb-2.5 text-center">
-            <span className="text-xs text-red-400 font-semibold">✗ Abortita</span>
-          </div>
-        )}
+          {isAborted && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 mb-3 flex items-center justify-center gap-2">
+              <XCircle className="w-4 h-4 text-red-400" />
+              <span className="text-sm text-red-400 font-semibold">Abortita</span>
+            </div>
+          )}
 
-        {/* Action buttons compatti */}
-        {isAvailable && (
-          <button
-            onClick={handleAccept}
-            disabled={loading}
-            className="w-full px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white text-sm rounded font-bold transition-all flex items-center justify-center gap-1.5"
-          >
-            <CheckCircle className="w-3.5 h-3.5" />
-            Accetta
-          </button>
-        )}
-
-        {isAssigned && user && (user.globalName === mission.assigned_to || user.username === mission.assigned_to) && (
-          <div className="flex gap-2">
+          {/* Action buttons */}
+          {isAvailable && (
             <button
-              onClick={handleComplete}
+              onClick={handleAccept}
               disabled={loading}
-              className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white text-sm rounded font-bold transition-all flex items-center justify-center gap-1.5"
+              className="w-full px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white text-sm rounded-lg font-bold transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
             >
-              <CheckCircle className="w-3.5 h-3.5" />
-              Completa
+              <CheckCircle className="w-4 h-4" />
+              Accetta Missione
             </button>
-            <button
-              onClick={handleAbort}
-              disabled={loading}
-              className="px-3 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white text-sm rounded font-bold transition-all flex items-center justify-center gap-1.5"
-            >
-              <XCircle className="w-3.5 h-3.5" />
-              Abortisci
-            </button>
-          </div>
-        )}
+          )}
+
+          {isAssigned && user && (user.globalName === mission.assigned_to || user.username === mission.assigned_to) && (
+            <div className="flex gap-2">
+              <button
+                onClick={handleComplete}
+                disabled={loading}
+                className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white text-sm rounded-lg font-bold transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+              >
+                <CheckCircle className="w-4 h-4" />
+                Completa
+              </button>
+              <button
+                onClick={handleAbort}
+                disabled={loading}
+                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white text-sm rounded-lg font-bold transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+              >
+                <XCircle className="w-4 h-4" />
+                Abortisci
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {showAircraftModal && (
