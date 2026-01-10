@@ -713,163 +713,153 @@ export default function MissionDispatchPanel() {
   };
 
   return (
-    <div className="bg-yt-bg-secondary rounded-lg border border-yt-border overflow-hidden">
+    <div className="h-full bg-yt-bg-secondary rounded-lg border border-yt-border overflow-hidden flex flex-col">
       {/* Header */}
-      <div
-        className="p-4 cursor-pointer hover:bg-yt-bg-tertiary/50 transition-colors"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-red-500/20 rounded">
-              <Target className="w-5 h-5 text-red-400" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-yt-text-primary">Missioni di Combattimento</h2>
-              <p className="text-xs text-yt-text-secondary">
-                Dispatch sistema - {availableCount} disponibili, {assignedCount} assegnate
-              </p>
-            </div>
+      <div className="p-3 flex-shrink-0 border-b border-yt-border">
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-red-500/20 rounded">
+            <Target className="w-5 h-5 text-red-400" />
           </div>
-          {expanded ? <ChevronUp className="w-5 h-5 text-yt-text-secondary" /> : <ChevronDown className="w-5 h-5 text-yt-text-secondary" />}
+          <div>
+            <h2 className="text-lg font-bold text-yt-text-primary">Missioni di Combattimento</h2>
+            <p className="text-xs text-yt-text-secondary">
+              {availableCount} disponibili, {assignedCount} assegnate
+            </p>
+          </div>
         </div>
       </div>
 
-      {expanded && (
-        <>
-          {/* Filters */}
-          <div className="px-4 pb-3 border-b border-yt-border space-y-3">
-            {/* Status filters */}
-            <div>
-              <div className="text-xs font-semibold text-yt-text-secondary mb-2 uppercase tracking-wide">Status</div>
-              <div className="flex gap-2 flex-wrap">
-                <button
-                  onClick={() => setFilter('available')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${
-                    filter === 'available'
-                      ? 'bg-yt-accent text-yt-bg-primary'
-                      : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border'
-                  }`}
-                >
-                  Disponibili ({availableCount})
-                </button>
-                <button
-                  onClick={() => setFilter('assigned')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${
-                    filter === 'assigned'
-                      ? 'bg-yt-accent text-yt-bg-primary'
-                      : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border'
-                  }`}
-                >
-                  Assegnate ({assignedCount})
-                </button>
-                <button
-                  onClick={() => setFilter('all')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${
-                    filter === 'all'
-                      ? 'bg-yt-accent text-yt-bg-primary'
-                      : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border'
-                  }`}
-                >
-                  Tutte ({allMissions.length})
-                </button>
-              </div>
-            </div>
-
-            {/* Priority filters */}
-            <div>
-              <div className="text-xs font-semibold text-yt-text-secondary mb-2 uppercase tracking-wide">Priorità</div>
-              <div className="flex gap-2 flex-wrap">
-                <button
-                  onClick={() => setPriorityFilter('all')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${
-                    priorityFilter === 'all'
-                      ? 'bg-yt-accent text-yt-bg-primary'
-                      : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border'
-                  }`}
-                >
-                  Tutte
-                </button>
-                <button
-                  onClick={() => setPriorityFilter('1')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium transition-all border ${
-                    priorityFilter === '1'
-                      ? 'bg-red-500/20 text-red-400 border-red-500'
-                      : 'bg-yt-bg-tertiary text-yt-text-secondary border-transparent hover:bg-yt-border'
-                  }`}
-                >
-                  Massima ({priority1Count})
-                </button>
-                <button
-                  onClick={() => setPriorityFilter('2')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium transition-all border ${
-                    priorityFilter === '2'
-                      ? 'bg-orange-500/20 text-orange-400 border-orange-500'
-                      : 'bg-yt-bg-tertiary text-yt-text-secondary border-transparent hover:bg-yt-border'
-                  }`}
-                >
-                  Elevata ({priority2Count})
-                </button>
-                <button
-                  onClick={() => setPriorityFilter('3')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium transition-all border ${
-                    priorityFilter === '3'
-                      ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500'
-                      : 'bg-yt-bg-tertiary text-yt-text-secondary border-transparent hover:bg-yt-border'
-                  }`}
-                >
-                  Alta ({priority3Count})
-                </button>
-                <button
-                  onClick={() => setPriorityFilter('4')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium transition-all border ${
-                    priorityFilter === '4'
-                      ? 'bg-blue-500/20 text-blue-400 border-blue-500'
-                      : 'bg-yt-bg-tertiary text-yt-text-secondary border-transparent hover:bg-yt-border'
-                  }`}
-                >
-                  Media ({priority4Count})
-                </button>
-                <button
-                  onClick={() => setPriorityFilter('5')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium transition-all border ${
-                    priorityFilter === '5'
-                      ? 'bg-green-500/20 text-green-400 border-green-500'
-                      : 'bg-yt-bg-tertiary text-yt-text-secondary border-transparent hover:bg-yt-border'
-                  }`}
-                >
-                  Bassa ({priority5Count})
-                </button>
-              </div>
-            </div>
+      {/* Filters */}
+      <div className="px-3 py-2 border-b border-yt-border space-y-2 flex-shrink-0">
+        {/* Status filters */}
+        <div>
+          <div className="text-xs font-semibold text-yt-text-secondary mb-1.5 uppercase tracking-wide">Status</div>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setFilter('available')}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
+                filter === 'available'
+                  ? 'bg-yt-accent text-yt-bg-primary'
+                  : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border'
+              }`}
+            >
+              Disponibili ({availableCount})
+            </button>
+            <button
+              onClick={() => setFilter('assigned')}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
+                filter === 'assigned'
+                  ? 'bg-yt-accent text-yt-bg-primary'
+                  : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border'
+              }`}
+            >
+              Assegnate ({assignedCount})
+            </button>
+            <button
+              onClick={() => setFilter('all')}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
+                filter === 'all'
+                  ? 'bg-yt-accent text-yt-bg-primary'
+                  : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border'
+              }`}
+            >
+              Tutte ({allMissions.length})
+            </button>
           </div>
+        </div>
 
-          {/* Mission List */}
-          <div className="p-4 max-h-[600px] overflow-y-auto">
-            {loading ? (
-              <div className="text-center py-8 text-yt-text-secondary">
-                Caricamento missioni...
-              </div>
-            ) : missions.length === 0 ? (
-              <div className="text-center py-8 text-yt-text-secondary">
-                Nessuna missione {filter === 'all' ? '' : filter === 'available' ? 'disponibile' : 'assegnata'}
-              </div>
-            ) : (
-              <div className={`grid gap-3 ${missions.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
-                {missions.map(mission => (
-                  <CombatMissionCard
-                    key={mission.id}
-                    mission={mission}
-                    onUpdate={fetchMissions}
-                    onAccept={handleMissionAccept}
-                    user={user}
-                  />
-                ))}
-              </div>
-            )}
+        {/* Priority filters */}
+        <div>
+          <div className="text-xs font-semibold text-yt-text-secondary mb-1.5 uppercase tracking-wide">Priorità</div>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setPriorityFilter('all')}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
+                priorityFilter === 'all'
+                  ? 'bg-yt-accent text-yt-bg-primary'
+                  : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border'
+              }`}
+            >
+              Tutte
+            </button>
+            <button
+              onClick={() => setPriorityFilter('1')}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-all border ${
+                priorityFilter === '1'
+                  ? 'bg-red-500/20 text-red-400 border-red-500'
+                  : 'bg-yt-bg-tertiary text-yt-text-secondary border-transparent hover:bg-yt-border'
+              }`}
+            >
+              Massima ({priority1Count})
+            </button>
+            <button
+              onClick={() => setPriorityFilter('2')}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-all border ${
+                priorityFilter === '2'
+                  ? 'bg-orange-500/20 text-orange-400 border-orange-500'
+                  : 'bg-yt-bg-tertiary text-yt-text-secondary border-transparent hover:bg-yt-border'
+              }`}
+            >
+              Elevata ({priority2Count})
+            </button>
+            <button
+              onClick={() => setPriorityFilter('3')}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-all border ${
+                priorityFilter === '3'
+                  ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500'
+                  : 'bg-yt-bg-tertiary text-yt-text-secondary border-transparent hover:bg-yt-border'
+              }`}
+            >
+              Alta ({priority3Count})
+            </button>
+            <button
+              onClick={() => setPriorityFilter('4')}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-all border ${
+                priorityFilter === '4'
+                  ? 'bg-blue-500/20 text-blue-400 border-blue-500'
+                  : 'bg-yt-bg-tertiary text-yt-text-secondary border-transparent hover:bg-yt-border'
+              }`}
+            >
+              Media ({priority4Count})
+            </button>
+            <button
+              onClick={() => setPriorityFilter('5')}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-all border ${
+                priorityFilter === '5'
+                  ? 'bg-green-500/20 text-green-400 border-green-500'
+                  : 'bg-yt-bg-tertiary text-yt-text-secondary border-transparent hover:bg-yt-border'
+              }`}
+            >
+              Bassa ({priority5Count})
+            </button>
           </div>
-        </>
-      )}
+        </div>
+      </div>
+
+      {/* Mission List */}
+      <div className="flex-1 overflow-y-auto p-3">
+        {loading ? (
+          <div className="text-center py-8 text-yt-text-secondary">
+            Caricamento missioni...
+          </div>
+        ) : missions.length === 0 ? (
+          <div className="text-center py-8 text-yt-text-secondary">
+            Nessuna missione {filter === 'all' ? '' : filter === 'available' ? 'disponibile' : 'assegnata'}
+          </div>
+        ) : (
+          <div className="grid gap-3 grid-cols-1">
+            {missions.map(mission => (
+              <CombatMissionCard
+                key={mission.id}
+                mission={mission}
+                onUpdate={fetchMissions}
+                onAccept={handleMissionAccept}
+                user={user}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

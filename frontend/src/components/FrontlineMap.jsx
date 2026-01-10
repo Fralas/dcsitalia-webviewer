@@ -166,71 +166,67 @@ export default function FrontlineMap({ airportsData }) {
   console.log('🗺️ FrontlineMap rendered with', validZones.length, 'zones');
 
   return (
-    <div className="min-h-screen bg-yt-bg-primary p-4">
-      <div className="max-w-[1800px] mx-auto">
-        {/* Header */}
-        <div className="bg-yt-bg-secondary rounded-lg p-4 border border-yt-border mb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-yt-accent/20 rounded">
-                <Shield className="w-6 h-6 text-yt-accent" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-yt-text-primary">Frontline</h1>
-                <p className="text-xs text-yt-text-secondary">Mappa del fronte - Zone di controllo</p>
-              </div>
+    <div className="h-screen bg-yt-bg-primary flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="bg-yt-bg-secondary p-3 border-b border-yt-border flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-yt-accent/20 rounded">
+              <Shield className="w-5 h-5 text-yt-accent" />
             </div>
+            <div>
+              <h1 className="text-lg font-bold text-yt-text-primary">Frontline</h1>
+              <p className="text-xs text-yt-text-secondary">Mappa del fronte - Zone di controllo</p>
+            </div>
+          </div>
 
-            {/* Legend */}
-            <div className="flex items-center gap-3 text-xs">
-              <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 rounded-full bg-white border-2 border-gray-400"></div>
-                <span className="text-yt-text-secondary">Zone Neutrali ({zoneStats.NEUTRAL})</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-blue-600"></div>
-                <span className="text-yt-text-secondary">Zone Blu ({zoneStats.BLUE})</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 rounded-full bg-red-500 border-2 border-red-600"></div>
-                <span className="text-yt-text-secondary">Zone Rosse ({zoneStats.RED})</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 rounded-full bg-orange-500 border-2 border-orange-600"></div>
-                <span className="text-yt-text-secondary">Sotto Attacco ({zoneStats.UNDER_ATTACK})</span>
-              </div>
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 rounded border border-green-500/30">
-                <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                <span className="text-green-600 font-semibold">Zone Attive ({zoneStats.active})</span>
-              </div>
-              <div className="h-4 w-px bg-yt-border"></div>
-              <div className="flex items-center gap-1.5">
-                <Plane className="w-4 h-4 text-blue-500" />
-                <span className="text-yt-text-secondary">Aeroporti</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Helicopter className="w-4 h-4 text-cyan-400" />
-                <span className="text-yt-text-secondary">Eliporti</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Anchor className="w-4 h-4 text-green-500" />
-                <span className="text-yt-text-secondary">Portaerei</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 rounded-full bg-fuchsia-400 border-2 border-fuchsia-500"></div>
-                <span className="text-yt-text-secondary">Base Principale</span>
-              </div>
+          {/* Legend */}
+          <div className="flex items-center gap-3 text-xs">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-white border-2 border-gray-400"></div>
+              <span className="text-yt-text-secondary">Neutrali ({zoneStats.NEUTRAL})</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-blue-500 border-2 border-blue-600"></div>
+              <span className="text-yt-text-secondary">Blu ({zoneStats.BLUE})</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-red-500 border-2 border-red-600"></div>
+              <span className="text-yt-text-secondary">Rosse ({zoneStats.RED})</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-orange-500 border-2 border-orange-600"></div>
+              <span className="text-yt-text-secondary">Attacco ({zoneStats.UNDER_ATTACK})</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 rounded border border-green-500/30">
+              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+              <span className="text-green-600 font-semibold">Attive ({zoneStats.active})</span>
+            </div>
+            <div className="h-4 w-px bg-yt-border"></div>
+            <div className="flex items-center gap-1.5">
+              <Plane className="w-3 h-3 text-blue-500" />
+              <span className="text-yt-text-secondary">Aeroporti</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Helicopter className="w-3 h-3 text-cyan-400" />
+              <span className="text-yt-text-secondary">Eliporti</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Anchor className="w-3 h-3 text-green-500" />
+              <span className="text-yt-text-secondary">Portaerei</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-fuchsia-400 border-2 border-fuchsia-500"></div>
+              <span className="text-yt-text-secondary">Base Principale</span>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Mission Dispatch Panel */}
-        <div className="mb-4">
-          <MissionDispatchPanel />
-        </div>
-
-        {/* Map */}
-        <div className="bg-yt-bg-secondary rounded-lg overflow-hidden border border-yt-border" style={{ height: '800px' }}>
+      {/* Two-column layout: Map | Missions */}
+      <div className="flex-1 flex gap-4 p-4 overflow-hidden">
+        {/* Map - Left side (60% width) */}
+        <div className="flex-[3] bg-yt-bg-secondary rounded-lg overflow-hidden border border-yt-border">
           <MapContainer
             center={center}
             zoom={10}
@@ -338,6 +334,11 @@ export default function FrontlineMap({ airportsData }) {
               );
             })}
           </MapContainer>
+        </div>
+
+        {/* Mission Dispatch Panel - Right side (40% width) */}
+        <div className="flex-[2] overflow-hidden">
+          <MissionDispatchPanel />
         </div>
       </div>
     </div>
