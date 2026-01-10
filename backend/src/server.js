@@ -27,6 +27,7 @@ import * as airbaseStatusParser from './services/airbaseStatusParser.js';
 import * as airbaseStatusManager from './services/airbaseStatusManager.js';
 import * as discordAuth from './services/discordAuth.js';
 import * as combatMissionDispatch from './services/combatMissionDispatch.js';
+import * as luaZoneSync from './services/luaZoneSync.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1061,6 +1062,23 @@ airbaseStatusWatcher.on('change', () => {
 
 airbaseStatusWatcher.on('error', (error) => {
   console.error('Airbase status file watcher error:', error);
+});
+
+// Watch Lua zone files for changes (Dyzone_Status, ActDyzone_Task, Dyzone_Position)
+const luaZoneWatcher = luaZoneSync.initialize((result) => {
+  if (result.success) {
+    console.log(`🎯 Lua zones synced (${result.count} zones) - regenerating combat missions...`);
+
+    // Regenerate combat missions from updated zones
+    const missions = combatMissionDispatch.refreshCombatMissions();
+
+    // Broadcast updated missions to all clients
+    io.emit('combat-missions:updated', {
+      missions: combatMissionDispatch.getAllCombatMissions()
+    });
+
+    console.log(`✅ Regenerated ${missions.length} combat missions`);
+  }
 });
 
 // ==================== SCHEDULED TASKS ====================
