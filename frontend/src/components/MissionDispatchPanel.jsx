@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Target, Plane, AlertTriangle, CheckCircle, XCircle, LogIn, ChevronDown, ChevronUp } from 'lucide-react';
 import * as api from '../services/api';
 import { useUser } from '../contexts/UserContext';
+import socketService from '../services/socket';
 
 /**
  * Get priority badge color and label
@@ -409,7 +410,8 @@ function CombatMissionCard({ mission, onUpdate, user }) {
  * Mission Dispatch Panel Component
  */
 export default function MissionDispatchPanel() {
-  const [missions, setMissions] = useState([]);
+  const [missions, setMissions] = useState([]); // Filtered missions for display
+  const [allMissions, setAllMissions] = useState([]); // All missions for counts
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('available'); // available | assigned | all
   const [expanded, setExpanded] = useState(true);
@@ -418,8 +420,15 @@ export default function MissionDispatchPanel() {
   const fetchMissions = async () => {
     setLoading(true);
     try {
-      const data = await api.getCombatMissions(filter === 'all' ? null : filter);
-      setMissions(data);
+      // Fetch all missions for counts
+      const allData = await api.getCombatMissions(null);
+      setAllMissions(allData);
+
+      // Apply filter for display
+      const filteredData = filter === 'all'
+        ? allData
+        : allData.filter(m => m.mission_status === filter);
+      setMissions(filteredData);
     } catch (error) {
       console.error('Error fetching combat missions:', error);
     } finally {
@@ -429,13 +438,37 @@ export default function MissionDispatchPanel() {
 
   useEffect(() => {
     fetchMissions();
-    // Poll for updates every 30 seconds
+
+    // Poll for updates every 30 seconds (fallback)
     const interval = setInterval(fetchMissions, 30000);
-    return () => clearInterval(interval);
+
+    // Listen for real-time updates via WebSocket
+    const unsubscribe = socketService.on('combat-missions:updated', (data) => {
+      console.log('🎯 Combat missions updated via WebSocket');
+      if (data && data.missions) {
+        // Store all missions
+        setAllMissions(data.missions);
+
+        // Apply current filter to received missions for display
+        const filteredMissions = filter === 'all'
+          ? data.missions
+          : data.missions.filter(m => m.mission_status === filter);
+        setMissions(filteredMissions);
+        setLoading(false);
+      } else {
+        // Fallback: fetch missions if data format is unexpected
+        fetchMissions();
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+    };
   }, [filter]);
 
-  const availableCount = missions.filter(m => m.mission_status === 'available').length;
-  const assignedCount = missions.filter(m => m.mission_status === 'assigned').length;
+  const availableCount = allMissions.filter(m => m.mission_status === 'available').length;
+  const assignedCount = allMissions.filter(m => m.mission_status === 'assigned').length;
 
   return (
     <div className="bg-yt-bg-secondary rounded-lg border border-yt-border overflow-hidden">
