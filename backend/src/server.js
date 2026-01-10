@@ -28,6 +28,7 @@ import * as airbaseStatusManager from './services/airbaseStatusManager.js';
 import * as discordAuth from './services/discordAuth.js';
 import * as combatMissionDispatch from './services/combatMissionDispatch.js';
 import * as luaZoneSync from './services/luaZoneSync.js';
+import * as activeUsers from './services/activeUsers.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -286,6 +287,9 @@ app.get('/api/auth/discord/callback', async (req, res) => {
       avatar: discordUser.avatar,
       globalName: discordUser.global_name || discordUser.username
     };
+
+    // Register user as active
+    activeUsers.addActiveUser(discordUser);
 
     // Store tokens for potential future use
     req.session.discordTokens = {
@@ -618,6 +622,30 @@ app.get('/api/mock-users', (req, res) => {
     { id: 'mock_5', globalName: 'Echo Five', username: 'echo_five', aircraft: 'AV-8B' },
   ];
   res.json(mockUsers);
+});
+
+/**
+ * GET /api/logged-in-users - Get currently logged in users (via Discord OAuth)
+ */
+app.get('/api/logged-in-users', (req, res) => {
+  // Update requesting user's activity if logged in
+  if (req.session?.user?.id) {
+    activeUsers.updateUserActivity(req.session.user.id);
+  }
+
+  const users = activeUsers.getActiveUsers();
+
+  // Format users for consumption (remove sensitive data, add aircraft placeholder)
+  const formattedUsers = users.map(user => ({
+    id: user.id,
+    globalName: user.globalName,
+    username: user.username,
+    avatar: user.avatar,
+    // Aircraft will be specified when adding to mission
+    aircraft: null
+  }));
+
+  res.json(formattedUsers);
 });
 
 /**

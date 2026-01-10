@@ -217,6 +217,13 @@ export async function getMockUsers() {
   return fetchAPI('/mock-users');
 }
 
+/**
+ * Get logged-in users (real users from Discord OAuth)
+ */
+export async function getLoggedInUsers() {
+  return fetchAPI('/logged-in-users');
+}
+
 export default {
   getAirports,
   getAirport,

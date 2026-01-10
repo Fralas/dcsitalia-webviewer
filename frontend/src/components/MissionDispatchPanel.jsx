@@ -253,31 +253,47 @@ function AddUserModal({ mission, onClose, onConfirm }) {
   const [mockUsers, setMockUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [aircraft, setAircraft] = useState('');
+  const [isDevelopment, setIsDevelopment] = useState(false);
 
   useEffect(() => {
-    const fetchMockUsers = async () => {
+    const fetchUsers = async () => {
       try {
-        const users = await api.getMockUsers();
+        // Use logged-in users in production, mock users in development
+        const isDevEnv = import.meta.env.DEV || window.location.hostname === 'localhost';
+        setIsDevelopment(isDevEnv);
+
+        const users = isDevEnv
+          ? await api.getMockUsers()
+          : await api.getLoggedInUsers();
+
         // Filter out users already assigned to the mission
         const availableUsers = users.filter(
           u => !mission.assigned_users.some(au => au.name === u.globalName)
         );
         setMockUsers(availableUsers);
       } catch (error) {
-        console.error('Error fetching mock users:', error);
+        console.error('Error fetching users:', error);
       } finally {
         setLoading(false);
       }
     };
-    fetchMockUsers();
+    fetchUsers();
   }, [mission]);
 
   const handleAddUser = async () => {
     if (!selectedUser) return;
 
+    // In production, require aircraft input
+    const userAircraft = isDevelopment ? selectedUser.aircraft : aircraft.trim();
+    if (!userAircraft) {
+      alert('Inserisci un aereo per il pilota');
+      return;
+    }
+
     setLoading(true);
     try {
-      await api.addUserToCombatMission(mission.id, selectedUser.globalName, selectedUser.aircraft);
+      await api.addUserToCombatMission(mission.id, selectedUser.globalName, userAircraft);
       onConfirm();
       onClose();
     } catch (error) {
@@ -330,16 +346,35 @@ function AddUserModal({ mission, onClose, onConfirm }) {
                     }`}
                   >
                     <div className="font-semibold">{user.globalName}</div>
-                    <div className="text-sm opacity-75">{user.aircraft}</div>
+                    {user.aircraft && (
+                      <div className="text-sm opacity-75">{user.aircraft}</div>
+                    )}
                   </button>
                 ))}
               </div>
             </div>
 
+            {/* Aircraft input - only in production */}
+            {!isDevelopment && selectedUser && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-yt-text-primary mb-2">
+                  Aereo di {selectedUser.globalName}
+                </label>
+                <input
+                  type="text"
+                  value={aircraft}
+                  onChange={(e) => setAircraft(e.target.value)}
+                  placeholder="Es: F-16C, A-10C, F/A-18C..."
+                  className="w-full px-3 py-2 bg-yt-bg-tertiary border border-yt-border rounded text-yt-text-primary focus:border-yt-accent focus:outline-none"
+                  autoFocus
+                />
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button
                 onClick={handleAddUser}
-                disabled={loading || !selectedUser}
+                disabled={loading || !selectedUser || (!isDevelopment && !aircraft.trim())}
                 className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded font-bold transition-all flex items-center justify-center gap-2"
               >
                 <Plus className="w-5 h-5" />
