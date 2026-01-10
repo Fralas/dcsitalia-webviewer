@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -37,6 +37,24 @@ function FitBounds({ positions }) {
       map.fitBounds(bounds, { padding: [80, 80] });
     }, 100);
   }
+
+  return null;
+}
+
+/**
+ * Component to zoom to a specific zone
+ */
+function ZoomToZone({ coordinates, zoomLevel = 13 }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (coordinates) {
+      map.setView([coordinates.lat, coordinates.lon], zoomLevel, {
+        animate: true,
+        duration: 0.5
+      });
+    }
+  }, [coordinates, zoomLevel, map]);
 
   return null;
 }
@@ -118,6 +136,9 @@ function getStatusLabel(status) {
  * Frontline Map Component
  */
 export default function FrontlineMap({ airportsData }) {
+  // State for selected zone
+  const [selectedZoneId, setSelectedZoneId] = useState(null);
+
   // Memoize calculations
   const validZones = useMemo(() => {
     return frontlineZones.filter(z => z.coordinates && z.coordinates.lat && z.coordinates.lon);
@@ -162,6 +183,22 @@ export default function FrontlineMap({ airportsData }) {
 
     return stats;
   }, [validZones]);
+
+  // Get selected zone coordinates for zooming
+  const selectedZone = useMemo(() => {
+    if (!selectedZoneId) return null;
+    return validZones.find(z => z.id === selectedZoneId);
+  }, [selectedZoneId, validZones]);
+
+  // Handle mission click - zoom to zone
+  const handleMissionClick = (zoneId) => {
+    setSelectedZoneId(zoneId);
+  };
+
+  // Handle zone marker click - select zone
+  const handleZoneClick = (zoneId) => {
+    setSelectedZoneId(zoneId);
+  };
 
   console.log('🗺️ FrontlineMap rendered with', validZones.length, 'zones');
 
@@ -239,8 +276,11 @@ export default function FrontlineMap({ airportsData }) {
               url="https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png"
             />
 
-            {/* Fit bounds to show all zones */}
-            <FitBounds positions={allPositions} />
+            {/* Fit bounds to show all zones - only on initial mount */}
+            {!selectedZone && <FitBounds positions={allPositions} />}
+
+            {/* Zoom to selected zone */}
+            {selectedZone && <ZoomToZone coordinates={selectedZone.coordinates} />}
 
             {/* Zone markers */}
             {validZones.map(zone => {
@@ -250,17 +290,22 @@ export default function FrontlineMap({ airportsData }) {
               // For neutral zones (white), use a darker border for visibility
               const borderColor = zone.status === 'NEUTRAL' ? '#6b7280' : color;
 
+              const isSelected = zone.id === selectedZoneId;
+
               return (
                 <CircleMarker
                   key={zone.id}
                   center={[zone.coordinates.lat, zone.coordinates.lon]}
-                  radius={8}
+                  radius={isSelected ? 12 : 8}
                   pathOptions={{
                     color: borderColor,
                     fillColor: color,
-                    fillOpacity: isActive ? 0.7 : 0.4,
-                    opacity: isActive ? 1 : 0.6,
-                    weight: isActive ? 2 : 1,
+                    fillOpacity: isActive || isSelected ? 0.7 : 0.4,
+                    opacity: isActive || isSelected ? 1 : 0.6,
+                    weight: isSelected ? 3 : isActive ? 2 : 1,
+                  }}
+                  eventHandlers={{
+                    click: () => handleZoneClick(zone.id),
                   }}
                 >
                   <Popup>
@@ -338,7 +383,10 @@ export default function FrontlineMap({ airportsData }) {
 
         {/* Mission Dispatch Panel - Right side (55% width) */}
         <div className="flex-[3] overflow-hidden">
-          <MissionDispatchPanel />
+          <MissionDispatchPanel
+            selectedZoneId={selectedZoneId}
+            onMissionClick={handleMissionClick}
+          />
         </div>
       </div>
     </div>

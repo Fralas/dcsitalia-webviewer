@@ -398,7 +398,7 @@ function AddUserModal({ mission, onClose, onConfirm }) {
 /**
  * Combat Mission Card Component
  */
-function CombatMissionCard({ mission, onUpdate, onAccept, user }) {
+function CombatMissionCard({ mission, onUpdate, onAccept, user, isHighlighted, onMissionClick }) {
   const [showAircraftModal, setShowAircraftModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -477,12 +477,17 @@ function CombatMissionCard({ mission, onUpdate, onAccept, user }) {
 
   return (
     <>
-      <div className={`bg-yt-bg-tertiary rounded-lg overflow-hidden border shadow-lg transition-all ${
-        isAvailable ? 'border-yt-border hover:border-yt-accent hover:shadow-xl' :
-        isAssigned ? 'border-blue-500/50 shadow-blue-500/20' :
-        isCompleted ? 'border-green-500/50 shadow-green-500/20' :
-        'border-red-500/50 shadow-red-500/20'
-      }`}>
+      <div
+        className={`bg-yt-bg-tertiary rounded-lg overflow-hidden border shadow-lg transition-all cursor-pointer ${
+          isHighlighted
+            ? 'border-yt-accent shadow-yt-accent/50 ring-2 ring-yt-accent'
+            : isAvailable ? 'border-yt-border hover:border-yt-accent hover:shadow-xl' :
+            isAssigned ? 'border-blue-500/50 shadow-blue-500/20' :
+            isCompleted ? 'border-green-500/50 shadow-green-500/20' :
+            'border-red-500/50 shadow-red-500/20'
+        }`}
+        onClick={() => onMissionClick && onMissionClick(mission.zone_id)}
+      >
         {/* Header con gradiente status zona */}
         <div className={`bg-gradient-to-r ${statusHeaderColor} border-b px-3 py-2`}>
           <div className="flex items-center justify-between">
@@ -626,7 +631,7 @@ function CombatMissionCard({ mission, onUpdate, onAccept, user }) {
 /**
  * Mission Dispatch Panel Component
  */
-export default function MissionDispatchPanel() {
+export default function MissionDispatchPanel({ selectedZoneId, onMissionClick }) {
   const [missions, setMissions] = useState([]); // Filtered missions for display
   const [allMissions, setAllMissions] = useState([]); // All missions for counts
   const [loading, setLoading] = useState(true);
@@ -855,6 +860,8 @@ export default function MissionDispatchPanel() {
                 onUpdate={fetchMissions}
                 onAccept={handleMissionAccept}
                 user={user}
+                isHighlighted={mission.zone_id === selectedZoneId}
+                onMissionClick={onMissionClick}
               />
             ))}
           </div>
