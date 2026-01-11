@@ -114,6 +114,13 @@ const BUFFER_FILE_PATH = process.env.BUFFER_FILE_PATH
   ? path.resolve(process.env.BUFFER_FILE_PATH)
   : path.resolve(process.cwd(), 'data-buffer.json');
 
+// Lua zone buffer location and refresh interval
+const LUA_ZONE_BUFFER_PATH = process.env.LUA_ZONE_BUFFER_PATH
+  ? path.resolve(process.env.LUA_ZONE_BUFFER_PATH)
+  : path.resolve(process.cwd(), 'lua-zones-buffer.json');
+
+const LUA_ZONE_BUFFER_INTERVAL_MS = Number.parseInt(process.env.LUA_ZONE_BUFFER_INTERVAL_MS, 10) || 5 * 60 * 1000;
+
 /**
  * Load airbase status from airbase_status.lua file
  */
@@ -1155,7 +1162,7 @@ airbaseStatusWatcher.on('error', (error) => {
   console.error('Airbase status file watcher error:', error);
 });
 
-// Watch Lua zone files for changes (Dyzone_Status, ActDyzone_Task, Dyzone_Position)
+// Buffered Lua zone sync (refreshes every 5 minutes by default)
 const luaZoneWatcher = luaZoneSync.initialize((result) => {
   if (result.success) {
     console.log(`🎯 Lua zones synced (${result.count} zones) - regenerating combat missions...`);
@@ -1170,6 +1177,9 @@ const luaZoneWatcher = luaZoneSync.initialize((result) => {
 
     console.log(`✅ Regenerated ${missions.length} combat missions`);
   }
+}, {
+  bufferFilePath: LUA_ZONE_BUFFER_PATH,
+  intervalMs: LUA_ZONE_BUFFER_INTERVAL_MS
 });
 
 // ==================== SCHEDULED TASKS ====================
@@ -1351,6 +1361,9 @@ process.on('SIGTERM', () => {
   console.log('👋 Shutting down gracefully...');
   watcher.close();
   airbaseStatusWatcher.close();
+  if (luaZoneWatcher && typeof luaZoneWatcher.stop === 'function') {
+    luaZoneWatcher.stop();
+  }
   httpServer.close(() => {
     console.log('✅ Server closed');
     process.exit(0);

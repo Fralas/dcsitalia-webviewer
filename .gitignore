@@ -10,3 +10,7 @@ data/historical/*.json
 *.db
 *.sqlite
 data-buffer.json
+lua-zones-buffer.json
+ago --name-status --pretty=format-h -ad -an -s --date=short
+CHANGELOG.md
+/csvexample
