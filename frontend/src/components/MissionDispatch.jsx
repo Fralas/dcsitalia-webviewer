@@ -146,7 +146,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted, user, onStats
       await api.completeMission(mission.id);
       onUpdate();
       if (user) {
-        onStatsUpdate({ missionsCompleted: 1, ordersCompleted: 1 });
+        onStatsUpdate({ ordersCompleted: 1 });
       }
     } catch (error) {
       alert(t('airportCard.alerts.completeError', { message: error.message }));

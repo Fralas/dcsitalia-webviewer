@@ -239,7 +239,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
     try {
       await api.completeMission(missionId);
       if (user) {
-        incrementStats({ missionsCompleted: 1, ordersCompleted: 1 });
+        incrementStats({ ordersCompleted: 1 });
       }
       setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: false } }));
       if (onMissionsUpdate) onMissionsUpdate();

@@ -110,6 +110,27 @@ function StatusBadge({ status }) {
   );
 }
 
+function formatDms(value, isLatitude) {
+  const direction = value >= 0 ? (isLatitude ? 'N' : 'E') : (isLatitude ? 'S' : 'W');
+  const absValue = Math.abs(value);
+  let degrees = Math.floor(absValue);
+  let minutesFloat = (absValue - degrees) * 60;
+  let minutes = Math.floor(minutesFloat);
+  let seconds = (minutesFloat - minutes) * 60;
+
+  seconds = Math.round(seconds * 10) / 10;
+  if (seconds >= 60) {
+    seconds = 0;
+    minutes += 1;
+  }
+  if (minutes >= 60) {
+    minutes = 0;
+    degrees += 1;
+  }
+
+  return `${degrees}d ${minutes}' ${seconds}" ${direction}`;
+}
+
 /**
  * Login Required Modal
  */
@@ -160,8 +181,8 @@ function LoginRequiredModal({ onClose, onLogin }) {
 /**
  * Aircraft Selection Modal
  */
-function AircraftSelectionModal({ mission, onClose, onConfirm, user }) {
-  const [aircraft, setAircraft] = useState('');
+function AircraftSelectionModal({ mission, onClose, onConfirm, user, availableAircraft }) {
+  const [aircraft, setAircraft] = useState(availableAircraft?.[0] || '');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -211,15 +232,29 @@ function AircraftSelectionModal({ mission, onClose, onConfirm, user }) {
             <label className="block text-sm font-medium text-yt-text-primary mb-2">
               Che aereo stai usando?
             </label>
-            <input
-              type="text"
-              value={aircraft}
-              onChange={(e) => setAircraft(e.target.value)}
-              placeholder="Es: F-16C, A-10C, F/A-18C..."
-              className="w-full px-3 py-2 bg-yt-bg-tertiary border border-yt-border rounded text-yt-text-primary focus:border-yt-accent focus:outline-none"
-              autoFocus
-              required
-            />
+            {availableAircraft && availableAircraft.length > 0 ? (
+              <select
+                value={aircraft}
+                onChange={(e) => setAircraft(e.target.value)}
+                className="w-full px-3 py-2 bg-yt-bg-tertiary border border-yt-border rounded text-yt-text-primary focus:border-yt-accent focus:outline-none"
+                autoFocus
+                required
+              >
+                {availableAircraft.map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={aircraft}
+                onChange={(e) => setAircraft(e.target.value)}
+                placeholder="Es: F-16C, A-10C, F/A-18C..."
+                className="w-full px-3 py-2 bg-yt-bg-tertiary border border-yt-border rounded text-yt-text-primary focus:border-yt-accent focus:outline-none"
+                autoFocus
+                required
+              />
+            )}
           </div>
 
           <div className="flex gap-3">
@@ -249,7 +284,7 @@ function AircraftSelectionModal({ mission, onClose, onConfirm, user }) {
 /**
  * Add User Modal - Select from mock users to add to mission
  */
-function AddUserModal({ mission, onClose, onConfirm }) {
+function AddUserModal({ mission, onClose, onConfirm, defaultAircraft }) {
   const [mockUsers, setMockUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -284,8 +319,10 @@ function AddUserModal({ mission, onClose, onConfirm }) {
   const handleAddUser = async () => {
     if (!selectedUser) return;
 
-    // In production, require aircraft input
-    const userAircraft = isDevelopment ? selectedUser.aircraft : aircraft.trim();
+    // In production, assign the same aircraft as the current user
+    const userAircraft = isDevelopment
+      ? selectedUser.aircraft
+      : (defaultAircraft || aircraft.trim());
     if (!userAircraft) {
       alert('Inserisci un aereo per il pilota');
       return;
@@ -358,23 +395,28 @@ function AddUserModal({ mission, onClose, onConfirm }) {
             {!isDevelopment && selectedUser && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-yt-text-primary mb-2">
-                  Aereo di {selectedUser.globalName}
+                  Aereo assegnato
                 </label>
-                <input
-                  type="text"
-                  value={aircraft}
-                  onChange={(e) => setAircraft(e.target.value)}
-                  placeholder="Es: F-16C, A-10C, F/A-18C..."
-                  className="w-full px-3 py-2 bg-yt-bg-tertiary border border-yt-border rounded text-yt-text-primary focus:border-yt-accent focus:outline-none"
-                  autoFocus
-                />
+                <div className="w-full px-3 py-2 bg-yt-bg-tertiary border border-yt-border rounded text-yt-text-primary">
+                  {defaultAircraft || 'Seleziona un aereo per prima missione'}
+                </div>
+                {!defaultAircraft && (
+                  <input
+                    type="text"
+                    value={aircraft}
+                    onChange={(e) => setAircraft(e.target.value)}
+                    placeholder="Es: F-16C, A-10C, F/A-18C..."
+                    className="w-full mt-2 px-3 py-2 bg-yt-bg-tertiary border border-yt-border rounded text-yt-text-primary focus:border-yt-accent focus:outline-none"
+                    autoFocus
+                  />
+                )}
               </div>
             )}
 
             <div className="flex gap-3">
               <button
                 onClick={handleAddUser}
-                disabled={loading || !selectedUser || (!isDevelopment && !aircraft.trim())}
+                disabled={loading || !selectedUser || (!isDevelopment && !defaultAircraft && !aircraft.trim())}
                 className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded font-bold transition-all flex items-center justify-center gap-2"
               >
                 <Plus className="w-5 h-5" />
@@ -398,7 +440,7 @@ function AddUserModal({ mission, onClose, onConfirm }) {
 /**
  * Combat Mission Card Component
  */
-function CombatMissionCard({ mission, onUpdate, onAccept, user, isHighlighted, onMissionClick, cardRef, onStatsUpdate }) {
+function CombatMissionCard({ mission, onUpdate, onAccept, user, isHighlighted, onMissionClick, cardRef, onStatsUpdate, userAircraft, availableAircraft }) {
   const [showAircraftModal, setShowAircraftModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -431,7 +473,7 @@ function CombatMissionCard({ mission, onUpdate, onAccept, user, isHighlighted, o
       await api.completeCombatMission(mission.id);
       onUpdate();
       if (user) {
-        onStatsUpdate({ missionsCompleted: 1, ordersCompleted: 1 });
+        onStatsUpdate({ missionsCompleted: 1 });
       }
     } catch (error) {
       alert('Errore nel completare la missione: ' + error.message);
@@ -517,7 +559,9 @@ function CombatMissionCard({ mission, onUpdate, onAccept, user, isHighlighted, o
           {/* Coordinates */}
           <div className="flex items-center gap-1.5 mb-3 text-xs text-yt-text-secondary">
             <Target className="w-3 h-3" />
-            <span className="font-mono">{mission.coordinates.lat.toFixed(4)}°, {mission.coordinates.lon.toFixed(4)}°</span>
+            <span className="font-mono">
+              {formatDms(mission.coordinates.lat, true)}, {formatDms(mission.coordinates.lon, false)}
+            </span>
           </div>
 
           {/* Status piloti */}
@@ -598,7 +642,7 @@ function CombatMissionCard({ mission, onUpdate, onAccept, user, isHighlighted, o
                 className="px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white text-sm rounded-lg font-bold transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
               >
                 <XCircle className="w-4 h-4" />
-                Abortisci
+                Annulla
               </button>
             </div>
           )}
@@ -611,6 +655,7 @@ function CombatMissionCard({ mission, onUpdate, onAccept, user, isHighlighted, o
           onClose={() => setShowAircraftModal(false)}
           onConfirm={handleConfirmAssignment}
           user={user}
+          availableAircraft={availableAircraft}
         />
       )}
 
@@ -626,6 +671,7 @@ function CombatMissionCard({ mission, onUpdate, onAccept, user, isHighlighted, o
           mission={mission}
           onClose={() => setShowAddUserModal(false)}
           onConfirm={onUpdate}
+          defaultAircraft={userAircraft}
         />
       )}
     </>
@@ -642,7 +688,7 @@ export default function MissionDispatchPanel({ selectedZoneId, onMissionClick })
   const [filter, setFilter] = useState('available'); // available | assigned | all
   const [priorityFilter, setPriorityFilter] = useState('all'); // all | 1 | 2 | 3 | 4 | 5
   const [expanded, setExpanded] = useState(true);
-  const { user, incrementStats } = useUser();
+  const { user, profile, incrementStats } = useUser();
 
   // Refs for mission cards to enable scrolling
   const missionRefs = useRef({});
@@ -870,23 +916,33 @@ export default function MissionDispatchPanel({ selectedZoneId, onMissionClick })
           </div>
         ) : (
           <div className="grid gap-3 grid-cols-2">
-            {missions.map(mission => (
-              <CombatMissionCard
-                key={mission.id}
-                mission={mission}
-                onUpdate={fetchMissions}
-                onAccept={handleMissionAccept}
-                user={user}
-                isHighlighted={mission.zone_id === selectedZoneId}
-                onMissionClick={onMissionClick}
-                onStatsUpdate={incrementStats}
-                cardRef={(el) => {
-                  if (el) {
-                    missionRefs.current[mission.zone_id] = el;
-                  }
-                }}
-              />
-            ))}
+            {missions.map(mission => {
+              const assignedUser = mission.assigned_users?.find(
+                (entry) => entry.name === (user?.globalName || user?.username)
+              );
+              const userAircraft = assignedUser?.aircraft || mission.assigned_aircraft || '';
+              const availableAircraft = profile?.selectedAircraft || [];
+
+              return (
+                <CombatMissionCard
+                  key={mission.id}
+                  mission={mission}
+                  onUpdate={fetchMissions}
+                  onAccept={handleMissionAccept}
+                  user={user}
+                  isHighlighted={mission.zone_id === selectedZoneId}
+                  onMissionClick={onMissionClick}
+                  onStatsUpdate={incrementStats}
+                  userAircraft={userAircraft}
+                  availableAircraft={availableAircraft}
+                  cardRef={(el) => {
+                    if (el) {
+                      missionRefs.current[mission.zone_id] = el;
+                    }
+                  }}
+                />
+              );
+            })}
           </div>
         )}
       </div>
