@@ -201,6 +201,13 @@ export async function getPilotCombatMissions(pilotName) {
 }
 
 /**
+ * Get frontline zones
+ */
+export async function getFrontlineZones() {
+  return fetchAPI('/frontline-zones');
+}
+
+/**
  * Add user to an assigned combat mission
  */
 export async function addUserToCombatMission(missionId, pilotName, aircraft) {
@@ -266,6 +273,7 @@ export default {
   refreshCombatMissions,
   clearCombatMissions,
   getPilotCombatMissions,
+  getFrontlineZones,
   getUserProfile,
   saveUserProfile,
 };

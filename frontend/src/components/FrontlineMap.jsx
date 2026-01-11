@@ -7,6 +7,8 @@ import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import { t } from '../utils/locale';
 import MissionDispatchPanel from './MissionDispatchPanel';
+import socketService from '../services/socket';
+import { getFrontlineZones } from '../services/api';
 
 /**
  * Convert decimal coordinates to DMS (Degrees, Minutes, Seconds)
@@ -139,11 +141,45 @@ function getStatusLabel(status) {
 export default function FrontlineMap({ airportsData }) {
   // State for selected zone
   const [selectedZoneId, setSelectedZoneId] = useState(null);
+  const [zones, setZones] = useState(frontlineZones);
+
+  useEffect(() => {
+    let isMounted = true;
+    getFrontlineZones()
+      .then((data) => {
+        const nextZones = data?.zones || data;
+        if (isMounted && Array.isArray(nextZones)) {
+          setZones(nextZones);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to load frontline zones:', error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = socketService.on('frontline:updated', (data) => {
+      const nextZones = data?.zones || data;
+      if (Array.isArray(nextZones)) {
+        setZones(nextZones);
+      }
+    });
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, []);
 
   // Memoize calculations
   const validZones = useMemo(() => {
-    return frontlineZones.filter(z => z.coordinates && z.coordinates.lat && z.coordinates.lon);
-  }, []);
+    return zones.filter(z => z.coordinates && z.coordinates.lat && z.coordinates.lon);
+  }, [zones]);
 
   const validAirports = useMemo(() => {
     const airportsList = airportsData ? airportsData : airports;

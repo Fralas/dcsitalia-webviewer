@@ -123,6 +123,10 @@ const LUA_ZONE_BUFFER_PATH = process.env.LUA_ZONE_BUFFER_PATH
 
 const LUA_ZONE_BUFFER_INTERVAL_MS = Number.parseInt(process.env.LUA_ZONE_BUFFER_INTERVAL_MS, 10) || 5 * 60 * 1000;
 
+const FRONTLINE_ZONES_FILE = process.env.DYZONE_OUTPUT_JSON
+  ? path.resolve(process.env.DYZONE_OUTPUT_JSON)
+  : path.resolve(__dirname, '../../frontend/src/config/frontlineZones.json');
+
 /**
  * Load airbase status from airbase_status.lua file
  */
@@ -642,6 +646,24 @@ app.post('/api/combat-missions/clear', (req, res) => {
 app.get('/api/combat-missions/pilot/:pilotName', (req, res) => {
   const missions = combatMissionDispatch.getMissionsByPilot(req.params.pilotName);
   res.json(missions);
+});
+
+/**
+ * GET /api/frontline-zones - Get latest frontline zones
+ */
+app.get('/api/frontline-zones', (req, res) => {
+  try {
+    if (!fs.existsSync(FRONTLINE_ZONES_FILE)) {
+      return res.json({ zones: [] });
+    }
+
+    const data = fs.readFileSync(FRONTLINE_ZONES_FILE, 'utf8');
+    const zones = JSON.parse(data);
+    res.json({ zones });
+  } catch (error) {
+    console.error('Error loading frontline zones:', error.message);
+    res.status(500).json({ error: 'Failed to load frontline zones' });
+  }
 });
 
 /**
@@ -1177,6 +1199,10 @@ const luaZoneWatcher = luaZoneSync.initialize((result) => {
       missions: combatMissionDispatch.getAllCombatMissions()
     });
 
+    io.emit('frontline:updated', {
+      zones: result.zones
+    });
+
     console.log(`✅ Regenerated ${missions.length} combat missions`);
   }
 }, {
@@ -1371,3 +1397,4 @@ process.on('SIGTERM', () => {
     process.exit(0);
   });
 });
+
