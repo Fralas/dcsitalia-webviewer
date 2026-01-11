@@ -7,18 +7,23 @@ const __dirname = path.dirname(__filename);
 
 // Paths
 const LUA_DIR = path.join(__dirname, '../../../csvexample');
-const DYZONE_STATUS_PATH = process.env.DYZONE_STATUS_FILE
-  ? path.resolve(process.env.DYZONE_STATUS_FILE)
-  : path.join(LUA_DIR, 'Dyzone_Status.lua');
-const DYZONE_TASK_PATH = process.env.DYZONE_TASK_FILE
-  ? path.resolve(process.env.DYZONE_TASK_FILE)
-  : path.join(LUA_DIR, 'ActDyzone_Task.lua');
-const DYZONE_POSITION_PATH = process.env.DYZONE_POSITION_FILE
-  ? path.resolve(process.env.DYZONE_POSITION_FILE)
-  : path.join(LUA_DIR, 'Dyzone_Position.lua');
-const OUTPUT_JSON_PATH = process.env.DYZONE_OUTPUT_JSON
-  ? path.resolve(process.env.DYZONE_OUTPUT_JSON)
-  : path.join(__dirname, '../../../frontend/src/config/frontlineZones.json');
+
+function getLuaPaths() {
+  return {
+    statusPath: process.env.DYZONE_STATUS_FILE
+      ? path.resolve(process.env.DYZONE_STATUS_FILE)
+      : path.join(LUA_DIR, 'Dyzone_Status.lua'),
+    taskPath: process.env.DYZONE_TASK_FILE
+      ? path.resolve(process.env.DYZONE_TASK_FILE)
+      : path.join(LUA_DIR, 'ActDyzone_Task.lua'),
+    positionPath: process.env.DYZONE_POSITION_FILE
+      ? path.resolve(process.env.DYZONE_POSITION_FILE)
+      : path.join(LUA_DIR, 'Dyzone_Position.lua'),
+    outputJsonPath: process.env.DYZONE_OUTPUT_JSON
+      ? path.resolve(process.env.DYZONE_OUTPUT_JSON)
+      : path.join(__dirname, '../../../frontend/src/config/frontlineZones.json')
+  };
+}
 
 const DEFAULT_BUFFER_FILE = path.resolve(process.cwd(), 'lua-zones-buffer.json');
 const DEFAULT_INTERVAL_MS = 5 * 60 * 1000;
@@ -34,7 +39,8 @@ function getBufferFilePath(customPath) {
  */
 function parseDyzoneStatus() {
   try {
-    const content = fs.readFileSync(DYZONE_STATUS_PATH, 'utf8');
+    const { statusPath } = getLuaPaths();
+    const content = fs.readFileSync(statusPath, 'utf8');
     const zoneStatus = {};
 
     // Match pattern: zone_XX = "STATUS"
@@ -61,7 +67,8 @@ function parseDyzoneStatus() {
  */
 function parseActDyzoneTask() {
   try {
-    const content = fs.readFileSync(DYZONE_TASK_PATH, 'utf8');
+    const { taskPath } = getLuaPaths();
+    const content = fs.readFileSync(taskPath, 'utf8');
     const zoneTasks = {};
 
     // Match pattern: zone_XX : TASK1, TASK2, TASK3
@@ -92,7 +99,8 @@ function parseActDyzoneTask() {
  */
 function parseDyzonePosition() {
   try {
-    const content = fs.readFileSync(DYZONE_POSITION_PATH, 'utf8');
+    const { positionPath } = getLuaPaths();
+    const content = fs.readFileSync(positionPath, 'utf8');
     const zonePositions = {};
 
     // Match pattern: zone_XX = "LAT LON"
@@ -175,7 +183,8 @@ function writeZoneBuffer(payload, bufferFilePath) {
 }
 
 function writeFrontlineZones(zones) {
-  fs.writeFileSync(OUTPUT_JSON_PATH, JSON.stringify(zones, null, 2), 'utf8');
+  const { outputJsonPath } = getLuaPaths();
+  fs.writeFileSync(outputJsonPath, JSON.stringify(zones, null, 2), 'utf8');
 }
 
 function buildZonesFromLua() {
