@@ -122,6 +122,36 @@ export const missionRules = {
     missionExpiry: 24,
   },
 
+  // Logistics container configuration (C-130 load planning)
+  logistics: {
+    isoContainerUnit: 1.0,
+    isoContainerSmallUnit: 0.5,
+    maxLoadUnits: 2.5, // 2x ISO + 1x ISO small
+  },
+
+  // Per-weapon logistics rules (X threshold + ISO fill for that request batch)
+  // thresholdX: medium priority threshold
+  // isoFill: container units for the default request batch
+  // orderQuantity: quantity requested per order (defaults to thresholdX)
+  weaponLogistics: {
+    'weapons.missiles.AIM_120C': { thresholdX: 50, isoFill: 1.0, orderQuantity: 50 },
+    'weapons.missiles.AIM_9X': { thresholdX: 50, isoFill: 0.5, orderQuantity: 50 },
+    'weapons.missiles.AGM_65D': { thresholdX: 32, isoFill: 0.6, orderQuantity: 32 },
+    'weapons.missiles.AGM_65F': { thresholdX: 24, isoFill: 0.4, orderQuantity: 24 },
+    'weapons.missiles.AGM_65H': { thresholdX: 24, isoFill: 0.4, orderQuantity: 24 },
+    'weapons.missiles.AGM_88': { thresholdX: 22, isoFill: 2.0, orderQuantity: 22 },
+    'weapons.missiles.ADM_141A': { thresholdX: 36, isoFill: 2.0, orderQuantity: 36 },
+    'weapons.bombs.GBU_12': { thresholdX: 26, isoFill: 2.0, orderQuantity: 26 },
+    'weapons.bombs.GBU_24': { thresholdX: 12, isoFill: 0.9, orderQuantity: 12 },
+    'weapons.bombs.GBU_31_V_3B': { thresholdX: 16, isoFill: 0.5, orderQuantity: 16 },
+    'weapons.bombs.GBU_38': { thresholdX: 48, isoFill: 0.5, orderQuantity: 48 },
+    'weapons.bombs.CBU_105': { thresholdX: 24, isoFill: 0.3, orderQuantity: 24 },
+    'weapons.missiles.AGM_114K': { thresholdX: 64, isoFill: 0.6, orderQuantity: 64 },
+    'weapons.missiles.AGM_114': { thresholdX: 64, isoFill: 0.6, orderQuantity: 64 },
+    'weapons.missiles.AGR_20_M282': { thresholdX: 100, isoFill: 1.0, orderQuantity: 100 },
+    'weapons.missiles.AGR_20A': { thresholdX: 100, isoFill: 1.0, orderQuantity: 100 },
+  },
+
   // Donor airport configuration
   donor: {
     // Minimum quantity to be eligible as donor
@@ -159,6 +189,64 @@ export function isImportantWeapon(weaponId, isHeliport = false, isCarrier = fals
     // Airports have both airport and heliport weapons
     return missionRules.importantWeaponsAirports.includes(weaponId) || missionRules.importantWeaponsHeliports.includes(weaponId);
   }
+}
+
+/**
+ * Get logistics rule for a weapon (if configured)
+ */
+export function getWeaponLogisticsRule(weaponId) {
+  return missionRules.weaponLogistics[weaponId] || null;
+}
+
+/**
+ * Get thresholds for a weapon based on X
+ */
+export function getWeaponThresholds(weaponId) {
+  const rule = getWeaponLogisticsRule(weaponId);
+
+  if (!rule) {
+    return {
+      critical: missionRules.criticalThreshold,
+      high: missionRules.highThreshold,
+      medium: missionRules.mediumThreshold,
+      donor: missionRules.donor.minQuantityToDonate,
+    };
+  }
+
+  return {
+    critical: rule.thresholdX / 4,
+    high: rule.thresholdX / 2,
+    medium: rule.thresholdX,
+    donor: rule.thresholdX * 2,
+  };
+}
+
+/**
+ * Get priority for a weapon based on its thresholds
+ */
+export function getWeaponPriority(weaponId, quantity) {
+  const thresholds = getWeaponThresholds(weaponId);
+  if (quantity <= thresholds.critical) return 'critical';
+  if (quantity <= thresholds.high) return 'high';
+  if (quantity <= thresholds.medium) return 'medium';
+  return 'ok';
+}
+
+/**
+ * Get order quantity for a weapon
+ */
+export function getOrderQuantityForWeapon(weaponId) {
+  const rule = getWeaponLogisticsRule(weaponId);
+  if (!rule) return missionRules.mission.defaultSupplyQuantity;
+  return Number.isFinite(rule.orderQuantity) ? rule.orderQuantity : rule.thresholdX;
+}
+
+/**
+ * Get ISO fill units for a weapon order
+ */
+export function getIsoFillForWeapon(weaponId) {
+  const rule = getWeaponLogisticsRule(weaponId);
+  return rule?.isoFill ?? 1.0;
 }
 
 /**

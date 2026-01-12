@@ -9,12 +9,91 @@ import { isImportantWeapon, importantWeaponsAirports, importantWeaponsHeliports,
 import { formatWeight } from '../utils/weightFormatter';
 import { t, formatElapsedTime, formatRemainingTime, getStatusLabel } from '../utils/locale';
 import { useUser } from '../contexts/UserContext';
+import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 
 /**
  * Get weapon display name (remove prefix)
  */
 function getWeaponDisplayName(weaponId) {
   return weaponId.replace(/^weapons\.(missiles|bombs|nurs|containers|droptanks|torpedoes|adapters)\./, '');
+}
+
+function getMissionOrders(mission) {
+  if (Array.isArray(mission.orders) && mission.orders.length > 0) {
+    return mission.orders;
+  }
+
+  if (mission.weapon_id) {
+    return [{
+      weapon_id: mission.weapon_id,
+      quantity_needed: mission.quantity_needed,
+      current_quantity: mission.current_quantity,
+      total_weight_lbs: mission.total_weight_lbs,
+      priority: mission.priority,
+    }];
+  }
+
+  return [];
+}
+
+function getMissionPriority(mission) {
+  if (mission.priority) return mission.priority;
+  const orders = getMissionOrders(mission);
+  const priorities = orders.map(order => order.priority).filter(Boolean);
+  if (priorities.length === 0) return 'medium';
+  if (priorities.includes('critical')) return 'critical';
+  if (priorities.includes('high')) return 'high';
+  if (priorities.includes('medium')) return 'medium';
+  return 'ok';
+}
+
+function getMissionTotals(mission) {
+  const orders = getMissionOrders(mission);
+  const totalWeight = Number.isFinite(mission.total_weight_lbs)
+    ? mission.total_weight_lbs
+    : orders.reduce((sum, order) => sum + (order.total_weight_lbs || 0), 0);
+  const totalIsoUnits = Number.isFinite(mission.total_iso_units)
+    ? mission.total_iso_units
+    : orders.reduce((sum, order) => sum + (order.iso_units || 0), 0);
+
+  return { orders, totalWeight, totalIsoUnits };
+}
+
+function getMissionTitle(mission) {
+  const orders = getMissionOrders(mission);
+  if (orders.length === 0) return 'Missione';
+  if (orders.length === 1) return getWeaponDisplayName(orders[0].weapon_id);
+  return `${getWeaponDisplayName(orders[0].weapon_id)} +${orders.length - 1}`;
+}
+
+const PRIORITY_RANK = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  ok: 3,
+};
+
+function getMissionPriorityRank(mission) {
+  return PRIORITY_RANK[getMissionPriority(mission)] ?? PRIORITY_RANK.ok;
+}
+
+function getIsoSummary(isoPlan, translate) {
+  const isoCount = isoPlan.containers.filter(container => !container.small && container.used > 0).length;
+  const smallCount = isoPlan.containers.filter(container => container.small && container.used > 0).length;
+
+  if (isoCount === 0 && smallCount === 0) {
+    return translate('missionDispatch.iso.emptySummary');
+  }
+
+  const parts = [];
+  if (isoCount > 0) {
+    parts.push(`${isoCount} ${translate('missionDispatch.iso.containerShort')}`);
+  }
+  if (smallCount > 0) {
+    parts.push(`${smallCount} ${translate('missionDispatch.iso.containerSmallShort')}`);
+  }
+
+  return parts.join(' + ');
 }
 
 /**
@@ -239,7 +318,9 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
     try {
       await api.completeMission(missionId);
       if (user) {
-        incrementStats({ ordersCompleted: 1 });
+        const mission = missions.find(m => m.id === missionId);
+        const ordersCount = getMissionOrders(mission || {}).length || 1;
+        incrementStats({ ordersCompleted: ordersCount });
       }
       setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: false } }));
       if (onMissionsUpdate) onMissionsUpdate();
@@ -448,9 +529,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
               <div className={`grid gap-3 ${airportMissions.length === 1 ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
                 {airportMissions.sort((a, b) => {
                   // Sort by priority: CRITICAL > HIGH > MEDIUM
-                  const priorityA = a.current_quantity <= 5 ? 0 : a.current_quantity <= 20 ? 1 : 2;
-                  const priorityB = b.current_quantity <= 5 ? 0 : b.current_quantity <= 20 ? 1 : 2;
-                  return priorityA - priorityB;
+                  return getMissionPriorityRank(a) - getMissionPriorityRank(b);
                 }).map(mission => {
                   const sourceName = mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Main Base';
                   const sourceAirport = mission.source_airport_id ? airports.find(a => a.id === mission.source_airport_id) : null;
@@ -458,13 +537,17 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                   const timeAgo = getTimeAgo(mission.created_at);
                   const expiresIn = getTimeRemaining(mission.expires_at);
                   const state = missionStates[mission.id] || { loading: false, showLoginModal: false };
+                  const { orders, totalWeight } = getMissionTotals(mission);
+                  const missionPriority = getMissionPriority(mission);
+                  const title = getMissionTitle(mission);
+                  const isoPlan = buildIsoContainerPlan(orders);
 
                   return (
                     <div key={mission.id} className="bg-yt-bg-secondary p-3 rounded-lg border-2 border-fuchsia-500/30">
                       {/* Header: weapon name, time, and priority */}
                       <div className="flex justify-between items-start mb-2">
                         <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <h3 className="text-lg font-bold text-yt-text-primary font-mono truncate">{getWeaponDisplayName(mission.weapon_id)}</h3>
+                          <h3 className="text-lg font-bold text-yt-text-primary font-mono truncate">{title}</h3>
                           <div className="flex items-center gap-1 flex-shrink-0">
                             <Clock className="w-3.5 h-3.5 text-yt-text-secondary" />
                             <span className="text-xs text-yt-text-secondary">{timeAgo}</span>
@@ -472,9 +555,9 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                         </div>
                         <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide flex-shrink-0 ml-2 ${
                           mission.status === 'pending'
-                            ? mission.current_quantity <= 5
+                            ? missionPriority === 'critical'
                               ? 'bg-red-400/20 text-red-400 border border-red-400/50'
-                              : mission.current_quantity <= 20
+                              : missionPriority === 'high'
                               ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
                               : 'bg-yellow-400/20 text-yellow-400 border border-yellow-400/50'
                             : mission.status === 'accepted'
@@ -482,9 +565,9 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                             : 'bg-yt-bg-primary/50 text-yt-text-secondary'
                         }`}>
                           {mission.status === 'pending'
-                            ? mission.current_quantity <= 5
+                            ? missionPriority === 'critical'
                               ? getStatusLabel('critical')
-                              : mission.current_quantity <= 20
+                              : missionPriority === 'high'
                               ? getStatusLabel('high')
                               : getStatusLabel('medium')
                             : mission.status === 'accepted'
@@ -561,20 +644,70 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                           )}
                       </div>
 
-                      {/* Quantities and weight - compact layout */}
+                      {/* Orders list */}
+                      <div className="space-y-1 mb-2">
+                        {orders.map(order => (
+                          <div key={order.weapon_id} className="flex items-center justify-between bg-yt-bg-tertiary rounded px-2 py-1 text-xs">
+                            <span className="text-yt-text-primary font-mono">{getWeaponDisplayName(order.weapon_id)}</span>
+                            <span className="text-yt-text-secondary">
+                              {t('airportCard.filters.stocks')}: <span className="text-red-400 font-bold">{order.current_quantity ?? '-'}</span>
+                              {' '}| {t('airportCard.filters.requested')}: <span className="text-green-400 font-bold">{order.quantity_needed ?? '-'}</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Cargo summary */}
                       <div className="flex gap-2 mb-2">
                         <div className="flex-1 bg-yt-bg-tertiary rounded p-1.5 text-center">
-                          <div className="text-[10px] text-yt-text-secondary mb-0.5">{t('airportCard.filters.stocks')}</div>
-                          <div className="text-base font-bold text-red-400">{mission.current_quantity}</div>
+                          <div className="text-[10px] text-yt-text-secondary mb-0.5">Ordini</div>
+                          <div className="text-base font-bold text-yt-text-primary">{orders.length}</div>
                         </div>
-                        <div className="flex-1 bg-yt-bg-tertiary rounded p-1.5 text-center">
-                          <div className="text-[10px] text-yt-text-secondary mb-0.5">{t('airportCard.filters.requested')}</div>
-                          <div className="text-base font-bold text-green-400">{mission.quantity_needed}</div>
-                        </div>
-                        {mission.total_weight_lbs && mission.total_weight_lbs > 0 && (
+                        {totalWeight > 0 && (
                           <div className="flex-[2] bg-yt-bg-tertiary rounded p-1.5 flex items-center justify-center gap-1.5">
                             <Weight className="w-4 h-4 text-yt-text-primary" />
-                            <span className="text-base font-bold text-yt-text-primary font-mono">{formatWeight(mission.total_weight_lbs)}</span>
+                            <span className="text-base font-bold text-yt-text-primary font-mono">{formatWeight(totalWeight)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* ISO container plan */}
+                      <div className="bg-yt-bg-tertiary rounded p-2 mb-2 text-xs">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-yt-text-secondary">{t('missionDispatch.iso.title')}</span>
+                          <span className="text-yt-text-primary font-medium">{getIsoSummary(isoPlan, t)}</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          {isoPlan.containers.map(container => {
+                            const fillPercent = container.capacity > 0 ? Math.min(100, (container.used / container.capacity) * 100) : 0;
+                            return (
+                              <div key={container.id} className="bg-yt-bg-secondary rounded border border-yt-border p-2">
+                                <div className="flex items-center justify-between text-[10px] text-yt-text-secondary mb-1">
+                                  <span>{container.small ? t('missionDispatch.iso.containerSmall') : t('missionDispatch.iso.container')}</span>
+                                  <span className="font-mono">{formatIsoUnits(container.used)} / {formatIsoUnits(container.capacity)}</span>
+                                </div>
+                                <div className="h-1.5 bg-yt-border/40 rounded-full overflow-hidden mb-1.5">
+                                  <div className="h-full bg-yt-accent" style={{ width: `${fillPercent}%` }}></div>
+                                </div>
+                                {container.items.length === 0 ? (
+                                  <div className="text-[10px] text-yt-text-secondary">{t('missionDispatch.iso.empty')}</div>
+                                ) : (
+                                  <div className="space-y-1">
+                                    {container.items.map((item, idx) => (
+                                      <div key={`${item.weapon_id}-${idx}`} className="flex items-center justify-between text-[10px]">
+                                        <span className="text-yt-text-primary font-mono">{getWeaponDisplayName(item.weapon_id)}</span>
+                                        <span className="text-yt-text-secondary font-mono">{formatIsoUnits(item.units)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {isoPlan.overflow.length > 0 && (
+                          <div className="mt-2 text-[10px] text-orange-400">
+                            {t('missionDispatch.iso.overflow')} {isoPlan.overflow.map(item => `${getWeaponDisplayName(item.weapon_id)} (${formatIsoUnits(item.units)})`).join(', ')}
                           </div>
                         )}
                       </div>

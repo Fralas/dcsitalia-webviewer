@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { isImportantWeapon } from '../config/rules.config.js';
+import { isImportantWeapon, getPriority } from '../config/rules.config.js';
 import { getAirportById } from '../config/airports.config.js';
 import { calculateTotalWeight } from '../config/weaponWeights.config.js';
 
@@ -85,29 +85,47 @@ function getMissionKey(airportId, weaponId) {
   return `${airportId}::${weaponId}`;
 }
 
+function getMissionWeaponIds(mission) {
+  if (Array.isArray(mission.orders) && mission.orders.length > 0) {
+    return mission.orders.map(order => order.weapon_id).filter(Boolean);
+  }
+
+  if (mission.weapon_id) {
+    return [mission.weapon_id];
+  }
+
+  return [];
+}
+
 function isMissionActive(mission, now = Date.now()) {
   return (mission.status === 'pending' || mission.status === 'accepted') && mission.expires_at > now;
 }
 
 function addActiveIndex(mission, now = Date.now()) {
   if (!isMissionActive(mission, now)) return;
-  const key = getMissionKey(mission.airport_id, mission.weapon_id);
-  let ids = activeMissionIndex.get(key);
-  if (!ids) {
-    ids = new Set();
-    activeMissionIndex.set(key, ids);
-  }
-  ids.add(mission.id);
+  const weaponIds = getMissionWeaponIds(mission);
+  weaponIds.forEach(weaponId => {
+    const key = getMissionKey(mission.airport_id, weaponId);
+    let ids = activeMissionIndex.get(key);
+    if (!ids) {
+      ids = new Set();
+      activeMissionIndex.set(key, ids);
+    }
+    ids.add(mission.id);
+  });
 }
 
 function removeActiveIndex(mission) {
-  const key = getMissionKey(mission.airport_id, mission.weapon_id);
-  const ids = activeMissionIndex.get(key);
-  if (!ids) return;
-  ids.delete(mission.id);
-  if (ids.size === 0) {
-    activeMissionIndex.delete(key);
-  }
+  const weaponIds = getMissionWeaponIds(mission);
+  weaponIds.forEach(weaponId => {
+    const key = getMissionKey(mission.airport_id, weaponId);
+    const ids = activeMissionIndex.get(key);
+    if (!ids) return;
+    ids.delete(mission.id);
+    if (ids.size === 0) {
+      activeMissionIndex.delete(key);
+    }
+  });
 }
 
 function rebuildMissionIndex() {
@@ -223,25 +241,54 @@ export function getLatestSnapshot(airportId) {
 /**
  * Create a new mission with source routing
  */
-export function createMission(airportId, weaponId, quantityNeeded, currentQuantity, expiryHours = 24, sourceAirportId = null, distance = null, recommendedAircraft = 'airplane') {
+export function createMission(paramsOrAirportId, weaponId, quantityNeeded, currentQuantity, expiryHours = 24, sourceAirportId = null, distance = null, recommendedAircraft = 'airplane') {
+  const params = typeof paramsOrAirportId === 'object'
+    ? paramsOrAirportId
+    : {
+      airportId: paramsOrAirportId,
+      sourceAirportId,
+      distance,
+      recommendedAircraft,
+      expiryHours,
+      orders: [{
+        weapon_id: weaponId,
+        quantity_needed: quantityNeeded,
+        current_quantity: currentQuantity,
+      }],
+      totalWeightLbs: calculateTotalWeight(weaponId, quantityNeeded),
+      totalIsoUnits: null,
+      priority: getPriority(currentQuantity),
+    };
+
   const missionId = `mission_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const createdAt = Date.now();
-  const expiresAt = createdAt + (expiryHours * 60 * 60 * 1000);
+  const expiresAt = createdAt + ((params.expiryHours ?? 24) * 60 * 60 * 1000);
 
-  // Calculate total weight for the cargo
-  const totalWeightLbs = calculateTotalWeight(weaponId, quantityNeeded);
+  const orders = Array.isArray(params.orders) ? params.orders : [];
+  const totalWeightLbs = Number.isFinite(params.totalWeightLbs)
+    ? params.totalWeightLbs
+    : orders.reduce((sum, order) => {
+      const weight = Number.isFinite(order.total_weight_lbs)
+        ? order.total_weight_lbs
+        : calculateTotalWeight(order.weapon_id, order.quantity_needed || 0);
+      return sum + weight;
+    }, 0);
+
+  const totalIsoUnits = Number.isFinite(params.totalIsoUnits)
+    ? params.totalIsoUnits
+    : orders.reduce((sum, order) => sum + (order.iso_units || 0), 0);
 
   const mission = {
     id: missionId,
-    airport_id: airportId, // Destination (recipient)
-    source_airport_id: sourceAirportId, // Source (donor or main base)
-    distance_nm: distance, // Distance in nautical miles
-    weapon_id: weaponId,
-    quantity_needed: quantityNeeded,
-    current_quantity: currentQuantity,
+    airport_id: params.airportId, // Destination (recipient)
+    source_airport_id: params.sourceAirportId, // Source (donor or main base)
+    distance_nm: params.distance, // Distance in nautical miles
+    orders,
     total_weight_lbs: totalWeightLbs, // Total cargo weight in pounds
+    total_iso_units: totalIsoUnits,
+    priority: params.priority || null,
     status: 'pending',
-    recommended_aircraft: recommendedAircraft, // 'helicopter', 'airplane', or 'airdrop'
+    recommended_aircraft: params.recommendedAircraft || 'airplane', // 'helicopter', 'airplane', or 'airdrop'
     created_at: createdAt,
     expires_at: expiresAt,
     accepted_at: null,

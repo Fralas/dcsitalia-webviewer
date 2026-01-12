@@ -12,6 +12,7 @@ export default {
     },
     navigation: {
       dashboard: 'Dashboard',
+      missions: 'Missions',
       map: 'Map',
       admin: 'Admin'
     },
@@ -173,6 +174,16 @@ export default {
   missionDispatch: {
     title: 'Mission Management',
     subtitle: 'Active resupply missions',
+    iso: {
+      title: 'ISO Load',
+      container: 'ISO container',
+      containerSmall: 'ISO container small',
+      containerShort: 'ISO',
+      containerSmallShort: 'ISO small',
+      empty: 'Empty',
+      emptySummary: 'Empty',
+      overflow: 'Overflow:'
+    },
     stats: {
       pending: 'Pending',
       accepted: 'Accepted',

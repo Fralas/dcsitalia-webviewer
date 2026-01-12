@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plane, Package, Activity, AlertCircle, Map, Shield, Target } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import MapView from './components/MapView';
+import MissionDispatch from './components/MissionDispatch';
 import FrontlineMap from './components/FrontlineMap';
 import AdminPanel from './components/AdminPanel';
 import UserMenu from './components/UserMenu';
@@ -179,6 +180,17 @@ function App() {
                   <span className="hidden sm:inline">{t('general.navigation.dashboard')}</span>
                 </button>
                 <button
+                  onClick={() => setCurrentView('missions')}
+                  className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
+                    currentView === 'missions'
+                      ? 'bg-yt-bg-tertiary text-yt-text-primary'
+                      : 'text-yt-text-secondary hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary'
+                  }`}
+                >
+                  <Package className="w-4 h-4" />
+                  <span className="hidden sm:inline">{t('general.navigation.missions')}</span>
+                </button>
+                <button
                   onClick={() => setCurrentView('map')}
                   className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
                     currentView === 'map'
@@ -232,6 +244,14 @@ function App() {
             selectedAirportToken={selectedAirportToken}
           />
         )}
+        {currentView === 'missions' && (
+          <MissionDispatch
+            missions={missions}
+            airports={Object.values(airports)}
+            onUpdate={handleMissionUpdate}
+            highlightedMissionId={highlightedMissionId}
+          />
+        )}
         {currentView === 'map' && (
           <MapView
             missions={missions}
@@ -241,7 +261,7 @@ function App() {
               setHighlightedMissionId(missionId);
               setSelectedAirportId(mission?.airport_id || null);
               setSelectedAirportToken(Date.now());
-              setCurrentView('dashboard');
+              setCurrentView('missions');
             }}
           />
         )}

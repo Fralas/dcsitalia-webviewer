@@ -15,6 +15,45 @@ function getWeaponDisplayName(weaponId) {
   return weaponId.replace(/^weapons\.(missiles|bombs|nurs|containers|droptanks|torpedoes|adapters)\./, '');
 }
 
+const MAX_ISO_UNITS = 2.5;
+
+function getMissionOrders(mission) {
+  if (Array.isArray(mission.orders) && mission.orders.length > 0) {
+    return mission.orders;
+  }
+
+  if (mission.weapon_id) {
+    return [{
+      weapon_id: mission.weapon_id,
+      quantity_needed: mission.quantity_needed,
+      current_quantity: mission.current_quantity,
+      total_weight_lbs: mission.total_weight_lbs,
+      priority: mission.priority,
+    }];
+  }
+
+  return [];
+}
+
+function getMissionTotals(mission) {
+  const orders = getMissionOrders(mission);
+  const totalWeight = Number.isFinite(mission.total_weight_lbs)
+    ? mission.total_weight_lbs
+    : orders.reduce((sum, order) => sum + (order.total_weight_lbs || 0), 0);
+  const totalIsoUnits = Number.isFinite(mission.total_iso_units)
+    ? mission.total_iso_units
+    : orders.reduce((sum, order) => sum + (order.iso_units || 0), 0);
+
+  return { orders, totalWeight, totalIsoUnits };
+}
+
+function getMissionTitle(mission) {
+  const orders = getMissionOrders(mission);
+  if (orders.length === 0) return 'Missione';
+  if (orders.length === 1) return getWeaponDisplayName(orders[0].weapon_id);
+  return `${getWeaponDisplayName(orders[0].weapon_id)} +${orders.length - 1}`;
+}
+
 /**
  * Component to fit bounds of all airports (only on mount)
  */
@@ -95,6 +134,8 @@ function MissionCard({ mission, airport, onHover, onSelect, isHighlighted, isSel
   const sourceName = mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Main Base';
   const distance = mission.distance_nm ? `${mission.distance_nm}nm` : '-';
   const isPending = mission.status === 'pending';
+  const { orders, totalWeight, totalIsoUnits } = getMissionTotals(mission);
+  const title = getMissionTitle(mission);
 
   return (
     <div
@@ -111,15 +152,21 @@ function MissionCard({ mission, airport, onHover, onSelect, isHighlighted, isSel
     >
       <div className="flex justify-between items-start mb-2">
         <div className="flex-1 min-w-0">
-          <div className="font-mono text-sm text-yt-text-primary font-bold mb-1 truncate">{getWeaponDisplayName(mission.weapon_id)}</div>
+          <div className="font-mono text-sm text-yt-text-primary font-bold mb-1 truncate">{title}</div>
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-yt-text-secondary">Qty:</span>
-            <span className="font-bold text-yt-text-primary bg-yt-bg-tertiary px-1.5 py-0.5 rounded">{mission.quantity_needed}</span>
+            <span className="text-yt-text-secondary">Ordini:</span>
+            <span className="font-bold text-yt-text-primary bg-yt-bg-tertiary px-1.5 py-0.5 rounded">{orders.length}</span>
           </div>
-          {mission.total_weight_lbs && mission.total_weight_lbs > 0 && (
+          {totalIsoUnits > 0 && (
+            <div className="flex items-center gap-1.5 text-xs text-yt-text-primary mt-1.5">
+              <Package className="w-3.5 h-3.5" />
+              <span className="font-mono font-medium">{totalIsoUnits.toFixed(2)} / {MAX_ISO_UNITS}</span>
+            </div>
+          )}
+          {totalWeight > 0 && (
             <div className="flex items-center gap-1.5 text-xs text-yt-text-primary mt-1.5">
               <Weight className="w-3.5 h-3.5" />
-              <span className="font-mono font-medium">{formatWeight(mission.total_weight_lbs)}</span>
+              <span className="font-mono font-medium">{formatWeight(totalWeight)}</span>
             </div>
           )}
         </div>
@@ -183,12 +230,15 @@ function MissionPolyline({ mission, sourceAirport, destAirport, isHighlighted, i
     >
       <Popup>
         <div className="text-xs">
-          <div className="font-bold">{getWeaponDisplayName(mission.weapon_id)}</div>
+          <div className="font-bold">{getMissionTitle(mission)}</div>
           <div className="text-gray-600">
             {sourceAirport.displayName} → {destAirport.displayName}
           </div>
           <div className="text-gray-600">
             {mission.distance_nm ? `${mission.distance_nm}nm` : '-'}
+          </div>
+          <div className="text-gray-600">
+            Ordini: {getMissionOrders(mission).length}
           </div>
           <div className="mt-1">
             <span className={`px-2 py-1 rounded text-xs ${
