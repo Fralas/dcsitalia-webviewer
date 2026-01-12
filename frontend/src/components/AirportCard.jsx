@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Helicopter, Anchor, Plus, X, TrendingUp, ArrowRight, FileDown, Weight, Clock, User, XCircle, Search, LogIn } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Helicopter, Anchor, Plus, X, TrendingUp, FileDown, Weight, Clock, User, XCircle, Search, LogIn } from 'lucide-react';
 import * as api from '../services/api';
 import WeaponChart from './WeaponChart';
 import { getAirportName } from '../config/airports';
@@ -96,12 +96,27 @@ function getIsoSummary(isoPlan, translate) {
   return parts.join(' + ');
 }
 
+function getLocationColorClass(airport) {
+  if (!airport) return 'text-yt-text-primary';
+  if (airport.isMainBase) return 'text-fuchsia-400';
+  if (airport.isHeliport) return 'text-cyan-400';
+  return 'text-yt-accent';
+}
+
 function getItemQuantity(item) {
   const orderQty = Number(item.order_quantity_needed || 0);
-  if (!Number.isFinite(orderQty) || orderQty <= 0) {
+  const orderIsoUnits = Number(item.order_iso_units || 0);
+  const usedUnits = Number(item.units || 0);
+  if (!Number.isFinite(orderQty) || orderQty <= 0 || !Number.isFinite(usedUnits) || usedUnits <= 0) {
     return null;
   }
-  return Math.floor((item.units || 0) * orderQty);
+  if (Number.isFinite(orderIsoUnits) && orderIsoUnits > 1) {
+    return Math.floor((usedUnits / orderIsoUnits) * orderQty);
+  }
+  if (Number.isFinite(orderIsoUnits) && orderIsoUnits > 0 && usedUnits >= orderIsoUnits) {
+    return Math.floor(orderQty);
+  }
+  return Math.floor(usedUnits * orderQty);
 }
 
 /**
@@ -541,143 +556,63 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                 }).map(mission => {
                   const sourceName = mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Main Base';
                   const sourceAirport = mission.source_airport_id ? airports.find(a => a.id === mission.source_airport_id) : null;
-                  const distance = mission.distance_nm ? `${mission.distance_nm}nm` : '-';
                   const timeAgo = getTimeAgo(mission.created_at);
                   const expiresIn = getTimeRemaining(mission.expires_at);
                   const state = missionStates[mission.id] || { loading: false, showLoginModal: false };
                   const { orders, totalWeight } = getMissionTotals(mission);
                   const missionPriority = getMissionPriority(mission);
-                  const title = getMissionTitle(mission);
+                  const destinationName = airport.displayName || airport.name;
+                  const sourceColor = getLocationColorClass(sourceAirport);
+                  const destinationColor = getLocationColorClass(airport);
+                  const weightLabel = totalWeight > 0 ? formatWeight(totalWeight) : '-';
                   const isoPlan = buildIsoContainerPlan(orders);
 
                   return (
-                    <div key={mission.id} className="bg-yt-bg-secondary p-3 rounded-lg border-2 border-fuchsia-500/30">
-                      {/* Header: weapon name, time, and priority */}
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <h3 className="text-lg font-bold text-yt-text-primary font-mono truncate">{title}</h3>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <Clock className="w-3.5 h-3.5 text-yt-text-secondary" />
-                            <span className="text-xs text-yt-text-secondary">{timeAgo}</span>
+                    <div key={mission.id} className="bg-yt-bg-secondary p-2 rounded-lg border-2 border-fuchsia-500/30">
+                      {/* Route title */}
+                      <div className="bg-yt-bg-tertiary rounded p-2 mb-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <h3 className="text-base font-bold text-yt-text-primary truncate">
+                              <span className={sourceColor}>{sourceName}</span>
+                              <span className="text-yt-text-secondary"> → </span>
+                              <span className={destinationColor}>{destinationName}</span>
+                            </h3>
+                            <div className="text-[11px] text-yt-text-secondary font-mono truncate">{weightLabel}</div>
                           </div>
+                          <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide flex-shrink-0 ${
+                            mission.status === 'pending'
+                              ? missionPriority === 'critical'
+                                ? 'bg-red-400/20 text-red-400 border border-red-400/50'
+                                : missionPriority === 'high'
+                                ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
+                                : 'bg-yellow-400/20 text-yellow-400 border border-yellow-400/50'
+                              : mission.status === 'accepted'
+                              ? 'bg-yt-accent/20 text-yt-accent'
+                              : 'bg-yt-bg-primary/50 text-yt-text-secondary'
+                          }`}>
+                            {mission.status === 'pending'
+                              ? missionPriority === 'critical'
+                                ? getStatusLabel('critical')
+                                : missionPriority === 'high'
+                                ? getStatusLabel('high')
+                                : getStatusLabel('medium')
+                              : mission.status === 'accepted'
+                              ? getStatusLabel('accepted')
+                              : mission.status.toUpperCase()}
+                          </span>
                         </div>
-                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide flex-shrink-0 ml-2 ${
-                          mission.status === 'pending'
-                            ? missionPriority === 'critical'
-                              ? 'bg-red-400/20 text-red-400 border border-red-400/50'
-                              : missionPriority === 'high'
-                              ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
-                              : 'bg-yellow-400/20 text-yellow-400 border border-yellow-400/50'
-                            : mission.status === 'accepted'
-                            ? 'bg-yt-accent/20 text-yt-accent'
-                            : 'bg-yt-bg-primary/50 text-yt-text-secondary'
-                        }`}>
-                          {mission.status === 'pending'
-                            ? missionPriority === 'critical'
-                              ? getStatusLabel('critical')
-                              : missionPriority === 'high'
-                              ? getStatusLabel('high')
-                              : getStatusLabel('medium')
-                            : mission.status === 'accepted'
-                            ? getStatusLabel('accepted')
-                            : mission.status.toUpperCase()}
-                        </span>
-                      </div>
-
-                      {/* Route Information */}
-                      <div className="flex items-center gap-1 text-xs bg-yt-bg-tertiary px-2 py-1.5 rounded mb-2 flex-wrap">
-                        {!sourceAirport ? (
-                          <span className="text-fuchsia-400 font-medium truncate">{sourceName}</span>
-                        ) : sourceAirport.isMainBase ? (
-                          <span className="text-fuchsia-400 font-medium truncate">{sourceName}</span>
-                        ) : sourceAirport.isCarrier ? (
-                          <>
-                            <Anchor className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-                            <span className="text-green-500 font-medium truncate">{sourceName}</span>
-                          </>
-                        ) : sourceAirport.isHeliport ? (
-                          <>
-                            <Helicopter className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
-                            <span className="text-cyan-400 font-medium truncate">{sourceName}</span>
-                          </>
-                        ) : (
-                          <>
-                            <Plane className="w-3.5 h-3.5 text-yt-accent flex-shrink-0" />
-                            <span className="text-yt-accent font-medium truncate">{sourceName}</span>
-                          </>
-                        )}
-                        <ArrowRight className="w-3.5 h-3.5 text-yt-text-secondary flex-shrink-0" />
-                        {isCarrier ? (
-                          <>
-                            <Anchor className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-                            <span className="text-green-500 font-medium truncate">{airport.displayName || airport.name}</span>
-                          </>
-                        ) : isHeliport ? (
-                          <>
-                            <Helicopter className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
-                            <span className="text-cyan-400 font-medium truncate">{airport.displayName || airport.name}</span>
-                          </>
-                        ) : (
-                          <>
-                            <Plane className="w-3.5 h-3.5 text-yt-accent flex-shrink-0" />
-                            <span className="text-yt-accent font-medium truncate">{airport.displayName || airport.name}</span>
-                          </>
-                        )}
-                        <span className="text-yt-border flex-shrink-0">•</span>
-                        <span className="text-yt-text-primary font-mono flex-shrink-0">{distance}</span>
-
-                        {/* Recommended Aircraft inline */}
-                          {mission.recommended_aircraft && (
-                            <>
-                              <span className="text-yt-border flex-shrink-0">•</span>
-                              {mission.recommended_aircraft === 'helicopter' && (
-                                <>
-                                  <Helicopter className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
-                                  <span className="text-cyan-400 font-medium flex-shrink-0">{t('airportCard.recommended.helicopter')}</span>
-                                </>
-                              )}
-                              {mission.recommended_aircraft === 'airplane' && (
-                                <>
-                                  <Plane className="w-3.5 h-3.5 text-yt-accent flex-shrink-0" />
-                                  <span className="text-yt-accent font-medium flex-shrink-0">{t('airportCard.recommended.airplane')}</span>
-                                </>
-                              )}
-                              {mission.recommended_aircraft === 'airdrop' && (
-                                <>
-                                  <Package className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
-                                  <span className="text-orange-400 font-medium flex-shrink-0">{t('airportCard.recommended.airdrop')}</span>
-                                </>
-                              )}
-                            </>
-                          )}
-                      </div>
-
-                      {/* Orders list */}
-                      <div className="space-y-1 mb-2">
-                        {orders.map(order => (
-                          <div key={order.weapon_id} className="flex items-center justify-between bg-yt-bg-tertiary rounded px-2 py-1 text-xs">
-                            <span className="text-yt-text-primary font-mono">{getWeaponDisplayName(order.weapon_id)}</span>
-                            <span className="text-yt-text-secondary">
-                              {t('airportCard.filters.stocks')}: <span className="text-red-400 font-bold">{order.current_quantity ?? '-'}</span>
-                              {' '}| {t('airportCard.filters.requested')}: <span className="text-green-400 font-bold">{order.quantity_needed ?? '-'}</span>
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Cargo summary */}
-                      <div className="flex gap-2 mb-2">
-                        <div className="flex-1 bg-yt-bg-tertiary rounded p-1.5 text-center">
-                          <div className="text-[10px] text-yt-text-secondary mb-0.5">Ordini</div>
-                          <div className="text-base font-bold text-yt-text-primary">{orders.length}</div>
+                        <div className="flex items-center gap-1 text-xs text-yt-text-secondary mt-1">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>{timeAgo}</span>
                         </div>
-                        {totalWeight > 0 && (
-                          <div className="flex-[2] bg-yt-bg-tertiary rounded p-1.5 flex items-center justify-center gap-1.5">
-                            <Weight className="w-4 h-4 text-yt-text-primary" />
-                            <span className="text-base font-bold text-yt-text-primary font-mono">{formatWeight(totalWeight)}</span>
-                          </div>
-                        )}
                       </div>
+
+                      {/* Route details removed */}
+
+                      {/* Orders list removed */}
+
+                      {/* Cargo summary removed */}
 
                       {/* ISO container plan */}
                       <div className="bg-yt-bg-tertiary rounded p-2 mb-2 text-xs">
@@ -716,14 +651,21 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                             );
                           })}
                         </div>
-                        {isoPlan.overflow.length > 0 && (
-                          <div className="mt-2 text-[10px] text-orange-400">
-                            {t('missionDispatch.iso.overflow')} {isoPlan.overflow.map(item => {
-                              const qty = getItemQuantity(item);
-                              return `${getWeaponDisplayName(item.weapon_id)} (${qty !== null ? `x${qty}` : '-'})`;
-                            }).join(', ')}
-                          </div>
-                        )}
+                        {isoPlan.overflow.length > 0 && (() => {
+                          const overflowLabels = isoPlan.overflow.map(item => {
+                            const qty = getItemQuantity(item);
+                            if (!qty) return null;
+                            return `${getWeaponDisplayName(item.weapon_id)} (x${qty})`;
+                          }).filter(Boolean);
+
+                          if (overflowLabels.length === 0) return null;
+
+                          return (
+                            <div className="mt-2 text-[10px] text-orange-400">
+                              {t('missionDispatch.iso.overflow')} {overflowLabels.join(', ')}
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* Pilot info for accepted missions */}

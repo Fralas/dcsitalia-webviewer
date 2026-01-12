@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plane, Helicopter, Clock, User, CheckCircle, XCircle, Package, ArrowRight, Weight, LogIn } from 'lucide-react';
+import { Plane, Helicopter, Clock, User, CheckCircle, XCircle, Package, LogIn } from 'lucide-react';
 import * as api from '../services/api';
 import { getAirportName } from '../config/airports';
 import airports from '../config/airports';
@@ -83,10 +83,25 @@ function getIsoSummary(isoPlan, translate) {
 
 function getItemQuantity(item) {
   const orderQty = Number(item.order_quantity_needed || 0);
-  if (!Number.isFinite(orderQty) || orderQty <= 0) {
+  const orderIsoUnits = Number(item.order_iso_units || 0);
+  const usedUnits = Number(item.units || 0);
+  if (!Number.isFinite(orderQty) || orderQty <= 0 || !Number.isFinite(usedUnits) || usedUnits <= 0) {
     return null;
   }
-  return Math.floor((item.units || 0) * orderQty);
+  if (Number.isFinite(orderIsoUnits) && orderIsoUnits > 1) {
+    return Math.floor((usedUnits / orderIsoUnits) * orderQty);
+  }
+  if (Number.isFinite(orderIsoUnits) && orderIsoUnits > 0 && usedUnits >= orderIsoUnits) {
+    return Math.floor(orderQty);
+  }
+  return Math.floor(usedUnits * orderQty);
+}
+
+function getLocationColorClass(airport) {
+  if (!airport) return 'text-yt-text-primary';
+  if (airport.isMainBase) return 'text-fuchsia-400';
+  if (airport.isHeliport) return 'text-cyan-400';
+  return 'text-yt-accent';
 }
 
 /**
@@ -177,7 +192,11 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted, user, onStats
   const missionPriority = getMissionPriority(mission);
   const { orders, totalWeight } = getMissionTotals(mission);
   const isoPlan = buildIsoContainerPlan(orders);
-  const title = getMissionTitle(orders);
+  const sourceName = sourceAirport?.displayName || getAirportName(mission.source_airport_id) || t('airportCard.baseLabel');
+  const destinationName = airport?.displayName || airport?.name || t('general.unknown');
+  const sourceColor = getLocationColorClass(sourceAirport);
+  const destinationColor = getLocationColorClass(airport);
+  const weightLabel = totalWeight > 0 ? formatWeight(totalWeight) : '-';
 
   // Scroll to and highlight this card when isHighlighted is true
   useEffect(() => {
@@ -251,50 +270,30 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted, user, onStats
   return (
     <div
       ref={cardRef}
-      className={`bg-yt-bg-secondary rounded-lg border-2 p-3 transition-all duration-300 hover:border-yt-border ${
+      className={`bg-yt-bg-secondary rounded-lg border-2 p-2 transition-all duration-300 hover:border-yt-border ${
         mission.status === 'accepted' ? 'border-yt-accent/50' : 'border-yt-border'
       } ${
         isHighlighted ? 'ring-4 ring-fuchsia-400 shadow-lg shadow-fuchsia-400/50 scale-[1.02]' : ''
       }`}
     >
-      {/* Header compatto con info principali */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2 flex-1">
-          <Clock className="w-4 h-4 text-yt-text-secondary" />
-          <span className="text-sm text-yt-text-secondary">{timeAgo}</span>
+      {/* Route title */}
+      <div className="bg-yt-bg-tertiary rounded p-2 mb-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-bold text-yt-text-primary">
+            <span className={sourceColor}>{sourceName}</span>
+            <span className="text-yt-text-secondary"> → </span>
+            <span className={destinationColor}>{destinationName}</span>
+          </h3>
+          <PriorityBadge priority={missionPriority} />
         </div>
-        <PriorityBadge priority={missionPriority} />
-      </div>
-
-      {/* Mission title */}
-      <h3 className="text-lg font-bold text-yt-text-primary mb-2 font-mono">{title}</h3>
-
-      {/* Orders list */}
-      <div className="space-y-1 mb-2">
-        {orders.map(order => (
-          <div key={order.weapon_id} className="flex items-center justify-between bg-yt-bg-tertiary rounded px-2 py-1 text-xs">
-            <span className="text-yt-text-primary font-mono">{getWeaponDisplayName(order.weapon_id)}</span>
-            <span className="text-yt-text-secondary">
-              {t('missionDispatch.quantities.stock')}: <span className="text-red-400 font-bold">{order.current_quantity ?? '-'}</span>
-              {' '}| {t('missionDispatch.quantities.requested')}: <span className="text-green-400 font-bold">{order.quantity_needed ?? '-'}</span>
-            </span>
-          </div>
-        ))}
-      </div>
-
-      {/* Cargo summary */}
-      <div className="flex gap-2 mb-2">
-        <div className="flex-1 bg-yt-bg-tertiary rounded p-1.5 text-center">
-          <div className="text-[10px] text-yt-text-secondary mb-0.5">Ordini</div>
-          <div className="text-base font-bold text-yt-text-primary">{orders.length}</div>
+        <div className="text-[11px] text-yt-text-secondary font-mono mt-1">{weightLabel}</div>
+        <div className="flex items-center gap-2 text-xs text-yt-text-secondary mt-1">
+          <Clock className="w-3.5 h-3.5" />
+          <span>{timeAgo}</span>
         </div>
-        {totalWeight > 0 && (
-          <div className="flex-[2] bg-yt-bg-tertiary rounded p-1.5 flex items-center justify-center gap-1.5">
-            <Weight className="w-4 h-4 text-yt-text-primary" />
-            <span className="text-base font-bold text-yt-text-primary font-mono">{formatWeight(totalWeight)}</span>
-          </div>
-        )}
       </div>
+
+      {/* Cargo summary removed */}
 
       {/* ISO container plan */}
       <div className="bg-yt-bg-tertiary rounded p-2 mb-2 text-xs">
@@ -333,87 +332,60 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted, user, onStats
             );
           })}
         </div>
-        {isoPlan.overflow.length > 0 && (
-          <div className="mt-2 text-[10px] text-orange-400">
-            {t('missionDispatch.iso.overflow')} {isoPlan.overflow.map(item => {
-              const qty = getItemQuantity(item);
-              return `${getWeaponDisplayName(item.weapon_id)} (${qty !== null ? `x${qty}` : '-'})`;
-            }).join(', ')}
-          </div>
-        )}
+        {isoPlan.overflow.length > 0 && (() => {
+          const overflowLabels = isoPlan.overflow.map(item => {
+            const qty = getItemQuantity(item);
+            if (!qty) return null;
+            return `${getWeaponDisplayName(item.weapon_id)} (x${qty})`;
+          }).filter(Boolean);
+
+          if (overflowLabels.length === 0) return null;
+
+          return (
+            <div className="mt-2 text-[10px] text-orange-400">
+              {t('missionDispatch.iso.overflow')} {overflowLabels.join(', ')}
+            </div>
+          );
+        })()}
       </div>
 
-      {/* Route e info missione - compatto */}
-      <div className="bg-yt-bg-tertiary rounded p-2 mb-2 text-xs">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {sourceAirport?.isMainBase ? (
-            <span className="text-fuchsia-400 font-medium">{mission.source_airport_id ? getAirportName(mission.source_airport_id) : t('airportCard.baseLabel')}</span>
-          ) : sourceAirport?.isHeliport ? (
-            <>
-              <Helicopter className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="text-cyan-400 font-medium">{getAirportName(mission.source_airport_id)}</span>
-            </>
-          ) : (
-            <>
-              <Plane className="w-3.5 h-3.5 text-yt-accent" />
-              <span className="text-yt-accent font-medium">{getAirportName(mission.source_airport_id)}</span>
-            </>
+      {/* Recommended Aircraft + pilot */}
+      {(mission.recommended_aircraft || (mission.status === 'accepted' && mission.accepted_by)) && (
+        <div className="bg-yt-bg-tertiary rounded p-2 mb-2 text-xs">
+          {mission.recommended_aircraft && (
+            <div className="flex items-center gap-1.5">
+              {mission.recommended_aircraft === 'helicopter' && (
+                <>
+                  <Helicopter className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="text-yt-text-secondary">{t('missionDispatch.recommended.label')}</span>
+                  <span className="text-cyan-400 font-medium">{t('missionDispatch.recommended.helicopter')}</span>
+                </>
+              )}
+              {mission.recommended_aircraft === 'airplane' && (
+                <>
+                  <Plane className="w-3.5 h-3.5 text-yt-accent" />
+                  <span className="text-yt-text-secondary">{t('missionDispatch.recommended.label')}</span>
+                  <span className="text-yt-accent font-medium">{t('missionDispatch.recommended.airplane')}</span>
+                </>
+              )}
+              {mission.recommended_aircraft === 'airdrop' && (
+                <>
+                  <Package className="w-3.5 h-3.5 text-orange-400" />
+                  <span className="text-yt-text-secondary">{t('missionDispatch.recommended.label')}</span>
+                  <span className="text-orange-400 font-medium">{t('missionDispatch.recommended.airdrop')}</span>
+                </>
+              )}
+            </div>
           )}
-          <ArrowRight className="w-3.5 h-3.5 text-yt-text-secondary" />
-          {isHeliport ? (
-            <>
-              <Helicopter className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="text-cyan-400 font-medium">{airport?.displayName || airport?.name || t('general.unknown')}</span>
-            </>
-          ) : (
-            <>
-              <Plane className="w-3.5 h-3.5 text-yt-accent" />
-              <span className="text-yt-accent font-medium">{airport?.displayName || airport?.name || t('general.unknown')}</span>
-            </>
-          )}
-          {mission.distance_nm && (
-            <>
-              <span className="text-yt-border">•</span>
-              <span className="text-yt-text-primary font-mono font-medium">{mission.distance_nm}nm</span>
-            </>
+          {mission.status === 'accepted' && mission.accepted_by && (
+            <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-yt-border">
+              <User className="w-3.5 h-3.5 text-yt-text-secondary" />
+              <span className="text-yt-text-secondary">{t('missionDispatch.pilot')}</span>
+              <span className="text-yt-text-primary font-bold">{mission.accepted_by}</span>
+            </div>
           )}
         </div>
-
-        {/* Recommended Aircraft */}
-        {mission.recommended_aircraft && (
-          <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-yt-border">
-            {mission.recommended_aircraft === 'helicopter' && (
-              <>
-                <Helicopter className="w-3.5 h-3.5 text-cyan-400" />
-                <span className="text-yt-text-secondary">{t('missionDispatch.recommended.label')}</span>
-                <span className="text-cyan-400 font-medium">{t('missionDispatch.recommended.helicopter')}</span>
-              </>
-            )}
-            {mission.recommended_aircraft === 'airplane' && (
-              <>
-                <Plane className="w-3.5 h-3.5 text-yt-accent" />
-                <span className="text-yt-text-secondary">{t('missionDispatch.recommended.label')}</span>
-                <span className="text-yt-accent font-medium">{t('missionDispatch.recommended.airplane')}</span>
-              </>
-            )}
-            {mission.recommended_aircraft === 'airdrop' && (
-              <>
-                <Package className="w-3.5 h-3.5 text-orange-400" />
-                <span className="text-yt-text-secondary">{t('missionDispatch.recommended.label')}</span>
-                <span className="text-orange-400 font-medium">{t('missionDispatch.recommended.airdrop')}</span>
-              </>
-            )}
-          </div>
-        )}
-
-        {mission.status === 'accepted' && mission.accepted_by && (
-          <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-yt-border">
-            <User className="w-3.5 h-3.5 text-yt-text-secondary" />
-            <span className="text-yt-text-secondary">{t('missionDispatch.pilot')}</span>
-            <span className="text-yt-text-primary font-bold">{mission.accepted_by}</span>
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Azioni - compatte */}
       <div className="flex gap-2">
@@ -465,14 +437,40 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted, user, onStats
  */
 export default function MissionDispatch({ missions, airports, onUpdate, highlightedMissionId }) {
   const [filter, setFilter] = useState('all'); // all, pending, accepted
+  const [filterMode, setFilterMode] = useState('route'); // route, priority
+  const [routeFilter, setRouteFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
 
   // Use shared user context
   const { user, incrementStats } = useUser();
+
+  const routes = missions.reduce((acc, mission) => {
+    const source = mission.source_airport_id || 'main';
+    const destination = mission.airport_id || 'unknown';
+    const key = `${source}::${destination}`;
+    if (acc.some(r => r.key === key)) return acc;
+    acc.push({
+      key,
+      source,
+      destination,
+      label: `${getAirportName(source) || t('airportCard.baseLabel')} → ${getAirportName(destination) || t('general.unknown')}`,
+    });
+    return acc;
+  }, []).sort((a, b) => a.label.localeCompare(b.label));
 
   const filteredMissions = missions.filter(m => {
     if (filter === 'pending') return m.status === 'pending';
     if (filter === 'accepted') return m.status === 'accepted';
     return m.status === 'pending' || m.status === 'accepted';
+  }).filter(m => {
+    if (filterMode === 'route' && routeFilter !== 'all') {
+      const key = `${m.source_airport_id || 'main'}::${m.airport_id || 'unknown'}`;
+      return key === routeFilter;
+    }
+    if (filterMode === 'priority' && priorityFilter !== 'all') {
+      return getMissionPriority(m) === priorityFilter;
+    }
+    return true;
   });
 
   const stats = {
@@ -544,6 +542,52 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
           >
             {t('missionDispatch.filters.accepted')} ({stats.accepted})
           </button>
+        </div>
+
+        {/* Route/Priority filter */}
+        <div className="flex flex-wrap items-center gap-2 mt-4">
+          <div className="flex items-center gap-1 bg-yt-bg-tertiary rounded p-1">
+            <button
+              onClick={() => setFilterMode('route')}
+              className={`px-3 py-1 text-xs font-medium rounded ${
+                filterMode === 'route' ? 'bg-yt-accent text-white' : 'text-yt-text-secondary hover:text-yt-text-primary'
+              }`}
+            >
+              {t('missionDispatch.filters.route')}
+            </button>
+            <button
+              onClick={() => setFilterMode('priority')}
+              className={`px-3 py-1 text-xs font-medium rounded ${
+                filterMode === 'priority' ? 'bg-yt-accent text-white' : 'text-yt-text-secondary hover:text-yt-text-primary'
+              }`}
+            >
+              {t('missionDispatch.filters.priority')}
+            </button>
+          </div>
+
+          {filterMode === 'route' ? (
+            <select
+              value={routeFilter}
+              onChange={(e) => setRouteFilter(e.target.value)}
+              className="px-2 py-1 text-xs bg-yt-bg-tertiary border border-yt-border rounded text-yt-text-primary"
+            >
+              <option value="all">{t('missionDispatch.filters.allRoutes')}</option>
+              {routes.map(route => (
+                <option key={route.key} value={route.key}>{route.label}</option>
+              ))}
+            </select>
+          ) : (
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              className="px-2 py-1 text-xs bg-yt-bg-tertiary border border-yt-border rounded text-yt-text-primary"
+            >
+              <option value="all">{t('missionDispatch.filters.allPriorities')}</option>
+              <option value="critical">{getStatusLabel('critical')}</option>
+              <option value="high">{getStatusLabel('high')}</option>
+              <option value="medium">{getStatusLabel('medium')}</option>
+            </select>
+          )}
         </div>
       </div>
 

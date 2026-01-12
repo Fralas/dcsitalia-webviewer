@@ -192,7 +192,11 @@ export default {
     filters: {
       all: 'Tutte',
       pending: 'In Attesa',
-      accepted: 'Accettate'
+      accepted: 'Accettate',
+      route: 'Route',
+      priority: 'Priorità',
+      allRoutes: 'Tutte le route',
+      allPriorities: 'Tutte le priorità'
     },
     emptyTitle: 'Nessuna missione disponibile',
     emptySubtitle: 'Le missioni appariranno qui quando le scorte saranno basse',

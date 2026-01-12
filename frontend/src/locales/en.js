@@ -192,7 +192,11 @@ export default {
     filters: {
       all: 'All',
       pending: 'Pending',
-      accepted: 'Accepted'
+      accepted: 'Accepted',
+      route: 'Route',
+      priority: 'Priority',
+      allRoutes: 'All routes',
+      allPriorities: 'All priorities'
     },
     emptyTitle: 'No missions available',
     emptySubtitle: 'Missions will appear here when stock levels are low',
