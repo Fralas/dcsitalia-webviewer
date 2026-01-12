@@ -11,6 +11,7 @@ const ZONES_PATH = path.join(__dirname, '../../../frontend/src/config/frontlineZ
 // In-memory storage for combat missions
 let combatMissions = [];
 let missionIdCounter = 1;
+let lastZonesSignature = null;
 
 /**
  * Priority levels for mission generation
@@ -104,6 +105,26 @@ function loadFrontlineZones() {
   }
 }
 
+function buildZonesSignature(zones) {
+  const normalized = zones.map(zone => ([
+    zone.id,
+    zone.status,
+    zone.isActive ? 1 : 0,
+    zone.name,
+    zone.coordinates?.lat ?? null,
+    zone.coordinates?.lon ?? null,
+    Array.isArray(zone.tasks) ? zone.tasks.join('|') : ''
+  ]));
+
+  normalized.sort((a, b) => {
+    if (a[0] < b[0]) return -1;
+    if (a[0] > b[0]) return 1;
+    return 0;
+  });
+
+  return JSON.stringify(normalized);
+}
+
 /**
  * Generate combat missions from active zones
  * Creates ONE mission per zone (not per task)
@@ -113,6 +134,12 @@ function loadFrontlineZones() {
  */
 export function generateCombatMissions() {
   const zones = loadFrontlineZones();
+  const nextSignature = buildZonesSignature(zones);
+  if (nextSignature === lastZonesSignature) {
+    return combatMissions;
+  }
+  lastZonesSignature = nextSignature;
+  lastZonesSignature = buildZonesSignature(zones);
   const missions = [];
 
   zones.forEach(zone => {
@@ -462,6 +489,7 @@ export function clearAllCombatMissions() {
   const count = combatMissions.length;
   combatMissions = [];
   missionIdCounter = 1;
+  lastZonesSignature = null;
   console.log(`🗑️  Cleared ${count} combat missions`);
   return count;
 }
