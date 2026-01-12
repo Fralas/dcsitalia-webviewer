@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plane, Package, Activity, AlertCircle, Map, Shield, Target } from 'lucide-react';
+import { Plane, Package, Activity, AlertCircle, Shield, Target } from 'lucide-react';
 import Dashboard from './components/Dashboard';
-import MapView from './components/MapView';
 import MissionDispatch from './components/MissionDispatch';
 import FrontlineMap from './components/FrontlineMap';
 import AdminPanel from './components/AdminPanel';
@@ -191,17 +190,6 @@ function App() {
                   <span className="hidden sm:inline">{t('general.navigation.missions')}</span>
                 </button>
                 <button
-                  onClick={() => setCurrentView('map')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
-                    currentView === 'map'
-                      ? 'bg-yt-bg-tertiary text-yt-text-primary'
-                      : 'text-yt-text-secondary hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary'
-                  }`}
-                >
-                  <Map className="w-4 h-4" />
-                  <span className="hidden sm:inline">{t('general.navigation.map')}</span>
-                </button>
-                <button
                   onClick={() => setCurrentView('frontline')}
                   className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
                     currentView === 'frontline'
@@ -233,7 +221,7 @@ function App() {
       </header>
 
       {/* Main Content - padding ridotto */}
-      <main className={`flex-1 ${currentView === 'map' || currentView === 'frontline' || currentView === 'admin' ? 'overflow-hidden' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
+      <main className={`flex-1 ${currentView === 'frontline' || currentView === 'admin' ? 'overflow-hidden' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
         {currentView === 'dashboard' && (
           <Dashboard
             airports={airports}
@@ -252,19 +240,6 @@ function App() {
             highlightedMissionId={highlightedMissionId}
           />
         )}
-        {currentView === 'map' && (
-          <MapView
-            missions={missions}
-            airportsData={Object.values(airports)}
-            onNavigateToMissions={(missionId) => {
-              const mission = missions.find((m) => m.id === missionId);
-              setHighlightedMissionId(missionId);
-              setSelectedAirportId(mission?.airport_id || null);
-              setSelectedAirportToken(Date.now());
-              setCurrentView('missions');
-            }}
-          />
-        )}
         {currentView === 'frontline' && (
           <FrontlineMap airportsData={Object.values(airports)} />
         )}
@@ -277,7 +252,7 @@ function App() {
       </main>
 
       {/* Footer - compatto (hidden on map/frontline/admin views) */}
-      {currentView !== 'map' && currentView !== 'frontline' && currentView !== 'admin' && (
+      {currentView !== 'frontline' && currentView !== 'admin' && (
         <footer className="bg-yt-bg-secondary border-t border-yt-border mt-8">
           <div className="container mx-auto px-4 py-3 text-center text-xs text-yt-text-secondary">
             <p>DCS Italia Warehouse Viewer v1.0 • Real-time logistics management</p>

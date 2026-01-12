@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plane, Helicopter, Clock, User, CheckCircle, XCircle, Package, LogIn } from 'lucide-react';
+import { Plane, Helicopter, Clock, User, CheckCircle, XCircle, Package, LogIn, ChevronDown, ChevronUp, Map } from 'lucide-react';
 import * as api from '../services/api';
 import { getAirportName } from '../config/airports';
 import airports from '../config/airports';
@@ -7,6 +7,7 @@ import { formatWeight } from '../utils/weightFormatter';
 import { t, formatElapsedTime, formatRemainingTime, getStatusLabel } from '../utils/locale';
 import { useUser } from '../contexts/UserContext';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
+import MapView from './MapView';
 
 /**
  * Get weapon display name
@@ -440,6 +441,7 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
   const [filterMode, setFilterMode] = useState('route'); // route, priority
   const [routeFilter, setRouteFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
+  const [isMapOpen, setIsMapOpen] = useState(false);
 
   // Use shared user context
   const { user, incrementStats } = useUser();
@@ -588,6 +590,43 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
               <option value="medium">{getStatusLabel('medium')}</option>
             </select>
           )}
+        </div>
+      </div>
+
+      {/* Map section */}
+      <div className="bg-yt-bg-secondary rounded-lg border border-yt-border">
+        <button
+          type="button"
+          onClick={() => setIsMapOpen((prev) => !prev)}
+          className="w-full flex items-center justify-between px-4 py-3 text-left"
+        >
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-yt-accent/20 rounded">
+              <Map className="w-5 h-5 text-yt-accent" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-yt-text-primary">{t('mapView.title')}</h3>
+              <p className="text-[11px] text-yt-text-secondary">{t('mapView.subtitle')}</p>
+            </div>
+          </div>
+          {isMapOpen ? (
+            <ChevronUp className="w-5 h-5 text-yt-text-secondary" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-yt-text-secondary" />
+          )}
+        </button>
+        <div
+          className={`overflow-hidden transition-all duration-300 ${
+            isMapOpen ? 'max-h-[1200px] opacity-100' : 'max-h-0 opacity-0'
+          }`}
+        >
+          <div className="p-3 pt-0">
+            <MapView
+              missions={missions}
+              airportsData={airports}
+              embedded
+            />
+          </div>
         </div>
       </div>
 
