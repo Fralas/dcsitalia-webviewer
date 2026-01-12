@@ -170,7 +170,13 @@ function MissionPolyline({ mission, sourceAirport, destAirport, isHighlighted, i
 /**
  * Map View Component
  */
-export default function MapView({ missions, airportsData, onNavigateToMissions, embedded = false }) {
+export default function MapView({
+  missions,
+  airportsData,
+  embedded = false,
+  onRouteSelect,
+  onAirportSelect,
+}) {
   const [hoveredMission, setHoveredMission] = useState(null);
   const [selectedMission, setSelectedMission] = useState(null);
 
@@ -191,16 +197,19 @@ export default function MapView({ missions, airportsData, onNavigateToMissions, 
     validAirports.map(a => [a.coordinates.lat, a.coordinates.lon])
   , [validAirports]);
 
-  // Handle mission selection
-  const handleSelectMission = (missionId) => {
-    if (selectedMission === missionId) {
-      // Second click - navigate to Missions page with mission ID
-      if (onNavigateToMissions) {
-        onNavigateToMissions(missionId);
-      }
-    } else {
-      // First click - select mission
-      setSelectedMission(missionId);
+  const handleSelectRoute = (mission) => {
+    if (!mission) return;
+    setSelectedMission(mission.id);
+    if (onRouteSelect) {
+      const key = `${mission.source_airport_id || 'main'}::${mission.airport_id || 'unknown'}`;
+      onRouteSelect(key);
+    }
+  };
+
+  const handleSelectAirport = (airportId) => {
+    if (!airportId) return;
+    if (onAirportSelect) {
+      onAirportSelect(airportId);
     }
   };
 
@@ -314,7 +323,7 @@ export default function MapView({ missions, airportsData, onNavigateToMissions, 
                     isHighlighted={hoveredMission === mission.id}
                     isSelected={selectedMission === mission.id}
                     onHover={setHoveredMission}
-                    onSelect={handleSelectMission}
+                    onSelect={handleSelectRoute}
                   />
                 );
               })}
@@ -328,6 +337,9 @@ export default function MapView({ missions, airportsData, onNavigateToMissions, 
                     key={airport.id}
                     position={[airport.coordinates.lat, airport.coordinates.lon]}
                     icon={createAirportIcon(airport.isMainBase, missionCount, airport.isHeliport, airport.isCarrier)}
+                    eventHandlers={{
+                      click: () => handleSelectAirport(airport.id),
+                    }}
                   >
                     <Popup>
                       <div className="text-sm">

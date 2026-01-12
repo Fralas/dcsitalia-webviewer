@@ -45,6 +45,7 @@ export default {
       yourName: 'Your name...',
       pilotName: 'Pilot name...'
     },
+    clear: 'Clear',
     unknown: 'Unknown'
   },
   dashboard: {
@@ -195,6 +196,7 @@ export default {
       accepted: 'Accepted',
       route: 'Route',
       priority: 'Priority',
+      airport: 'Airport',
       allRoutes: 'All routes',
       allPriorities: 'All priorities'
     },

@@ -441,6 +441,7 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
   const [filterMode, setFilterMode] = useState('route'); // route, priority
   const [routeFilter, setRouteFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
+  const [airportFilter, setAirportFilter] = useState('all');
   const [isMapOpen, setIsMapOpen] = useState(false);
 
   // Use shared user context
@@ -473,6 +474,9 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
       return getMissionPriority(m) === priorityFilter;
     }
     return true;
+  }).filter(m => {
+    if (airportFilter === 'all') return true;
+    return m.source_airport_id === airportFilter || m.airport_id === airportFilter;
   });
 
   const stats = {
@@ -590,6 +594,23 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
               <option value="medium">{getStatusLabel('medium')}</option>
             </select>
           )}
+          {airportFilter !== 'all' && (
+            <div className="flex items-center gap-2 text-xs bg-yt-bg-tertiary border border-yt-border rounded px-2 py-1">
+              <span className="text-yt-text-secondary">
+                {t('missionDispatch.filters.airport')}:
+              </span>
+              <span className="text-yt-text-primary font-medium">
+                {getAirportName(airportFilter) || t('general.unknown')}
+              </span>
+              <button
+                type="button"
+                onClick={() => setAirportFilter('all')}
+                className="text-yt-text-secondary hover:text-yt-text-primary"
+              >
+                {t('general.clear')}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -622,9 +643,18 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
         >
           <div className="p-3 pt-0">
             <MapView
-              missions={missions}
+              missions={filteredMissions}
               airportsData={airports}
               embedded
+              onRouteSelect={(key) => {
+                setFilterMode('route');
+                setRouteFilter(key);
+                setAirportFilter('all');
+              }}
+              onAirportSelect={(airportId) => {
+                setAirportFilter(airportId);
+                setRouteFilter('all');
+              }}
             />
           </div>
         </div>
