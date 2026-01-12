@@ -8,72 +8,137 @@ const DATA_DIR = './data/historical';
 const SNAPSHOTS_FILE = path.join(DATA_DIR, 'snapshots.json');
 const MISSIONS_FILE = path.join(DATA_DIR, 'missions.json');
 
-// Ensure directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+const SNAPSHOT_WRITE_DELAY_MS = 1000;
+const MISSIONS_WRITE_DELAY_MS = 1000;
+
+let snapshotsCache = [];
+let missionsCache = [];
+let missionsById = new Map();
+let activeMissionIndex = new Map();
+let snapshotsWriteTimer = null;
+let missionsWriteTimer = null;
+let snapshotsDirty = false;
+let missionsDirty = false;
+
+function ensureStorage() {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+
+  if (!fs.existsSync(SNAPSHOTS_FILE)) {
+    fs.writeFileSync(SNAPSHOTS_FILE, JSON.stringify([], null, 2));
+  }
+  if (!fs.existsSync(MISSIONS_FILE)) {
+    fs.writeFileSync(MISSIONS_FILE, JSON.stringify([], null, 2));
+  }
 }
 
-// Initialize files if they don't exist
-if (!fs.existsSync(SNAPSHOTS_FILE)) {
-  fs.writeFileSync(SNAPSHOTS_FILE, JSON.stringify([], null, 2));
-}
-if (!fs.existsSync(MISSIONS_FILE)) {
-  fs.writeFileSync(MISSIONS_FILE, JSON.stringify([], null, 2));
-}
-
-/**
- * Read snapshots from file (READ-ONLY for CSV files)
- */
-function readSnapshots() {
+function readJsonFile(filePath, fallback) {
   try {
-    const data = fs.readFileSync(SNAPSHOTS_FILE, 'utf-8');
+    const data = fs.readFileSync(filePath, 'utf-8');
     return JSON.parse(data);
   } catch (error) {
-    console.error('Error reading snapshots:', error.message);
-    return [];
+    console.error(`Error reading ${filePath}:`, error.message);
+    return fallback;
   }
 }
 
-/**
- * Write snapshots to file (NEVER writes to CSV files)
- */
-function writeSnapshots(snapshots) {
-  try {
-    fs.writeFileSync(SNAPSHOTS_FILE, JSON.stringify(snapshots, null, 2));
-  } catch (error) {
-    console.error('Error writing snapshots:', error.message);
+async function writeJsonAtomic(filePath, payload) {
+  const tempPath = `${filePath}.tmp`;
+  await fs.promises.writeFile(tempPath, JSON.stringify(payload, null, 2), 'utf-8');
+  await fs.promises.rename(tempPath, filePath);
+}
+
+function scheduleSnapshotsWrite() {
+  snapshotsDirty = true;
+  if (snapshotsWriteTimer) return;
+
+  snapshotsWriteTimer = setTimeout(async () => {
+    snapshotsWriteTimer = null;
+    if (!snapshotsDirty) return;
+    snapshotsDirty = false;
+    try {
+      await writeJsonAtomic(SNAPSHOTS_FILE, snapshotsCache);
+    } catch (error) {
+      console.error('Error writing snapshots:', error.message);
+    }
+  }, SNAPSHOT_WRITE_DELAY_MS);
+}
+
+function scheduleMissionsWrite() {
+  missionsDirty = true;
+  if (missionsWriteTimer) return;
+
+  missionsWriteTimer = setTimeout(async () => {
+    missionsWriteTimer = null;
+    if (!missionsDirty) return;
+    missionsDirty = false;
+    try {
+      await writeJsonAtomic(MISSIONS_FILE, missionsCache);
+    } catch (error) {
+      console.error('Error writing missions:', error.message);
+    }
+  }, MISSIONS_WRITE_DELAY_MS);
+}
+
+function getMissionKey(airportId, weaponId) {
+  return `${airportId}::${weaponId}`;
+}
+
+function isMissionActive(mission, now = Date.now()) {
+  return (mission.status === 'pending' || mission.status === 'accepted') && mission.expires_at > now;
+}
+
+function addActiveIndex(mission, now = Date.now()) {
+  if (!isMissionActive(mission, now)) return;
+  const key = getMissionKey(mission.airport_id, mission.weapon_id);
+  let ids = activeMissionIndex.get(key);
+  if (!ids) {
+    ids = new Set();
+    activeMissionIndex.set(key, ids);
+  }
+  ids.add(mission.id);
+}
+
+function removeActiveIndex(mission) {
+  const key = getMissionKey(mission.airport_id, mission.weapon_id);
+  const ids = activeMissionIndex.get(key);
+  if (!ids) return;
+  ids.delete(mission.id);
+  if (ids.size === 0) {
+    activeMissionIndex.delete(key);
   }
 }
 
-/**
- * Read missions from file
- */
-function readMissions() {
-  try {
-    const data = fs.readFileSync(MISSIONS_FILE, 'utf-8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Error reading missions:', error.message);
-    return [];
-  }
+function rebuildMissionIndex() {
+  missionsById = new Map();
+  activeMissionIndex = new Map();
+  const now = Date.now();
+
+  missionsCache.forEach(mission => {
+    missionsById.set(mission.id, mission);
+    addActiveIndex(mission, now);
+  });
 }
 
-/**
- * Write missions to file (NEVER writes to CSV files)
- */
-function writeMissions(missions) {
-  try {
-    fs.writeFileSync(MISSIONS_FILE, JSON.stringify(missions, null, 2));
-  } catch (error) {
-    console.error('Error writing missions:', error.message);
-  }
+ensureStorage();
+
+snapshotsCache = readJsonFile(SNAPSHOTS_FILE, []);
+if (!Array.isArray(snapshotsCache)) {
+  snapshotsCache = [];
 }
+
+missionsCache = readJsonFile(MISSIONS_FILE, []);
+if (!Array.isArray(missionsCache)) {
+  missionsCache = [];
+}
+
+rebuildMissionIndex();
 
 /**
  * Save warehouse snapshot (only important weapons for efficiency)
  */
 export function saveSnapshot(airportId, data) {
-  const snapshots = readSnapshots();
   const airport = getAirportById(airportId);
 
   // Filter only important weapons for this type of base (airport vs heliport vs carrier)
@@ -81,7 +146,7 @@ export function saveSnapshot(airportId, data) {
     isImportantWeapon(w.item, airport?.isHeliport || false, airport?.isCarrier || false)
   ) : [];
 
-  snapshots.push({
+  snapshotsCache.push({
     airport_id: airportId,
     timestamp: Date.now(),
     weapons: importantWeapons,
@@ -89,14 +154,14 @@ export function saveSnapshot(airportId, data) {
 
   // Cleanup old snapshots (older than 7 days)
   const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-  const filteredSnapshots = snapshots.filter(s => s.timestamp >= sevenDaysAgo);
+  const filteredSnapshots = snapshotsCache.filter(s => s.timestamp >= sevenDaysAgo);
+  const removed = snapshotsCache.length - filteredSnapshots.length;
+  snapshotsCache = filteredSnapshots;
 
-  writeSnapshots(filteredSnapshots);
+  scheduleSnapshotsWrite();
 
-  // Log cleanup if any were removed
-  const removed = snapshots.length - filteredSnapshots.length;
   if (removed > 0) {
-    console.log(`🧹 Cleaned up ${removed} old snapshots (>7 days)`);
+    console.log(`胑蘠 Cleaned up ${removed} old snapshots (>7 days)`);
   }
 }
 
@@ -104,10 +169,9 @@ export function saveSnapshot(airportId, data) {
  * Get historical data for an airport
  */
 export function getHistory(airportId, hoursBack = 24) {
-  const snapshots = readSnapshots();
   const timestamp = Date.now() - (hoursBack * 60 * 60 * 1000);
 
-  return snapshots
+  return snapshotsCache
     .filter(s => s.airport_id === airportId && s.timestamp >= timestamp)
     .map(s => ({
       timestamp: s.timestamp,
@@ -123,10 +187,9 @@ export function getHistory(airportId, hoursBack = 24) {
  * @returns {Array} Array of {timestamp, quantity} objects
  */
 export function getWeaponHistory(airportId, weaponId, days = 7) {
-  const snapshots = readSnapshots();
   const timestamp = Date.now() - (days * 24 * 60 * 60 * 1000);
 
-  const history = snapshots
+  const history = snapshotsCache
     .filter(s => s.airport_id === airportId && s.timestamp >= timestamp)
     .map(s => {
       // Find the weapon in this snapshot
@@ -147,9 +210,7 @@ export function getWeaponHistory(airportId, weaponId, days = 7) {
  * Get latest snapshot for an airport
  */
 export function getLatestSnapshot(airportId) {
-  const snapshots = readSnapshots();
-
-  const airportSnapshots = snapshots.filter(s => s.airport_id === airportId);
+  const airportSnapshots = snapshotsCache.filter(s => s.airport_id === airportId);
   if (airportSnapshots.length === 0) return null;
 
   const latest = airportSnapshots[airportSnapshots.length - 1];
@@ -163,8 +224,6 @@ export function getLatestSnapshot(airportId) {
  * Create a new mission with source routing
  */
 export function createMission(airportId, weaponId, quantityNeeded, currentQuantity, expiryHours = 24, sourceAirportId = null, distance = null, recommendedAircraft = 'airplane') {
-  const missions = readMissions();
-
   const missionId = `mission_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const createdAt = Date.now();
   const expiresAt = createdAt + (expiryHours * 60 * 60 * 1000);
@@ -172,7 +231,7 @@ export function createMission(airportId, weaponId, quantityNeeded, currentQuanti
   // Calculate total weight for the cargo
   const totalWeightLbs = calculateTotalWeight(weaponId, quantityNeeded);
 
-  missions.push({
+  const mission = {
     id: missionId,
     airport_id: airportId, // Destination (recipient)
     source_airport_id: sourceAirportId, // Source (donor or main base)
@@ -188,9 +247,12 @@ export function createMission(airportId, weaponId, quantityNeeded, currentQuanti
     accepted_at: null,
     accepted_by: null,
     completed_at: null,
-  });
+  };
 
-  writeMissions(missions);
+  missionsCache.push(mission);
+  missionsById.set(missionId, mission);
+  addActiveIndex(mission, createdAt);
+  scheduleMissionsWrite();
   return missionId;
 }
 
@@ -198,10 +260,9 @@ export function createMission(airportId, weaponId, quantityNeeded, currentQuanti
  * Get all active missions
  */
 export function getActiveMissions() {
-  const missions = readMissions();
   const now = Date.now();
 
-  return missions.filter(m =>
+  return missionsCache.filter(m =>
     (m.status === 'pending' || m.status === 'accepted') &&
     m.expires_at > now
   );
@@ -211,10 +272,9 @@ export function getActiveMissions() {
  * Get missions for an airport
  */
 export function getAirportMissions(airportId) {
-  const missions = readMissions();
   const now = Date.now();
 
-  return missions.filter(m =>
+  return missionsCache.filter(m =>
     m.airport_id === airportId &&
     (m.status === 'pending' || m.status === 'accepted') &&
     m.expires_at > now
@@ -225,16 +285,15 @@ export function getAirportMissions(airportId) {
  * Accept a mission
  */
 export function acceptMission(missionId, userId) {
-  const missions = readMissions();
-
-  const mission = missions.find(m => m.id === missionId && m.status === 'pending');
-  if (!mission) return false;
+  const mission = missionsById.get(missionId);
+  if (!mission || mission.status !== 'pending') return false;
 
   mission.status = 'accepted';
   mission.accepted_at = Date.now();
   mission.accepted_by = userId;
 
-  writeMissions(missions);
+  addActiveIndex(mission);
+  scheduleMissionsWrite();
   return true;
 }
 
@@ -242,15 +301,14 @@ export function acceptMission(missionId, userId) {
  * Complete a mission
  */
 export function completeMission(missionId) {
-  const missions = readMissions();
-
-  const mission = missions.find(m => m.id === missionId && m.status === 'accepted');
-  if (!mission) return false;
+  const mission = missionsById.get(missionId);
+  if (!mission || mission.status !== 'accepted') return false;
 
   mission.status = 'completed';
   mission.completed_at = Date.now();
 
-  writeMissions(missions);
+  removeActiveIndex(mission);
+  scheduleMissionsWrite();
   return true;
 }
 
@@ -258,14 +316,13 @@ export function completeMission(missionId) {
  * Cancel a mission
  */
 export function cancelMission(missionId) {
-  const missions = readMissions();
-
-  const mission = missions.find(m => m.id === missionId);
+  const mission = missionsById.get(missionId);
   if (!mission) return false;
 
   mission.status = 'cancelled';
 
-  writeMissions(missions);
+  removeActiveIndex(mission);
+  scheduleMissionsWrite();
   return true;
 }
 
@@ -273,34 +330,55 @@ export function cancelMission(missionId) {
  * Check if a mission already exists for this weapon (to avoid duplicates)
  */
 export function missionExistsForWeapon(airportId, weaponId) {
-  const missions = readMissions();
   const now = Date.now();
+  const key = getMissionKey(airportId, weaponId);
+  const ids = activeMissionIndex.get(key);
+  if (!ids || ids.size === 0) return false;
 
-  return missions.some(m =>
-    m.airport_id === airportId &&
-    m.weapon_id === weaponId &&
-    (m.status === 'pending' || m.status === 'accepted') &&
-    m.expires_at > now
-  );
+  let hasActive = false;
+  for (const id of ids) {
+    const mission = missionsById.get(id);
+    if (!mission) {
+      ids.delete(id);
+      continue;
+    }
+
+    if (isMissionActive(mission, now)) {
+      hasActive = true;
+      break;
+    }
+
+    if (mission.status === 'pending' || mission.status === 'accepted') {
+      mission.status = 'expired';
+      removeActiveIndex(mission);
+      scheduleMissionsWrite();
+    }
+  }
+
+  if (ids.size === 0) {
+    activeMissionIndex.delete(key);
+  }
+
+  return hasActive;
 }
 
 /**
  * Clean up expired missions
  */
 export function cleanupExpiredMissions() {
-  const missions = readMissions();
   const now = Date.now();
 
   let expiredCount = 0;
-  missions.forEach(m => {
+  missionsCache.forEach(m => {
     if ((m.status === 'pending' || m.status === 'accepted') && m.expires_at <= now) {
       m.status = 'expired';
+      removeActiveIndex(m);
       expiredCount++;
     }
   });
 
   if (expiredCount > 0) {
-    writeMissions(missions);
+    scheduleMissionsWrite();
   }
 
   return expiredCount;
@@ -310,7 +388,10 @@ export function cleanupExpiredMissions() {
  * Clear all missions (DEBUG ONLY)
  */
 export function clearAllMissions() {
-  writeMissions([]);
+  missionsCache = [];
+  missionsById = new Map();
+  activeMissionIndex = new Map();
+  scheduleMissionsWrite();
   return true;
 }
 

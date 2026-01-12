@@ -110,6 +110,8 @@ let currentData = {};
 let dataRefreshInProgress = false;
 let refreshQueued = false;
 let refreshPromise = Promise.resolve(currentData);
+let refreshTimer = null;
+let pendingRefreshReason = null;
 
 // Buffer file location (optional override via environment variable)
 const BUFFER_FILE_PATH = process.env.BUFFER_FILE_PATH
@@ -122,6 +124,7 @@ const LUA_ZONE_BUFFER_PATH = process.env.LUA_ZONE_BUFFER_PATH
   : path.resolve(process.cwd(), 'lua-zones-buffer.json');
 
 const LUA_ZONE_BUFFER_INTERVAL_MS = Number.parseInt(process.env.LUA_ZONE_BUFFER_INTERVAL_MS, 10) || 5 * 60 * 1000;
+const REFRESH_DEBOUNCE_MS = Number.parseInt(process.env.REFRESH_DEBOUNCE_MS, 10) || 500;
 
 const FRONTLINE_ZONES_FILE = process.env.DYZONE_OUTPUT_JSON
   ? path.resolve(process.env.DYZONE_OUTPUT_JSON)
@@ -238,6 +241,22 @@ function refreshDataFromCsv(reason = 'manual') {
 
   refreshPromise = executeRefresh(reason);
   return refreshPromise;
+}
+
+function scheduleRefresh(reason = 'scheduled') {
+  pendingRefreshReason = reason;
+  if (refreshTimer) {
+    return;
+  }
+
+  refreshTimer = setTimeout(() => {
+    refreshTimer = null;
+    const reasonToUse = pendingRefreshReason || reason;
+    pendingRefreshReason = null;
+    refreshDataFromCsv(reasonToUse).catch((error) => {
+      logger.error('Scheduled refresh failed:', error);
+    });
+  }, REFRESH_DEBOUNCE_MS);
 }
 
 // ==================== API ROUTES ====================
@@ -1151,9 +1170,7 @@ const watcher = chokidar.watch('*.csv', {
 watcher.on('change', (filename) => {
   console.log(`📝 CSV file changed: ${filename}`);
 
-  refreshDataFromCsv('file-change').catch((error) => {
-    logger.error('Watcher refresh failed:', error);
-  });
+  scheduleRefresh('file-change');
 });
 
 watcher.on('error', (error) => {
@@ -1177,9 +1194,7 @@ airbaseStatusWatcher.on('change', () => {
   loadAirbaseStatus();
 
   // Refresh airport data with new active airports list
-  refreshDataFromCsv('airbase-status-change').catch((error) => {
-    logger.error('Airbase status watcher refresh failed:', error);
-  });
+  scheduleRefresh('airbase-status-change');
 });
 
 airbaseStatusWatcher.on('error', (error) => {
@@ -1226,9 +1241,7 @@ setInterval(() => {
 // Check for new orders every 5 minutes (automatic polling)
 setInterval(() => {
   console.log('⏰ 5-minute check: Scanning for critical weapons...');
-  refreshDataFromCsv('scheduled').catch((error) => {
-    logger.error('Scheduled refresh failed:', error);
-  });
+  scheduleRefresh('scheduled');
 }, 5 * 60 * 1000); // Every 5 minutes
 
 // ==================== START SERVER ====================

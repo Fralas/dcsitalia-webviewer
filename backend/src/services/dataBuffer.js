@@ -25,7 +25,7 @@ export function readBuffer(bufferFilePath) {
   }
 }
 
-export function writeBuffer(data, bufferFilePath) {
+export async function writeBuffer(data, bufferFilePath) {
   const targetPath = getBufferFilePath(bufferFilePath);
   const tempPath = `${targetPath}.tmp`;
   const payload = {
@@ -33,13 +33,17 @@ export function writeBuffer(data, bufferFilePath) {
     updatedAt: Date.now(),
   };
 
-  fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2));
-  fs.renameSync(tempPath, targetPath);
+  try {
+    await fs.promises.writeFile(tempPath, JSON.stringify(payload, null, 2), 'utf-8');
+    await fs.promises.rename(tempPath, targetPath);
+  } catch (error) {
+    console.error('Error writing buffer file:', error.message);
+  }
 }
 
 export async function syncFromCsv(airports, csvDir, bufferFilePath) {
   const data = await csvParser.parseAllAirports(airports, csvDir);
-  writeBuffer(data, bufferFilePath);
+  await writeBuffer(data, bufferFilePath);
   return data;
 }
 
