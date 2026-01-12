@@ -28,6 +28,8 @@ export function buildIsoContainerPlan(orders = []) {
       container.items.push({
         weapon_id: order.weapon_id,
         units: amount,
+        order_quantity_needed: order.quantity_needed,
+        order_iso_units: order.iso_units,
       });
       remaining -= amount;
     });
@@ -36,6 +38,8 @@ export function buildIsoContainerPlan(orders = []) {
       overflow.push({
         weapon_id: order.weapon_id,
         units: remaining,
+        order_quantity_needed: order.quantity_needed,
+        order_iso_units: order.iso_units,
       });
     }
   });

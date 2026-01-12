@@ -81,6 +81,14 @@ function getIsoSummary(isoPlan, translate) {
   return parts.join(' + ');
 }
 
+function getItemQuantity(item) {
+  const orderQty = Number(item.order_quantity_needed || 0);
+  if (!Number.isFinite(orderQty) || orderQty <= 0) {
+    return null;
+  }
+  return Math.floor((item.units || 0) * orderQty);
+}
+
 /**
  * Get priority badge
  */
@@ -310,12 +318,15 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted, user, onStats
                   <div className="text-[10px] text-yt-text-secondary">{t('missionDispatch.iso.empty')}</div>
                 ) : (
                   <div className="space-y-1">
-                    {container.items.map((item, idx) => (
-                      <div key={`${item.weapon_id}-${idx}`} className="flex items-center justify-between text-[10px]">
-                        <span className="text-yt-text-primary font-mono">{getWeaponDisplayName(item.weapon_id)}</span>
-                        <span className="text-yt-text-secondary font-mono">{formatIsoUnits(item.units)}</span>
-                      </div>
-                    ))}
+                    {container.items.map((item, idx) => {
+                      const qty = getItemQuantity(item);
+                      return (
+                        <div key={`${item.weapon_id}-${idx}`} className="flex items-center justify-between text-[10px]">
+                          <span className="text-yt-text-primary font-mono">{getWeaponDisplayName(item.weapon_id)}</span>
+                          <span className="text-yt-text-secondary font-mono">{qty !== null ? `x${qty}` : '-'}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -324,7 +335,10 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted, user, onStats
         </div>
         {isoPlan.overflow.length > 0 && (
           <div className="mt-2 text-[10px] text-orange-400">
-            {t('missionDispatch.iso.overflow')} {isoPlan.overflow.map(item => `${getWeaponDisplayName(item.weapon_id)} (${formatIsoUnits(item.units)})`).join(', ')}
+            {t('missionDispatch.iso.overflow')} {isoPlan.overflow.map(item => {
+              const qty = getItemQuantity(item);
+              return `${getWeaponDisplayName(item.weapon_id)} (${qty !== null ? `x${qty}` : '-'})`;
+            }).join(', ')}
           </div>
         )}
       </div>
