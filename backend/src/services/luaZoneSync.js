@@ -27,6 +27,7 @@ function getLuaPaths() {
 
 const DEFAULT_BUFFER_FILE = path.resolve(process.cwd(), 'lua-zones-buffer.json');
 const DEFAULT_INTERVAL_MS = 5 * 60 * 1000;
+let lastLuaMtimes = null;
 
 function getBufferFilePath(customPath) {
   return customPath ? path.resolve(customPath) : DEFAULT_BUFFER_FILE;
@@ -234,7 +235,34 @@ function buildZonesFromLua() {
 
 export function buildLuaZoneBuffer(bufferFilePath) {
   try {
+    const { statusPath, taskPath, positionPath } = getLuaPaths();
+    const currentMtimes = {
+      status: fs.existsSync(statusPath) ? fs.statSync(statusPath).mtimeMs : 0,
+      task: fs.existsSync(taskPath) ? fs.statSync(taskPath).mtimeMs : 0,
+      position: fs.existsSync(positionPath) ? fs.statSync(positionPath).mtimeMs : 0,
+    };
+
+    if (
+      lastLuaMtimes &&
+      currentMtimes.status === lastLuaMtimes.status &&
+      currentMtimes.task === lastLuaMtimes.task &&
+      currentMtimes.position === lastLuaMtimes.position
+    ) {
+      const cached = readZoneBuffer(bufferFilePath);
+      if (cached && Array.isArray(cached.zones)) {
+        return {
+          success: true,
+          count: cached.zones.length,
+          zones: cached.zones,
+          counts: cached.counts || {},
+          bufferPath: getBufferFilePath(bufferFilePath),
+          skipped: true
+        };
+      }
+    }
+
     const { zones, counts } = buildZonesFromLua();
+    lastLuaMtimes = currentMtimes;
     const payload = {
       updatedAt: new Date().toISOString(),
       counts,
