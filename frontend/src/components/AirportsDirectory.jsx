@@ -37,13 +37,22 @@ function getAirportCoordinates(airport) {
   return fallback?.coordinates || null;
 }
 
-export default function AirportsDirectory({ airports, onSelectAirport }) {
+export default function AirportsDirectory({ airports, missions = [], onSelectAirport }) {
   const airportList = useMemo(() => {
     const items = Object.values(airports || {}).filter(item => item && item.name);
     return items
       .filter(item => item.isActive !== false)
       .sort((a, b) => (a.displayName || a.name).localeCompare(b.displayName || b.name));
   }, [airports]);
+
+  const missionsByAirport = useMemo(() => {
+    return missions.reduce((acc, mission) => {
+      const key = mission.airport_id;
+      if (!key) return acc;
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+  }, [missions]);
 
   return (
     <div className="space-y-3">
@@ -72,18 +81,20 @@ export default function AirportsDirectory({ airports, onSelectAirport }) {
             const dmsLat = coords ? formatDms(coords.lat, 'N', 'S') : '-';
             const dmsLon = coords ? formatDms(coords.lon, 'E', 'W') : '-';
             const typeInfo = getAirportType(airport);
+            const isDefaultAirport = !airport.isMainBase && !airport.isCarrier && !airport.isHeliport;
             const icao = (airport.icao || airport.csvPrefix || airport.id || '').toUpperCase();
+            const missionCount = missionsByAirport[airport.id] || 0;
 
             return (
               <button
                 key={airport.id}
                 type="button"
                 onClick={() => onSelectAirport && onSelectAirport(airport.id)}
-                className="w-full text-left bg-yt-bg-secondary rounded-lg border border-yt-border p-4 hover:border-yt-border/60 hover:shadow-lg transition-all"
+                className="w-full text-left bg-yt-bg-secondary rounded-lg border border-yt-border/80 p-4 hover:border-yt-border hover:shadow-lg transition-all"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
-                    <div className="mt-0.5">
+                    <div className="mt-0.5 rounded bg-yt-bg-tertiary p-2 border border-yt-border/70">
                       {airport.isCarrier ? (
                         <Anchor className={`w-5 h-5 ${typeInfo.color}`} />
                       ) : airport.isHeliport ? (
@@ -92,21 +103,29 @@ export default function AirportsDirectory({ airports, onSelectAirport }) {
                         <Plane className={`w-5 h-5 ${typeInfo.color}`} />
                       )}
                     </div>
-                    <div>
-                      <div className="text-base font-bold text-yt-text-primary">{airport.displayName || airport.name}</div>
+                    <div className="min-w-0">
+                      <div className="text-base font-bold text-yt-text-primary truncate">{airport.displayName || airport.name}</div>
                       <div className="text-xs text-yt-text-secondary mt-1">
                         <span className="font-medium text-yt-text-primary">{t('airportsDirectory.labels.icao')}:</span> {icao}
                       </div>
-                      <div className="text-xs text-yt-text-secondary mt-1 flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5" />
-                        <span>{dmsLat} | {dmsLon}</span>
+                      <div className="text-xs text-yt-text-secondary mt-2 flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-yt-text-secondary" />
+                        <span className="font-mono">{dmsLat} | {dmsLon}</span>
                       </div>
                     </div>
                   </div>
-                  <span className={`text-xs font-bold uppercase tracking-wide ${typeInfo.color}`}>
-                    {typeInfo.label}
-                  </span>
+                  {!isDefaultAirport && (
+                    <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded bg-yt-bg-tertiary border border-yt-border/70 ${typeInfo.color}`}>
+                      {typeInfo.label}
+                    </span>
+                  )}
                 </div>
+                {missionCount > 0 && (
+                  <div className="mt-3 inline-flex items-center gap-2 text-[11px] text-yt-text-secondary bg-yt-bg-tertiary border border-yt-border/70 px-2 py-1 rounded">
+                    <span className="font-bold text-yt-text-primary">{missionCount}</span>
+                    <span>{t('airportsDirectory.missions')}</span>
+                  </div>
+                )}
               </button>
             );
           })

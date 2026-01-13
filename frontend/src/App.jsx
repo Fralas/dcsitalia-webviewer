@@ -258,6 +258,7 @@ function App() {
         {currentView === 'airports' && (
           <AirportsDirectory
             airports={airports}
+            missions={missions}
             onSelectAirport={handleAirportSelect}
           />
         )}

@@ -68,6 +68,7 @@ export default {
     subtitle: 'Full list with basic information',
     emptyTitle: 'No airports found',
     emptySubtitle: 'No data available',
+    missions: 'incoming missions',
     labels: {
       icao: 'ICAO'
     },
