@@ -68,7 +68,7 @@ export default function AirportsDirectory({ airports, missions = [], onSelectAir
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {airportList.length === 0 ? (
           <div className="bg-yt-bg-secondary rounded-lg p-8 text-center border border-yt-border">
             <Plane className="w-12 h-12 text-yt-text-secondary mx-auto mb-3 opacity-50" />
@@ -90,11 +90,11 @@ export default function AirportsDirectory({ airports, missions = [], onSelectAir
                 key={airport.id}
                 type="button"
                 onClick={() => onSelectAirport && onSelectAirport(airport.id)}
-                className="w-full text-left bg-yt-bg-secondary rounded-lg border border-yt-border/80 p-4 hover:border-yt-border hover:shadow-lg transition-all"
+                className="w-full text-left bg-yt-bg-secondary rounded-xl border border-yt-border/70 p-4 hover:border-yt-border hover:-translate-y-0.5 hover:shadow-xl transition-all"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 rounded bg-yt-bg-tertiary p-2 border border-yt-border/70">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="rounded-lg bg-yt-bg-tertiary/80 p-2.5 border border-yt-border/70">
                       {airport.isCarrier ? (
                         <Anchor className={`w-5 h-5 ${typeInfo.color}`} />
                       ) : airport.isHeliport ? (
@@ -105,27 +105,25 @@ export default function AirportsDirectory({ airports, missions = [], onSelectAir
                     </div>
                     <div className="min-w-0">
                       <div className="text-base font-bold text-yt-text-primary truncate">{airport.displayName || airport.name}</div>
-                      <div className="text-xs text-yt-text-secondary mt-1">
+                      <div className="text-[11px] text-yt-text-secondary mt-1">
                         <span className="font-medium text-yt-text-primary">{t('airportsDirectory.labels.icao')}:</span> {icao}
-                      </div>
-                      <div className="text-xs text-yt-text-secondary mt-2 flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-yt-text-secondary" />
-                        <span className="font-mono">{dmsLat} | {dmsLon}</span>
                       </div>
                     </div>
                   </div>
-                  {!isDefaultAirport && (
-                    <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded bg-yt-bg-tertiary border border-yt-border/70 ${typeInfo.color}`}>
-                      {typeInfo.label}
-                    </span>
+                  <div />
+                </div>
+                <div className="mt-4 pt-3 border-t border-yt-border/60 flex items-center justify-between gap-3 text-[11px] text-yt-text-secondary">
+                  <div className="flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-yt-text-secondary" />
+                    <span className="font-mono">{dmsLat} | {dmsLon}</span>
+                  </div>
+                  {missionCount > 0 && (
+                    <div className="inline-flex items-center gap-1.5 bg-yt-bg-tertiary border border-yt-border/70 px-2 py-1 rounded-full">
+                      <span className="font-bold text-yt-text-primary">{missionCount}</span>
+                      <span>{t('airportsDirectory.missions')}</span>
+                    </div>
                   )}
                 </div>
-                {missionCount > 0 && (
-                  <div className="mt-3 inline-flex items-center gap-2 text-[11px] text-yt-text-secondary bg-yt-bg-tertiary border border-yt-border/70 px-2 py-1 rounded">
-                    <span className="font-bold text-yt-text-primary">{missionCount}</span>
-                    <span>{t('airportsDirectory.missions')}</span>
-                  </div>
-                )}
               </button>
             );
           })

@@ -303,7 +303,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted, user, onStats
           <span className="text-yt-text-primary font-medium">{getIsoSummary(isoPlan, t)}</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          {isoPlan.containers.map(container => {
+          {isoPlan.containers.filter(container => container.used > 0).map(container => {
             const fillPercent = container.capacity > 0 ? Math.min(100, (container.used / container.capacity) * 100) : 0;
             return (
               <div key={container.id} className="bg-yt-bg-secondary rounded border border-yt-border p-2">
@@ -314,21 +314,17 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted, user, onStats
                 <div className="h-1.5 bg-yt-border/40 rounded-full overflow-hidden mb-1.5">
                   <div className="h-full bg-yt-accent" style={{ width: `${fillPercent}%` }}></div>
                 </div>
-                {container.items.length === 0 ? (
-                  <div className="text-[10px] text-yt-text-secondary">{t('missionDispatch.iso.empty')}</div>
-                ) : (
-                  <div className="space-y-1">
-                    {container.items.map((item, idx) => {
-                      const qty = getItemQuantity(item);
-                      return (
-                        <div key={`${item.weapon_id}-${idx}`} className="flex items-center justify-between text-[10px]">
-                          <span className="text-yt-text-primary font-mono">{getWeaponDisplayName(item.weapon_id)}</span>
-                          <span className="text-yt-text-secondary font-mono">{qty !== null ? `x${qty}` : '-'}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                <div className="space-y-1">
+                  {container.items.map((item, idx) => {
+                    const qty = getItemQuantity(item);
+                    return (
+                      <div key={`${item.weapon_id}-${idx}`} className="flex items-center justify-between text-[10px]">
+                        <span className="text-yt-text-primary font-mono">{getWeaponDisplayName(item.weapon_id)}</span>
+                        <span className="text-yt-text-secondary font-mono">{qty !== null ? `x${qty}` : '-'}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           })}
@@ -668,7 +664,7 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
           <p className="text-xs text-yt-text-secondary mt-1">{t('missionDispatch.emptySubtitle')}</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-2">
           {filteredMissions.map(mission => (
             <MissionCard
               key={mission.id}

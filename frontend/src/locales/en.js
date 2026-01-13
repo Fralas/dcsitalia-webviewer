@@ -205,7 +205,7 @@ export default {
     iso: {
       title: 'ISO Load',
       container: 'ISO container',
-      containerSmall: 'ISO container small',
+      containerSmall: 'ISO small',
       containerShort: 'ISO',
       containerSmallShort: 'ISO small',
       empty: 'Empty',
