@@ -119,7 +119,7 @@ export default {
       weapon: 'Arma',
       quantity: 'Qtà',
       status: 'Stato',
-      liquids: 'Liquidi e Carburante',
+      charts: 'Chart',
       type: 'Tipo',
       level: 'Livello',
       historical: 'Andamento Storico (7 giorni)',
@@ -166,6 +166,10 @@ export default {
     chart: {
       emptyTitle: "Seleziona un'arma dal menu per visualizzare il grafico",
       emptySubtitle: '📊 Dati salvati ogni 4 ore'
+    },
+    charts: {
+      loading: 'Caricamento chart...',
+      empty: 'Nessuna chart disponibile'
     }
   },
   mapView: {

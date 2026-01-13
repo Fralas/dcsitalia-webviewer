@@ -119,7 +119,7 @@ export default {
       weapon: 'Weapon',
       quantity: 'Qty',
       status: 'Status',
-      liquids: 'Liquids & Fuel',
+      charts: 'Charts',
       type: 'Type',
       level: 'Level',
       historical: 'Historical Trend (7 days)',
@@ -166,6 +166,10 @@ export default {
     chart: {
       emptyTitle: 'Select a weapon from the menu to view the chart',
       emptySubtitle: '📊 Data saved every 4 hours'
+    },
+    charts: {
+      loading: 'Loading charts...',
+      empty: 'No charts available'
     }
   },
   mapView: {

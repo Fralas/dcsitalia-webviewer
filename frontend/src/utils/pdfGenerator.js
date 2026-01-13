@@ -22,6 +22,16 @@ export async function checkChartsAvailable(airportId) {
   }
 }
 
+export async function fetchChartsList(airportId) {
+  try {
+    const response = await fetch(`${API_URL}/airports/${airportId}/charts`);
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching charts list:', error);
+    return { available: false, charts: [], message: error.message };
+  }
+}
+
 /**
  * Generate PDF with airport charts
  * @param {string} airportId - Airport ID

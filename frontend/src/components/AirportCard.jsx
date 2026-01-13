@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Helicopter, Anchor, Plus, X, TrendingUp, FileDown, Weight, Clock, User, XCircle, Search, LogIn } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Plane, Helicopter, Anchor, Plus, X, TrendingUp, FileDown, Weight, Clock, User, XCircle, Search, LogIn, Image } from 'lucide-react';
 import * as api from '../services/api';
 import WeaponChart from './WeaponChart';
 import { getAirportName } from '../config/airports';
 import airports from '../config/airports';
-import { generateChartsPDF, checkChartsAvailable } from '../utils/pdfGenerator';
+import { generateChartsPDF, fetchChartsList } from '../utils/pdfGenerator';
 import { isImportantWeapon, importantWeaponsAirports, importantWeaponsHeliports, importantWeaponsCarriers } from '../config/weapons';
 import { formatWeight } from '../utils/weightFormatter';
 import { t, formatElapsedTime, formatRemainingTime, getStatusLabel } from '../utils/locale';
@@ -240,6 +240,9 @@ export default function AirportCard({
   const [chartWeapon, setChartWeapon] = useState(''); // For the historical chart
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [chartsAvailable, setChartsAvailable] = useState(null); // null = not checked, true/false = has charts
+  const [chartsList, setChartsList] = useState([]);
+  const [chartsLoading, setChartsLoading] = useState(false);
+  const [chartsError, setChartsError] = useState(null);
   const [weaponSearchTerm, setWeaponSearchTerm] = useState(''); // For weapon search
 
   // Mission management states
@@ -256,10 +259,34 @@ export default function AirportCard({
 
   // Check if charts are available when card is expanded
   useEffect(() => {
-    if (expanded && chartsAvailable === null) {
-      checkChartsAvailable(airport.id).then(setChartsAvailable);
-    }
-  }, [expanded, airport.id, chartsAvailable]);
+    if (!expanded) return;
+
+    let isMounted = true;
+    setChartsLoading(true);
+    setChartsError(null);
+
+    fetchChartsList(airport.id)
+      .then((data) => {
+        if (!isMounted) return;
+        const hasCharts = !!(data && data.available && Array.isArray(data.charts) && data.charts.length > 0);
+        setChartsAvailable(hasCharts);
+        setChartsList(Array.isArray(data?.charts) ? data.charts : []);
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        setChartsError(error?.message || 'Errore nel caricamento delle chart');
+        setChartsAvailable(false);
+        setChartsList([]);
+      })
+      .finally(() => {
+        if (!isMounted) return;
+        setChartsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [expanded, airport.id]);
 
   // Expand and scroll into view when a mission is selected from the map
   useEffect(() => {
@@ -275,7 +302,7 @@ export default function AirportCard({
     }
   }, [forceExpanded]);
 
-  const { weapons = [], liquids = [] } = airport.data;
+  const { weapons = [] } = airport.data;
 
   // Get suggested quantity based on priority
   const getSuggestedQuantity = (weaponId) => {
@@ -555,7 +582,7 @@ export default function AirportCard({
                     title={chartsAvailable === false ? t('airportCard.pdfUnavailable') : ''}
                   >
                     <FileDown className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">{generatingPDF ? 'PDF...' : chartsAvailable === null ? t('general.loading') : 'PDF'}</span>
+                    <span className="hidden sm:inline">{generatingPDF ? 'Chart...' : chartsAvailable === null ? t('general.loading') : 'Chart'}</span>
                   </button>
                   <button
                     onClick={() => setShowOrderModal(true)}
@@ -760,7 +787,7 @@ export default function AirportCard({
                   title={chartsAvailable === false ? t('airportCard.pdfUnavailable') : ''}
                 >
                   <FileDown className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">{generatingPDF ? 'PDF...' : chartsAvailable === null ? t('general.loading') : 'PDF'}</span>
+                  <span className="hidden sm:inline">{generatingPDF ? 'Chart...' : chartsAvailable === null ? t('general.loading') : 'Chart'}</span>
                 </button>
                 <button
                   onClick={() => setShowOrderModal(true)}
@@ -773,7 +800,7 @@ export default function AirportCard({
             </div>
           )}
 
-          {/* Weapons & Liquids Section - Split Layout */}
+          {/* Weapons & Charts Section - Split Layout */}
           <div className="p-3">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Left Column: Weapons in single scrollbar */}
@@ -837,19 +864,43 @@ export default function AirportCard({
                 </div>
               </div>
 
-              {/* Right Column: Liquids in 2x2 block */}
+              {/* Right Column: Charts preview */}
               <div>
                 <h4 className="text-xs font-bold text-yt-text-secondary mb-2 flex items-center gap-1.5 uppercase tracking-wide">
-                  <Droplet className="w-3.5 h-3.5" />
-                  {t('airportCard.headers.liquids')}
+                  <Image className="w-3.5 h-3.5" />
+                  {t('airportCard.headers.charts')}
                 </h4>
-                <div className="grid grid-cols-2 gap-3 h-96">
-                  {liquids.map((liquid, idx) => (
-                    <div key={idx} className="bg-yt-bg-tertiary p-4 rounded border border-yt-border flex flex-col justify-center items-center">
-                      <div className="text-sm text-yt-text-secondary mb-2">{`${t('airportCard.headers.type')} ${liquid.item}`}</div>
-                      <div className="text-2xl font-bold text-yt-text-primary">{liquid.quantity.toLocaleString()}</div>
+                <div className="min-h-96 border border-yt-border rounded p-3 bg-yt-bg-tertiary">
+                  {chartsLoading ? (
+                    <div className="h-full flex items-center justify-center text-sm text-yt-text-secondary">
+                      {t('airportCard.charts.loading')}
                     </div>
-                  ))}
+                  ) : chartsError ? (
+                    <div className="h-full flex items-center justify-center text-sm text-red-400">
+                      {chartsError}
+                    </div>
+                  ) : chartsAvailable && chartsList.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto pr-1">
+                      {chartsList.map((chart) => {
+                        const baseUrl = import.meta.env.VITE_SOCKET_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+                        const chartUrl = `${baseUrl}${chart.url}`;
+                        return (
+                          <div key={chart.filename || chart.url} className="bg-yt-bg-secondary rounded border border-yt-border p-2">
+                            <img
+                              src={chartUrl}
+                              alt={chart.filename || 'chart'}
+                              className="w-full h-auto rounded"
+                              loading="lazy"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-sm text-yt-text-secondary">
+                      {t('airportCard.charts.empty')}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
