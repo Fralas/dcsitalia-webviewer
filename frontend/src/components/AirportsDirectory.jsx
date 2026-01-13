@@ -45,6 +45,8 @@ export default function AirportsDirectory({ airports, missions = [], onSelectAir
       .sort((a, b) => (a.displayName || a.name).localeCompare(b.displayName || b.name));
   }, [airports]);
 
+  const activeAirportsCount = airportList.length;
+
   const missionsByAirport = useMemo(() => {
     return missions.reduce((acc, mission) => {
       const key = mission.airport_id;
@@ -57,13 +59,19 @@ export default function AirportsDirectory({ airports, missions = [], onSelectAir
   return (
     <div className="space-y-3">
       <div className="bg-yt-bg-secondary rounded-lg p-4 border border-yt-border">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
           <div className="p-2 bg-yt-accent/20 rounded">
             <Plane className="w-5 h-5 text-yt-accent" />
           </div>
           <div>
             <h2 className="text-xl font-bold text-yt-text-primary">{t('airportsDirectory.title')}</h2>
             <p className="text-xs text-yt-text-secondary">{t('airportsDirectory.subtitle')}</p>
+          </div>
+          </div>
+          <div className="flex items-center gap-2 bg-yt-bg-tertiary border border-yt-border/70 rounded-full px-3 py-1">
+            <span className="text-xs text-yt-text-secondary">{t('airportsDirectory.activeCount')}</span>
+            <span className="text-sm font-bold text-yt-text-primary">{activeAirportsCount}</span>
           </div>
         </div>
       </div>

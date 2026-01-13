@@ -101,14 +101,7 @@ export default function Dashboard({ airports, missions, stats, onMissionsUpdate,
   return (
     <div className="space-y-4">
       {/* Stats Row - Compatta e moderna */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatsCard
-          title={t('dashboard.stats.airports')}
-          value={stats.totalAirports || 0}
-          icon={Plane}
-          color="text-yt-accent"
-          bgColor="bg-yt-accent/20"
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         <StatsCard
           title={t('dashboard.stats.critical')}
           value={stats.criticalAirports || 0}

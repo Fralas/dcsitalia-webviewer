@@ -68,6 +68,7 @@ export default {
     subtitle: 'Elenco completo con informazioni di base',
     emptyTitle: 'Nessun aeroporto trovato',
     emptySubtitle: 'Nessun dato disponibile',
+    activeCount: 'Aeroporti attivi',
     missions: 'missioni in arrivo',
     labels: {
       icao: 'ICAO'
