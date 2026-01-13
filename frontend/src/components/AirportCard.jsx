@@ -223,7 +223,15 @@ function LoginRequiredModal({ onClose, onLogin }) {
 /**
  * Airport Card Component
  */
-export default function AirportCard({ airport, missions = [], onMissionsUpdate, shouldExpand, expandToken }) {
+export default function AirportCard({
+  airport,
+  missions = [],
+  onMissionsUpdate,
+  shouldExpand,
+  expandToken,
+  showOrders = true,
+  forceExpanded = false,
+}) {
   const [expanded, setExpanded] = useState(false);
   const [filter, setFilter] = useState('all'); // all, critical, important
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -260,6 +268,12 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
       cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, [shouldExpand, expandToken]);
+
+  useEffect(() => {
+    if (forceExpanded) {
+      setExpanded(true);
+    }
+  }, [forceExpanded]);
 
   const { weapons = [], liquids = [] } = airport.data;
 
@@ -470,8 +484,12 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
     >
       {/* Header */}
       <div
-        className="p-3 cursor-pointer hover:bg-yt-bg-tertiary/50 transition-colors"
-        onClick={() => setExpanded(!expanded)}
+        className={`p-3 ${forceExpanded ? '' : 'cursor-pointer hover:bg-yt-bg-tertiary/50'} transition-colors`}
+        onClick={() => {
+          if (!forceExpanded) {
+            setExpanded(!expanded);
+          }
+        }}
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -505,7 +523,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                 <span className="font-bold">{stats.medium}</span>
               </div>
             )}
-            {expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+            {!forceExpanded && (expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />)}
           </div>
         </div>
       </div>
@@ -514,7 +532,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
       {expanded && (
         <div className="border-t border-yt-border">
           {/* Active Orders Section - When there are missions */}
-          {!airport.isMainBase && airportMissions.length > 0 && (
+          {showOrders && !airport.isMainBase && airportMissions.length > 0 && (
             <div className="p-3 bg-fuchsia-500/10 border-t-2 border-fuchsia-500/40">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-sm font-bold text-fuchsia-300 flex items-center gap-2">
@@ -726,7 +744,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
           )}
 
           {/* Action buttons - When there are NO missions OR is main base */}
-          {(airport.isMainBase || airportMissions.length === 0) && (
+          {(airport.isMainBase || airportMissions.length === 0 || !showOrders) && (
             <div className="p-3 border-t border-yt-border bg-yt-bg-tertiary/30">
               <div className="flex gap-2 justify-end">
                 <button

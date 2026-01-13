@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Plane, Package, Activity, AlertCircle, Shield, Target } from 'lucide-react';
+import { Plane, Package, Activity, AlertCircle, Shield, Target, MapPin } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import MissionDispatch from './components/MissionDispatch';
+import AirportsDirectory from './components/AirportsDirectory';
+import AirportDetails from './components/AirportDetails';
 import FrontlineMap from './components/FrontlineMap';
 import AdminPanel from './components/AdminPanel';
 import UserMenu from './components/UserMenu';
@@ -13,7 +15,7 @@ import logoImg from '../img/DCS_ITALIA_ICON.png';
 import { useUser } from './contexts/UserContext';
 
 function App() {
-  const [currentView, setCurrentView] = useState('dashboard'); // dashboard, missions
+  const [currentView, setCurrentView] = useState('dashboard'); // dashboard, airports, airport, missions
   const [airports, setAirports] = useState({});
   const [missions, setMissions] = useState([]);
   const [stats, setStats] = useState({});
@@ -111,6 +113,16 @@ function App() {
     }
   };
 
+  const handleAirportSelect = (airportId) => {
+    setSelectedAirportId(airportId);
+    setSelectedAirportToken((prev) => prev + 1);
+    setCurrentView('airport');
+  };
+
+  const handleAirportBack = () => {
+    setCurrentView('airports');
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-yt-bg-primary flex items-center justify-center">
@@ -179,6 +191,17 @@ function App() {
                   <span className="hidden sm:inline">{t('general.navigation.dashboard')}</span>
                 </button>
                 <button
+                  onClick={() => setCurrentView('airports')}
+                  className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
+                    currentView === 'airports'
+                      ? 'bg-yt-bg-tertiary text-yt-text-primary'
+                      : 'text-yt-text-secondary hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary'
+                  }`}
+                >
+                  <MapPin className="w-4 h-4" />
+                  <span className="hidden sm:inline">{t('general.navigation.airports')}</span>
+                </button>
+                <button
                   onClick={() => setCurrentView('missions')}
                   className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
                     currentView === 'missions'
@@ -230,6 +253,20 @@ function App() {
             onMissionsUpdate={handleMissionUpdate}
             selectedAirportId={selectedAirportId}
             selectedAirportToken={selectedAirportToken}
+          />
+        )}
+        {currentView === 'airports' && (
+          <AirportsDirectory
+            airports={airports}
+            onSelectAirport={handleAirportSelect}
+          />
+        )}
+        {currentView === 'airport' && (
+          <AirportDetails
+            airport={selectedAirportId ? airports[selectedAirportId] : null}
+            missions={missions}
+            onMissionsUpdate={handleMissionUpdate}
+            onBack={handleAirportBack}
           />
         )}
         {currentView === 'missions' && (

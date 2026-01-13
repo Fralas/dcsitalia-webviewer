@@ -12,6 +12,7 @@ export default {
     },
     navigation: {
       dashboard: 'Dashboard',
+      airports: 'Airports',
       missions: 'Missions',
       map: 'Map',
       admin: 'Admin'
@@ -61,6 +62,27 @@ export default {
     pdfTooltip: 'Select the directory where charts PDFs should be saved',
     emptyTitle: 'No airports found',
     emptySubtitle: 'Try adjusting your search filters'
+  },
+  airportsDirectory: {
+    title: 'Airports',
+    subtitle: 'Full list with basic information',
+    emptyTitle: 'No airports found',
+    emptySubtitle: 'No data available',
+    labels: {
+      icao: 'ICAO'
+    },
+    tags: {
+      mainBase: 'Main base',
+      heliport: 'Heliport',
+      airport: 'Airport',
+      carrier: 'Carrier'
+    }
+  },
+  airportDetails: {
+    subtitle: 'Full airport details',
+    back: 'Back to airports',
+    emptyTitle: 'Airport not found',
+    emptySubtitle: 'Select an airport from the list'
   },
   airportCard: {
     activeOrders: 'ACTIVE ORDERS',
