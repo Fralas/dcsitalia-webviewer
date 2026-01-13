@@ -44,6 +44,7 @@ export default function AirportDetails({ airport, missions, onMissionsUpdate, on
         shouldExpand
         expandToken={1}
         forceExpanded
+        showOrders={false}
       />
     </div>
   );
