@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Shield, Circle, Plane, Helicopter, Anchor } from 'lucide-react';
+import { Shield, Circle, Plane, Helicopter, Anchor, Target } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import { t } from '../utils/locale';
@@ -245,9 +245,9 @@ export default function FrontlineMap({ airportsData }) {
       <div className="bg-yt-bg-secondary px-3 py-2 border-b border-yt-border flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-yt-accent/20 rounded">
-              <Shield className="w-5 h-5 text-yt-accent" />
-            </div>
+              <div className="p-2 bg-red-400/20 rounded">
+                <Target className="w-5 h-5 text-red-400" />
+              </div>
             <div>
               <h1 className="text-lg font-bold text-yt-text-primary">Frontline</h1>
               <p className="text-xs text-yt-text-secondary">Mappa del fronte - Zone di controllo</p>

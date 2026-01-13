@@ -1,10 +1,9 @@
-import { useState } from 'react';
-import { Package, AlertTriangle, Plane, Activity, FolderOpen, ArrowDownAZ, TriangleAlert } from 'lucide-react';
-import AirportCard from './AirportCard';
-import { selectPDFDirectory, isFileSystemAccessSupported } from '../utils/fileSystemAccess';
-import { isImportantWeapon } from '../config/weapons';
+import { useMemo, useState, useEffect } from 'react';
+import { Package, Activity, Radio, ClipboardList, Megaphone, ShieldCheck, Target } from 'lucide-react';
 import { t } from '../utils/locale';
-import airportsConfig from '../config/airports';
+import { getAirportName } from '../config/airports';
+import { isAuthenticated } from '../utils/api';
+import { useUser } from '../contexts/UserContext';
 
 /**
  * Stats Card Component - YouTube Style
@@ -25,87 +24,175 @@ function StatsCard({ title, value, icon: Icon, color, bgColor }) {
   );
 }
 
+const ANNOUNCEMENTS_KEY = 'dashboard_announcements';
+
+function loadAnnouncements() {
+  try {
+    const raw = localStorage.getItem(ANNOUNCEMENTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (error) {
+    console.warn('Failed to load announcements:', error);
+    return [];
+  }
+}
+
+function formatAnnouncementTime(timestamp) {
+  try {
+    return new Date(timestamp).toLocaleString();
+  } catch {
+    return '-';
+  }
+}
+
 /**
  * Dashboard Component
  */
-export default function Dashboard({ airports, missions, stats, onMissionsUpdate, selectedAirportId, selectedAirportToken }) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('name'); // name, critical
+export default function Dashboard({ airports, missions, combatMissions, stats }) {
+  const { user } = useUser();
+  const [announcements, setAnnouncements] = useState(loadAnnouncements);
+  const [draftTitle, setDraftTitle] = useState('');
+  const [draftBody, setDraftBody] = useState('');
+  const [draftImageUrl, setDraftImageUrl] = useState('');
+  const [draftImageName, setDraftImageName] = useState('');
+  const isAdmin = isAuthenticated();
 
-  // Handle PDF directory selection
-  const handleSelectPDFDirectory = async () => {
-    const success = await selectPDFDirectory();
-    if (success) {
-      alert(`${t('dashboard.pdfTooltip')}\n\n${t('dashboard.emptySubtitle')}`);
+  useEffect(() => {
+    try {
+      localStorage.setItem(ANNOUNCEMENTS_KEY, JSON.stringify(announcements));
+    } catch (error) {
+      console.warn('Failed to save announcements:', error);
     }
-  };
+  }, [announcements]);
 
-  // Filter and sort airports
-  let filteredAirports = Object.values(airports).filter(airport => {
-    if (!airport || !airport.name) return false;
-    // Filter out inactive airports
-    if (airport.isActive === false) return false;
-    return airport.name.toLowerCase().includes(searchTerm.toLowerCase());
-  });
+  const activeAirports = useMemo(() => {
+    return Object.values(airports).filter(airport => airport && airport.name && airport.isActive !== false).length;
+  }, [airports]);
 
-  if (sortBy === 'critical') {
-    filteredAirports = filteredAirports.sort((a, b) => {
-      const getPriorityInfo = (airport) => {
-        if (!airport.data || !airport.data.weapons) return { level: 4, count: 0 };
+  const activeZonesCount = useMemo(() => {
+    return (combatMissions || []).filter(mission => mission.is_active).length;
+  }, [combatMissions]);
 
-        // Get airport config to check if it's a heliport or carrier
-        const config = airportsConfig.find(a => a.id === airport.id);
-        const isHeliport = config?.isHeliport || false;
-        const isCarrier = config?.isCarrier || false;
-
-        let criticalCount = 0;
-        let highCount = 0;
-        let mediumCount = 0;
-
-        airport.data.weapons.forEach(w => {
-          const important = isImportantWeapon(w.item, isHeliport, isCarrier);
-          if (!important) return;
-
-          // Count weapons by priority level
-          if (w.quantity <= 5) {
-            criticalCount++;
-          } else if (w.quantity <= 20) {
-            highCount++;
-          } else if (w.quantity <= 40) {
-            mediumCount++;
+  const activeTaskCounts = useMemo(() => {
+    const counts = { SEAD: 0, DEAD: 0, CAS: 0 };
+    (combatMissions || [])
+      .filter(mission => mission.mission_status !== 'completed' && mission.mission_status !== 'aborted')
+      .forEach(mission => {
+        (mission.tasks || []).forEach(task => {
+          if (counts[task] !== undefined) {
+            counts[task] += 1;
           }
         });
+      });
+    return counts;
+  }, [combatMissions]);
 
-        // Return highest priority level (lower number = higher priority) and count
-        if (criticalCount > 0) return { level: 1, count: criticalCount };
-        if (highCount > 0) return { level: 2, count: highCount };
-        if (mediumCount > 0) return { level: 3, count: mediumCount };
-        return { level: 4, count: 0 };
-      };
-
-      const priorityA = getPriorityInfo(a);
-      const priorityB = getPriorityInfo(b);
-
-      // First sort by priority level (lower = more critical)
-      if (priorityA.level !== priorityB.level) {
-        return priorityA.level - priorityB.level;
-      }
-
-      // If same level, sort by count (higher count first)
-      return priorityB.count - priorityA.count;
+  const topOrderAirports = useMemo(() => {
+    const totals = {};
+    missions.forEach(mission => {
+      const orders = Array.isArray(mission.orders) && mission.orders.length > 0
+        ? mission.orders
+        : mission.weapon_id ? [mission] : [];
+      const orderCount = orders.length;
+      if (orderCount === 0) return;
+      const airportId = mission.airport_id;
+      if (!airportId) return;
+      totals[airportId] = (totals[airportId] || 0) + orderCount;
     });
-  } else {
-    filteredAirports = filteredAirports.sort((a, b) => a.name.localeCompare(b.name));
-  }
+
+    return Object.entries(totals)
+      .map(([airportId, count]) => ({
+        airportId,
+        name: getAirportName(airportId),
+        count,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3);
+  }, [missions]);
+
+  const acceptedMissions = useMemo(() => {
+    const logistics = missions
+      .filter(mission => mission.status === 'accepted' && mission.accepted_by)
+      .map(mission => ({
+        id: mission.id,
+        type: 'logistics',
+        label: `${getAirportName(mission.source_airport_id)} → ${getAirportName(mission.airport_id)}`,
+        users: [mission.accepted_by],
+        distance: mission.distance_nm,
+        sortTime: mission.created_at || 0,
+      }));
+
+    const combat = (combatMissions || [])
+      .filter(mission => mission.mission_status === 'assigned')
+      .map(mission => ({
+        id: mission.id,
+        type: 'combat',
+        label: mission.zone_name || 'Combat mission',
+        users: (mission.assigned_users || []).map(user => user.name).filter(Boolean).length > 0
+          ? mission.assigned_users.map(user => user.name).filter(Boolean)
+          : mission.assigned_to ? [mission.assigned_to] : [],
+        distance: null,
+        sortTime: mission.assigned_at || mission.created_at || 0,
+      }));
+
+    return [...logistics, ...combat]
+      .sort((a, b) => b.sortTime - a.sortTime)
+      .slice(0, 8);
+  }, [missions, combatMissions]);
+
+  const handleAddAnnouncement = () => {
+    const title = draftTitle.trim();
+    const body = draftBody.trim();
+    const imageUrl = draftImageUrl.trim();
+    if (!title || !body) return;
+
+    const author = user?.globalName || user?.username || 'Admin';
+    const next = [{
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      title,
+      body,
+      imageUrl: imageUrl || null,
+      createdAt: Date.now(),
+      author,
+    }, ...announcements];
+
+    setAnnouncements(next);
+    setDraftTitle('');
+    setDraftBody('');
+    setDraftImageUrl('');
+    setDraftImageName('');
+  };
+
+  const handleDeleteAnnouncement = (id) => {
+    setAnnouncements(prev => prev.filter(item => item.id !== id));
+  };
 
   return (
     <div className="space-y-4">
-      {/* Stats Row - Compatta e moderna */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="bg-yt-bg-secondary rounded-xl border border-yt-border p-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-yt-text-primary">{t('dashboard.title')}</h2>
+            <p className="text-xs text-yt-text-secondary">{t('dashboard.subtitle')}</p>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-yt-text-secondary bg-yt-bg-tertiary border border-yt-border/70 px-3 py-1.5 rounded-full">
+            <Radio className="w-3.5 h-3.5 text-green-400" />
+            <span>{t('dashboard.status.live')}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         <StatsCard
-          title={t('dashboard.stats.critical')}
-          value={stats.criticalAirports || 0}
-          icon={AlertTriangle}
+          title={t('dashboard.stats.activeAirports')}
+          value={activeAirports}
+          icon={ShieldCheck}
+          color="text-yt-accent"
+          bgColor="bg-yt-accent/20"
+        />
+        <StatsCard
+          title={t('dashboard.stats.activeZones')}
+          value={activeZonesCount}
+          icon={Target}
           color="text-red-400"
           bgColor="bg-red-400/20"
         />
@@ -114,86 +201,234 @@ export default function Dashboard({ airports, missions, stats, onMissionsUpdate,
           value={stats.activeMissions || 0}
           icon={Package}
           color="text-fuchsia-400"
-          bgColor="bg-fuchsia-400/20"
-        />
-        <StatsCard
-          title={t('dashboard.stats.accepted')}
-          value={stats.acceptedMissions || 0}
-          icon={Activity}
-          color="text-green-400"
-          bgColor="bg-green-400/20"
+          bgColor="bg-fuchsia-500/20"
         />
       </div>
 
-      {/* Controls - Compatte stile YouTube */}
-      <div className="bg-yt-bg-secondary rounded-lg p-3 border border-yt-border">
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="flex-1">
-            <input
-              type="text"
-              placeholder={t('dashboard.searchPlaceholder')}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 bg-yt-bg-primary border border-yt-border rounded text-yt-text-primary placeholder-yt-text-secondary text-sm focus:outline-none focus:border-yt-accent transition-all"
-            />
+      <div className="grid grid-cols-1 xl:grid-cols-[3fr,2fr] gap-4 items-start">
+        <div className="space-y-4">
+          <div className="bg-yt-bg-secondary rounded-xl border border-yt-border p-4">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-yt-accent/20 rounded">
+                  <Megaphone className="w-4 h-4 text-yt-accent" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-yt-text-primary">{t('dashboard.announcements.title')}</h3>
+                  <p className="text-[11px] text-yt-text-secondary">{t('dashboard.announcements.subtitle')}</p>
+                </div>
+              </div>
+            </div>
+
+            {isAdmin && (
+              <div className="bg-yt-bg-tertiary/60 border border-yt-border rounded-lg p-3 mb-3">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                  <input
+                    type="text"
+                    placeholder={t('dashboard.announcements.form.title')}
+                    value={draftTitle}
+                    onChange={(event) => setDraftTitle(event.target.value)}
+                    className="md:col-span-1 px-3 py-2 bg-yt-bg-secondary border border-yt-border rounded text-xs text-yt-text-primary placeholder-yt-text-secondary focus:outline-none focus:border-yt-accent"
+                  />
+                  <input
+                    type="text"
+                    placeholder={t('dashboard.announcements.form.body')}
+                    value={draftBody}
+                    onChange={(event) => setDraftBody(event.target.value)}
+                    className="md:col-span-2 px-3 py-2 bg-yt-bg-secondary border border-yt-border rounded text-xs text-yt-text-primary placeholder-yt-text-secondary focus:outline-none focus:border-yt-accent"
+                  />
+                  <input
+                    type="text"
+                    placeholder={t('dashboard.announcements.form.image')}
+                    value={draftImageUrl}
+                    onChange={(event) => setDraftImageUrl(event.target.value)}
+                    className="md:col-span-1 px-3 py-2 bg-yt-bg-secondary border border-yt-border rounded text-xs text-yt-text-primary placeholder-yt-text-secondary focus:outline-none focus:border-yt-accent"
+                  />
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-yt-text-secondary">
+                  <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-yt-bg-secondary border border-yt-border rounded cursor-pointer hover:border-yt-border/80 transition-all">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          const result = reader.result;
+                          if (typeof result === 'string') {
+                            setDraftImageUrl(result);
+                            setDraftImageName(file.name);
+                          }
+                        };
+                        reader.readAsDataURL(file);
+                        event.target.value = '';
+                      }}
+                    />
+                    {t('dashboard.announcements.form.upload')}
+                  </label>
+                  {draftImageName && (
+                    <span className="truncate max-w-[240px]">{draftImageName}</span>
+                  )}
+                </div>
+                <div className="flex justify-end mt-2">
+                  <button
+                    type="button"
+                    onClick={handleAddAnnouncement}
+                    className="px-3 py-1.5 text-xs font-bold bg-yt-accent text-white rounded hover:bg-yt-accent/80 transition-all"
+                  >
+                    {t('dashboard.announcements.form.publish')}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {announcements.length === 0 ? (
+              <div className="text-xs text-yt-text-secondary bg-yt-bg-tertiary/60 border border-yt-border rounded p-4">
+                {t('dashboard.announcements.empty')}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {announcements.map(item => (
+                  <div key={item.id} className="bg-yt-bg-tertiary/60 border border-yt-border rounded-lg p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold text-yt-text-primary">{item.title}</div>
+                        <div className="text-[11px] text-yt-text-secondary mt-1">{item.body}</div>
+                        {item.imageUrl && (
+                          <div className="mt-2">
+                            <img
+                              src={item.imageUrl}
+                              alt={item.title}
+                              className="w-full max-h-48 object-cover rounded border border-yt-border"
+                              loading="lazy"
+                            />
+                          </div>
+                        )}
+                      </div>
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAnnouncement(item.id)}
+                          className="text-[10px] text-red-400 hover:text-red-300"
+                        >
+                          {t('dashboard.announcements.form.remove')}
+                        </button>
+                      )}
+                    </div>
+              <div className="flex items-center gap-2 text-[10px] text-yt-text-secondary mt-2">
+                <span>{formatAnnouncementTime(item.createdAt)}</span>
+                <span>·</span>
+                <span>{item.author || t('dashboard.announcements.unknownAuthor')}</span>
+              </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={() => setSortBy('name')}
-              className={`px-3 py-2 rounded text-sm font-medium transition-all flex items-center gap-1.5 ${
-                sortBy === 'name'
-                  ? 'bg-yt-accent text-white'
-                  : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'
-              }`}
-              title={t('dashboard.sortByName')}
-            >
-              <ArrowDownAZ className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setSortBy('critical')}
-              className={`px-3 py-2 rounded text-sm font-medium transition-all flex items-center gap-1.5 ${
-                sortBy === 'critical'
-                  ? 'bg-yt-accent text-white'
-                  : 'bg-yt-bg-tertiary text-yt-text-secondary hover:bg-yt-border hover:text-yt-text-primary'
-              }`}
-              title={t('dashboard.sortByCriticality')}
-            >
-              <TriangleAlert className="w-4 h-4" />
-            </button>
-            {isFileSystemAccessSupported() && (
-              <button
-                onClick={handleSelectPDFDirectory}
-                className="px-3 py-2 rounded text-sm font-medium bg-green-400 text-white hover:bg-green-400/80 flex items-center gap-1.5 transition-all"
-                title={t('dashboard.pdfTooltip')}
-              >
-                <FolderOpen className="w-4 h-4" />
-                <span className="hidden sm:inline">PDF</span>
-              </button>
+
+          <div className="bg-yt-bg-secondary rounded-xl border border-yt-border p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="p-2 bg-yt-accent/20 rounded">
+                <ClipboardList className="w-4 h-4 text-yt-accent" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-yt-text-primary">{t('dashboard.acceptedMissions.title')}</h3>
+                <p className="text-[11px] text-yt-text-secondary">{t('dashboard.acceptedMissions.subtitle')}</p>
+              </div>
+            </div>
+            {acceptedMissions.length === 0 ? (
+              <div className="text-xs text-yt-text-secondary bg-yt-bg-tertiary/60 border border-yt-border rounded p-4">
+                {t('dashboard.acceptedMissions.empty')}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {acceptedMissions.map(mission => {
+                  const isCombat = mission.type === 'combat';
+                  return (
+                    <div key={mission.id} className="flex items-center justify-between gap-3 text-xs bg-yt-bg-tertiary/60 border border-yt-border rounded p-2">
+                      <div className="min-w-0">
+                        <div className="text-yt-text-primary font-medium truncate">
+                          {mission.label}
+                        </div>
+                        <div className="text-[10px] text-yt-text-secondary">
+                          {mission.users.length > 0 ? mission.users.join(', ') : t('dashboard.acceptedMissions.noAssignee')}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          isCombat ? 'bg-red-400/20 text-red-400' : 'bg-fuchsia-500/20 text-fuchsia-400'
+                        }`}>
+                          {isCombat ? t('dashboard.acceptedMissions.combat') : t('dashboard.acceptedMissions.logistics')}
+                        </span>
+                        <span className="text-[10px] text-yt-text-secondary">
+                          {mission.distance ? `${mission.distance}nm` : '-'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>
-      </div>
 
-      {/* Airports Grid - compatta */}
-      <div className="grid grid-cols-1 gap-3">
-        {filteredAirports.length === 0 ? (
-          <div className="bg-yt-bg-secondary rounded-lg p-12 text-center border border-yt-border">
-            <Plane className="w-12 h-12 text-yt-text-secondary mx-auto mb-3 opacity-50" />
-            <p className="text-lg text-yt-text-primary font-medium">{t('dashboard.emptyTitle')}</p>
-            <p className="text-sm text-yt-text-secondary mt-1">{t('dashboard.emptySubtitle')}</p>
+        <div className="space-y-4">
+          <div className="bg-yt-bg-secondary rounded-xl border border-yt-border p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="p-2 bg-red-400/20 rounded">
+                <Target className="w-4 h-4 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-yt-text-primary">{t('dashboard.activeTasks.title')}</h3>
+                <p className="text-[11px] text-yt-text-secondary">{t('dashboard.activeTasks.subtitle')}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs bg-yt-bg-tertiary/60 border border-yt-border rounded p-2">
+                <span className="text-yt-text-secondary">{t('dashboard.activeTasks.sead')}</span>
+                <span className="text-yt-text-primary font-bold">{activeTaskCounts.SEAD}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs bg-yt-bg-tertiary/60 border border-yt-border rounded p-2">
+                <span className="text-yt-text-secondary">{t('dashboard.activeTasks.dead')}</span>
+                <span className="text-yt-text-primary font-bold">{activeTaskCounts.DEAD}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs bg-yt-bg-tertiary/60 border border-yt-border rounded p-2">
+                <span className="text-yt-text-secondary">{t('dashboard.activeTasks.cas')}</span>
+                <span className="text-yt-text-primary font-bold">{activeTaskCounts.CAS}</span>
+              </div>
+            </div>
           </div>
-        ) : (
-          filteredAirports.map(airport => (
-            <AirportCard
-              key={airport.id}
-              airport={airport}
-              missions={missions}
-              onMissionsUpdate={onMissionsUpdate}
-              shouldExpand={airport.id === selectedAirportId}
-              expandToken={selectedAirportToken}
-            />
-          ))
-        )}
+
+          <div className="bg-yt-bg-secondary rounded-xl border border-yt-border p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="p-2 bg-fuchsia-500/20 rounded">
+                <Package className="w-4 h-4 text-fuchsia-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-yt-text-primary">{t('dashboard.pipeline.title')}</h3>
+                <p className="text-[11px] text-yt-text-secondary">{t('dashboard.pipeline.subtitle')}</p>
+              </div>
+            </div>
+            {topOrderAirports.length === 0 ? (
+              <div className="text-xs text-yt-text-secondary bg-yt-bg-tertiary/60 border border-yt-border rounded p-4">
+                {t('dashboard.pipeline.empty')}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-2">
+                {topOrderAirports.map(entry => (
+                  <div key={entry.airportId} className="flex items-center justify-between text-xs bg-yt-bg-tertiary/60 border border-yt-border rounded p-2">
+                    <span className="text-yt-text-secondary">{entry.name}</span>
+                    <span className="text-yt-text-primary font-bold">
+                      {t('dashboard.pipeline.orders', { count: entry.count })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

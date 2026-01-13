@@ -50,18 +50,52 @@ export default {
     unknown: 'Sconosciuto'
   },
   dashboard: {
-    stats: {
-      airports: 'Aeroporti',
-      critical: 'Critici',
-      missions: 'Missioni',
-      accepted: 'Accettate'
+    title: 'Dashboard Operativa',
+    subtitle: 'Sintesi logistica e aggiornamenti in tempo reale',
+    status: {
+      live: 'Live'
     },
-    searchPlaceholder: 'Cerca aeroporti...',
-    sortByName: 'Nome',
-    sortByCriticality: 'Criticità',
-    pdfTooltip: 'Seleziona la directory dove salvare i PDF delle chart',
-    emptyTitle: 'Nessun aeroporto trovato',
-    emptySubtitle: 'Prova a modificare i filtri di ricerca'
+    stats: {
+      activeAirports: 'Aeroporti attivi',
+      activeZones: 'Zone attive',
+      missions: 'Missioni attive',
+      pending: 'In attesa'
+    },
+    announcements: {
+      title: 'Annunci operativi',
+      subtitle: 'Messaggi e aggiornamenti per tutti i piloti',
+      empty: 'Nessun annuncio attivo',
+      unknownAuthor: 'Admin',
+      form: {
+        title: 'Titolo annuncio',
+        body: 'Messaggio breve',
+        image: 'URL immagine (opzionale)',
+        upload: 'Carica immagine',
+        publish: 'Pubblica',
+        remove: 'Rimuovi'
+      }
+    },
+    acceptedMissions: {
+      title: 'Missioni accettate',
+      subtitle: 'Piloti assegnati alle missioni',
+      empty: 'Nessuna missione accettata',
+      logistics: 'LOG',
+      combat: 'COMBAT',
+      noAssignee: 'Nessun pilota'
+    },
+    activeTasks: {
+      title: 'Task attive',
+      subtitle: 'Conteggio task combat in corso',
+      sead: 'SEAD',
+      dead: 'DEAD',
+      cas: 'CAS'
+    },
+    pipeline: {
+      title: 'Pipeline missioni',
+      subtitle: 'Top aeroporti per ordini',
+      empty: 'Nessun ordine disponibile',
+      orders: '{{count}} ordini'
+    }
   },
   airportsDirectory: {
     title: 'Aeroporti',

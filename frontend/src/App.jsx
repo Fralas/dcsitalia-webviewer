@@ -18,6 +18,7 @@ function App() {
   const [currentView, setCurrentView] = useState('dashboard'); // dashboard, airports, airport, missions
   const [airports, setAirports] = useState({});
   const [missions, setMissions] = useState([]);
+  const [combatMissions, setCombatMissions] = useState([]);
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -77,13 +78,15 @@ function App() {
     try {
       setLoading(true);
       setError(null);
-      const [airportsData, missionsData, statsData] = await Promise.all([
+      const [airportsData, missionsData, combatMissionsData, statsData] = await Promise.all([
         api.getAirports(),
         api.getMissions(),
+        api.getCombatMissions(),
         api.getStats(),
       ]);
       setAirports(airportsData);
       setMissions(missionsData);
+      setCombatMissions(combatMissionsData);
       setStats(statsData);
     } catch (err) {
       setError(err.message);
@@ -244,15 +247,13 @@ function App() {
       </header>
 
       {/* Main Content - padding ridotto */}
-      <main className={`flex-1 ${currentView === 'frontline' || currentView === 'admin' ? 'overflow-hidden' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
+      <main className={`flex-1 ${currentView === 'frontline' || currentView === 'admin' ? 'overflow-hidden' : currentView === 'dashboard' ? 'max-w-[1800px] mx-auto px-4 py-4 overflow-y-auto w-full' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
         {currentView === 'dashboard' && (
           <Dashboard
             airports={airports}
             missions={missions}
+            combatMissions={combatMissions}
             stats={stats}
-            onMissionsUpdate={handleMissionUpdate}
-            selectedAirportId={selectedAirportId}
-            selectedAirportToken={selectedAirportToken}
           />
         )}
         {currentView === 'airports' && (

@@ -50,18 +50,52 @@ export default {
     unknown: 'Unknown'
   },
   dashboard: {
-    stats: {
-      airports: 'Airports',
-      critical: 'Critical',
-      missions: 'Missions',
-      accepted: 'Accepted'
+    title: 'Operations Dashboard',
+    subtitle: 'Logistics summary and live updates',
+    status: {
+      live: 'Live'
     },
-    searchPlaceholder: '🔍 Search airports...',
-    sortByName: '📝 Name',
-    sortByCriticality: '⚠️ Criticality',
-    pdfTooltip: 'Select the directory where charts PDFs should be saved',
-    emptyTitle: 'No airports found',
-    emptySubtitle: 'Try adjusting your search filters'
+    stats: {
+      activeAirports: 'Active airports',
+      activeZones: 'Active zones',
+      missions: 'Active missions',
+      pending: 'Pending'
+    },
+    announcements: {
+      title: 'Operations announcements',
+      subtitle: 'Updates shared with all pilots',
+      empty: 'No announcements yet',
+      unknownAuthor: 'Admin',
+      form: {
+        title: 'Announcement title',
+        body: 'Short message',
+        image: 'Image URL (optional)',
+        upload: 'Upload image',
+        publish: 'Publish',
+        remove: 'Remove'
+      }
+    },
+    acceptedMissions: {
+      title: 'Accepted missions',
+      subtitle: 'Pilots assigned to missions',
+      empty: 'No accepted missions',
+      logistics: 'LOG',
+      combat: 'COMBAT',
+      noAssignee: 'No pilot'
+    },
+    activeTasks: {
+      title: 'Active tasks',
+      subtitle: 'Combat task counters',
+      sead: 'SEAD',
+      dead: 'DEAD',
+      cas: 'CAS'
+    },
+    pipeline: {
+      title: 'Mission pipeline',
+      subtitle: 'Top airports by orders',
+      empty: 'No orders available',
+      orders: '{{count}} orders'
+    }
   },
   airportsDirectory: {
     title: 'Airports',
