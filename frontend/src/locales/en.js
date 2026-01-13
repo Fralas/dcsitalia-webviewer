@@ -1,7 +1,7 @@
 export default {
   general: {
-    appTitle: 'DCS Warehouse',
-    appSubtitle: 'Logistics Management',
+    appTitle: 'DCS Frontline',
+    appSubtitle: 'Dynamic Campaign Management',
     loading: 'Loading DCS Warehouse Viewer...',
     errorTitle: 'Error Loading Data',
     retry: 'Retry',
@@ -13,7 +13,7 @@ export default {
     navigation: {
       dashboard: 'Dashboard',
       airports: 'Airports',
-      missions: 'Missions',
+      missions: 'Logistics',
       map: 'Map',
       admin: 'Admin'
     },

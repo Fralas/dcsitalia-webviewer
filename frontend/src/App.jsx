@@ -224,7 +224,7 @@ function App() {
                   }`}
                 >
                   <Target className="w-4 h-4" />
-                  <span className="hidden sm:inline">Frontline</span>
+                  <span className="hidden sm:inline">ATO</span>
                 </button>
                 <button
                   onClick={() => setCurrentView('admin')}
