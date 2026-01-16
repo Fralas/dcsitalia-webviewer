@@ -11,7 +11,7 @@ import UserProfile from './components/UserProfile';
 import * as api from './services/api';
 import socketService from './services/socket';
 import { t } from './utils/locale';
-import logoImg from '../img/DCS_ITALIA_ICON.png';
+import bannerImg from '../img/frontline_test_1.png';
 import { useUser } from './contexts/UserContext';
 
 function App() {
@@ -169,14 +169,10 @@ function App() {
               title={user ? 'Apri profilo' : 'Dashboard'}
             >
               <img
-                src={logoImg}
-                alt="DCS Italia"
-                className="h-10 w-auto object-contain"
+                src={bannerImg}
+                alt="DCS Frontline - Gestione Campagna Dinamica"
+                className="h-20 w-auto object-contain"
               />
-              <div>
-                <h1 className="text-lg font-bold text-yt-text-primary">{t('general.appTitle')}</h1>
-                <p className="text-xs text-yt-text-secondary">{t('general.appSubtitle')}</p>
-              </div>
             </button>
 
             <div className="flex items-center gap-3">
