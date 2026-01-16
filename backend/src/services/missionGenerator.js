@@ -414,6 +414,11 @@ export function determineRecommendedAircraft(sourceAirport, recipientAirport, di
   const isSourceHerculesBase = sourceAirport.herculesBase === true;
   const isShortDistance = distance < 35;
 
+  // If source cannot support Hercules -> helicopter (always)
+  if (!isSourceHerculesBase) {
+    return 'helicopter';
+  }
+
   // Special case: CRITICAL to heliport -> always airdrop
   if (isCritical && isDestinationHeliport) {
     return 'airdrop';
@@ -422,11 +427,6 @@ export function determineRecommendedAircraft(sourceAirport, recipientAirport, di
   // CRITICAL missions always use airplane (unless to heliport, handled above)
   if (isCritical) {
     return 'airplane';
-  }
-
-  // If source cannot support Hercules -> helicopter
-  if (!isSourceHerculesBase) {
-    return 'helicopter';
   }
 
   // If short distance -> helicopter
