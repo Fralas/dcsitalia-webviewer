@@ -11,7 +11,7 @@ import UserProfile from './components/UserProfile';
 import * as api from './services/api';
 import socketService from './services/socket';
 import { t } from './utils/locale';
-import bannerImg from '../img/frontline_test_1.png';
+import bannerImg from '../img/DCS_ITALIA_ICON.png';
 import { useUser } from './contexts/UserContext';
 
 function App() {
@@ -159,20 +159,24 @@ function App() {
     <div className="h-screen bg-yt-bg-primary flex flex-col overflow-hidden">
       {/* Header - Compatto stile YouTube */}
       <header className="bg-yt-bg-secondary border-b border-yt-border sticky top-0 z-50 shadow-lg">
-        <div className="container mx-auto px-4 py-2">
+        <div className="container mx-auto px-4 py-1.5">
           <div className="flex items-center justify-between">
             {/* Logo compatto */}
             <button
               type="button"
               onClick={() => setCurrentView(user ? 'profile' : 'dashboard')}
-              className="flex items-center gap-2 text-left hover:opacity-90 transition-opacity"
+              className="flex items-center gap-3 text-left hover:opacity-90 transition-opacity"
               title={user ? 'Apri profilo' : 'Dashboard'}
             >
               <img
                 src={bannerImg}
-                alt="DCS Frontline - Gestione Campagna Dinamica"
-                className="h-20 w-auto object-contain"
+                alt="DCS Italia"
+                className="h-10 w-10 object-contain"
               />
+              <div className="leading-tight">
+                <div className="text-xl font-extrabold text-yt-text-primary">DCS Frontline</div>
+                <div className="text-[11px] text-yt-text-secondary">Gestione Campagna dinamica</div>
+              </div>
             </button>
 
             <div className="flex items-center gap-3">
