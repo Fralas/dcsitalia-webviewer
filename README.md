@@ -155,3 +155,79 @@ This project is licensed under the [DCS Italia Warehouse Viewer License](LICENSE
 
 ## AI Notice
 Parts of this project were created with the assistance of artificial intelligence tooling. The software may contain mistakes or omissions; please review configurations and outputs before operational use.
+
+
+#ALGORITHM
+
+Spiegazione teorica (alto livello)
+
+Per ogni aeroporto attivo e ogni arma importante, il sistema calcola lo stato usando le soglie per‑arma:
+X (media), X/2 (alta), X/4 (critica).
+Se lo stock scende sotto queste soglie, viene creato un ordine con quantità orderQuantity (di default = X).
+Se un aeroporto supera X*2 per un’arma, può diventare donatore (se non è la base principale). La base principale resta sempre sorgente “infinita”.
+Per ogni ordine si calcola il “peso ISO” (isoFill), che serve a comporre il carico dei C‑130.
+Le missioni sono ottimizzate per sfruttare la capacità totale di 2.5 unità (2 ISO + 1 ISO small).
+Gli ordini vengono spezzati se superano la capacità residua per riempire più missioni.
+Le missioni sono raggruppate per rotta (source → destination) e velivolo consigliato.
+Non si duplicano ordini nella stessa missione/rotta.
+C’è una regola semplice di “sharing”: se sulla stessa rotta ci sono 2 missioni con ISO small vuoti e una missione con 1 ISO pieno, si sposta 0.5+0.5 dentro i piccoli e si elimina la missione da 1 ISO.
+Schema logico (passi chiave)
+
+INPUT
+
+Scorte per aeroporto
+Config arma: thresholdX, orderQuantity, isoFill
+Config logistica: ISO 1.0, ISO small 0.5, max 2.5
+Distanze, aeroporti attivi, base principale
+GENERAZIONE ORDINI
+
+Per ogni aeroporto attivo
+Per ogni arma importante
+Calcola priorità:
+<= X/4 => critical, <= X/2 => high, <= X => medium, altrimenti ok
+Se priorità ≠ ok → crea ordine (qty = orderQuantity)
+Determina donatore: base principale o aeroporto che supera X*2
+(rispettando distanza e condizioni di donazione)
+Deduplica ordini per aeroporto/arma
+CREAZIONE MISSIONI (packing)
+
+Raggruppa ordini per rotta e tipo velivolo
+Per ogni gruppo:
+Ordina per priorità (critical > high > medium)
+Alloca isoFill dentro la capacità 2.5
+Se un ordine non entra intero → crea “chunk” residuo per la prossima missione
+Regola “sharing” tra missioni della stessa rotta (spostare 1 ISO in 2 small)
+OUTPUT
+
+Missioni con più ordini, carico ISO composto, sorgente, destinazione, priorità, velivolo consigliato
+Grafica (flowchart ASCII)
+
+[Scorte aeroporto] + [Config arma/logistica]
+            |
+            v
+   [Calcolo soglie X, X/2, X/4]
+            |
+            v
+ [Priorità per arma: critical/high/medium/ok]
+            |
+            v
+    [Se ok -> skip]  [Se != ok -> crea ordine]
+            |
+            v
+ [Sorgente: base principale o donatore (X*2 + distanza)]
+            |
+            v
+      [Ordini per rotta + velivolo]
+            |
+            v
+    [Packing ISO: max 2.5 unità]
+      |             |
+      |             +--> [Split ordine se non entra]
+      v
+ [Missioni con più ordini]
+            |
+            v
+[Sharing: se 2 small vuoti + 1 iso pieno -> sposta 0.5+0.5]
+            |
+            v
+      [Missioni finali] 
