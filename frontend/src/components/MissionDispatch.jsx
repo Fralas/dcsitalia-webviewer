@@ -441,6 +441,7 @@ function MissionCard({ mission, airports, onUpdate, isHighlighted, user, onStats
  */
 export default function MissionDispatch({ missions, airports, onUpdate, highlightedMissionId }) {
   const [filter, setFilter] = useState('all'); // all, pending, accepted
+  const [priorityFilter, setPriorityFilter] = useState('all');
   const [sourceAirportFilter, setSourceAirportFilter] = useState('all');
   const [destinationAirportFilter, setDestinationAirportFilter] = useState('all');
   const [isMapOpen, setIsMapOpen] = useState(false);
@@ -452,6 +453,9 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
     if (filter === 'pending') return m.status === 'pending';
     if (filter === 'accepted') return m.status === 'accepted';
     return m.status === 'pending' || m.status === 'accepted';
+  }).filter(m => {
+    if (priorityFilter === 'all') return true;
+    return getMissionPriority(m) === priorityFilter;
   }).filter(m => {
     if (sourceAirportFilter !== 'all') {
       return (m.source_airport_id || 'main') === sourceAirportFilter;
@@ -525,13 +529,14 @@ export default function MissionDispatch({ missions, airports, onUpdate, highligh
 
           <div className="flex items-center gap-2 ml-auto flex-wrap">
             <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
               className="px-3 py-1.5 text-[11px] font-semibold uppercase bg-yt-bg-tertiary/80 border border-yt-border/60 rounded-lg text-yt-text-primary"
             >
-              <option value="all">STATUS</option>
-              <option value="pending">Disponibili</option>
-              <option value="accepted">Accettate</option>
+              <option value="all">PRIORITA</option>
+              <option value="critical">{getStatusLabel('critical')}</option>
+              <option value="high">{getStatusLabel('high')}</option>
+              <option value="medium">{getStatusLabel('medium')}</option>
             </select>
             <select
               value={sourceAirportFilter}
