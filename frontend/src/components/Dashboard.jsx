@@ -10,14 +10,14 @@ import { useUser } from '../contexts/UserContext';
  */
 function StatsCard({ title, value, icon: Icon, color, bgColor }) {
   return (
-    <div className="bg-yt-bg-secondary rounded-lg p-4 border border-yt-border hover:border-yt-border/50 transition-all">
+    <div className="bg-yt-bg-secondary/85 rounded-2xl p-4 border border-yt-border/70 shadow-[0_10px_26px_rgba(0,0,0,0.3)] hover:border-yt-border/50 transition-all">
       <div className="flex items-center gap-3">
-        <div className={`p-2.5 rounded ${bgColor}`}>
+        <div className={`p-2.5 rounded-2xl ring-1 ring-yt-border/40 ${bgColor}`}>
           <Icon className={`w-6 h-6 ${color}`} />
         </div>
         <div className="flex-1">
-          <p className="text-xs text-yt-text-secondary uppercase tracking-wide mb-0.5">{title}</p>
-          <p className={`text-2xl font-bold ${color}`}>{value}</p>
+          <p className="text-[11px] text-yt-text-secondary uppercase tracking-wide mb-0.5">{title}</p>
+          <p className={`text-3xl font-extrabold ${color}`}>{value}</p>
         </div>
       </div>
     </div>
@@ -167,11 +167,11 @@ export default function Dashboard({ airports, missions, combatMissions, stats })
   };
 
   return (
-    <div className="space-y-4">
-      <div className="bg-yt-bg-secondary rounded-xl border border-yt-border p-4">
+    <div className="flex flex-col gap-4 max-w-[1100px] mx-auto w-full">
+      <div className="bg-yt-bg-secondary/85 rounded-2xl border border-yt-border/70 p-4 shadow-[0_14px_30px_rgba(0,0,0,0.35)] backdrop-blur-sm">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-yt-text-primary">{t('dashboard.title')}</h2>
+            <h2 className="text-2xl font-extrabold text-yt-text-primary tracking-[0.08em]">{t('dashboard.title')}</h2>
             <p className="text-xs text-yt-text-secondary">{t('dashboard.subtitle')}</p>
           </div>
           <div className="flex items-center gap-2 text-xs text-yt-text-secondary bg-yt-bg-tertiary border border-yt-border/70 px-3 py-1.5 rounded-full">
@@ -205,12 +205,12 @@ export default function Dashboard({ airports, missions, combatMissions, stats })
         />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[3fr,2fr] gap-4 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
         <div className="space-y-4">
-          <div className="bg-yt-bg-secondary rounded-xl border border-yt-border p-4">
+          <div className="bg-yt-bg-secondary/85 rounded-2xl border border-yt-border/70 p-4 shadow-[0_10px_26px_rgba(0,0,0,0.3)]">
             <div className="flex items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-2">
-                <div className="p-2 bg-yt-accent/20 rounded">
+                <div className="p-2 bg-yt-accent/20 rounded-2xl ring-1 ring-yt-accent/30">
                   <Megaphone className="w-4 h-4 text-yt-accent" />
                 </div>
                 <div>
@@ -221,32 +221,32 @@ export default function Dashboard({ airports, missions, combatMissions, stats })
             </div>
 
             {isAdmin && (
-              <div className="bg-yt-bg-tertiary/60 border border-yt-border rounded-lg p-3 mb-3">
+              <div className="bg-yt-bg-tertiary/60 border border-yt-border rounded-xl p-3 mb-3">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                   <input
                     type="text"
                     placeholder={t('dashboard.announcements.form.title')}
                     value={draftTitle}
                     onChange={(event) => setDraftTitle(event.target.value)}
-                    className="md:col-span-1 px-3 py-2 bg-yt-bg-secondary border border-yt-border rounded text-xs text-yt-text-primary placeholder-yt-text-secondary focus:outline-none focus:border-yt-accent"
+                    className="md:col-span-1 px-3 py-2 bg-yt-bg-secondary border border-yt-border rounded-lg text-xs text-yt-text-primary placeholder-yt-text-secondary focus:outline-none focus:border-yt-accent"
                   />
                   <input
                     type="text"
                     placeholder={t('dashboard.announcements.form.body')}
                     value={draftBody}
                     onChange={(event) => setDraftBody(event.target.value)}
-                    className="md:col-span-2 px-3 py-2 bg-yt-bg-secondary border border-yt-border rounded text-xs text-yt-text-primary placeholder-yt-text-secondary focus:outline-none focus:border-yt-accent"
+                    className="md:col-span-2 px-3 py-2 bg-yt-bg-secondary border border-yt-border rounded-lg text-xs text-yt-text-primary placeholder-yt-text-secondary focus:outline-none focus:border-yt-accent"
                   />
                   <input
                     type="text"
                     placeholder={t('dashboard.announcements.form.image')}
                     value={draftImageUrl}
                     onChange={(event) => setDraftImageUrl(event.target.value)}
-                    className="md:col-span-1 px-3 py-2 bg-yt-bg-secondary border border-yt-border rounded text-xs text-yt-text-primary placeholder-yt-text-secondary focus:outline-none focus:border-yt-accent"
+                    className="md:col-span-1 px-3 py-2 bg-yt-bg-secondary border border-yt-border rounded-lg text-xs text-yt-text-primary placeholder-yt-text-secondary focus:outline-none focus:border-yt-accent"
                   />
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-yt-text-secondary">
-                  <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-yt-bg-secondary border border-yt-border rounded cursor-pointer hover:border-yt-border/80 transition-all">
+                  <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-yt-bg-secondary border border-yt-border rounded-lg cursor-pointer hover:border-yt-border/80 transition-all">
                     <input
                       type="file"
                       accept="image/*"
@@ -276,7 +276,7 @@ export default function Dashboard({ airports, missions, combatMissions, stats })
                   <button
                     type="button"
                     onClick={handleAddAnnouncement}
-                    className="px-3 py-1.5 text-xs font-bold bg-yt-accent text-white rounded hover:bg-yt-accent/80 transition-all"
+                    className="px-3 py-1.5 text-xs font-bold bg-yt-accent text-white rounded-lg hover:bg-yt-accent/80 transition-all"
                   >
                     {t('dashboard.announcements.form.publish')}
                   </button>
@@ -285,13 +285,13 @@ export default function Dashboard({ airports, missions, combatMissions, stats })
             )}
 
             {announcements.length === 0 ? (
-              <div className="text-xs text-yt-text-secondary bg-yt-bg-tertiary/60 border border-yt-border rounded p-4">
+              <div className="text-xs text-yt-text-secondary bg-yt-bg-tertiary/60 border border-yt-border rounded-xl p-4">
                 {t('dashboard.announcements.empty')}
               </div>
             ) : (
               <div className="space-y-3">
                 {announcements.map(item => (
-                  <div key={item.id} className="bg-yt-bg-tertiary/60 border border-yt-border rounded-lg p-3">
+                  <div key={item.id} className="bg-yt-bg-tertiary/60 border border-yt-border rounded-xl p-3">
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <div className="text-sm font-bold text-yt-text-primary">{item.title}</div>
@@ -317,20 +317,20 @@ export default function Dashboard({ airports, missions, combatMissions, stats })
                         </button>
                       )}
                     </div>
-              <div className="flex items-center gap-2 text-[10px] text-yt-text-secondary mt-2">
-                <span>{formatAnnouncementTime(item.createdAt)}</span>
-                <span>·</span>
-                <span>{item.author || t('dashboard.announcements.unknownAuthor')}</span>
-              </div>
+                    <div className="flex items-center gap-2 text-[10px] text-yt-text-secondary mt-2">
+                      <span>{formatAnnouncementTime(item.createdAt)}</span>
+                      <span>-</span>
+                      <span>{item.author || t('dashboard.announcements.unknownAuthor')}</span>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          <div className="bg-yt-bg-secondary rounded-xl border border-yt-border p-4">
+          <div className="bg-yt-bg-secondary/85 rounded-2xl border border-yt-border/70 p-4 shadow-[0_10px_26px_rgba(0,0,0,0.3)]">
             <div className="flex items-center gap-2 mb-3">
-              <div className="p-2 bg-yt-accent/20 rounded">
+              <div className="p-2 bg-yt-accent/20 rounded-2xl ring-1 ring-yt-accent/30">
                 <ClipboardList className="w-4 h-4 text-yt-accent" />
               </div>
               <div>
@@ -339,7 +339,7 @@ export default function Dashboard({ airports, missions, combatMissions, stats })
               </div>
             </div>
             {acceptedMissions.length === 0 ? (
-              <div className="text-xs text-yt-text-secondary bg-yt-bg-tertiary/60 border border-yt-border rounded p-4">
+              <div className="text-xs text-yt-text-secondary bg-yt-bg-tertiary/60 border border-yt-border rounded-xl p-4">
                 {t('dashboard.acceptedMissions.empty')}
               </div>
             ) : (
@@ -347,7 +347,7 @@ export default function Dashboard({ airports, missions, combatMissions, stats })
                 {acceptedMissions.map(mission => {
                   const isCombat = mission.type === 'combat';
                   return (
-                    <div key={mission.id} className="flex items-center justify-between gap-3 text-xs bg-yt-bg-tertiary/60 border border-yt-border rounded p-2">
+                    <div key={mission.id} className="flex items-center justify-between gap-3 text-xs bg-yt-bg-tertiary/60 border border-yt-border rounded-xl p-2">
                       <div className="min-w-0">
                         <div className="text-yt-text-primary font-medium truncate">
                           {mission.label}
@@ -375,9 +375,9 @@ export default function Dashboard({ airports, missions, combatMissions, stats })
         </div>
 
         <div className="space-y-4">
-          <div className="bg-yt-bg-secondary rounded-xl border border-yt-border p-4">
+          <div className="bg-yt-bg-secondary/85 rounded-2xl border border-yt-border/70 p-4 shadow-[0_10px_26px_rgba(0,0,0,0.3)]">
             <div className="flex items-center gap-2 mb-3">
-              <div className="p-2 bg-red-400/20 rounded">
+              <div className="p-2 bg-red-400/20 rounded-2xl ring-1 ring-red-400/30">
                 <Target className="w-4 h-4 text-red-400" />
               </div>
               <div>
@@ -386,24 +386,24 @@ export default function Dashboard({ airports, missions, combatMissions, stats })
               </div>
             </div>
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs bg-yt-bg-tertiary/60 border border-yt-border rounded p-2">
+              <div className="flex items-center justify-between text-xs bg-yt-bg-tertiary/60 border border-yt-border rounded-xl p-2">
                 <span className="text-yt-text-secondary">{t('dashboard.activeTasks.sead')}</span>
                 <span className="text-yt-text-primary font-bold">{activeTaskCounts.SEAD}</span>
               </div>
-              <div className="flex items-center justify-between text-xs bg-yt-bg-tertiary/60 border border-yt-border rounded p-2">
+              <div className="flex items-center justify-between text-xs bg-yt-bg-tertiary/60 border border-yt-border rounded-xl p-2">
                 <span className="text-yt-text-secondary">{t('dashboard.activeTasks.dead')}</span>
                 <span className="text-yt-text-primary font-bold">{activeTaskCounts.DEAD}</span>
               </div>
-              <div className="flex items-center justify-between text-xs bg-yt-bg-tertiary/60 border border-yt-border rounded p-2">
+              <div className="flex items-center justify-between text-xs bg-yt-bg-tertiary/60 border border-yt-border rounded-xl p-2">
                 <span className="text-yt-text-secondary">{t('dashboard.activeTasks.cas')}</span>
                 <span className="text-yt-text-primary font-bold">{activeTaskCounts.CAS}</span>
               </div>
             </div>
           </div>
 
-          <div className="bg-yt-bg-secondary rounded-xl border border-yt-border p-4">
+          <div className="bg-yt-bg-secondary/85 rounded-2xl border border-yt-border/70 p-4 shadow-[0_10px_26px_rgba(0,0,0,0.3)]">
             <div className="flex items-center gap-2 mb-3">
-              <div className="p-2 bg-fuchsia-500/20 rounded">
+              <div className="p-2 bg-fuchsia-500/20 rounded-2xl ring-1 ring-fuchsia-500/30">
                 <Package className="w-4 h-4 text-fuchsia-400" />
               </div>
               <div>
@@ -412,13 +412,13 @@ export default function Dashboard({ airports, missions, combatMissions, stats })
               </div>
             </div>
             {topOrderAirports.length === 0 ? (
-              <div className="text-xs text-yt-text-secondary bg-yt-bg-tertiary/60 border border-yt-border rounded p-4">
+              <div className="text-xs text-yt-text-secondary bg-yt-bg-tertiary/60 border border-yt-border rounded-xl p-4">
                 {t('dashboard.pipeline.empty')}
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-2">
                 {topOrderAirports.map(entry => (
-                  <div key={entry.airportId} className="flex items-center justify-between text-xs bg-yt-bg-tertiary/60 border border-yt-border rounded p-2">
+                  <div key={entry.airportId} className="flex items-center justify-between text-xs bg-yt-bg-tertiary/60 border border-yt-border rounded-xl p-2">
                     <span className="text-yt-text-secondary">{entry.name}</span>
                     <span className="text-yt-text-primary font-bold">
                       {t('dashboard.pipeline.orders', { count: entry.count })}
