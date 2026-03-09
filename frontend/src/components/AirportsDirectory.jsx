@@ -37,6 +37,12 @@ function getAirportCoordinates(airport) {
   return fallback?.coordinates || null;
 }
 
+function getAirportIcao(airport) {
+  const fallback = airportsConfig.find(item => item.id === airport.id);
+  const code = fallback?.icao || airport.icao || airport.id || '';
+  return String(code).toUpperCase();
+}
+
 export default function AirportsDirectory({ airports, missions = [], onSelectAirport }) {
   const airportList = useMemo(() => {
     const items = Object.values(airports || {}).filter(item => item && item.name);
@@ -90,7 +96,7 @@ export default function AirportsDirectory({ airports, missions = [], onSelectAir
             const dmsLon = coords ? formatDms(coords.lon, 'E', 'W') : '-';
             const typeInfo = getAirportType(airport);
             const isDefaultAirport = !airport.isMainBase && !airport.isCarrier && !airport.isHeliport;
-            const icao = (airport.icao || airport.csvPrefix || airport.id || '').toUpperCase();
+            const icao = getAirportIcao(airport);
             const missionCount = missionsByAirport[airport.id] || 0;
 
             return (

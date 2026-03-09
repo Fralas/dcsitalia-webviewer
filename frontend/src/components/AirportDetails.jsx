@@ -30,6 +30,12 @@ function getAirportCoordinates(airport) {
   return fallback?.coordinates || null;
 }
 
+function getAirportIcao(airport) {
+  const fallback = airportsConfig.find(item => item.id === airport?.id);
+  const code = fallback?.icao || airport?.icao || airport?.id || '';
+  return String(code).toUpperCase();
+}
+
 function getAirportType(airport) {
   if (airport?.isMainBase) return { label: t('airportsDirectory.tags.mainBase'), color: 'text-fuchsia-400' };
   if (airport?.isCarrier) return { label: t('airportsDirectory.tags.carrier'), color: 'text-green-400' };
@@ -59,7 +65,7 @@ export default function AirportDetails({ airport, missions, onMissionsUpdate, on
   const dmsLat = coords ? formatDms(coords.lat, 'N', 'S') : '-';
   const dmsLon = coords ? formatDms(coords.lon, 'E', 'W') : '-';
   const typeInfo = getAirportType(airport);
-  const icao = (airport.icao || airport.csvPrefix || airport.id || '').toUpperCase();
+  const icao = getAirportIcao(airport);
 
   return (
     <div className="space-y-3">
