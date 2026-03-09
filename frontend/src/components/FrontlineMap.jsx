@@ -1,6 +1,8 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import createGlobe from 'cobe';
-import { Globe2, Layers, MapPin, Plane, Radio, RefreshCw, Target, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap, useMapEvents } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import { Globe2, Layers, Map, MapPin, Plane, Radio, RefreshCw, Target, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import MissionDispatchPanel from './MissionDispatchPanel';
@@ -37,7 +39,7 @@ function getStatusLabel(status) {
   }
 }
 
-function GlobeCanvas({ points, focusCoordinates }) {
+function GlobeCanvas({ points, focusCoordinates, onScaleChange }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [canvasSize, setCanvasSize] = useState(0);
@@ -118,6 +120,7 @@ function GlobeCanvas({ points, focusCoordinates }) {
         phiRef.current += (targetPhiRef.current - phiRef.current) * 0.08;
         thetaRef.current += (targetThetaRef.current - thetaRef.current) * 0.08;
         scaleRef.current += (targetScaleRef.current - scaleRef.current) * 0.18;
+        if (onScaleChange) onScaleChange(scaleRef.current);
         state.phi = phiRef.current;
         state.theta = thetaRef.current;
         state.scale = scaleRef.current;
@@ -141,7 +144,7 @@ function GlobeCanvas({ points, focusCoordinates }) {
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('resize', onResize);
     };
-  }, [points]);
+  }, [points, onScaleChange]);
 
   const zoomIn = () => {
     targetScaleRef.current = Math.min(3.2, targetScaleRef.current + 0.16);
@@ -201,10 +204,113 @@ function GlobeCanvas({ points, focusCoordinates }) {
   );
 }
 
+function FlatMapFocus({ center }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!center) return;
+    map.setView([center.lat, center.lon], Math.max(map.getZoom(), 8), {
+      animate: true,
+      duration: 0.7,
+    });
+  }, [center, map]);
+
+  return null;
+}
+
+function FlatMapZoomWatcher({ onZoomChange }) {
+  const map = useMapEvents({
+    zoomend: () => {
+      onZoomChange(map.getZoom());
+    },
+  });
+
+  useEffect(() => {
+    onZoomChange(map.getZoom());
+  }, [map, onZoomChange]);
+
+  return null;
+}
+
+function FlatMapView({ zones, airportsData, selectedZoneId, onZoneSelect, focusCoordinates, onZoomChange }) {
+  const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
+
+  return (
+    <div className="h-full w-full">
+      <MapContainer
+        center={[center.lat, center.lon]}
+        zoom={7}
+        minZoom={4}
+        maxZoom={13}
+        style={{ height: '100%', width: '100%' }}
+        scrollWheelZoom
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        />
+        <FlatMapZoomWatcher onZoomChange={onZoomChange} />
+        <FlatMapFocus center={focusCoordinates} />
+
+        {zones.map((zone) => {
+          const isSelected = zone.id === selectedZoneId;
+          const color =
+            zone.status === 'RED'
+              ? '#ef4444'
+              : zone.status === 'BLUE'
+                ? '#3b82f6'
+                : zone.status === 'UNDER_ATTACK'
+                  ? '#f97316'
+                  : '#e2e8f0';
+
+          return (
+            <CircleMarker
+              key={zone.id}
+              center={[zone.coordinates.lat, zone.coordinates.lon]}
+              radius={isSelected ? 9 : 6}
+              pathOptions={{
+                color,
+                fillColor: color,
+                fillOpacity: isSelected ? 0.9 : 0.65,
+                weight: isSelected ? 3 : 2,
+              }}
+              eventHandlers={{ click: () => onZoneSelect(zone.id) }}
+            >
+              <Tooltip direction="top" offset={[0, -4]} opacity={0.95}>
+                {zone.name || zone.zone_name || zone.id}
+              </Tooltip>
+            </CircleMarker>
+          );
+        })}
+
+        {airportsData.map((airport) => (
+          <CircleMarker
+            key={airport.id}
+            center={[airport.coordinates.lat, airport.coordinates.lon]}
+            radius={airport.isMainBase ? 6 : 4}
+            pathOptions={{
+              color: airport.isMainBase ? '#4ec5ff' : '#6ea3c8',
+              fillColor: airport.isMainBase ? '#4ec5ff' : '#6ea3c8',
+              fillOpacity: 0.85,
+              weight: 2,
+            }}
+          >
+            <Tooltip direction="top" offset={[0, -4]} opacity={0.95}>
+              {airport.displayName}
+            </Tooltip>
+          </CircleMarker>
+        ))}
+      </MapContainer>
+    </div>
+  );
+}
+
 export default function FrontlineMap({ airportsData }) {
   const [selectedZoneId, setSelectedZoneId] = useState(null);
   const [zones, setZones] = useState(frontlineZones);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mapMode, setMapMode] = useState(false);
+  const mapModeRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -301,6 +407,28 @@ export default function FrontlineMap({ airportsData }) {
 
   const handleResetView = () => {
     setSelectedZoneId(null);
+    setMapMode(false);
+    mapModeRef.current = false;
+  };
+
+  const handleScaleChange = (scale) => {
+    if (scale >= 2.1 && !mapModeRef.current) {
+      mapModeRef.current = true;
+      setMapMode(true);
+      return;
+    }
+
+    if (scale <= 1.85 && mapModeRef.current) {
+      mapModeRef.current = false;
+      setMapMode(false);
+    }
+  };
+
+  const handleFlatMapZoomChange = (zoom) => {
+    if (zoom <= 5 && mapModeRef.current) {
+      mapModeRef.current = false;
+      setMapMode(false);
+    }
   };
 
   return (
@@ -364,8 +492,8 @@ export default function FrontlineMap({ airportsData }) {
           <section className="flex min-h-[320px] min-w-0 flex-col overflow-hidden rounded-2xl border border-yt-border bg-yt-bg-secondary/75 backdrop-blur">
             <div className="flex flex-wrap items-center gap-2 border-b border-yt-border px-3 py-2">
               <div className="inline-flex items-center gap-2 rounded-full border border-yt-border bg-yt-bg-tertiary/80 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-yt-text-secondary">
-                <Globe2 className="h-3.5 w-3.5 text-yt-accent" />
-                Global Theater
+                {mapMode ? <Map className="h-3.5 w-3.5 text-yt-accent" /> : <Globe2 className="h-3.5 w-3.5 text-yt-accent" />}
+                {mapMode ? 'Tactical Map' : 'Global Theater'}
               </div>
               <div className="inline-flex items-center gap-2 rounded-full border border-yt-border bg-yt-bg-tertiary/80 px-3 py-1 text-[11px] text-yt-text-secondary">
                 <Layers className="h-3.5 w-3.5 text-orange-400" />
@@ -378,7 +506,23 @@ export default function FrontlineMap({ airportsData }) {
             </div>
 
             <div className="relative min-h-0 flex-1">
-              <GlobeCanvas points={globePoints} focusCoordinates={focusCoordinates} />
+              {mapMode ? (
+                <FlatMapView
+                  zones={validZones}
+                  airportsData={validAirports}
+                  selectedZoneId={selectedZoneId}
+                  onZoneSelect={setSelectedZoneId}
+                  focusCoordinates={focusCoordinates}
+                  onZoomChange={handleFlatMapZoomChange}
+                />
+              ) : (
+                <GlobeCanvas points={globePoints} focusCoordinates={focusCoordinates} onScaleChange={handleScaleChange} />
+              )}
+              {mapMode && (
+                <div className="pointer-events-none absolute inset-x-0 top-3 mx-auto w-fit rounded-full border border-yt-border/80 bg-yt-bg-secondary/90 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-yt-text-secondary">
+                  Tactical 2D Map (zoom threshold reached)
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 gap-2 border-t border-yt-border p-3 md:grid-cols-2">
