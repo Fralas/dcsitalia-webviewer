@@ -2,17 +2,40 @@ import { useState, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Map as MapIcon, Plane, Helicopter, Anchor, ArrowRight, Weight, Package } from 'lucide-react';
-import { getAirportName } from '../config/airports';
+import { Map as MapIcon, Plane, Helicopter, Anchor } from 'lucide-react';
 import airports from '../config/airports';
-import { formatWeight } from '../utils/weightFormatter';
-import { t, getStatusLabel } from '../utils/locale';
+import { t } from '../utils/locale';
 
 /**
  * Get weapon display name
  */
 function getWeaponDisplayName(weaponId) {
   return weaponId.replace(/^weapons\.(missiles|bombs|nurs|containers|droptanks|torpedoes|adapters)\./, '');
+}
+
+function getMissionOrders(mission) {
+  if (Array.isArray(mission.orders) && mission.orders.length > 0) {
+    return mission.orders;
+  }
+
+  if (mission.weapon_id) {
+    return [{
+      weapon_id: mission.weapon_id,
+      quantity_needed: mission.quantity_needed,
+      current_quantity: mission.current_quantity,
+      total_weight_lbs: mission.total_weight_lbs,
+      priority: mission.priority,
+    }];
+  }
+
+  return [];
+}
+
+function getMissionTitle(mission) {
+  const orders = getMissionOrders(mission);
+  if (orders.length === 0) return 'Missione';
+  if (orders.length === 1) return getWeaponDisplayName(orders[0].weapon_id);
+  return `${getWeaponDisplayName(orders[0].weapon_id)} +${orders.length - 1}`;
 }
 
 /**
@@ -89,68 +112,6 @@ const createAirportIcon = (isMainBase, missionCount, isHeliport, isCarrier) => {
 };
 
 /**
- * Mission Card Component (sidebar)
- */
-function MissionCard({ mission, airport, onHover, onSelect, isHighlighted, isSelected }) {
-  const sourceName = mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Main Base';
-  const distance = mission.distance_nm ? `${mission.distance_nm}nm` : '-';
-  const isPending = mission.status === 'pending';
-
-  return (
-    <div
-      className={`bg-yt-bg-secondary p-3 rounded-lg border-2 transition-all cursor-pointer ${
-        isSelected
-          ? 'border-fuchsia-400 shadow-lg shadow-fuchsia-400/30 scale-[1.02]'
-          : isHighlighted
-          ? 'border-yt-accent shadow-lg shadow-yt-accent/20'
-          : 'border-yt-border hover:border-yt-border/50'
-      }`}
-      onMouseEnter={() => onHover(mission.id)}
-      onMouseLeave={() => onHover(null)}
-      onClick={() => onSelect(mission.id)}
-    >
-      <div className="flex justify-between items-start mb-2">
-        <div className="flex-1 min-w-0">
-          <div className="font-mono text-sm text-yt-text-primary font-bold mb-1 truncate">{getWeaponDisplayName(mission.weapon_id)}</div>
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-yt-text-secondary">Qty:</span>
-            <span className="font-bold text-yt-text-primary bg-yt-bg-tertiary px-1.5 py-0.5 rounded">{mission.quantity_needed}</span>
-          </div>
-          {mission.total_weight_lbs && mission.total_weight_lbs > 0 && (
-            <div className="flex items-center gap-1.5 text-xs text-yt-text-primary mt-1.5">
-              <Weight className="w-3.5 h-3.5" />
-              <span className="font-mono font-medium">{formatWeight(mission.total_weight_lbs)}</span>
-            </div>
-          )}
-        </div>
-        <div>
-          <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide ${
-            isPending ? 'bg-yellow-400/20 text-yellow-400' : 'bg-yt-accent/20 text-yt-accent'
-          }`}>
-            {isPending ? getStatusLabel('pending') : getStatusLabel('accepted')}
-          </span>
-        </div>
-      </div>
-
-      {/* Route - più grande e leggibile */}
-      <div className="flex items-center gap-1.5 text-xs bg-yt-bg-tertiary px-2.5 py-2 rounded">
-        <span className="text-yt-accent font-medium truncate">{sourceName}</span>
-        <ArrowRight className="w-3.5 h-3.5 text-yt-text-secondary flex-shrink-0" />
-        <span className="text-yt-accent font-medium truncate">{airport?.displayName}</span>
-        <span className="text-yt-border flex-shrink-0">•</span>
-        <span className="text-yt-text-primary font-mono font-medium flex-shrink-0">{distance}</span>
-      </div>
-
-      {isSelected && (
-        <div className="mt-2 pt-2 border-t border-fuchsia-400/30 text-xs text-fuchsia-400 text-center font-medium">
-          {t('mapView.missionCard.clickHint')}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
  * Mission Polyline Component
  */
 function MissionPolyline({ mission, sourceAirport, destAirport, isHighlighted, isSelected, onHover, onSelect }) {
@@ -183,12 +144,15 @@ function MissionPolyline({ mission, sourceAirport, destAirport, isHighlighted, i
     >
       <Popup>
         <div className="text-xs">
-          <div className="font-bold">{getWeaponDisplayName(mission.weapon_id)}</div>
+          <div className="font-bold">{getMissionTitle(mission)}</div>
           <div className="text-gray-600">
             {sourceAirport.displayName} → {destAirport.displayName}
           </div>
           <div className="text-gray-600">
             {mission.distance_nm ? `${mission.distance_nm}nm` : '-'}
+          </div>
+          <div className="text-gray-600">
+            Ordini: {getMissionOrders(mission).length}
           </div>
           <div className="mt-1">
             <span className={`px-2 py-1 rounded text-xs ${
@@ -206,7 +170,13 @@ function MissionPolyline({ mission, sourceAirport, destAirport, isHighlighted, i
 /**
  * Map View Component
  */
-export default function MapView({ missions, airportsData, onNavigateToMissions }) {
+export default function MapView({
+  missions,
+  airportsData,
+  embedded = false,
+  onRouteSelect,
+  onAirportSelect,
+}) {
   const [hoveredMission, setHoveredMission] = useState(null);
   const [selectedMission, setSelectedMission] = useState(null);
 
@@ -227,16 +197,19 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
     validAirports.map(a => [a.coordinates.lat, a.coordinates.lon])
   , [validAirports]);
 
-  // Handle mission selection
-  const handleSelectMission = (missionId) => {
-    if (selectedMission === missionId) {
-      // Second click - navigate to Missions page with mission ID
-      if (onNavigateToMissions) {
-        onNavigateToMissions(missionId);
-      }
-    } else {
-      // First click - select mission
-      setSelectedMission(missionId);
+  const handleSelectRoute = (mission) => {
+    if (!mission) return;
+    setSelectedMission(mission.id);
+    if (onRouteSelect) {
+      const key = `${mission.source_airport_id || 'main'}::${mission.airport_id || 'unknown'}`;
+      onRouteSelect(key);
+    }
+  };
+
+  const handleSelectAirport = (airportId) => {
+    if (!airportId) return;
+    if (onAirportSelect) {
+      onAirportSelect(airportId);
     }
   };
 
@@ -262,6 +235,8 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
 
   // Group missions by airport for badge count
   const missionsByAirport = {};
+  // Map layout sizing
+  const mapHeight = embedded ? 520 : 750;
   missions.forEach(mission => {
     if (!missionsByAirport[mission.airport_id]) {
       missionsByAirport[mission.airport_id] = [];
@@ -270,10 +245,10 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
   });
 
   return (
-    <div className="min-h-screen bg-yt-bg-primary p-4">
-      <div className="max-w-[1800px] mx-auto">
-        {/* Header compatto stile YouTube */}
-        <div className="bg-yt-bg-secondary rounded-lg p-4 border border-yt-border mb-4">
+    <div className={embedded ? 'bg-yt-bg-secondary rounded-lg overflow-hidden border border-yt-border' : 'min-h-screen bg-yt-bg-primary p-4'}>
+      <div className={embedded ? '' : 'max-w-[1800px] mx-auto'}>
+        {!embedded && (
+          <div className="bg-yt-bg-secondary rounded-lg p-4 border border-yt-border mb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="p-2 bg-yt-accent/20 rounded">
@@ -313,11 +288,12 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
               </div>
             </div>
           </div>
-        </div>
+          </div>
+        )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           {/* Map - più largo */}
-          <div className="lg:col-span-3 bg-yt-bg-secondary rounded-lg overflow-hidden border border-yt-border" style={{ height: '750px' }}>
+          <div className="bg-yt-bg-secondary rounded-lg overflow-hidden border border-yt-border" style={{ height: `${mapHeight}px` }}>
             <MapContainer
               center={center}
               zoom={10}
@@ -347,7 +323,7 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
                     isHighlighted={hoveredMission === mission.id}
                     isSelected={selectedMission === mission.id}
                     onHover={setHoveredMission}
-                    onSelect={handleSelectMission}
+                    onSelect={handleSelectRoute}
                   />
                 );
               })}
@@ -361,6 +337,9 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
                     key={airport.id}
                     position={[airport.coordinates.lat, airport.coordinates.lon]}
                     icon={createAirportIcon(airport.isMainBase, missionCount, airport.isHeliport, airport.isCarrier)}
+                    eventHandlers={{
+                      click: () => handleSelectAirport(airport.id),
+                    }}
                   >
                     <Popup>
                       <div className="text-sm">
@@ -389,38 +368,6 @@ export default function MapView({ missions, airportsData, onNavigateToMissions }
                 );
               })}
             </MapContainer>
-          </div>
-
-          {/* Mission List Sidebar - più larga */}
-          <div className="lg:col-span-1 bg-yt-bg-secondary rounded-lg p-3 border border-yt-border flex flex-col">
-            <h3 className="text-base font-bold text-yt-text-primary mb-3 flex items-center gap-2 px-1">
-              <Package className="w-5 h-5 text-yt-accent" />
-              {t('mapView.sidebar.heading')} ({missions.length})
-            </h3>
-
-            <div className="space-y-2 flex-1 overflow-y-auto pr-1" style={{ maxHeight: '690px' }}>
-              {missions.length === 0 ? (
-                <div className="text-center py-12">
-                  <Package className="w-10 h-10 text-yt-text-secondary mx-auto mb-2 opacity-50" />
-                  <p className="text-yt-text-secondary text-sm">{t('mapView.sidebar.empty')}</p>
-                </div>
-              ) : (
-                missions.map(mission => {
-                  const airport = airportsData?.find(a => a.id === mission.airport_id);
-                  return (
-                    <MissionCard
-                      key={mission.id}
-                      mission={mission}
-                      airport={airport}
-                      onHover={setHoveredMission}
-                      onSelect={handleSelectMission}
-                      isHighlighted={hoveredMission === mission.id}
-                      isSelected={selectedMission === mission.id}
-                    />
-                  );
-                })
-              )}
-            </div>
           </div>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { LogIn, LogOut, User, ChevronDown, UserCircle } from 'lucide-react';
+import { LogOut, User, ChevronDown, UserCircle } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
+import discordLogo from '../../img/discord_logo.png';
 
 /**
  * User Menu Component - Discord Authentication
@@ -53,10 +54,14 @@ export default function UserMenu({ onProfileOpen }) {
     return (
       <button
         onClick={handleLogin}
-        className="px-3 py-1.5 rounded text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 transition-all"
+        aria-label="Login con Discord"
+        className="p-1.5 rounded text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 transition-all"
       >
-        <LogIn className="w-4 h-4" />
-        <span className="hidden sm:inline">Login con Discord</span>
+        <img
+          src={discordLogo}
+          alt="Discord"
+          className="h-8 w-auto object-contain"
+        />
       </button>
     );
   }

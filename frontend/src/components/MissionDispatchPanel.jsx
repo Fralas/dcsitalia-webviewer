@@ -3,6 +3,7 @@ import { Target, Plane, AlertTriangle, CheckCircle, XCircle, LogIn, ChevronDown,
 import * as api from '../services/api';
 import { useUser } from '../contexts/UserContext';
 import socketService from '../services/socket';
+import discordLogo from '../../img/discord_logo.png';
 
 /**
  * Get priority badge color and label
@@ -159,10 +160,14 @@ function LoginRequiredModal({ onClose, onLogin }) {
           <div className="flex gap-3">
             <button
               onClick={onLogin}
+              aria-label="Login con Discord"
               className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold transition-all flex items-center justify-center gap-2"
             >
-              <LogIn className="w-5 h-5" />
-              Login con Discord
+              <img
+                src={discordLogo}
+                alt="Discord"
+                className="h-9 w-auto object-contain"
+              />
             </button>
 
             <button

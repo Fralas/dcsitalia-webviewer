@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Plane, Package, Activity, AlertCircle, Map, Shield, Target } from 'lucide-react';
+import { Plane, Package, Activity, AlertCircle, Shield, Target, MapPin } from 'lucide-react';
 import Dashboard from './components/Dashboard';
-import MapView from './components/MapView';
+import MissionDispatch from './components/MissionDispatch';
+import AirportsDirectory from './components/AirportsDirectory';
+import AirportDetails from './components/AirportDetails';
 import FrontlineMap from './components/FrontlineMap';
 import AdminPanel from './components/AdminPanel';
 import UserMenu from './components/UserMenu';
@@ -9,13 +11,14 @@ import UserProfile from './components/UserProfile';
 import * as api from './services/api';
 import socketService from './services/socket';
 import { t } from './utils/locale';
-import logoImg from '../img/DCS_ITALIA_ICON.png';
+import bannerImg from '../img/DCS_ITALIA_ICON.png';
 import { useUser } from './contexts/UserContext';
 
 function App() {
-  const [currentView, setCurrentView] = useState('dashboard'); // dashboard, missions
+  const [currentView, setCurrentView] = useState('dashboard'); // dashboard, airports, airport, missions
   const [airports, setAirports] = useState({});
   const [missions, setMissions] = useState([]);
+  const [combatMissions, setCombatMissions] = useState([]);
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -75,13 +78,15 @@ function App() {
     try {
       setLoading(true);
       setError(null);
-      const [airportsData, missionsData, statsData] = await Promise.all([
+      const [airportsData, missionsData, combatMissionsData, statsData] = await Promise.all([
         api.getAirports(),
         api.getMissions(),
+        api.getCombatMissions(),
         api.getStats(),
       ]);
       setAirports(airportsData);
       setMissions(missionsData);
+      setCombatMissions(combatMissionsData);
       setStats(statsData);
     } catch (err) {
       setError(err.message);
@@ -109,6 +114,16 @@ function App() {
     } catch (err) {
       console.error('Failed to reload missions:', err);
     }
+  };
+
+  const handleAirportSelect = (airportId) => {
+    setSelectedAirportId(airportId);
+    setSelectedAirportToken((prev) => prev + 1);
+    setCurrentView('airport');
+  };
+
+  const handleAirportBack = () => {
+    setCurrentView('airports');
   };
 
   if (loading) {
@@ -144,23 +159,23 @@ function App() {
     <div className="h-screen bg-yt-bg-primary flex flex-col overflow-hidden">
       {/* Header - Compatto stile YouTube */}
       <header className="bg-yt-bg-secondary border-b border-yt-border sticky top-0 z-50 shadow-lg">
-        <div className="container mx-auto px-4 py-2">
+        <div className="container mx-auto px-4 py-1.5">
           <div className="flex items-center justify-between">
             {/* Logo compatto */}
             <button
               type="button"
               onClick={() => setCurrentView(user ? 'profile' : 'dashboard')}
-              className="flex items-center gap-2 text-left hover:opacity-90 transition-opacity"
+              className="flex items-center gap-3 text-left hover:opacity-90 transition-opacity"
               title={user ? 'Apri profilo' : 'Dashboard'}
             >
               <img
-                src={logoImg}
+                src={bannerImg}
                 alt="DCS Italia"
-                className="h-10 w-auto object-contain"
+                className="h-10 w-10 object-contain"
               />
-              <div>
-                <h1 className="text-lg font-bold text-yt-text-primary">{t('general.appTitle')}</h1>
-                <p className="text-xs text-yt-text-secondary">{t('general.appSubtitle')}</p>
+              <div className="leading-tight">
+                <div className="text-xl font-extrabold text-yt-text-primary">DCS Frontline</div>
+                <div className="text-[11px] text-yt-text-secondary">Gestione Campagna dinamica</div>
               </div>
             </button>
 
@@ -179,15 +194,26 @@ function App() {
                   <span className="hidden sm:inline">{t('general.navigation.dashboard')}</span>
                 </button>
                 <button
-                  onClick={() => setCurrentView('map')}
+                  onClick={() => setCurrentView('airports')}
                   className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
-                    currentView === 'map'
+                    currentView === 'airports'
                       ? 'bg-yt-bg-tertiary text-yt-text-primary'
                       : 'text-yt-text-secondary hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary'
                   }`}
                 >
-                  <Map className="w-4 h-4" />
-                  <span className="hidden sm:inline">{t('general.navigation.map')}</span>
+                  <MapPin className="w-4 h-4" />
+                  <span className="hidden sm:inline">{t('general.navigation.airports')}</span>
+                </button>
+                <button
+                  onClick={() => setCurrentView('missions')}
+                  className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
+                    currentView === 'missions'
+                      ? 'bg-yt-bg-tertiary text-yt-text-primary'
+                      : 'text-yt-text-secondary hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary'
+                  }`}
+                >
+                  <Package className="w-4 h-4" />
+                  <span className="hidden sm:inline">{t('general.navigation.missions')}</span>
                 </button>
                 <button
                   onClick={() => setCurrentView('frontline')}
@@ -198,7 +224,7 @@ function App() {
                   }`}
                 >
                   <Target className="w-4 h-4" />
-                  <span className="hidden sm:inline">Frontline</span>
+                  <span className="hidden sm:inline">ATO</span>
                 </button>
                 <button
                   onClick={() => setCurrentView('admin')}
@@ -221,28 +247,36 @@ function App() {
       </header>
 
       {/* Main Content - padding ridotto */}
-      <main className={`flex-1 ${currentView === 'map' || currentView === 'frontline' || currentView === 'admin' ? 'overflow-hidden' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
+      <main className={`flex-1 ${currentView === 'frontline' || currentView === 'admin' ? 'overflow-hidden' : currentView === 'dashboard' ? 'max-w-[1800px] mx-auto px-4 py-4 overflow-y-auto w-full' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
         {currentView === 'dashboard' && (
           <Dashboard
             airports={airports}
             missions={missions}
+            combatMissions={combatMissions}
             stats={stats}
-            onMissionsUpdate={handleMissionUpdate}
-            selectedAirportId={selectedAirportId}
-            selectedAirportToken={selectedAirportToken}
           />
         )}
-        {currentView === 'map' && (
-          <MapView
+        {currentView === 'airports' && (
+          <AirportsDirectory
+            airports={airports}
             missions={missions}
-            airportsData={Object.values(airports)}
-            onNavigateToMissions={(missionId) => {
-              const mission = missions.find((m) => m.id === missionId);
-              setHighlightedMissionId(missionId);
-              setSelectedAirportId(mission?.airport_id || null);
-              setSelectedAirportToken(Date.now());
-              setCurrentView('dashboard');
-            }}
+            onSelectAirport={handleAirportSelect}
+          />
+        )}
+        {currentView === 'airport' && (
+          <AirportDetails
+            airport={selectedAirportId ? airports[selectedAirportId] : null}
+            missions={missions}
+            onMissionsUpdate={handleMissionUpdate}
+            onBack={handleAirportBack}
+          />
+        )}
+        {currentView === 'missions' && (
+          <MissionDispatch
+            missions={missions}
+            airports={Object.values(airports)}
+            onUpdate={handleMissionUpdate}
+            highlightedMissionId={highlightedMissionId}
           />
         )}
         {currentView === 'frontline' && (
@@ -257,7 +291,7 @@ function App() {
       </main>
 
       {/* Footer - compatto (hidden on map/frontline/admin views) */}
-      {currentView !== 'map' && currentView !== 'frontline' && currentView !== 'admin' && (
+      {currentView !== 'frontline' && currentView !== 'admin' && (
         <footer className="bg-yt-bg-secondary border-t border-yt-border mt-8">
           <div className="container mx-auto px-4 py-3 text-center text-xs text-yt-text-secondary">
             <p>DCS Italia Warehouse Viewer v1.0 • Real-time logistics management</p>

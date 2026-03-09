@@ -1,20 +1,123 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Droplet, Plane, Helicopter, Anchor, Plus, X, TrendingUp, ArrowRight, FileDown, Weight, Clock, User, XCircle, Search, LogIn } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, AlertCircle, Package, Plane, Helicopter, Anchor, Plus, X, TrendingUp, FileDown, Weight, Clock, User, XCircle, Search, LogIn, Image } from 'lucide-react';
 import * as api from '../services/api';
 import WeaponChart from './WeaponChart';
 import { getAirportName } from '../config/airports';
 import airports from '../config/airports';
-import { generateChartsPDF, checkChartsAvailable } from '../utils/pdfGenerator';
+import { generateChartsPDF, fetchChartsList } from '../utils/pdfGenerator';
 import { isImportantWeapon, importantWeaponsAirports, importantWeaponsHeliports, importantWeaponsCarriers } from '../config/weapons';
 import { formatWeight } from '../utils/weightFormatter';
 import { t, formatElapsedTime, formatRemainingTime, getStatusLabel } from '../utils/locale';
 import { useUser } from '../contexts/UserContext';
+import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
+import discordLogo from '../../img/discord_logo.png';
 
 /**
  * Get weapon display name (remove prefix)
  */
 function getWeaponDisplayName(weaponId) {
   return weaponId.replace(/^weapons\.(missiles|bombs|nurs|containers|droptanks|torpedoes|adapters)\./, '');
+}
+
+function getMissionOrders(mission) {
+  if (Array.isArray(mission.orders) && mission.orders.length > 0) {
+    return mission.orders;
+  }
+
+  if (mission.weapon_id) {
+    return [{
+      weapon_id: mission.weapon_id,
+      quantity_needed: mission.quantity_needed,
+      current_quantity: mission.current_quantity,
+      total_weight_lbs: mission.total_weight_lbs,
+      priority: mission.priority,
+    }];
+  }
+
+  return [];
+}
+
+function getMissionPriority(mission) {
+  if (mission.priority) return mission.priority;
+  const orders = getMissionOrders(mission);
+  const priorities = orders.map(order => order.priority).filter(Boolean);
+  if (priorities.length === 0) return 'medium';
+  if (priorities.includes('critical')) return 'critical';
+  if (priorities.includes('high')) return 'high';
+  if (priorities.includes('medium')) return 'medium';
+  return 'ok';
+}
+
+function getMissionTotals(mission) {
+  const orders = getMissionOrders(mission);
+  const totalWeight = Number.isFinite(mission.total_weight_lbs)
+    ? mission.total_weight_lbs
+    : orders.reduce((sum, order) => sum + (order.total_weight_lbs || 0), 0);
+  const totalIsoUnits = Number.isFinite(mission.total_iso_units)
+    ? mission.total_iso_units
+    : orders.reduce((sum, order) => sum + (order.iso_units || 0), 0);
+
+  return { orders, totalWeight, totalIsoUnits };
+}
+
+function getMissionTitle(mission) {
+  const orders = getMissionOrders(mission);
+  if (orders.length === 0) return 'Missione';
+  if (orders.length === 1) return getWeaponDisplayName(orders[0].weapon_id);
+  return `${getWeaponDisplayName(orders[0].weapon_id)} +${orders.length - 1}`;
+}
+
+const PRIORITY_RANK = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  ok: 3,
+};
+
+function getMissionPriorityRank(mission) {
+  return PRIORITY_RANK[getMissionPriority(mission)] ?? PRIORITY_RANK.ok;
+}
+
+function getIsoSummary(isoPlan, translate) {
+  const isoCount = isoPlan.containers.filter(container => !container.small && container.used > 0).length;
+  const smallCount = isoPlan.containers.filter(container => container.small && container.used > 0).length;
+
+  if (isoCount === 0 && smallCount === 0) {
+    return translate('missionDispatch.iso.emptySummary');
+  }
+
+  const parts = [];
+  if (isoCount > 0) {
+    parts.push(`${isoCount} ${translate('missionDispatch.iso.containerShort')}`);
+  }
+  if (smallCount > 0) {
+    parts.push(`${smallCount} ${translate('missionDispatch.iso.containerSmallShort')}`);
+  }
+
+  return parts.join(' + ');
+}
+
+function getLocationColorClass(airport) {
+  if (!airport) return 'text-yt-text-primary';
+  if (airport.isMainBase) return 'text-fuchsia-400';
+  if (airport.isHeliport) return 'text-cyan-400';
+  return 'text-yt-accent';
+}
+
+function getItemQuantity(item) {
+  const orderQty = Number(item.order_quantity_needed || 0);
+  const orderIsoUnits = Number(item.order_iso_units || 0);
+  const usedUnits = Number(item.units || 0);
+  if (!Number.isFinite(orderQty) || orderQty <= 0 || !Number.isFinite(usedUnits) || usedUnits <= 0) {
+    return null;
+  }
+  if (Number.isFinite(orderIsoUnits) && orderIsoUnits > 1) {
+    return Math.floor((usedUnits / orderIsoUnits) * orderQty);
+  }
+  if (Number.isFinite(orderIsoUnits) && orderIsoUnits > 0 && usedUnits >= orderIsoUnits) {
+    return Math.floor(orderQty);
+  }
+  return Math.floor(usedUnits * orderQty);
 }
 
 /**
@@ -99,10 +202,14 @@ function LoginRequiredModal({ onClose, onLogin }) {
           <div className="flex gap-3">
             <button
               onClick={onLogin}
+              aria-label="Login con Discord"
               className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold transition-all flex items-center justify-center gap-2"
             >
-              <LogIn className="w-5 h-5" />
-              Login con Discord
+              <img
+                src={discordLogo}
+                alt="Discord"
+                className="h-9 w-auto object-contain"
+              />
             </button>
 
             <button
@@ -121,7 +228,15 @@ function LoginRequiredModal({ onClose, onLogin }) {
 /**
  * Airport Card Component
  */
-export default function AirportCard({ airport, missions = [], onMissionsUpdate, shouldExpand, expandToken }) {
+export default function AirportCard({
+  airport,
+  missions = [],
+  onMissionsUpdate,
+  shouldExpand,
+  expandToken,
+  showOrders = true,
+  forceExpanded = false,
+}) {
   const [expanded, setExpanded] = useState(false);
   const [filter, setFilter] = useState('all'); // all, critical, important
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -130,6 +245,9 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
   const [chartWeapon, setChartWeapon] = useState(''); // For the historical chart
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [chartsAvailable, setChartsAvailable] = useState(null); // null = not checked, true/false = has charts
+  const [chartsList, setChartsList] = useState([]);
+  const [chartsLoading, setChartsLoading] = useState(false);
+  const [chartsError, setChartsError] = useState(null);
   const [weaponSearchTerm, setWeaponSearchTerm] = useState(''); // For weapon search
 
   // Mission management states
@@ -146,10 +264,34 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
 
   // Check if charts are available when card is expanded
   useEffect(() => {
-    if (expanded && chartsAvailable === null) {
-      checkChartsAvailable(airport.id).then(setChartsAvailable);
-    }
-  }, [expanded, airport.id, chartsAvailable]);
+    if (!expanded) return;
+
+    let isMounted = true;
+    setChartsLoading(true);
+    setChartsError(null);
+
+    fetchChartsList(airport.id)
+      .then((data) => {
+        if (!isMounted) return;
+        const hasCharts = !!(data && data.available && Array.isArray(data.charts) && data.charts.length > 0);
+        setChartsAvailable(hasCharts);
+        setChartsList(Array.isArray(data?.charts) ? data.charts : []);
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        setChartsError(error?.message || 'Errore nel caricamento delle chart');
+        setChartsAvailable(false);
+        setChartsList([]);
+      })
+      .finally(() => {
+        if (!isMounted) return;
+        setChartsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [expanded, airport.id]);
 
   // Expand and scroll into view when a mission is selected from the map
   useEffect(() => {
@@ -159,7 +301,13 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
     }
   }, [shouldExpand, expandToken]);
 
-  const { weapons = [], liquids = [] } = airport.data;
+  useEffect(() => {
+    if (forceExpanded) {
+      setExpanded(true);
+    }
+  }, [forceExpanded]);
+
+  const { weapons = [] } = airport.data;
 
   // Get suggested quantity based on priority
   const getSuggestedQuantity = (weaponId) => {
@@ -239,7 +387,9 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
     try {
       await api.completeMission(missionId);
       if (user) {
-        incrementStats({ ordersCompleted: 1 });
+        const mission = missions.find(m => m.id === missionId);
+        const ordersCount = getMissionOrders(mission || {}).length || 1;
+        incrementStats({ ordersCompleted: ordersCount });
       }
       setMissionStates(prev => ({ ...prev, [missionId]: { ...state, loading: false } }));
       if (onMissionsUpdate) onMissionsUpdate();
@@ -366,8 +516,12 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
     >
       {/* Header */}
       <div
-        className="p-3 cursor-pointer hover:bg-yt-bg-tertiary/50 transition-colors"
-        onClick={() => setExpanded(!expanded)}
+        className={`p-3 ${forceExpanded ? '' : 'cursor-pointer hover:bg-yt-bg-tertiary/50'} transition-colors`}
+        onClick={() => {
+          if (!forceExpanded) {
+            setExpanded(!expanded);
+          }
+        }}
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -401,7 +555,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                 <span className="font-bold">{stats.medium}</span>
               </div>
             )}
-            {expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+            {!forceExpanded && (expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />)}
           </div>
         </div>
       </div>
@@ -410,7 +564,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
       {expanded && (
         <div className="border-t border-yt-border">
           {/* Active Orders Section - When there are missions */}
-          {!airport.isMainBase && airportMissions.length > 0 && (
+          {showOrders && !airport.isMainBase && airportMissions.length > 0 && (
             <div className="p-3 bg-fuchsia-500/10 border-t-2 border-fuchsia-500/40">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-sm font-bold text-fuchsia-300 flex items-center gap-2">
@@ -433,7 +587,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                     title={chartsAvailable === false ? t('airportCard.pdfUnavailable') : ''}
                   >
                     <FileDown className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">{generatingPDF ? 'PDF...' : chartsAvailable === null ? t('general.loading') : 'PDF'}</span>
+                    <span className="hidden sm:inline">{generatingPDF ? 'Chart...' : chartsAvailable === null ? t('general.loading') : 'Chart'}</span>
                   </button>
                   <button
                     onClick={() => setShowOrderModal(true)}
@@ -448,135 +602,116 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
               <div className={`grid gap-3 ${airportMissions.length === 1 ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
                 {airportMissions.sort((a, b) => {
                   // Sort by priority: CRITICAL > HIGH > MEDIUM
-                  const priorityA = a.current_quantity <= 5 ? 0 : a.current_quantity <= 20 ? 1 : 2;
-                  const priorityB = b.current_quantity <= 5 ? 0 : b.current_quantity <= 20 ? 1 : 2;
-                  return priorityA - priorityB;
+                  return getMissionPriorityRank(a) - getMissionPriorityRank(b);
                 }).map(mission => {
                   const sourceName = mission.source_airport_id ? getAirportName(mission.source_airport_id) : 'Main Base';
                   const sourceAirport = mission.source_airport_id ? airports.find(a => a.id === mission.source_airport_id) : null;
-                  const distance = mission.distance_nm ? `${mission.distance_nm}nm` : '-';
                   const timeAgo = getTimeAgo(mission.created_at);
                   const expiresIn = getTimeRemaining(mission.expires_at);
                   const state = missionStates[mission.id] || { loading: false, showLoginModal: false };
+                  const { orders, totalWeight } = getMissionTotals(mission);
+                  const missionPriority = getMissionPriority(mission);
+                  const destinationName = airport.displayName || airport.name;
+                  const sourceColor = getLocationColorClass(sourceAirport);
+                  const destinationColor = getLocationColorClass(airport);
+                  const weightLabel = totalWeight > 0 ? formatWeight(totalWeight) : '-';
+                  const isoPlan = buildIsoContainerPlan(orders);
 
                   return (
-                    <div key={mission.id} className="bg-yt-bg-secondary p-3 rounded-lg border-2 border-fuchsia-500/30">
-                      {/* Header: weapon name, time, and priority */}
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <h3 className="text-lg font-bold text-yt-text-primary font-mono truncate">{getWeaponDisplayName(mission.weapon_id)}</h3>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <Clock className="w-3.5 h-3.5 text-yt-text-secondary" />
-                            <span className="text-xs text-yt-text-secondary">{timeAgo}</span>
+                    <div key={mission.id} className="bg-yt-bg-secondary p-2 rounded-lg border-2 border-fuchsia-500/30">
+                      {/* Route title */}
+                      <div className="bg-yt-bg-tertiary rounded p-2 mb-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <h3 className="text-base font-bold text-yt-text-primary truncate">
+                              <span className={sourceColor}>{sourceName}</span>
+                              <span className="text-yt-text-secondary"> → </span>
+                              <span className={destinationColor}>{destinationName}</span>
+                            </h3>
+                            <div className="text-[11px] text-yt-text-secondary font-mono truncate">{weightLabel}</div>
                           </div>
+                          <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide flex-shrink-0 ${
+                            mission.status === 'pending'
+                              ? missionPriority === 'critical'
+                                ? 'bg-red-400/20 text-red-400 border border-red-400/50'
+                                : missionPriority === 'high'
+                                ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
+                                : 'bg-yellow-400/20 text-yellow-400 border border-yellow-400/50'
+                              : mission.status === 'accepted'
+                              ? 'bg-yt-accent/20 text-yt-accent'
+                              : 'bg-yt-bg-primary/50 text-yt-text-secondary'
+                          }`}>
+                            {mission.status === 'pending'
+                              ? missionPriority === 'critical'
+                                ? getStatusLabel('critical')
+                                : missionPriority === 'high'
+                                ? getStatusLabel('high')
+                                : getStatusLabel('medium')
+                              : mission.status === 'accepted'
+                              ? getStatusLabel('accepted')
+                              : mission.status.toUpperCase()}
+                          </span>
                         </div>
-                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide flex-shrink-0 ml-2 ${
-                          mission.status === 'pending'
-                            ? mission.current_quantity <= 5
-                              ? 'bg-red-400/20 text-red-400 border border-red-400/50'
-                              : mission.current_quantity <= 20
-                              ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
-                              : 'bg-yellow-400/20 text-yellow-400 border border-yellow-400/50'
-                            : mission.status === 'accepted'
-                            ? 'bg-yt-accent/20 text-yt-accent'
-                            : 'bg-yt-bg-primary/50 text-yt-text-secondary'
-                        }`}>
-                          {mission.status === 'pending'
-                            ? mission.current_quantity <= 5
-                              ? getStatusLabel('critical')
-                              : mission.current_quantity <= 20
-                              ? getStatusLabel('high')
-                              : getStatusLabel('medium')
-                            : mission.status === 'accepted'
-                            ? getStatusLabel('accepted')
-                            : mission.status.toUpperCase()}
-                        </span>
+                        <div className="flex items-center gap-1 text-xs text-yt-text-secondary mt-1">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>{timeAgo}</span>
+                        </div>
                       </div>
 
-                      {/* Route Information */}
-                      <div className="flex items-center gap-1 text-xs bg-yt-bg-tertiary px-2 py-1.5 rounded mb-2 flex-wrap">
-                        {!sourceAirport ? (
-                          <span className="text-fuchsia-400 font-medium truncate">{sourceName}</span>
-                        ) : sourceAirport.isMainBase ? (
-                          <span className="text-fuchsia-400 font-medium truncate">{sourceName}</span>
-                        ) : sourceAirport.isCarrier ? (
-                          <>
-                            <Anchor className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-                            <span className="text-green-500 font-medium truncate">{sourceName}</span>
-                          </>
-                        ) : sourceAirport.isHeliport ? (
-                          <>
-                            <Helicopter className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
-                            <span className="text-cyan-400 font-medium truncate">{sourceName}</span>
-                          </>
-                        ) : (
-                          <>
-                            <Plane className="w-3.5 h-3.5 text-yt-accent flex-shrink-0" />
-                            <span className="text-yt-accent font-medium truncate">{sourceName}</span>
-                          </>
-                        )}
-                        <ArrowRight className="w-3.5 h-3.5 text-yt-text-secondary flex-shrink-0" />
-                        {isCarrier ? (
-                          <>
-                            <Anchor className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-                            <span className="text-green-500 font-medium truncate">{airport.displayName || airport.name}</span>
-                          </>
-                        ) : isHeliport ? (
-                          <>
-                            <Helicopter className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
-                            <span className="text-cyan-400 font-medium truncate">{airport.displayName || airport.name}</span>
-                          </>
-                        ) : (
-                          <>
-                            <Plane className="w-3.5 h-3.5 text-yt-accent flex-shrink-0" />
-                            <span className="text-yt-accent font-medium truncate">{airport.displayName || airport.name}</span>
-                          </>
-                        )}
-                        <span className="text-yt-border flex-shrink-0">•</span>
-                        <span className="text-yt-text-primary font-mono flex-shrink-0">{distance}</span>
+                      {/* Route details removed */}
 
-                        {/* Recommended Aircraft inline */}
-                          {mission.recommended_aircraft && (
-                            <>
-                              <span className="text-yt-border flex-shrink-0">•</span>
-                              {mission.recommended_aircraft === 'helicopter' && (
-                                <>
-                                  <Helicopter className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
-                                  <span className="text-cyan-400 font-medium flex-shrink-0">{t('airportCard.recommended.helicopter')}</span>
-                                </>
-                              )}
-                              {mission.recommended_aircraft === 'airplane' && (
-                                <>
-                                  <Plane className="w-3.5 h-3.5 text-yt-accent flex-shrink-0" />
-                                  <span className="text-yt-accent font-medium flex-shrink-0">{t('airportCard.recommended.airplane')}</span>
-                                </>
-                              )}
-                              {mission.recommended_aircraft === 'airdrop' && (
-                                <>
-                                  <Package className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
-                                  <span className="text-orange-400 font-medium flex-shrink-0">{t('airportCard.recommended.airdrop')}</span>
-                                </>
-                              )}
-                            </>
-                          )}
-                      </div>
+                      {/* Orders list removed */}
 
-                      {/* Quantities and weight - compact layout */}
-                      <div className="flex gap-2 mb-2">
-                        <div className="flex-1 bg-yt-bg-tertiary rounded p-1.5 text-center">
-                          <div className="text-[10px] text-yt-text-secondary mb-0.5">{t('airportCard.filters.stocks')}</div>
-                          <div className="text-base font-bold text-red-400">{mission.current_quantity}</div>
+                      {/* Cargo summary removed */}
+
+                      {/* ISO container plan */}
+                      <div className="bg-yt-bg-tertiary rounded p-2 mb-2 text-xs">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-yt-text-secondary">{t('missionDispatch.iso.title')}</span>
+                          <span className="text-yt-text-primary font-medium">{getIsoSummary(isoPlan, t)}</span>
                         </div>
-                        <div className="flex-1 bg-yt-bg-tertiary rounded p-1.5 text-center">
-                          <div className="text-[10px] text-yt-text-secondary mb-0.5">{t('airportCard.filters.requested')}</div>
-                          <div className="text-base font-bold text-green-400">{mission.quantity_needed}</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          {isoPlan.containers.filter(container => container.used > 0).map(container => {
+                            const fillPercent = container.capacity > 0 ? Math.min(100, (container.used / container.capacity) * 100) : 0;
+                            return (
+                              <div key={container.id} className="bg-yt-bg-secondary rounded border border-yt-border p-2">
+                                <div className="flex items-center justify-between text-[10px] text-yt-text-secondary mb-1">
+                                  <span>{container.small ? t('missionDispatch.iso.containerSmall') : t('missionDispatch.iso.container')}</span>
+                                  <span className="font-mono">{formatIsoUnits(container.used)} / {formatIsoUnits(container.capacity)}</span>
+                                </div>
+                                <div className="h-1.5 bg-yt-border/40 rounded-full overflow-hidden mb-1.5">
+                                  <div className="h-full bg-yt-accent" style={{ width: `${fillPercent}%` }}></div>
+                                </div>
+                                <div className="space-y-1">
+                                  {container.items.map((item, idx) => {
+                                    const qty = getItemQuantity(item);
+                                    return (
+                                      <div key={`${item.weapon_id}-${idx}`} className="flex items-center justify-between text-[10px]">
+                                        <span className="text-yt-text-primary font-mono">{getWeaponDisplayName(item.weapon_id)}</span>
+                                        <span className="text-yt-text-secondary font-mono">{qty !== null ? `x${qty}` : '-'}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                        {mission.total_weight_lbs && mission.total_weight_lbs > 0 && (
-                          <div className="flex-[2] bg-yt-bg-tertiary rounded p-1.5 flex items-center justify-center gap-1.5">
-                            <Weight className="w-4 h-4 text-yt-text-primary" />
-                            <span className="text-base font-bold text-yt-text-primary font-mono">{formatWeight(mission.total_weight_lbs)}</span>
-                          </div>
-                        )}
+                        {isoPlan.overflow.length > 0 && (() => {
+                          const overflowLabels = isoPlan.overflow.map(item => {
+                            const qty = getItemQuantity(item);
+                            if (!qty) return null;
+                            return `${getWeaponDisplayName(item.weapon_id)} (x${qty})`;
+                          }).filter(Boolean);
+
+                          if (overflowLabels.length === 0) return null;
+
+                          return (
+                            <div className="mt-2 text-[10px] text-orange-400">
+                              {t('missionDispatch.iso.overflow')} {overflowLabels.join(', ')}
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* Pilot info for accepted missions */}
@@ -637,7 +772,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
           )}
 
           {/* Action buttons - When there are NO missions OR is main base */}
-          {(airport.isMainBase || airportMissions.length === 0) && (
+          {(airport.isMainBase || airportMissions.length === 0 || !showOrders) && (
             <div className="p-3 border-t border-yt-border bg-yt-bg-tertiary/30">
               <div className="flex gap-2 justify-end">
                 <button
@@ -653,7 +788,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                   title={chartsAvailable === false ? t('airportCard.pdfUnavailable') : ''}
                 >
                   <FileDown className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">{generatingPDF ? 'PDF...' : chartsAvailable === null ? t('general.loading') : 'PDF'}</span>
+                  <span className="hidden sm:inline">{generatingPDF ? 'Chart...' : chartsAvailable === null ? t('general.loading') : 'Chart'}</span>
                 </button>
                 <button
                   onClick={() => setShowOrderModal(true)}
@@ -666,7 +801,7 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
             </div>
           )}
 
-          {/* Weapons & Liquids Section - Split Layout */}
+          {/* Weapons & Charts Section - Split Layout */}
           <div className="p-3">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Left Column: Weapons in single scrollbar */}
@@ -730,19 +865,43 @@ export default function AirportCard({ airport, missions = [], onMissionsUpdate, 
                 </div>
               </div>
 
-              {/* Right Column: Liquids in 2x2 block */}
+              {/* Right Column: Charts preview */}
               <div>
                 <h4 className="text-xs font-bold text-yt-text-secondary mb-2 flex items-center gap-1.5 uppercase tracking-wide">
-                  <Droplet className="w-3.5 h-3.5" />
-                  {t('airportCard.headers.liquids')}
+                  <Image className="w-3.5 h-3.5" />
+                  {t('airportCard.headers.charts')}
                 </h4>
-                <div className="grid grid-cols-2 gap-3 h-96">
-                  {liquids.map((liquid, idx) => (
-                    <div key={idx} className="bg-yt-bg-tertiary p-4 rounded border border-yt-border flex flex-col justify-center items-center">
-                      <div className="text-sm text-yt-text-secondary mb-2">{`${t('airportCard.headers.type')} ${liquid.item}`}</div>
-                      <div className="text-2xl font-bold text-yt-text-primary">{liquid.quantity.toLocaleString()}</div>
+                <div className="min-h-96 border border-yt-border rounded p-3 bg-yt-bg-tertiary">
+                  {chartsLoading ? (
+                    <div className="h-full flex items-center justify-center text-sm text-yt-text-secondary">
+                      {t('airportCard.charts.loading')}
                     </div>
-                  ))}
+                  ) : chartsError ? (
+                    <div className="h-full flex items-center justify-center text-sm text-red-400">
+                      {chartsError}
+                    </div>
+                  ) : chartsAvailable && chartsList.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto pr-1">
+                      {chartsList.map((chart) => {
+                        const baseUrl = import.meta.env.VITE_SOCKET_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+                        const chartUrl = `${baseUrl}${chart.url}`;
+                        return (
+                          <div key={chart.filename || chart.url} className="bg-yt-bg-secondary rounded border border-yt-border p-2">
+                            <img
+                              src={chartUrl}
+                              alt={chart.filename || 'chart'}
+                              className="w-full h-auto rounded"
+                              loading="lazy"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-sm text-yt-text-secondary">
+                      {t('airportCard.charts.empty')}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

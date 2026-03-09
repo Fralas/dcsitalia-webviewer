@@ -1,7 +1,7 @@
 export default {
   general: {
-    appTitle: 'DCS Warehouse',
-    appSubtitle: 'Gestione Logistica',
+    appTitle: 'DCS Frontline',
+    appSubtitle: 'Gestione Campagna Dinamica',
     loading: 'Caricamento DCS Warehouse Viewer...',
     errorTitle: 'Errore nel caricamento dei dati',
     retry: 'Riprova',
@@ -12,6 +12,8 @@ export default {
     },
     navigation: {
       dashboard: 'Dashboard',
+      airports: 'Aeroporti',
+      missions: 'Logistica',
       map: 'Mappa',
       admin: 'Admin'
     },
@@ -44,21 +46,79 @@ export default {
       yourName: 'Il tuo nome...',
       pilotName: 'Nome pilota...'
     },
+    clear: 'Rimuovi',
     unknown: 'Sconosciuto'
   },
   dashboard: {
-    stats: {
-      airports: 'Aeroporti',
-      critical: 'Critici',
-      missions: 'Missioni',
-      accepted: 'Accettate'
+    title: 'Dashboard Operativa',
+    subtitle: 'Sintesi logistica e aggiornamenti in tempo reale',
+    status: {
+      live: 'Live'
     },
-    searchPlaceholder: 'Cerca aeroporti...',
-    sortByName: 'Nome',
-    sortByCriticality: 'Criticità',
-    pdfTooltip: 'Seleziona la directory dove salvare i PDF delle chart',
+    stats: {
+      activeAirports: 'Aeroporti attivi',
+      activeZones: 'Zone attive',
+      missions: 'Missioni attive',
+      pending: 'In attesa'
+    },
+    announcements: {
+      title: 'Annunci operativi',
+      subtitle: 'Messaggi e aggiornamenti per tutti i piloti',
+      empty: 'Nessun annuncio attivo',
+      unknownAuthor: 'Admin',
+      form: {
+        title: 'Titolo annuncio',
+        body: 'Messaggio breve',
+        image: 'URL immagine (opzionale)',
+        upload: 'Carica immagine',
+        publish: 'Pubblica',
+        remove: 'Rimuovi'
+      }
+    },
+    acceptedMissions: {
+      title: 'Missioni accettate',
+      subtitle: 'Piloti assegnati alle missioni',
+      empty: 'Nessuna missione accettata',
+      logistics: 'LOG',
+      combat: 'COMBAT',
+      noAssignee: 'Nessun pilota'
+    },
+    activeTasks: {
+      title: 'Task attive',
+      subtitle: 'Conteggio task combat in corso',
+      sead: 'SEAD',
+      dead: 'DEAD',
+      cas: 'CAS'
+    },
+    pipeline: {
+      title: 'Pipeline missioni',
+      subtitle: 'Top aeroporti per ordini',
+      empty: 'Nessun ordine disponibile',
+      orders: '{{count}} ordini'
+    }
+  },
+  airportsDirectory: {
+    title: 'Aeroporti',
+    subtitle: 'Elenco completo con informazioni di base',
     emptyTitle: 'Nessun aeroporto trovato',
-    emptySubtitle: 'Prova a modificare i filtri di ricerca'
+    emptySubtitle: 'Nessun dato disponibile',
+    activeCount: 'Aeroporti attivi',
+    missions: 'missioni in arrivo',
+    labels: {
+      icao: 'ICAO'
+    },
+    tags: {
+      mainBase: 'Base principale',
+      heliport: 'Eliporto',
+      airport: 'Aeroporto',
+      carrier: 'Carrier'
+    }
+  },
+  airportDetails: {
+    subtitle: 'Scheda completa aeroporto',
+    back: 'Torna agli aeroporti',
+    emptyTitle: 'Aeroporto non trovato',
+    emptySubtitle: 'Seleziona un aeroporto dalla lista'
   },
   airportCard: {
     activeOrders: 'ORDINI ATTIVI',
@@ -95,7 +155,7 @@ export default {
       weapon: 'Arma',
       quantity: 'Qtà',
       status: 'Stato',
-      liquids: 'Liquidi e Carburante',
+      charts: 'Chart',
       type: 'Tipo',
       level: 'Livello',
       historical: 'Andamento Storico (7 giorni)',
@@ -142,6 +202,10 @@ export default {
     chart: {
       emptyTitle: "Seleziona un'arma dal menu per visualizzare il grafico",
       emptySubtitle: '📊 Dati salvati ogni 4 ore'
+    },
+    charts: {
+      loading: 'Caricamento chart...',
+      empty: 'Nessuna chart disponibile'
     }
   },
   mapView: {
@@ -173,6 +237,16 @@ export default {
   missionDispatch: {
     title: 'Gestione Missioni',
     subtitle: 'Missioni di rifornimento attive',
+    iso: {
+      title: 'Carico ISO',
+      container: 'ISO container',
+      containerSmall: 'ISO small',
+      containerShort: 'ISO',
+      containerSmallShort: 'ISO small',
+      empty: 'Vuoto',
+      emptySummary: 'Vuoto',
+      overflow: 'Eccedenza:'
+    },
     stats: {
       pending: 'Attesa',
       accepted: 'Accettate',
@@ -181,7 +255,12 @@ export default {
     filters: {
       all: 'Tutte',
       pending: 'In Attesa',
-      accepted: 'Accettate'
+      accepted: 'Accettate',
+      route: 'Route',
+      priority: 'Priorità',
+      airport: 'Aeroporto',
+      allRoutes: 'Tutte le route',
+      allPriorities: 'Tutte le priorità'
     },
     emptyTitle: 'Nessuna missione disponibile',
     emptySubtitle: 'Le missioni appariranno qui quando le scorte saranno basse',

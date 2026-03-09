@@ -14,7 +14,7 @@ import session from 'express-session';
 import cookieParser from 'cookie-parser';
 
 import airports, { getAirportById } from './config/airports.config.js';
-import { isImportantWeapon, getPriority, getSupplyQuantityForPriority } from './config/rules.config.js';
+import { isImportantWeapon, getWeaponPriority, getOrderQuantityForWeapon, getWeaponThresholds, getIsoFillForWeapon } from './config/rules.config.js';
 import * as dataBuffer from './services/dataBuffer.js';
 import * as historicalData from './services/historicalData.js';
 import * as missionGenerator from './services/missionGenerator.js';
@@ -736,7 +736,7 @@ app.get('/api/stats', (req, res) => {
     criticalAirports: 0,
   };
 
-  // Count airports with critical weapons (quantity <= 5)
+  // Count airports with critical weapons (per-weapon thresholds)
   Object.values(currentData).forEach(airport => {
     if (airport.data && airport.data.weapons) {
       // Get airport config to check if it's a heliport or carrier
@@ -744,9 +744,11 @@ app.get('/api/stats', (req, res) => {
       const isHeliport = airportConfig?.isHeliport || false;
       const isCarrier = airportConfig?.isCarrier || false;
 
-      const hasCritical = airport.data.weapons.some(w =>
-        isImportantWeapon(w.item, isHeliport, isCarrier) && w.quantity <= 5
-      );
+      const hasCritical = airport.data.weapons.some(w => {
+        if (!isImportantWeapon(w.item, isHeliport, isCarrier)) return false;
+        const thresholds = getWeaponThresholds(w.item);
+        return w.quantity <= thresholds.critical;
+      });
       if (hasCritical) stats.criticalAirports++;
     }
   });
@@ -855,13 +857,17 @@ app.post('/api/test/generate-mission', (req, res) => {
   }
 
   // Create mission
-  const missionId = historicalData.createMission(
+  const missionId = historicalData.createMission({
     airportId,
-    weaponId,
-    100, // quantity needed
-    currentQuantity,
-    24 // expires in 24 hours
-  );
+    orders: [{
+      weapon_id: weaponId,
+      quantity_needed: 100,
+      current_quantity: currentQuantity,
+      iso_units: getIsoFillForWeapon(weaponId),
+    }],
+    priority: getWeaponPriority(weaponId, currentQuantity),
+    expiryHours: 24,
+  });
 
   console.log(`🧪 TEST: Generated mission ${missionId} for ${weaponId} at ${airportId}`);
 
@@ -919,13 +925,17 @@ app.post('/api/test/generate-random-missions', (req, res) => {
       continue;
     }
 
-    const missionId = historicalData.createMission(
-      targetAirport,
-      randomWeapon,
-      100,
-      randomQuantity,
-      24
-    );
+    const missionId = historicalData.createMission({
+      airportId: targetAirport,
+      orders: [{
+        weapon_id: randomWeapon,
+        quantity_needed: 100,
+        current_quantity: randomQuantity,
+        iso_units: getIsoFillForWeapon(randomWeapon),
+      }],
+      priority: getWeaponPriority(randomWeapon, randomQuantity),
+      expiryHours: 24,
+    });
 
     generatedMissions.push({
       missionId,
@@ -986,24 +996,25 @@ app.post('/api/airports/:id/create-order', (req, res) => {
     }
   }
 
-  // If quantity not specified or is 0, calculate based on priority
+  // If quantity not specified or is 0, calculate based on per-weapon rule
   if (!quantity || quantity <= 0) {
-    const priority = getPriority(currentQuantity);
-    quantity = getSupplyQuantityForPriority(priority);
-    console.log(`📊 Auto-calculated quantity for ${weaponId}: ${quantity} (priority: ${priority.toUpperCase()}, current: ${currentQuantity})`);
+    quantity = getOrderQuantityForWeapon(weaponId);
+    console.log(`?Y"S Auto-calculated quantity for ${weaponId}: ${quantity} (current: ${currentQuantity})`);
   }
 
   // Find best source airport using donor selection algorithm
+  const thresholds = getWeaponThresholds(weaponId);
   const bestSource = findBestSourceAirport({
     recipientAirport: airport,
     weaponId,
     quantityNeeded: quantity,
     allAirportsData: currentData,
+    donorThreshold: thresholds.donor,
   });
 
   // Get source airport and calculate priority for aircraft recommendation
   const sourceAirport = getAirportById(bestSource.airportId);
-  const priority = getPriority(currentQuantity);
+  const priority = getWeaponPriority(weaponId, currentQuantity);
 
   // Determine recommended aircraft
   const recommendedAircraft = determineRecommendedAircraft(
@@ -1014,16 +1025,21 @@ app.post('/api/airports/:id/create-order', (req, res) => {
   );
 
   // Create order with source routing and recommended aircraft
-  const orderId = historicalData.createMission(
+  const orderId = historicalData.createMission({
     airportId,
-    weaponId,
-    quantity,
-    currentQuantity,
-    24, // expires in 24 hours
-    bestSource.airportId,
-    bestSource.distance,
-    recommendedAircraft
-  );
+    sourceAirportId: bestSource.airportId,
+    distance: bestSource.distance,
+    recommendedAircraft,
+    orders: [{
+      weapon_id: weaponId,
+      quantity_needed: quantity,
+      current_quantity: currentQuantity,
+      iso_units: getIsoFillForWeapon(weaponId),
+      priority,
+    }],
+    priority,
+    expiryHours: 24,
+  });
 
   console.log(`📦 Manual order created: ${orderId} for ${weaponId} at ${airport.displayName} (qty: ${quantity})`);
   console.log(`   Route: ${bestSource.airportName} → ${airport.displayName} (${bestSource.distance}nm)`);
