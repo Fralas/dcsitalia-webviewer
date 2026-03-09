@@ -8,13 +8,27 @@ import { airports } from '../config/airports.config.js';
 
 // Internal state
 let airbaseStatus = {};
+let normalizedAirbaseStatus = {};
+
+function normalizeAirbaseName(name) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 /**
  * Update the airbase status (called when lua file changes)
  * @param {Object} newStatus - New status object from lua file
  */
 export function updateAirbaseStatus(newStatus) {
-  airbaseStatus = newStatus;
+  airbaseStatus = newStatus || {};
+  normalizedAirbaseStatus = {};
+
+  for (const [name, status] of Object.entries(airbaseStatus)) {
+    normalizedAirbaseStatus[normalizeAirbaseName(name)] = status;
+  }
 }
 
 /**
@@ -36,8 +50,17 @@ export function isAirbaseActive(airbaseName) {
     return true;
   }
 
+  if (Object.prototype.hasOwnProperty.call(airbaseStatus, airbaseName)) {
+    return airbaseStatus[airbaseName] !== false;
+  }
+
+  const normalizedName = normalizeAirbaseName(airbaseName);
+  if (Object.prototype.hasOwnProperty.call(normalizedAirbaseStatus, normalizedName)) {
+    return normalizedAirbaseStatus[normalizedName] !== false;
+  }
+
   // If airbase not in status file, default to active
-  return airbaseStatus[airbaseName] !== false;
+  return true;
 }
 
 /**

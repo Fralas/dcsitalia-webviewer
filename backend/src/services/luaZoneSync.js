@@ -5,20 +5,40 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Paths
-const LUA_DIR = path.join(__dirname, '../../../csvexample');
+// Input source directory (legacy Lua or new DMAP JSON exports)
+const SOURCE_DIR = process.env.DYZONE_SOURCE_DIR
+  ? path.resolve(process.env.DYZONE_SOURCE_DIR)
+  : path.join(__dirname, '../../../csvexample');
+
+function pickDefaultInputPath(candidateFiles) {
+  for (const fileName of candidateFiles) {
+    const candidate = path.join(SOURCE_DIR, fileName);
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  // Fallback to first candidate for clearer error messages if source files are missing
+  return path.join(SOURCE_DIR, candidateFiles[0]);
+}
 
 function getLuaPaths() {
   return {
-    statusPath: process.env.DYZONE_STATUS_FILE
+    statusPath: process.env.DYZONE_STATUS_EXPORT_FILE
+      ? path.resolve(process.env.DYZONE_STATUS_EXPORT_FILE)
+      : process.env.DYZONE_STATUS_FILE
       ? path.resolve(process.env.DYZONE_STATUS_FILE)
-      : path.join(LUA_DIR, 'Dyzone_Status.lua'),
-    taskPath: process.env.DYZONE_TASK_FILE
+      : pickDefaultInputPath(['Export_Dzone_Status.json', 'Dyzone_Status.lua']),
+    taskPath: process.env.DYZONE_TASK_EXPORT_FILE
+      ? path.resolve(process.env.DYZONE_TASK_EXPORT_FILE)
+      : process.env.DYZONE_TASK_FILE
       ? path.resolve(process.env.DYZONE_TASK_FILE)
-      : path.join(LUA_DIR, 'ActDyzone_Task.lua'),
-    positionPath: process.env.DYZONE_POSITION_FILE
+      : pickDefaultInputPath(['Export_Dzone_ActiveTask.json', 'ActDyzone_Task.lua']),
+    positionPath: process.env.DYZONE_POSITION_EXPORT_FILE
+      ? path.resolve(process.env.DYZONE_POSITION_EXPORT_FILE)
+      : process.env.DYZONE_POSITION_FILE
       ? path.resolve(process.env.DYZONE_POSITION_FILE)
-      : path.join(LUA_DIR, 'Dyzone_Position.lua'),
+      : pickDefaultInputPath(['Export_Dzone_Position.json', 'Dyzone_Position.lua']),
     outputJsonPath: process.env.DYZONE_OUTPUT_JSON
       ? path.resolve(process.env.DYZONE_OUTPUT_JSON)
       : path.join(__dirname, '../../../frontend/src/config/frontlineZones.json')
@@ -33,6 +53,38 @@ function getBufferFilePath(customPath) {
   return customPath ? path.resolve(customPath) : DEFAULT_BUFFER_FILE;
 }
 
+function parseJsonFile(filePath) {
+  const raw = fs.readFileSync(filePath, 'utf8');
+  return JSON.parse(raw);
+}
+
+function parseTaskString(value) {
+  if (value === null || value === undefined) {
+    return [];
+  }
+
+  return String(value)
+    .split(',')
+    .map(task => task.trim())
+    .filter(Boolean);
+}
+
+function parsePositionString(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const match = String(value).trim().match(/^(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)$/);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    lat: parseFloat(match[1]),
+    lon: parseFloat(match[2])
+  };
+}
+
 /**
  * Parse Dyzone_Status.lua file
  * Format: zone_00 = "BLUE"
@@ -41,6 +93,18 @@ function getBufferFilePath(customPath) {
 function parseDyzoneStatus() {
   try {
     const { statusPath } = getLuaPaths();
+
+    if (statusPath.toLowerCase().endsWith('.json')) {
+      const parsed = parseJsonFile(statusPath);
+      const zoneStatus = {};
+
+      for (const [zoneId, status] of Object.entries(parsed || {})) {
+        zoneStatus[zoneId] = String(status || '').trim().toUpperCase();
+      }
+
+      return zoneStatus;
+    }
+
     const content = fs.readFileSync(statusPath, 'utf8');
     const zoneStatus = {};
 
@@ -50,7 +114,7 @@ function parseDyzoneStatus() {
 
     while ((match = regex.exec(content)) !== null) {
       const [, zoneId, status] = match;
-      zoneStatus[zoneId] = status;
+      zoneStatus[zoneId] = status.trim().toUpperCase();
     }
 
     return zoneStatus;
@@ -69,6 +133,25 @@ function parseDyzoneStatus() {
 function parseActDyzoneTask() {
   try {
     const { taskPath } = getLuaPaths();
+
+    if (taskPath.toLowerCase().endsWith('.json')) {
+      const parsed = parseJsonFile(taskPath);
+      const zoneTasks = {};
+
+      for (const [zoneId, value] of Object.entries(parsed || {})) {
+        if (Array.isArray(value)) {
+          zoneTasks[zoneId] = value
+            .map(task => String(task).trim())
+            .filter(Boolean);
+          continue;
+        }
+
+        zoneTasks[zoneId] = parseTaskString(value);
+      }
+
+      return zoneTasks;
+    }
+
     const content = fs.readFileSync(taskPath, 'utf8');
     const zoneTasks = {};
 
@@ -78,10 +161,7 @@ function parseActDyzoneTask() {
 
     while ((match = regex.exec(content)) !== null) {
       const [, zoneId, tasksString] = match;
-      const tasks = tasksString
-        .split(',')
-        .map(t => t.trim())
-        .filter(Boolean);
+      const tasks = parseTaskString(tasksString);
 
       zoneTasks[zoneId] = tasks;
     }
@@ -101,11 +181,34 @@ function parseActDyzoneTask() {
 function parseDyzonePosition() {
   try {
     const { positionPath } = getLuaPaths();
+
+    if (positionPath.toLowerCase().endsWith('.json')) {
+      const parsed = parseJsonFile(positionPath);
+      const zonePositions = {};
+
+      for (const [zoneId, value] of Object.entries(parsed || {})) {
+        if (value && typeof value === 'object' && Number.isFinite(value.lat) && Number.isFinite(value.lon)) {
+          zonePositions[zoneId] = {
+            lat: Number(value.lat),
+            lon: Number(value.lon)
+          };
+          continue;
+        }
+
+        const parsedPosition = parsePositionString(value);
+        if (parsedPosition) {
+          zonePositions[zoneId] = parsedPosition;
+        }
+      }
+
+      return zonePositions;
+    }
+
     const content = fs.readFileSync(positionPath, 'utf8');
     const zonePositions = {};
 
     // Match pattern: zone_XX = "LAT LON"
-    const regex = /(zone_\d+)\s*=\s*"([0-9.]+)\s+([0-9.]+)"/g;
+    const regex = /(zone_\d+)\s*=\s*"(-?[0-9.]+)\s+(-?[0-9.]+)"/g;
     let match;
 
     while ((match = regex.exec(content)) !== null) {
