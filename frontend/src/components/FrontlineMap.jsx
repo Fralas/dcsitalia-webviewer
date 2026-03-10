@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import createGlobe from 'cobe';
+import * as mgrs from 'mgrs';
 import { MapContainer, TileLayer, CircleMarker, Marker, Polyline, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import { divIcon } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -96,6 +97,43 @@ function getZoneGridIndex(zone) {
   const value = Number.parseInt(match[1], 10);
   if (!Number.isFinite(value) || value < 0 || value > 99) return null;
   return value;
+}
+
+function formatDms(value, positiveLabel, negativeLabel) {
+  if (!Number.isFinite(value)) return '-';
+  const abs = Math.abs(value);
+  let degrees = Math.floor(abs);
+  let minutesFloat = (abs - degrees) * 60;
+  let minutes = Math.floor(minutesFloat);
+  let seconds = Math.round((minutesFloat - minutes) * 60);
+
+  if (seconds === 60) {
+    seconds = 0;
+    minutes += 1;
+  }
+  if (minutes === 60) {
+    minutes = 0;
+    degrees += 1;
+  }
+
+  const hemisphere = value >= 0 ? positiveLabel : negativeLabel;
+  return `${degrees} ${minutes}'${seconds}" ${hemisphere}`;
+}
+
+function formatZoneCoordinates(coordinates, format) {
+  const lat = Number(coordinates?.lat);
+  const lon = Number(coordinates?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return '-';
+
+  if (format === 'mgrs') {
+    try {
+      return mgrs.forward([lon, lat]);
+    } catch (error) {
+      return 'MGRS unavailable';
+    }
+  }
+
+  return `${formatDms(lat, 'N', 'S')}, ${formatDms(lon, 'E', 'W')}`;
 }
 
 function toGlobeAngles(coordinates) {
@@ -691,6 +729,7 @@ export default function FrontlineMap({ airportsData }) {
   const { user } = useUser();
   const [selectedZoneId, setSelectedZoneId] = useState(null);
   const [hoveredZoneId, setHoveredZoneId] = useState(null);
+  const [zoneCoordinatesFormat, setZoneCoordinatesFormat] = useState('dms');
   const [selectedAirportId, setSelectedAirportId] = useState(null);
   const [selectedLogisticsMission, setSelectedLogisticsMission] = useState(null);
   const [acceptingMissionId, setAcceptingMissionId] = useState(null);
@@ -1165,6 +1204,9 @@ export default function FrontlineMap({ airportsData }) {
         ...new Set([...(selectedZone.tasks || []), ...(selectedMission?.tasks || [])]),
       ].filter(Boolean)
     : [];
+  const selectedZoneCoordinates = selectedZone
+    ? formatZoneCoordinates(selectedZone.coordinates, zoneCoordinatesFormat)
+    : '-';
 
   const airportLogistics = useMemo(() => {
     if (!selectedAirportId) return [];
@@ -1190,6 +1232,10 @@ export default function FrontlineMap({ airportsData }) {
       setHoveredZoneId(null);
     }
   }, [filters.showAto]);
+
+  useEffect(() => {
+    setZoneCoordinatesFormat('dms');
+  }, [selectedZone?.id]);
 
   useEffect(() => {
     if (!selectedLogisticsMission?.id) return;
@@ -1523,10 +1569,18 @@ export default function FrontlineMap({ airportsData }) {
                     <span>{formatRelativeTime(selectedChangedAt)}</span>
                   </div>
 
-                  <div className="mt-2 flex items-center gap-2 text-sm text-yt-text-secondary">
+                  <button
+                    type="button"
+                    onClick={() => setZoneCoordinatesFormat((current) => (current === 'dms' ? 'mgrs' : 'dms'))}
+                    className="mt-2 flex w-full items-center gap-2 text-left text-sm text-yt-text-secondary transition-colors hover:text-yt-text-primary"
+                    title={zoneCoordinatesFormat === 'dms' ? 'Click to switch to MGRS' : 'Click to switch to DMS'}
+                  >
                     <MapPin className="h-4 w-4" />
-                    <span>{selectedZone.coordinates.lat.toFixed(5)}, {selectedZone.coordinates.lon.toFixed(5)}</span>
-                  </div>
+                    <span className="font-mono">{selectedZoneCoordinates}</span>
+                    <span className="ml-auto rounded border border-yt-border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">
+                      {zoneCoordinatesFormat}
+                    </span>
+                  </button>
 
                   <div className="mt-3 border-t border-yt-border pt-2">
                     <button
