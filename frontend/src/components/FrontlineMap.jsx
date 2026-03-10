@@ -6,8 +6,9 @@ import { Clock3, MapPin } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import socketService from '../services/socket';
-import { getCombatMissions, getFrontlineZones, getMissions } from '../services/api';
+import { acceptMission, cancelMission, completeMission, getCombatMissions, getFrontlineZones, getMissions } from '../services/api';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
+import { useUser } from '../contexts/UserContext';
 
 function getZoneColor(status) {
   switch (status) {
@@ -479,10 +480,13 @@ function FlatMapView({
 }
 
 export default function FrontlineMap({ airportsData }) {
+  const { user } = useUser();
   const [selectedZoneId, setSelectedZoneId] = useState(null);
   const [hoveredZoneId, setHoveredZoneId] = useState(null);
   const [selectedAirportId, setSelectedAirportId] = useState(null);
   const [selectedLogisticsMission, setSelectedLogisticsMission] = useState(null);
+  const [acceptingMissionId, setAcceptingMissionId] = useState(null);
+  const [updatingMissionId, setUpdatingMissionId] = useState(null);
   const [zones, setZones] = useState(frontlineZones);
   const [combatMissions, setCombatMissions] = useState([]);
   const [logisticsMissions, setLogisticsMissions] = useState([]);
@@ -491,7 +495,8 @@ export default function FrontlineMap({ airportsData }) {
   const [forcedGlobeScale, setForcedGlobeScale] = useState(null);
   const [filters, setFilters] = useState({
     control: 'all',
-    missionStatus: 'all',
+    atoMissionStatus: 'all',
+    logisticsStatus: 'all',
     priority: 'all',
     task: 'all',
     activity: 'all',
@@ -552,6 +557,21 @@ export default function FrontlineMap({ airportsData }) {
     };
   }, []);
 
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const latest = await getMissions();
+        if (Array.isArray(latest)) {
+          setLogisticsMissions(latest);
+        }
+      } catch (error) {
+        console.error('Failed to refresh logistics missions:', error);
+      }
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   const validZones = useMemo(
     () => zones.filter((zone) => zone.coordinates && Number.isFinite(zone.coordinates.lat) && Number.isFinite(zone.coordinates.lon)),
     [zones]
@@ -607,7 +627,7 @@ export default function FrontlineMap({ airportsData }) {
       const taskSet = new Set([...(zone.tasks || []), ...(mission?.tasks || [])]);
 
       if (filters.control !== 'all' && zone.status !== filters.control) return false;
-      if (filters.missionStatus !== 'all' && mission?.mission_status !== filters.missionStatus) return false;
+      if (filters.atoMissionStatus !== 'all' && mission?.mission_status !== filters.atoMissionStatus) return false;
       if (filters.priority !== 'all' && Number(filters.priority) !== Number(priority)) return false;
       if (filters.task !== 'all' && !taskSet.has(filters.task)) return false;
       if (filters.activity === 'active' && !zone.isActive) return false;
@@ -621,10 +641,10 @@ export default function FrontlineMap({ airportsData }) {
     return logisticsMissions.filter((mission) => {
       if (!mission?.airport_id || !mission?.source_airport_id) return false;
       if (mission.status !== 'pending' && mission.status !== 'accepted') return false;
-      if (filters.missionStatus !== 'all' && mission.status !== filters.missionStatus) return false;
+      if (filters.logisticsStatus !== 'all' && mission.status !== filters.logisticsStatus) return false;
       return true;
     });
-  }, [logisticsMissions, filters.missionStatus]);
+  }, [logisticsMissions, filters.logisticsStatus]);
 
   const focusedZone = useMemo(
     () => (selectedZoneId ? filteredZones.find((zone) => zone.id === selectedZoneId) || validZones.find((zone) => zone.id === selectedZoneId) || null : null),
@@ -655,9 +675,18 @@ export default function FrontlineMap({ airportsData }) {
 
   const missionStatusOptions = useMemo(
     () => [
-      { label: 'Any Mission', value: 'all' },
+      { label: 'ATO Any', value: 'all' },
       { label: 'Available', value: 'available' },
       { label: 'Assigned', value: 'assigned' },
+    ],
+    []
+  );
+
+  const logisticsStatusOptions = useMemo(
+    () => [
+      { label: 'LOG Any', value: 'all' },
+      { label: 'Pending', value: 'pending' },
+      { label: 'Accepted', value: 'accepted' },
     ],
     []
   );
@@ -763,6 +792,79 @@ export default function FrontlineMap({ airportsData }) {
     }
   }, [filters.showAto]);
 
+  useEffect(() => {
+    if (!selectedLogisticsMission?.id) return;
+    const next = logisticsMissions.find((mission) => mission.id === selectedLogisticsMission.id) || null;
+    setSelectedLogisticsMission(next);
+  }, [logisticsMissions, selectedLogisticsMission?.id]);
+
+  const handleAcceptLogisticsMission = async (mission) => {
+    if (!mission || mission.status !== 'pending') return;
+    if (!user) {
+      window.location.href = '/api/auth/discord';
+      return;
+    }
+
+    const userName = user.globalName || user.username || user.id;
+    setAcceptingMissionId(mission.id);
+    try {
+      await acceptMission(mission.id, userName);
+      const latest = await getMissions();
+      if (Array.isArray(latest)) {
+        setLogisticsMissions(latest);
+        const refreshed = latest.find((entry) => entry.id === mission.id) || null;
+        setSelectedLogisticsMission(refreshed);
+      }
+    } catch (error) {
+      console.error('Failed to accept logistics mission:', error);
+      alert(`Failed to accept mission: ${error.message}`);
+    } finally {
+      setAcceptingMissionId(null);
+    }
+  };
+
+  const handleCompleteLogisticsMission = async (mission) => {
+    if (!mission || mission.status !== 'accepted') return;
+    const userName = user?.globalName || user?.username || user?.id;
+    if (!userName || mission.accepted_by !== userName) return;
+
+    setUpdatingMissionId(mission.id);
+    try {
+      await completeMission(mission.id);
+      const latest = await getMissions();
+      if (Array.isArray(latest)) {
+        setLogisticsMissions(latest);
+        setSelectedLogisticsMission(latest.find((entry) => entry.id === mission.id) || null);
+      }
+    } catch (error) {
+      console.error('Failed to complete logistics mission:', error);
+      alert(`Failed to complete mission: ${error.message}`);
+    } finally {
+      setUpdatingMissionId(null);
+    }
+  };
+
+  const handleCancelLogisticsMission = async (mission) => {
+    if (!mission || mission.status !== 'accepted') return;
+    const userName = user?.globalName || user?.username || user?.id;
+    if (!userName || mission.accepted_by !== userName) return;
+
+    setUpdatingMissionId(mission.id);
+    try {
+      await cancelMission(mission.id);
+      const latest = await getMissions();
+      if (Array.isArray(latest)) {
+        setLogisticsMissions(latest);
+        setSelectedLogisticsMission(latest.find((entry) => entry.id === mission.id) || null);
+      }
+    } catch (error) {
+      console.error('Failed to cancel logistics mission:', error);
+      alert(`Failed to cancel mission: ${error.message}`);
+    } finally {
+      setUpdatingMissionId(null);
+    }
+  };
+
   return (
     <div className="h-full overflow-hidden bg-yt-bg-primary p-3">
       <div className="h-full">
@@ -858,14 +960,26 @@ export default function FrontlineMap({ airportsData }) {
 
                 <div className="mb-2 grid grid-cols-2 gap-2">
                   <select
-                    value={filters.missionStatus}
-                    onChange={(event) => setFilters((current) => ({ ...current, missionStatus: event.target.value }))}
+                    value={filters.atoMissionStatus}
+                    onChange={(event) => setFilters((current) => ({ ...current, atoMissionStatus: event.target.value }))}
                     className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
                   >
                     {missionStatusOptions.map((option) => (
                       <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
                   </select>
+                  <select
+                    value={filters.logisticsStatus}
+                    onChange={(event) => setFilters((current) => ({ ...current, logisticsStatus: event.target.value }))}
+                    className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
+                  >
+                    {logisticsStatusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
                   <select
                     value={filters.priority}
                     onChange={(event) => setFilters((current) => ({ ...current, priority: event.target.value }))}
@@ -875,9 +989,6 @@ export default function FrontlineMap({ airportsData }) {
                       <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
                   </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
                   <select
                     value={filters.task}
                     onChange={(event) => setFilters((current) => ({ ...current, task: event.target.value }))}
@@ -889,6 +1000,8 @@ export default function FrontlineMap({ airportsData }) {
                     <option value="DEAD">DEAD</option>
                     <option value="CAS">CAS</option>
                   </select>
+                </div>
+                <div className="grid grid-cols-1 gap-2">
                   <select
                     value={filters.activity}
                     onChange={(event) => setFilters((current) => ({ ...current, activity: event.target.value }))}
@@ -1031,13 +1144,33 @@ export default function FrontlineMap({ airportsData }) {
                           {selectedLogisticsMission.status}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedLogisticsMission(null)}
-                        className="rounded border border-yt-border px-2 py-1 text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
-                      >
-                        Close
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {selectedLogisticsMission.status === 'pending' && (
+                          <button
+                            type="button"
+                            onClick={() => handleAcceptLogisticsMission(selectedLogisticsMission)}
+                            disabled={acceptingMissionId === selectedLogisticsMission.id}
+                            className="rounded border border-green-500/50 bg-green-500/15 px-2.5 py-1 text-xs font-semibold text-green-300 hover:bg-green-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {acceptingMissionId === selectedLogisticsMission.id ? 'Accepting...' : 'Accept Mission'}
+                          </button>
+                        )}
+                        {selectedLogisticsMission.status === 'accepted' && (
+                          <span className="rounded border border-blue-500/50 bg-blue-500/15 px-2.5 py-1 text-xs font-semibold text-blue-300">
+                            Accepted
+                          </span>
+                        )}
+                        {!user && selectedLogisticsMission.status === 'pending' && (
+                          <span className="text-[10px] text-yt-text-secondary">Discord login required</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedLogisticsMission(null)}
+                          className="rounded border border-yt-border px-2 py-1 text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
+                        >
+                          Close
+                        </button>
+                      </div>
                     </div>
 
                     <div className="rounded-lg border border-yt-border/70 bg-yt-bg-tertiary/60 px-3 py-2 text-xs shadow-inner">

@@ -836,10 +836,10 @@ app.use('/charts', express.static(path.resolve(__dirname, '../../charts')));
 
 /**
  * POST /api/test/generate-mission - Generate a test mission (for testing only)
- * Body: { airportId, weaponId, currentQuantity }
+ * Body: { airportId, weaponId, currentQuantity, sourceAirportId? }
  */
 app.post('/api/test/generate-mission', (req, res) => {
-  const { airportId, weaponId, currentQuantity = 5 } = req.body;
+  const { airportId, weaponId, currentQuantity = 5, sourceAirportId = null } = req.body;
 
   if (!airportId || !weaponId) {
     return res.status(400).json({ error: 'airportId and weaponId are required' });
@@ -851,6 +851,13 @@ app.post('/api/test/generate-mission', (req, res) => {
     return res.status(404).json({ error: 'Airport not found or not active' });
   }
 
+  if (sourceAirportId) {
+    const sourceAirport = airbaseStatusManager.getActiveAirportById(sourceAirportId);
+    if (!sourceAirport) {
+      return res.status(404).json({ error: 'Source airport not found or not active' });
+    }
+  }
+
   // Check if mission already exists
   if (historicalData.missionExistsForWeapon(airportId, weaponId)) {
     return res.status(400).json({ error: 'Mission already exists for this weapon' });
@@ -859,6 +866,7 @@ app.post('/api/test/generate-mission', (req, res) => {
   // Create mission
   const missionId = historicalData.createMission({
     airportId,
+    sourceAirportId,
     orders: [{
       weapon_id: weaponId,
       quantity_needed: 100,
@@ -885,10 +893,10 @@ app.post('/api/test/generate-mission', (req, res) => {
 
 /**
  * POST /api/test/generate-random-missions - Generate random test missions
- * Body: { count, airportId? }
+ * Body: { count, airportId?, sourceAirportId? }
  */
 app.post('/api/test/generate-random-missions', (req, res) => {
-  const { count = 5, airportId } = req.body;
+  const { count = 5, airportId, sourceAirportId = null } = req.body;
 
   const testWeapons = [
     'weapons.missiles.AIM_120C',
@@ -916,6 +924,13 @@ app.post('/api/test/generate-random-missions', (req, res) => {
 
   const generatedMissions = [];
 
+  if (sourceAirportId) {
+    const sourceAirport = airbaseStatusManager.getActiveAirportById(sourceAirportId);
+    if (!sourceAirport) {
+      return res.status(404).json({ error: 'Source airport not found or not active' });
+    }
+  }
+
   for (let i = 0; i < count; i++) {
     const randomWeapon = testWeapons[Math.floor(Math.random() * testWeapons.length)];
     const randomQuantity = Math.floor(Math.random() * 15); // 0-14
@@ -927,6 +942,7 @@ app.post('/api/test/generate-random-missions', (req, res) => {
 
     const missionId = historicalData.createMission({
       airportId: targetAirport,
+      sourceAirportId,
       orders: [{
         weapon_id: randomWeapon,
         quantity_needed: 100,
