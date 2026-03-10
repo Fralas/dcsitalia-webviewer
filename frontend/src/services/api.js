@@ -34,6 +34,13 @@ export async function getAirports() {
 }
 
 /**
+ * Get authoritative server time and launch status
+ */
+export async function getServerTime() {
+  return fetchAPI('/time');
+}
+
+/**
  * Get specific airport data
  */
 export async function getAirport(airportId) {
@@ -316,6 +323,7 @@ export async function saveUserProfile(profile) {
 }
 
 export default {
+  getServerTime,
   getAirports,
   getAirport,
   getAirportHistory,

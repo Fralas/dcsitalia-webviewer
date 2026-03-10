@@ -10,7 +10,7 @@ import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
-import { acceptDcsarTask, acceptMission, cancelDcsarTask, cancelMission, completeDcsarTask, completeMission, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getMissions } from '../services/api';
+import { acceptDcsarTask, acceptMission, cancelDcsarTask, cancelMission, completeDcsarTask, completeMission, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getMissions, getServerTime } from '../services/api';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
@@ -83,6 +83,31 @@ function formatRelativeTime(timestamp) {
   if (hours < 24) return `about ${hours} hour${hours > 1 ? 's' : ''} ago`;
   const days = Math.floor(hours / 24);
   return `about ${days} day${days > 1 ? 's' : ''} ago`;
+}
+
+// March 13, 2026 17:00 Europe/Rome (CET, UTC+1 => 16:00 UTC)
+const LAUNCH_TARGET_UTC_MS = Date.UTC(2026, 2, 13, 16, 0, 0);
+// March 12, 2026 17:00 Europe/Rome (CET, UTC+1 => 16:00 UTC)
+const COUNTDOWN_REVEAL_UTC_MS = Date.UTC(2026, 2, 12, 16, 0, 0);
+
+function getCountdownParts(remainingMs) {
+  const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return { days, hours, minutes, seconds };
+}
+
+function formatCountdownValue(value) {
+  return String(value).padStart(2, '0');
+}
+
+function getEncryptedCountdownValue(seed = 0) {
+  const chars = ['X', '#', '?', '*', '@', '%', '&', '$'];
+  const first = chars[Math.abs(seed) % chars.length];
+  const second = chars[Math.abs(seed + 3) % chars.length];
+  return `${first}${second}`;
 }
 
 function getZoneNumber(zone) {
@@ -402,7 +427,7 @@ function getItemQuantity(item) {
   return Math.floor(usedUnits * orderQty);
 }
 
-function GlobeCanvas({ points, focusCoordinates, onScaleChange, mapMode, forcedScale }) {
+function GlobeCanvas({ points, focusCoordinates, onScaleChange, mapMode, forcedScale, autoSpin = false }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
@@ -504,6 +529,9 @@ function GlobeCanvas({ points, focusCoordinates, onScaleChange, mapMode, forcedS
         size: point.size,
       })),
       onRender: (state) => {
+        if (autoSpin && !pointerDownRef.current) {
+          targetPhiRef.current += 0.0016;
+        }
         phiRef.current += (targetPhiRef.current - phiRef.current) * 0.08;
         thetaRef.current += (targetThetaRef.current - thetaRef.current) * 0.08;
         scaleRef.current += (targetScaleRef.current - scaleRef.current) * 0.18;
@@ -541,7 +569,7 @@ function GlobeCanvas({ points, focusCoordinates, onScaleChange, mapMode, forcedS
       resizeObserver.disconnect();
       window.cancelAnimationFrame(rafId);
     };
-  }, [points, onScaleChange, mapMode, focusCoordinates]);
+  }, [points, onScaleChange, mapMode, focusCoordinates, autoSpin]);
 
   const zoomIn = () => {
     targetScaleRef.current = Math.min(3.2, targetScaleRef.current + 0.16);
@@ -901,6 +929,10 @@ export default function FrontlineMap({ airportsData }) {
   const [zoneStatusMeta, setZoneStatusMeta] = useState({});
   const [mapMode, setMapMode] = useState(false);
   const [forcedGlobeScale, setForcedGlobeScale] = useState(null);
+  const [launchTargetUtcMs, setLaunchTargetUtcMs] = useState(LAUNCH_TARGET_UTC_MS);
+  const [serverClockBase, setServerClockBase] = useState(null);
+  const [countdownTick, setCountdownTick] = useState(0);
+  const [scrambleTick, setScrambleTick] = useState(0);
   const [filters, setFilters] = useState({
     control: 'all',
     atoMissionStatus: 'all',
@@ -1101,6 +1133,87 @@ export default function FrontlineMap({ airportsData }) {
 
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const syncServerClock = async () => {
+      try {
+        const payload = await getServerTime();
+        if (!isMounted) return;
+
+        const serverNowMs = Number(payload?.serverNowMs);
+        const serverLaunchTarget = Number(payload?.launchTargetUtcMs);
+        if (Number.isFinite(serverLaunchTarget)) {
+          setLaunchTargetUtcMs(serverLaunchTarget);
+        }
+        if (Number.isFinite(serverNowMs)) {
+          setServerClockBase({
+            serverNowMs,
+            perfNowMs: performance.now(),
+          });
+        }
+      } catch (error) {
+        console.error('Failed to sync server time for countdown:', error);
+      }
+    };
+
+    syncServerClock();
+    const interval = setInterval(syncServerClock, 10000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCountdownTick((value) => value + 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setScrambleTick((value) => value + 1);
+    }, 90);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const effectiveServerNowMs = useMemo(() => {
+    if (!serverClockBase) return Date.now();
+    return serverClockBase.serverNowMs + (performance.now() - serverClockBase.perfNowMs);
+  }, [serverClockBase, countdownTick]);
+
+  const countdownRemainingMs = Math.max(0, launchTargetUtcMs - effectiveServerNowMs);
+  const isPreLaunchCountdownActive = countdownRemainingMs > 0;
+  const isCountdownEncrypted = effectiveServerNowMs < COUNTDOWN_REVEAL_UTC_MS;
+  const countdownParts = useMemo(() => getCountdownParts(countdownRemainingMs), [countdownRemainingMs]);
+  const countdownDisplay = useMemo(() => {
+    if (!isCountdownEncrypted) {
+      return {
+        hours: formatCountdownValue(countdownParts.hours),
+        minutes: formatCountdownValue(countdownParts.minutes),
+        seconds: formatCountdownValue(countdownParts.seconds),
+      };
+    }
+
+    return {
+      hours: getEncryptedCountdownValue(scrambleTick + 7),
+      minutes: getEncryptedCountdownValue(scrambleTick + 13),
+      seconds: getEncryptedCountdownValue(scrambleTick + 19),
+    };
+  }, [isCountdownEncrypted, countdownParts, countdownTick, scrambleTick]);
+
+  useEffect(() => {
+    if (!isPreLaunchCountdownActive) return;
+    if (mapModeRef.current || mapMode) {
+      mapModeRef.current = false;
+      setMapMode(false);
+    }
+  }, [isPreLaunchCountdownActive, mapMode]);
 
   const validZones = useMemo(
     () => zones.filter((zone) => zone.coordinates && Number.isFinite(zone.coordinates.lat) && Number.isFinite(zone.coordinates.lon)),
@@ -1653,7 +1766,11 @@ export default function FrontlineMap({ airportsData }) {
       <div className="h-full">
         <div className="min-h-0 h-full">
           <section className="relative flex h-full min-h-[320px] min-w-0 flex-col overflow-hidden rounded-2xl border border-yt-border bg-yt-bg-secondary/75 backdrop-blur">
-            <div className="relative min-h-0 flex-1">
+            <div
+              className={`relative min-h-0 flex-1 transition-[filter] duration-300 ${
+                isPreLaunchCountdownActive ? 'pointer-events-none select-none blur-[8px]' : ''
+              }`}
+            >
               <div className={`${mapMode ? 'pointer-events-none absolute inset-0 opacity-0' : 'relative h-full w-full opacity-100'} transition-opacity duration-300`}>
                 <GlobeCanvas
                   points={globePoints}
@@ -1661,6 +1778,7 @@ export default function FrontlineMap({ airportsData }) {
                   onScaleChange={handleScaleChange}
                   mapMode={mapMode}
                   forcedScale={forcedGlobeScale}
+                  autoSpin={isPreLaunchCountdownActive}
                 />
               </div>
               {mapMode && (
@@ -2334,6 +2452,28 @@ export default function FrontlineMap({ airportsData }) {
                 </div>
               )}
             </div>
+            {isPreLaunchCountdownActive && (
+              <div className="pointer-events-none absolute inset-0 z-[1400] flex items-center justify-center bg-[#02050dbd] backdrop-blur-md">
+                <div className="mx-4 w-[min(720px,92vw)] rounded-2xl border border-cyan-400/35 bg-[#0a1324de] p-6 text-center shadow-[0_25px_60px_rgba(0,0,0,0.65)]">
+                  <div className="mb-2 text-xs uppercase tracking-[0.24em] text-cyan-200/80">Release</div>
+                  <h2 className="mb-6 text-2xl font-semibold text-white sm:text-3xl">Loading Mission Data</h2>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl border border-yt-border/70 bg-[#121c31d9] p-3">
+                      <div className="font-mono text-3xl font-bold text-white sm:text-4xl">{countdownDisplay.hours}</div>
+                      <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-300">Hours</div>
+                    </div>
+                    <div className="rounded-xl border border-yt-border/70 bg-[#121c31d9] p-3">
+                      <div className="font-mono text-3xl font-bold text-white sm:text-4xl">{countdownDisplay.minutes}</div>
+                      <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-300">Minutes</div>
+                    </div>
+                    <div className="rounded-xl border border-yt-border/70 bg-[#121c31d9] p-3">
+                      <div className="font-mono text-3xl font-bold text-white sm:text-4xl">{countdownDisplay.seconds}</div>
+                      <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-300">Seconds</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
         </div>
       </div>

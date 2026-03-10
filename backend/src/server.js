@@ -54,6 +54,8 @@ const io = new Server(httpServer, {
 
 const PORT = process.env.PORT || 3001;
 const CONVOY_API_TOKEN = process.env.CONVOY_API_TOKEN || '';
+// March 13, 2026 17:00 Europe/Rome (CET => 16:00 UTC)
+const LAUNCH_TARGET_UTC_MS = Date.UTC(2026, 2, 13, 16, 0, 0);
 const CONVOY_SYNC_FILE = process.env.CONVOY_SYNC_FILE
   ? path.resolve(process.env.CONVOY_SYNC_FILE)
   : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DMAP\\Export_Ground_Convoys.json';
@@ -91,7 +93,7 @@ app.use(cors({
 // Rate limiting
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 500, // limit each IP to 500 requests per windowMs
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -619,6 +621,22 @@ app.put('/api/profile', (req, res) => {
 });
 
 // ==================== DATA ROUTES ====================
+
+/**
+ * GET /api/time - Server authoritative time and launch state
+ */
+app.get('/api/time', (req, res) => {
+  const serverNowMs = Date.now();
+  const launchRemainingMs = Math.max(0, LAUNCH_TARGET_UTC_MS - serverNowMs);
+  res.json({
+    serverNowMs,
+    serverNowIso: new Date(serverNowMs).toISOString(),
+    launchTargetUtcMs: LAUNCH_TARGET_UTC_MS,
+    launchTargetIso: new Date(LAUNCH_TARGET_UTC_MS).toISOString(),
+    preLaunchActive: launchRemainingMs > 0,
+    launchRemainingMs,
+  });
+});
 
 /**
  * GET /api/airports - Get all airports with current data

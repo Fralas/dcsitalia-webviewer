@@ -6,13 +6,9 @@
       "lat": 34.896686,
       "lon": 35.901641
     },
-    "status": "RED",
+    "status": "NEUTRAL",
     "isActive": true,
-    "tasks": [
-      "SEAD",
-      "DEAD",
-      "CAS"
-    ]
+    "tasks": []
   },
   {
     "id": "zone_01",
@@ -21,13 +17,9 @@
       "lat": 34.894043,
       "lon": 36.130745
     },
-    "status": "RED",
+    "status": "NEUTRAL",
     "isActive": true,
-    "tasks": [
-      "SEAD",
-      "DEAD",
-      "CAS"
-    ]
+    "tasks": []
   },
   {
     "id": "zone_02",
@@ -36,13 +28,9 @@
       "lat": 34.936889,
       "lon": 36.459928
     },
-    "status": "RED",
+    "status": "NEUTRAL",
     "isActive": true,
-    "tasks": [
-      "SEAD",
-      "DEAD",
-      "CAS"
-    ]
+    "tasks": []
   },
   {
     "id": "zone_03",
@@ -51,13 +39,9 @@
       "lat": 35.122655,
       "lon": 36.722176
     },
-    "status": "RED",
+    "status": "NEUTRAL",
     "isActive": true,
-    "tasks": [
-      "SEAD",
-      "DEAD",
-      "CAS"
-    ]
+    "tasks": []
   },
   {
     "id": "zone_04",
@@ -66,13 +50,9 @@
       "lat": 34.94038,
       "lon": 37.107138
     },
-    "status": "RED",
+    "status": "NEUTRAL",
     "isActive": true,
-    "tasks": [
-      "SEAD",
-      "DEAD",
-      "CAS"
-    ]
+    "tasks": []
   },
   {
     "id": "zone_05",
@@ -81,13 +61,9 @@
       "lat": 35.028352,
       "lon": 37.444683
     },
-    "status": "RED",
+    "status": "NEUTRAL",
     "isActive": true,
-    "tasks": [
-      "SEAD",
-      "DEAD",
-      "CAS"
-    ]
+    "tasks": []
   },
   {
     "id": "zone_06",
@@ -96,10 +72,9 @@
       "lat": 35.125372,
       "lon": 38.050561
     },
-    "status": "UNDER_ATTACK",
+    "status": "NEUTRAL",
     "isActive": true,
     "tasks": [
-      "SEAD",
       "DEAD",
       "CAS"
     ]
@@ -144,6 +119,8 @@
     "status": "RED",
     "isActive": true,
     "tasks": [
+      "SEAD",
+      "DEAD",
       "CAS"
     ]
   },
@@ -220,8 +197,8 @@
       "lat": 34.598856,
       "lon": 37.898989
     },
-    "status": "UNDER_ATTACK",
-    "isActive": true,
+    "status": "RED",
+    "isActive": false,
     "tasks": []
   },
   {
