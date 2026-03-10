@@ -171,12 +171,17 @@ function buildMissionSummary(mission) {
 }
 
 function normalizeConvoyEntry(entry) {
+  const lastEvent = String(entry?.last_event || '').trim().toLowerCase();
+  let status = String(entry?.status || 'active').trim().toLowerCase();
+  if (lastEvent === 'arrived') status = 'arrived';
+  if (lastEvent === 'destroyed') status = 'destroyed';
+
   return {
     convoy_id: String(entry?.convoy_id || '').trim(),
     origin_zone: String(entry?.origin_zone || '').trim() || null,
     destination_zone: String(entry?.destination_zone || '').trim() || null,
-    status: String(entry?.status || 'active').trim().toLowerCase(),
-    last_event: String(entry?.last_event || '').trim().toLowerCase(),
+    status,
+    last_event: lastEvent,
     event_at: Number.isFinite(Number(entry?.event_at)) ? Number(entry.event_at) : Date.now(),
     feed_message: String(entry?.feed_message || '').trim(),
     last_update: Number.isFinite(Number(entry?.event_at)) ? Number(entry.event_at) : Date.now(),
@@ -209,7 +214,7 @@ function syncConvoysFromFile() {
       const shouldEmitFeed = !prev || prev !== nextKey;
       if (!shouldEmitFeed) return;
 
-      if (convoy.status === 'arrived') {
+      if (convoy.last_event === 'arrived') {
         pushFeedEvent({
           type: 'convoy.arrived',
           title: 'Convoy event',
@@ -220,7 +225,7 @@ function syncConvoysFromFile() {
             destination_zone: convoy.destination_zone,
           },
         });
-      } else if (convoy.status === 'destroyed') {
+      } else if (convoy.last_event === 'destroyed') {
         pushFeedEvent({
           type: 'convoy.destroyed',
           title: 'Convoy event',
