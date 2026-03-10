@@ -2,12 +2,11 @@ import { useMemo, useState, useEffect, useRef } from 'react';
 import createGlobe from 'cobe';
 import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Globe2, Layers, Map, MapPin, Plane, Radio, RefreshCw, Target, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { Clock3, Globe2, Map as MapIcon, MapPin } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
-import MissionDispatchPanel from './MissionDispatchPanel';
 import socketService from '../services/socket';
-import { getFrontlineZones } from '../services/api';
+import { getCombatMissions, getFrontlineZones } from '../services/api';
 
 function getZoneColor(status) {
   switch (status) {
@@ -37,6 +36,60 @@ function getStatusLabel(status) {
     default:
       return 'Sconosciuto';
   }
+}
+
+function getZonePriority(zone, mission) {
+  if (mission?.priority) return mission.priority;
+  if (zone.status === 'NEUTRAL') return 1;
+  if (zone.status === 'UNDER_ATTACK') return 2;
+  const tasks = Array.isArray(zone.tasks) ? zone.tasks.length : 0;
+  if (tasks === 1) return 3;
+  if (tasks === 2) return 4;
+  if (tasks >= 3) return 5;
+  return null;
+}
+
+function getPriorityLabel(priority) {
+  switch (priority) {
+    case 1:
+      return 'P1 Massima';
+    case 2:
+      return 'P2 Elevata';
+    case 3:
+      return 'P3 Alta';
+    case 4:
+      return 'P4 Media';
+    case 5:
+      return 'P5 Bassa';
+    default:
+      return 'No Priority';
+  }
+}
+
+function formatRelativeTime(timestamp) {
+  if (!timestamp) return 'just now';
+  const deltaMs = Date.now() - timestamp;
+  const sec = Math.max(1, Math.floor(deltaMs / 1000));
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `about ${min} min ago`;
+  const hours = Math.floor(min / 60);
+  if (hours < 24) return `about ${hours} hour${hours > 1 ? 's' : ''} ago`;
+  const days = Math.floor(hours / 24);
+  return `about ${days} day${days > 1 ? 's' : ''} ago`;
+}
+
+function getZoneNumber(zone) {
+  const source = String(zone?.id || zone?.name || '');
+  const match = source.match(/\d+/);
+  return match ? match[0] : source || 'Unknown';
+}
+
+function getControlText(status) {
+  if (status === 'RED') return 'red control';
+  if (status === 'BLUE') return 'blue control';
+  if (status === 'UNDER_ATTACK') return 'contested control';
+  return 'no control';
 }
 
 function GlobeCanvas({ points, focusCoordinates, onScaleChange, mapMode, forcedScale }) {
@@ -247,7 +300,16 @@ function FlatMapZoomWatcher({ onZoomChange }) {
   return null;
 }
 
-function FlatMapView({ zones, airportsData, selectedZoneId, onZoneSelect, focusCoordinates, onZoomChange }) {
+function FlatMapView({
+  zones,
+  airportsData,
+  selectedZoneId,
+  onZoneSelect,
+  focusCoordinates,
+  onZoomChange,
+  onZoneHover,
+  showAirports,
+}) {
   const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
 
   return (
@@ -289,7 +351,11 @@ function FlatMapView({ zones, airportsData, selectedZoneId, onZoneSelect, focusC
                 fillOpacity: isSelected ? 0.9 : 0.65,
                 weight: isSelected ? 3 : 2,
               }}
-              eventHandlers={{ click: () => onZoneSelect(zone.id) }}
+              eventHandlers={{
+                click: () => onZoneSelect(zone.id),
+                mouseover: () => onZoneHover(zone.id),
+                mouseout: () => onZoneHover(null),
+              }}
             >
               <Tooltip direction="top" offset={[0, -4]} opacity={0.95}>
                 {zone.name || zone.zone_name || zone.id}
@@ -298,7 +364,7 @@ function FlatMapView({ zones, airportsData, selectedZoneId, onZoneSelect, focusC
           );
         })}
 
-        {airportsData.map((airport) => (
+        {showAirports && airportsData.map((airport) => (
           <CircleMarker
             key={airport.id}
             center={[airport.coordinates.lat, airport.coordinates.lon]}
@@ -322,23 +388,36 @@ function FlatMapView({ zones, airportsData, selectedZoneId, onZoneSelect, focusC
 
 export default function FrontlineMap({ airportsData }) {
   const [selectedZoneId, setSelectedZoneId] = useState(null);
+  const [hoveredZoneId, setHoveredZoneId] = useState(null);
   const [zones, setZones] = useState(frontlineZones);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [combatMissions, setCombatMissions] = useState([]);
+  const [zoneStatusMeta, setZoneStatusMeta] = useState({});
   const [mapMode, setMapMode] = useState(false);
   const [forcedGlobeScale, setForcedGlobeScale] = useState(null);
+  const [filters, setFilters] = useState({
+    control: 'all',
+    missionStatus: 'all',
+    priority: 'all',
+    task: 'all',
+    activity: 'all',
+    showAirports: true,
+  });
   const mapModeRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
-    getFrontlineZones()
-      .then((data) => {
-        const nextZones = data?.zones || data;
+    Promise.all([getFrontlineZones(), getCombatMissions()])
+      .then(([zonesData, missionsData]) => {
+        const nextZones = zonesData?.zones || zonesData;
         if (isMounted && Array.isArray(nextZones)) {
           setZones(nextZones);
         }
+        if (isMounted && Array.isArray(missionsData)) {
+          setCombatMissions(missionsData);
+        }
       })
       .catch((error) => {
-        console.error('Failed to load frontline zones:', error);
+        console.error('Failed to load frontline data:', error);
       });
 
     return () => {
@@ -353,7 +432,17 @@ export default function FrontlineMap({ airportsData }) {
         setZones(nextZones);
       }
     });
-    return () => unsubscribe && unsubscribe();
+
+    const unsubscribeMissions = socketService.on('combat-missions:updated', (data) => {
+      if (data?.missions && Array.isArray(data.missions)) {
+        setCombatMissions(data.missions);
+      }
+    });
+
+    return () => {
+      unsubscribe && unsubscribe();
+      unsubscribeMissions && unsubscribeMissions();
+    };
   }, []);
 
   const validZones = useMemo(
@@ -366,6 +455,61 @@ export default function FrontlineMap({ airportsData }) {
     return airportsList.filter((airport) => airport.coordinates && airport.isActive !== false);
   }, [airportsData]);
 
+  const combatMissionByZone = useMemo(() => {
+    const map = new Map();
+    combatMissions.forEach((mission) => {
+      if (mission?.zone_id) {
+        map.set(mission.zone_id, mission);
+      }
+    });
+    return map;
+  }, [combatMissions]);
+
+  useEffect(() => {
+    if (validZones.length === 0) return;
+    setZoneStatusMeta((previous) => {
+      const now = Date.now();
+      const next = { ...previous };
+
+      validZones.forEach((zone) => {
+        const current = previous[zone.id];
+        if (!current) {
+          next[zone.id] = {
+            status: zone.status,
+            changedAt: now,
+          };
+          return;
+        }
+
+        if (current.status !== zone.status) {
+          next[zone.id] = {
+            status: zone.status,
+            changedAt: now,
+          };
+        }
+      });
+
+      return next;
+    });
+  }, [validZones]);
+
+  const filteredZones = useMemo(() => {
+    return validZones.filter((zone) => {
+      const mission = combatMissionByZone.get(zone.id);
+      const priority = getZonePriority(zone, mission);
+      const taskSet = new Set([...(zone.tasks || []), ...(mission?.tasks || [])]);
+
+      if (filters.control !== 'all' && zone.status !== filters.control) return false;
+      if (filters.missionStatus !== 'all' && mission?.mission_status !== filters.missionStatus) return false;
+      if (filters.priority !== 'all' && Number(filters.priority) !== Number(priority)) return false;
+      if (filters.task !== 'all' && !taskSet.has(filters.task)) return false;
+      if (filters.activity === 'active' && !zone.isActive) return false;
+      if (filters.activity === 'inactive' && zone.isActive) return false;
+
+      return true;
+    });
+  }, [validZones, combatMissionByZone, filters]);
+
   const zoneStats = useMemo(() => {
     const stats = {
       NEUTRAL: 0,
@@ -374,6 +518,7 @@ export default function FrontlineMap({ airportsData }) {
       UNDER_ATTACK: 0,
       total: validZones.length,
       active: 0,
+      filtered: filteredZones.length,
     };
 
     validZones.forEach((zone) => {
@@ -381,26 +526,63 @@ export default function FrontlineMap({ airportsData }) {
       if (zone.isActive) stats.active += 1;
     });
     return stats;
-  }, [validZones]);
+  }, [validZones, filteredZones.length]);
 
-  const selectedZone = useMemo(
-    () => validZones.find((zone) => zone.id === selectedZoneId) || null,
-    [selectedZoneId, validZones]
+  const focusedZone = useMemo(
+    () => (selectedZoneId ? filteredZones.find((zone) => zone.id === selectedZoneId) || validZones.find((zone) => zone.id === selectedZoneId) || null : null),
+    [selectedZoneId, filteredZones, validZones]
+  );
+
+  const selectedZone = useMemo(() => {
+    const id = hoveredZoneId || selectedZoneId;
+    return id ? filteredZones.find((zone) => zone.id === id) || validZones.find((zone) => zone.id === id) || null : null;
+  }, [hoveredZoneId, selectedZoneId, filteredZones, validZones]);
+
+  const overlayTagOptions = useMemo(
+    () => [
+      { label: 'All', value: 'all' },
+      { label: 'Red', value: 'RED' },
+      { label: 'Blue', value: 'BLUE' },
+      { label: 'Neutral', value: 'NEUTRAL' },
+      { label: 'Under Attack', value: 'UNDER_ATTACK' },
+    ],
+    []
+  );
+
+  const missionStatusOptions = useMemo(
+    () => [
+      { label: 'Any Mission', value: 'all' },
+      { label: 'Available', value: 'available' },
+      { label: 'Assigned', value: 'assigned' },
+    ],
+    []
+  );
+
+  const priorityOptions = useMemo(
+    () => [
+      { label: 'Any Priority', value: 'all' },
+      { label: 'P1', value: '1' },
+      { label: 'P2', value: '2' },
+      { label: 'P3', value: '3' },
+      { label: 'P4', value: '4' },
+      { label: 'P5', value: '5' },
+    ],
+    []
   );
 
   const globePoints = useMemo(() => {
-    const zonePoints = validZones.map((zone) => ({
+    const zonePoints = filteredZones.map((zone) => ({
       lat: zone.coordinates.lat,
       lon: zone.coordinates.lon,
       size: zone.id === selectedZoneId ? 0.14 : zone.isActive ? 0.1 : 0.07,
     }));
-    const airportPoints = validAirports.map((airport) => ({
+    const airportPoints = filters.showAirports ? validAirports.map((airport) => ({
       lat: airport.coordinates.lat,
       lon: airport.coordinates.lon,
       size: airport.isMainBase ? 0.11 : 0.08,
-    }));
+    })) : [];
     return [...zonePoints, ...airportPoints];
-  }, [validZones, validAirports, selectedZoneId]);
+  }, [filteredZones, validAirports, selectedZoneId, filters.showAirports]);
 
   const theaterCenter = useMemo(() => {
     const source = validAirports.length > 0 ? validAirports : validZones;
@@ -415,18 +597,7 @@ export default function FrontlineMap({ airportsData }) {
     return { lat: sum.lat / source.length, lon: sum.lon / source.length };
   }, [validAirports, validZones]);
 
-  const focusCoordinates = selectedZone?.coordinates || theaterCenter || null;
-
-  const handleMissionClick = (zoneId) => {
-    setSelectedZoneId(zoneId);
-  };
-
-  const handleResetView = () => {
-    setSelectedZoneId(null);
-    setMapMode(false);
-    mapModeRef.current = false;
-    setForcedGlobeScale(1.15);
-  };
+  const focusCoordinates = focusedZone?.coordinates || (filteredZones[0] && filteredZones[0].coordinates) || theaterCenter || null;
 
   const handleScaleChange = (scale) => {
     if (scale >= 2.1 && !mapModeRef.current) {
@@ -450,80 +621,24 @@ export default function FrontlineMap({ airportsData }) {
     }
   };
 
+  const selectedMission = selectedZone ? combatMissionByZone.get(selectedZone.id) : null;
+  const selectedPriority = selectedZone ? getZonePriority(selectedZone, selectedMission) : null;
+  const selectedChangedAt = selectedZone ? zoneStatusMeta[selectedZone.id]?.changedAt : null;
+  const selectedTags = selectedZone
+    ? [
+        getStatusLabel(selectedZone.status),
+        selectedMission?.mission_status ? `Mission ${selectedMission.mission_status}` : 'No Mission',
+        selectedPriority ? getPriorityLabel(selectedPriority) : null,
+        selectedZone.isActive ? 'Active' : 'Inactive',
+        ...new Set([...(selectedZone.tasks || []), ...(selectedMission?.tasks || [])]),
+      ].filter(Boolean)
+    : [];
+
   return (
     <div className="h-full overflow-hidden bg-yt-bg-primary p-3">
-      <div className="flex h-full flex-col gap-3">
-        <div className="grid grid-cols-1 gap-3 rounded-2xl border border-yt-border bg-yt-bg-secondary/80 p-3 backdrop-blur md:grid-cols-[1.8fr_1fr_auto]">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl border border-red-500/40 bg-red-500/15 p-2">
-              <Target className="h-5 w-5 text-red-400" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold text-yt-text-primary">Frontline Ops</h1>
-              <p className="text-xs text-yt-text-secondary">Globo 3D, feed missioni e monitor zona in tempo reale</p>
-            </div>
-            <div className="ml-2 inline-flex items-center gap-2 rounded-full border border-green-500/40 bg-green-500/15 px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] text-green-300">
-              <Radio className="h-3.5 w-3.5" />
-              Live
-            </div>
-          </div>
-
-          <div className="grid grid-cols-4 gap-2 text-center text-xs">
-            <div className="rounded-lg border border-yt-border bg-yt-bg-tertiary/80 px-2 py-2">
-              <div className="text-yt-text-secondary">Zone</div>
-              <div className="text-sm font-semibold text-yt-text-primary">{zoneStats.total}</div>
-            </div>
-            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-2">
-              <div className="text-red-300">Rosse</div>
-              <div className="text-sm font-semibold text-red-200">{zoneStats.RED}</div>
-            </div>
-            <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 px-2 py-2">
-              <div className="text-blue-300">Blu</div>
-              <div className="text-sm font-semibold text-blue-200">{zoneStats.BLUE}</div>
-            </div>
-            <div className="rounded-lg border border-slate-400/30 bg-slate-400/10 px-2 py-2">
-              <div className="text-slate-300">Neutrali</div>
-              <div className="text-sm font-semibold text-slate-100">{zoneStats.NEUTRAL}</div>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={handleResetView}
-              className="inline-flex items-center gap-2 rounded-lg border border-yt-border bg-yt-bg-tertiary px-3 py-2 text-xs font-semibold text-yt-text-secondary transition-colors hover:text-yt-text-primary"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              Reset
-            </button>
-            <button
-              type="button"
-              onClick={() => setSidebarOpen((current) => !current)}
-              className="inline-flex items-center gap-2 rounded-lg border border-yt-border bg-yt-bg-tertiary px-3 py-2 text-xs font-semibold text-yt-text-secondary transition-colors hover:text-yt-text-primary"
-            >
-              {sidebarOpen ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
-              Feed
-            </button>
-          </div>
-        </div>
-
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-[1fr_30rem]">
-          <section className="flex min-h-[320px] min-w-0 flex-col overflow-hidden rounded-2xl border border-yt-border bg-yt-bg-secondary/75 backdrop-blur">
-            <div className="flex flex-wrap items-center gap-2 border-b border-yt-border px-3 py-2">
-              <div className="inline-flex items-center gap-2 rounded-full border border-yt-border bg-yt-bg-tertiary/80 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-yt-text-secondary">
-                {mapMode ? <Map className="h-3.5 w-3.5 text-yt-accent" /> : <Globe2 className="h-3.5 w-3.5 text-yt-accent" />}
-                {mapMode ? 'Tactical Map' : 'Global Theater'}
-              </div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-yt-border bg-yt-bg-tertiary/80 px-3 py-1 text-[11px] text-yt-text-secondary">
-                <Layers className="h-3.5 w-3.5 text-orange-400" />
-                Attacco: {zoneStats.UNDER_ATTACK}
-              </div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-yt-border bg-yt-bg-tertiary/80 px-3 py-1 text-[11px] text-yt-text-secondary">
-                <Plane className="h-3.5 w-3.5 text-yt-accent" />
-                Aeroporti: {validAirports.length}
-              </div>
-            </div>
-
+      <div className="h-full">
+        <div className="min-h-0 h-full">
+          <section className="relative flex h-full min-h-[320px] min-w-0 flex-col overflow-hidden rounded-2xl border border-yt-border bg-yt-bg-secondary/75 backdrop-blur">
             <div className="relative min-h-0 flex-1">
               <div className={`${mapMode ? 'pointer-events-none absolute inset-0 opacity-0' : 'relative h-full w-full opacity-100'} transition-opacity duration-300`}>
                 <GlobeCanvas
@@ -537,12 +652,14 @@ export default function FrontlineMap({ airportsData }) {
               {mapMode && (
                 <div className="absolute inset-0">
                   <FlatMapView
-                    zones={validZones}
+                    zones={filteredZones}
                     airportsData={validAirports}
                     selectedZoneId={selectedZoneId}
                     onZoneSelect={setSelectedZoneId}
                     focusCoordinates={focusCoordinates}
                     onZoomChange={handleFlatMapZoomChange}
+                    onZoneHover={setHoveredZoneId}
+                    showAirports={filters.showAirports}
                   />
                 </div>
               )}
@@ -551,63 +668,117 @@ export default function FrontlineMap({ airportsData }) {
                   Tactical 2D Map (zoom threshold reached)
                 </div>
               )}
-            </div>
 
-            <div className="grid grid-cols-1 gap-2 border-t border-yt-border p-3 md:grid-cols-2">
-              <div className="space-y-2">
-                <h3 className="text-xs uppercase tracking-[0.16em] text-yt-text-secondary">Zone Focus</h3>
-                <div className="max-h-28 space-y-1.5 overflow-y-auto pr-1">
-                  {validZones.slice(0, 12).map((zone) => (
+              <div className="absolute left-3 top-3 z-[1000] w-[320px] rounded-xl border border-yt-border bg-[#151925f2] p-3 shadow-2xl backdrop-blur">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-yt-text-secondary">Overlays</div>
+                  <button
+                    type="button"
+                    className={`rounded px-2 py-1 text-[10px] font-semibold ${filters.showAirports ? 'bg-yt-accent/25 text-yt-text-primary' : 'bg-yt-bg-tertiary text-yt-text-secondary'}`}
+                    onClick={() => setFilters((current) => ({ ...current, showAirports: !current.showAirports }))}
+                  >
+                    Airports
+                  </button>
+                </div>
+
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {overlayTagOptions.map((option) => (
                     <button
+                      key={option.value}
                       type="button"
-                      key={zone.id}
-                      onClick={() => setSelectedZoneId(zone.id)}
-                      className={`flex w-full items-center justify-between rounded-lg border px-2.5 py-1.5 text-left text-xs transition-colors ${
-                        zone.id === selectedZoneId
-                          ? 'border-yt-accent bg-yt-accent/15 text-yt-text-primary'
-                          : 'border-yt-border bg-yt-bg-tertiary/70 text-yt-text-secondary hover:text-yt-text-primary'
+                      onClick={() => setFilters((current) => ({ ...current, control: option.value }))}
+                      className={`rounded border px-2 py-1 text-[11px] ${
+                        filters.control === option.value
+                          ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
+                          : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
                       }`}
                     >
-                      <span className="truncate">{zone.name || zone.zone_name || zone.id}</span>
-                      <span className={`h-2.5 w-2.5 rounded-full border ${getZoneColor(zone.status)}`} />
+                      {option.label}
                     </button>
                   ))}
                 </div>
+
+                <div className="mb-2 grid grid-cols-2 gap-2">
+                  <select
+                    value={filters.missionStatus}
+                    onChange={(event) => setFilters((current) => ({ ...current, missionStatus: event.target.value }))}
+                    className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
+                  >
+                    {missionStatusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={filters.priority}
+                    onChange={(event) => setFilters((current) => ({ ...current, priority: event.target.value }))}
+                    className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
+                  >
+                    {priorityOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={filters.task}
+                    onChange={(event) => setFilters((current) => ({ ...current, task: event.target.value }))}
+                    className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
+                  >
+                    <option value="all">Any Task</option>
+                    <option value="LOGISTICS">LOGISTICS</option>
+                    <option value="SEAD">SEAD</option>
+                    <option value="DEAD">DEAD</option>
+                    <option value="CAS">CAS</option>
+                  </select>
+                  <select
+                    value={filters.activity}
+                    onChange={(event) => setFilters((current) => ({ ...current, activity: event.target.value }))}
+                    className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
+                  >
+                    <option value="all">All Activity</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <h3 className="text-xs uppercase tracking-[0.16em] text-yt-text-secondary">Zona Selezionata</h3>
-                {!selectedZone ? (
-                  <div className="rounded-lg border border-dashed border-yt-border px-3 py-4 text-xs text-yt-text-secondary">
-                    Seleziona una zona dal feed o dalla lista per puntare il globo.
+              {selectedZone && (
+                <div className="absolute bottom-4 left-4 z-[1000] w-[330px] rounded-xl border border-yt-border bg-[#1b1d2af0] p-3 shadow-2xl backdrop-blur">
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {selectedTags.slice(0, 8).map((tag) => (
+                      <span key={tag} className="rounded bg-[#2f3a24] px-2 py-0.5 text-[11px] font-semibold text-[#d8f08c]">
+                        {tag}
+                      </span>
+                    ))}
                   </div>
-                ) : (
-                  <div className="rounded-lg border border-yt-border bg-yt-bg-tertiary/75 p-3 text-xs text-yt-text-secondary">
-                    <div className="mb-2 text-sm font-semibold text-yt-text-primary">
-                      {selectedZone.name || selectedZone.zone_name || selectedZone.id}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-3.5 w-3.5 text-yt-accent" />
-                      {selectedZone.coordinates.lat.toFixed(3)}, {selectedZone.coordinates.lon.toFixed(3)}
-                    </div>
-                    <div className="mt-2">
-                      Stato: <span className="text-yt-text-primary">{getStatusLabel(selectedZone.status)}</span>
-                    </div>
+
+                  <div className="text-xl font-semibold leading-6 text-yt-text-primary">
+                    {`Zone: '${getZoneNumber(selectedZone)}' under ${getControlText(selectedZone.status)}`}
                   </div>
-                )}
-              </div>
+
+                  <div className="mt-3 flex items-center gap-2 text-sm text-yt-text-secondary">
+                    <Clock3 className="h-4 w-4" />
+                    <span>{formatRelativeTime(selectedChangedAt)}</span>
+                  </div>
+
+                  <div className="mt-2 flex items-center gap-2 text-sm text-yt-text-secondary">
+                    <MapPin className="h-4 w-4" />
+                    <span>{selectedZone.coordinates.lat.toFixed(5)}, {selectedZone.coordinates.lon.toFixed(5)}</span>
+                  </div>
+
+                  <div className="mt-3 border-t border-yt-border pt-2">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-2 text-sm font-semibold text-[#4ca3ff] transition-colors hover:text-[#7cbcff]"
+                    >
+                      View Details
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </section>
-
-          <aside className={`${sidebarOpen ? 'flex' : 'hidden'} min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-yt-border bg-yt-bg-secondary/75 backdrop-blur xl:flex`}>
-            <div className="border-b border-yt-border px-3 py-2">
-              <div className="text-xs uppercase tracking-[0.16em] text-yt-text-secondary">Sidebar Feed</div>
-              <div className="text-sm font-semibold text-yt-text-primary">Missioni e aggiornamenti</div>
-            </div>
-            <div className="min-h-0 flex-1 p-2">
-              <MissionDispatchPanel selectedZoneId={selectedZoneId} onMissionClick={handleMissionClick} />
-            </div>
-          </aside>
         </div>
       </div>
     </div>

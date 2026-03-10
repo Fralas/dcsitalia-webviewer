@@ -14,62 +14,78 @@ import { t } from './utils/locale';
 import bannerImg from '../img/DCS_ITALIA_ICON.png';
 import { useUser } from './contexts/UserContext';
 
+function buildFrontlineSummary(zones = []) {
+  const summary = {
+    total: 0,
+    RED: 0,
+    BLUE: 0,
+    NEUTRAL: 0,
+    UNDER_ATTACK: 0,
+  };
+
+  zones.forEach((zone) => {
+    summary.total += 1;
+    if (summary[zone.status] !== undefined) {
+      summary[zone.status] += 1;
+    }
+  });
+
+  return summary;
+}
+
 function App() {
-  const [currentView, setCurrentView] = useState('dashboard'); // dashboard, airports, airport, missions
+  const [currentView, setCurrentView] = useState('dashboard');
   const [airports, setAirports] = useState({});
   const [missions, setMissions] = useState([]);
   const [combatMissions, setCombatMissions] = useState([]);
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [highlightedMissionId, setHighlightedMissionId] = useState(null);
   const [selectedAirportId, setSelectedAirportId] = useState(null);
   const [selectedAirportToken, setSelectedAirportToken] = useState(0);
+  const [frontlineSummary, setFrontlineSummary] = useState({
+    total: 0,
+    RED: 0,
+    BLUE: 0,
+    NEUTRAL: 0,
+    UNDER_ATTACK: 0,
+  });
   const { user } = useUser();
 
-  // Load initial data
   useEffect(() => {
     loadData();
   }, []);
 
-  // Setup WebSocket
   useEffect(() => {
     socketService.connect();
 
-    const unsubscribeConnect = socketService.on('connect', () => {
-      setConnectionStatus('connected');
-      console.log('✅ WebSocket connected');
-    });
-
-    const unsubscribeDisconnect = socketService.on('disconnect', () => {
-      setConnectionStatus('disconnected');
-      console.log('❌ WebSocket disconnected');
-    });
-
     const unsubscribeInitial = socketService.on('data:initial', (data) => {
-      console.log('📊 Received initial data');
       setAirports(data);
     });
 
     const unsubscribeUpdated = socketService.on('data:updated', (data) => {
-      console.log('🔄 Data updated');
       setAirports(data);
-      loadStats(); // Reload stats
+      loadStats();
     });
 
     const unsubscribeMissions = socketService.on('missions:updated', (data) => {
-      console.log('🚨 Missions updated');
       setMissions(data.missions);
-      loadStats(); // Reload stats
+      loadStats();
+    });
+
+    const unsubscribeFrontline = socketService.on('frontline:updated', (data) => {
+      const zones = data?.zones || [];
+      if (Array.isArray(zones)) {
+        setFrontlineSummary(buildFrontlineSummary(zones));
+      }
     });
 
     return () => {
-      unsubscribeConnect();
-      unsubscribeDisconnect();
       unsubscribeInitial();
       unsubscribeUpdated();
       unsubscribeMissions();
+      unsubscribeFrontline();
       socketService.disconnect();
     };
   }, []);
@@ -78,16 +94,23 @@ function App() {
     try {
       setLoading(true);
       setError(null);
-      const [airportsData, missionsData, combatMissionsData, statsData] = await Promise.all([
+      const [airportsData, missionsData, combatMissionsData, statsData, zonesData] = await Promise.all([
         api.getAirports(),
         api.getMissions(),
         api.getCombatMissions(),
         api.getStats(),
+        api.getFrontlineZones(),
       ]);
+
       setAirports(airportsData);
       setMissions(missionsData);
       setCombatMissions(combatMissionsData);
       setStats(statsData);
+
+      const zones = zonesData?.zones || zonesData;
+      if (Array.isArray(zones)) {
+        setFrontlineSummary(buildFrontlineSummary(zones));
+      }
     } catch (err) {
       setError(err.message);
       console.error('Failed to load data:', err);
@@ -106,7 +129,6 @@ function App() {
   };
 
   const handleMissionUpdate = async () => {
-    // Reload missions after an update
     try {
       const missionsData = await api.getMissions();
       setMissions(missionsData);
@@ -157,30 +179,58 @@ function App() {
 
   return (
     <div className="h-screen bg-yt-bg-primary flex flex-col overflow-hidden">
-      {/* Header - Compatto stile YouTube */}
-      <header className="bg-yt-bg-secondary border-b border-yt-border sticky top-0 z-50 shadow-lg">
+      <header className="sticky top-0 z-50 border-b border-yt-border/90 bg-[#0f1721e6] shadow-[0_10px_35px_rgba(0,0,0,0.35)] backdrop-blur-md">
         <div className="container mx-auto px-4 py-1.5">
           <div className="flex items-center justify-between">
-            {/* Logo compatto */}
-            <button
-              type="button"
-              onClick={() => setCurrentView(user ? 'profile' : 'dashboard')}
-              className="flex items-center gap-3 text-left hover:opacity-90 transition-opacity"
-              title={user ? 'Apri profilo' : 'Dashboard'}
-            >
-              <img
-                src={bannerImg}
-                alt="DCS Italia"
-                className="h-10 w-10 object-contain"
-              />
-              <div className="leading-tight">
-                <div className="text-xl font-extrabold text-yt-text-primary">DCS Frontline</div>
-                <div className="text-[11px] text-yt-text-secondary">Gestione Campagna dinamica</div>
-              </div>
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setCurrentView(user ? 'profile' : 'dashboard')}
+                className="flex items-center gap-3 text-left hover:opacity-90 transition-opacity"
+                title={user ? 'Apri profilo' : 'Dashboard'}
+              >
+                <img
+                  src={bannerImg}
+                  alt="DCS Italia"
+                  className="h-10 w-10 object-contain"
+                />
+                <div className="leading-tight">
+                  <div className="text-xl font-extrabold text-yt-text-primary">DCS Frontline</div>
+                  <div className="text-[11px] text-yt-text-secondary">Gestione Campagna dinamica</div>
+                </div>
+              </button>
+
+              {currentView === 'frontline' && (
+                <div className="hidden lg:flex items-center gap-1 rounded-xl border border-yt-border/90 bg-yt-bg-tertiary/70 px-2 py-1">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-green-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-green-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
+                    Live
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold text-yt-text-secondary">
+                    <span className="h-1.5 w-1.5 rounded-full bg-yt-text-secondary/80" />
+                    {frontlineSummary.total}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold text-red-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
+                    {frontlineSummary.RED}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold text-blue-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+                    {frontlineSummary.BLUE}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold text-slate-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
+                    {frontlineSummary.NEUTRAL}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold text-orange-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
+                    {frontlineSummary.UNDER_ATTACK}
+                  </span>
+                </div>
+              )}
+            </div>
 
             <div className="flex items-center gap-3">
-              {/* Navigation - compatta e moderna */}
               <nav className="flex items-center gap-1">
                 <button
                   onClick={() => setCurrentView('dashboard')}
@@ -239,14 +289,12 @@ function App() {
                 </button>
               </nav>
 
-              {/* User Menu */}
               <UserMenu onProfileOpen={() => setCurrentView('profile')} />
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content - padding ridotto */}
       <main className={`flex-1 ${currentView === 'frontline' || currentView === 'admin' ? 'overflow-hidden' : currentView === 'dashboard' ? 'max-w-[1800px] mx-auto px-4 py-4 overflow-y-auto w-full' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
         {currentView === 'dashboard' && (
           <Dashboard
@@ -290,11 +338,10 @@ function App() {
         )}
       </main>
 
-      {/* Footer - compatto (hidden on map/frontline/admin views) */}
       {currentView !== 'frontline' && currentView !== 'admin' && (
         <footer className="bg-yt-bg-secondary border-t border-yt-border mt-8">
           <div className="container mx-auto px-4 py-3 text-center text-xs text-yt-text-secondary">
-            <p>DCS Italia Warehouse Viewer v1.0 • Real-time logistics management</p>
+            <p>DCS Italia Warehouse Viewer v1.0 - Real-time logistics management</p>
           </div>
         </footer>
       )}
