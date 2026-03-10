@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Package, Activity, AlertCircle, Target } from 'lucide-react';
+import { Activity, AlertCircle } from 'lucide-react';
 import MissionDispatch from './components/MissionDispatch';
 import FrontlineMap from './components/FrontlineMap';
 import UserMenu from './components/UserMenu';
@@ -46,7 +46,7 @@ function App() {
     UNDER_ATTACK: 0,
   });
   const { user } = useUser();
-  const allowedViews = useMemo(() => new Set(['frontline', 'missions', 'profile']), []);
+  const allowedViews = useMemo(() => new Set(['frontline', 'profile']), []);
 
   const goToView = (view) => {
     setCurrentView(allowedViews.has(view) ? view : 'frontline');
@@ -226,31 +226,6 @@ function App() {
             </div>
 
             <div className="flex items-center gap-3">
-              <nav className="flex items-center gap-1">
-                <button
-                  onClick={() => goToView('missions')}
-                  className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1 transition-all ${
-                    currentView === 'missions'
-                      ? 'bg-yt-bg-tertiary text-yt-text-primary'
-                      : 'text-yt-text-secondary hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary'
-                  }`}
-                >
-                  <Package className="w-4 h-4" />
-                  <span className="hidden sm:inline">{t('general.navigation.missions')}</span>
-                </button>
-                <button
-                  onClick={() => goToView('frontline')}
-                  className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1 transition-all ${
-                    currentView === 'frontline'
-                      ? 'bg-yt-bg-tertiary text-yt-text-primary'
-                      : 'text-yt-text-secondary hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary'
-                  }`}
-                >
-                  <Target className="w-4 h-4" />
-                  <span className="hidden sm:inline">ATO</span>
-                </button>
-              </nav>
-
               <UserMenu onProfileOpen={() => setCurrentView('profile')} />
             </div>
           </div>
@@ -258,14 +233,6 @@ function App() {
       </header>
 
       <main className={`flex-1 ${currentView === 'frontline' ? 'overflow-hidden' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
-        {currentView === 'missions' && (
-          <MissionDispatch
-            missions={missions}
-            airports={Object.values(airports)}
-            onUpdate={handleMissionUpdate}
-            highlightedMissionId={highlightedMissionId}
-          />
-        )}
         {currentView === 'frontline' && (
           <FrontlineMap airportsData={Object.values(airports)} />
         )}
