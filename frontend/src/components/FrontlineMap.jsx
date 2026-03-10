@@ -39,10 +39,10 @@ function getStatusLabel(status) {
   }
 }
 
-function GlobeCanvas({ points, focusCoordinates, onScaleChange }) {
+function GlobeCanvas({ points, focusCoordinates, onScaleChange, mapMode, forcedScale }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
-  const [canvasSize, setCanvasSize] = useState(0);
+  const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
   const phiRef = useRef(0);
   const thetaRef = useRef(0);
   const targetPhiRef = useRef(0);
@@ -59,6 +59,12 @@ function GlobeCanvas({ points, focusCoordinates, onScaleChange }) {
     targetPhiRef.current = (lon * Math.PI) / 180;
     targetThetaRef.current = (lat * Math.PI) / 180;
   }, [focusCoordinates]);
+
+  useEffect(() => {
+    if (typeof forcedScale !== 'number') return;
+    scaleRef.current = forcedScale;
+    targetScaleRef.current = forcedScale;
+  }, [forcedScale]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -94,14 +100,15 @@ function GlobeCanvas({ points, focusCoordinates, onScaleChange }) {
     window.addEventListener('pointerup', onPointerUp);
     canvas.addEventListener('wheel', onWheel, { passive: false });
 
-    let size = Math.min(container.offsetWidth, container.offsetHeight);
-    setCanvasSize(size);
+    let width = Math.max(320, container.offsetWidth);
+    let height = Math.max(320, container.offsetHeight);
+    setCanvasDimensions({ width, height });
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
     const globe = createGlobe(canvas, {
       devicePixelRatio: dpr,
-      width: size * dpr,
-      height: size * dpr,
+      width: width * dpr,
+      height: height * dpr,
       phi: phiRef.current,
       theta: thetaRef.current,
       scale: scaleRef.current,
@@ -120,21 +127,29 @@ function GlobeCanvas({ points, focusCoordinates, onScaleChange }) {
         phiRef.current += (targetPhiRef.current - phiRef.current) * 0.08;
         thetaRef.current += (targetThetaRef.current - thetaRef.current) * 0.08;
         scaleRef.current += (targetScaleRef.current - scaleRef.current) * 0.18;
-        if (onScaleChange) onScaleChange(scaleRef.current);
+        if (!mapMode && onScaleChange) onScaleChange(scaleRef.current);
         state.phi = phiRef.current;
         state.theta = thetaRef.current;
         state.scale = scaleRef.current;
-        state.width = size * dpr;
-        state.height = size * dpr;
+        state.width = Math.max(320, width) * dpr;
+        state.height = Math.max(320, height) * dpr;
       },
     });
 
-    const onResize = () => {
-      size = Math.min(container.offsetWidth, container.offsetHeight);
-      setCanvasSize(size);
+    const updateSize = () => {
+      width = Math.max(320, container.offsetWidth);
+      height = Math.max(320, container.offsetHeight);
+      setCanvasDimensions({ width, height });
     };
 
-    window.addEventListener('resize', onResize);
+    const resizeObserver = new ResizeObserver(() => {
+      updateSize();
+    });
+    resizeObserver.observe(container);
+    window.addEventListener('resize', updateSize);
+
+    // Handle the globe remount case after 2D->3D transition.
+    const rafId = window.requestAnimationFrame(updateSize);
 
     return () => {
       globe.destroy();
@@ -142,9 +157,11 @@ function GlobeCanvas({ points, focusCoordinates, onScaleChange }) {
       canvas.removeEventListener('wheel', onWheel);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
-      window.removeEventListener('resize', onResize);
+      window.removeEventListener('resize', updateSize);
+      resizeObserver.disconnect();
+      window.cancelAnimationFrame(rafId);
     };
-  }, [points, onScaleChange]);
+  }, [points, onScaleChange, mapMode]);
 
   const zoomIn = () => {
     targetScaleRef.current = Math.min(3.2, targetScaleRef.current + 0.16);
@@ -164,10 +181,8 @@ function GlobeCanvas({ points, focusCoordinates, onScaleChange }) {
         ref={canvasRef}
         className="cursor-grab active:cursor-grabbing"
         style={{
-          width: `${canvasSize}px`,
-          height: `${canvasSize}px`,
-          maxWidth: '100%',
-          maxHeight: '100%',
+          width: `${canvasDimensions.width}px`,
+          height: `${canvasDimensions.height}px`,
           display: 'block',
         }}
       />
@@ -310,6 +325,7 @@ export default function FrontlineMap({ airportsData }) {
   const [zones, setZones] = useState(frontlineZones);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mapMode, setMapMode] = useState(false);
+  const [forcedGlobeScale, setForcedGlobeScale] = useState(null);
   const mapModeRef = useRef(false);
 
   useEffect(() => {
@@ -409,6 +425,7 @@ export default function FrontlineMap({ airportsData }) {
     setSelectedZoneId(null);
     setMapMode(false);
     mapModeRef.current = false;
+    setForcedGlobeScale(1.15);
   };
 
   const handleScaleChange = (scale) => {
@@ -428,6 +445,8 @@ export default function FrontlineMap({ airportsData }) {
     if (zoom <= 5 && mapModeRef.current) {
       mapModeRef.current = false;
       setMapMode(false);
+      setForcedGlobeScale(1.6);
+      setTimeout(() => setForcedGlobeScale(null), 250);
     }
   };
 
@@ -506,17 +525,26 @@ export default function FrontlineMap({ airportsData }) {
             </div>
 
             <div className="relative min-h-0 flex-1">
-              {mapMode ? (
-                <FlatMapView
-                  zones={validZones}
-                  airportsData={validAirports}
-                  selectedZoneId={selectedZoneId}
-                  onZoneSelect={setSelectedZoneId}
+              <div className={`${mapMode ? 'pointer-events-none absolute inset-0 opacity-0' : 'relative h-full w-full opacity-100'} transition-opacity duration-300`}>
+                <GlobeCanvas
+                  points={globePoints}
                   focusCoordinates={focusCoordinates}
-                  onZoomChange={handleFlatMapZoomChange}
+                  onScaleChange={handleScaleChange}
+                  mapMode={mapMode}
+                  forcedScale={forcedGlobeScale}
                 />
-              ) : (
-                <GlobeCanvas points={globePoints} focusCoordinates={focusCoordinates} onScaleChange={handleScaleChange} />
+              </div>
+              {mapMode && (
+                <div className="absolute inset-0">
+                  <FlatMapView
+                    zones={validZones}
+                    airportsData={validAirports}
+                    selectedZoneId={selectedZoneId}
+                    onZoneSelect={setSelectedZoneId}
+                    focusCoordinates={focusCoordinates}
+                    onZoomChange={handleFlatMapZoomChange}
+                  />
+                </div>
               )}
               {mapMode && (
                 <div className="pointer-events-none absolute inset-x-0 top-3 mx-auto w-fit rounded-full border border-yt-border/80 bg-yt-bg-secondary/90 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-yt-text-secondary">
