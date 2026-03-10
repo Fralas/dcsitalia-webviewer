@@ -279,6 +279,31 @@ function interpolateLatLon(start, end, progress) {
   ];
 }
 
+function applyLateralOffset(start, end, point, offsetNm = 0.35) {
+  if (!start || !end || !point) return point;
+  const lat = Number(point[0]);
+  const lon = Number(point[1]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return point;
+
+  const dLat = end[0] - start[0];
+  const dLon = end[1] - start[1];
+  const norm = Math.hypot(dLat, dLon);
+  if (norm <= 1e-9) return point;
+
+  // Perpendicular unit vector in lat/lon degrees.
+  const nLat = -dLon / norm;
+  const nLon = dLat / norm;
+
+  // Convert NM to approx degree deltas at current latitude.
+  const latScale = offsetNm / 60;
+  const lonScale = offsetNm / (60 * Math.max(0.2, Math.cos((lat * Math.PI) / 180)));
+
+  return [
+    lat + nLat * latScale,
+    lon + nLon * lonScale,
+  ];
+}
+
 function hashString(text = '') {
   let hash = 0;
   for (let i = 0; i < text.length; i += 1) {
@@ -301,8 +326,8 @@ function computeBearingDeg(start, end) {
 }
 
 function createConvoyMovingIcon(bearingDeg) {
-  // Tank SVG baseline points roughly to the right (east), so offset heading from north-based bearing.
-  const iconHeadingDeg = bearingDeg - 90;
+  // Tank SVG baseline points roughly to the right (east); flipped 180deg on request.
+  const iconHeadingDeg = bearingDeg + 90;
   const html = renderToStaticMarkup(
     <div
       style={{
@@ -1166,11 +1191,17 @@ export default function FrontlineMap({ airportsData }) {
         const cycleMs = 18000;
         const offset = hashString(convoy.convoy_id || 'convoy') % cycleMs;
         const progress = ((animationTick + offset) % cycleMs) / cycleMs;
-        movingPosition = interpolateLatLon(routeLine[0], routeLine[1], progress);
+        const interpolated = interpolateLatLon(routeLine[0], routeLine[1], progress);
+        movingPosition = applyLateralOffset(routeLine[0], routeLine[1], interpolated, 0.5);
       } else if (convoy.status === 'arrived' && destinationPoint) {
-        movingPosition = destinationPoint;
+        movingPosition = routeLine.length >= 2
+          ? applyLateralOffset(routeLine[0], routeLine[1], destinationPoint, 0.5)
+          : destinationPoint;
       } else if (convoy.status === 'destroyed') {
-        movingPosition = toLatLngPoint(convoy.last_position) || originPoint;
+        const destroyedPos = toLatLngPoint(convoy.last_position) || originPoint;
+        movingPosition = routeLine.length >= 2
+          ? applyLateralOffset(routeLine[0], routeLine[1], destroyedPos, 0.5)
+          : destroyedPos;
       }
 
       return {
