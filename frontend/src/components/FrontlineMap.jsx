@@ -744,10 +744,16 @@ export default function FrontlineMap({ airportsData }) {
   }, [selectedAirportId, filteredLogisticsMissions]);
 
   const selectedAirport = selectedAirportId ? airportsById.get(selectedAirportId) : null;
+  const logisticsDetailOrders = selectedLogisticsMission ? getMissionOrders(selectedLogisticsMission) : [];
+  const logisticsDetailIsoPlan = useMemo(
+    () => (selectedLogisticsMission ? buildIsoContainerPlan(logisticsDetailOrders) : null),
+    [selectedLogisticsMission, logisticsDetailOrders]
+  );
 
   useEffect(() => {
     if (!filters.showLogistics) {
       setSelectedAirportId(null);
+      setSelectedLogisticsMission(null);
     }
   }, [filters.showLogistics]);
 
@@ -986,11 +992,108 @@ export default function FrontlineMap({ airportsData }) {
                                 );
                               })}
                             </div>
+                            <div className="mt-2 border-t border-yt-border/70 pt-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedLogisticsMission(mission)}
+                                className="inline-flex items-center gap-2 text-xs font-semibold text-[#4ca3ff] transition-colors hover:text-[#7cbcff]"
+                              >
+                                View Details
+                              </button>
+                            </div>
                           </div>
                         );
                       })}
                     </div>
                   )}
+                </div>
+              )}
+
+              {selectedLogisticsMission && logisticsDetailIsoPlan && (
+                <div className="fixed inset-0 z-[1200] flex items-center justify-center">
+                  <button
+                    type="button"
+                    className="absolute inset-0 bg-black/70"
+                    onClick={() => setSelectedLogisticsMission(null)}
+                    aria-label="Close logistics details"
+                  />
+                  <div className="relative w-[min(880px,92vw)] max-h-[84vh] overflow-y-auto rounded-2xl border border-yt-border bg-[#0f1727] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-yt-text-primary">
+                          Logistics Mission {selectedLogisticsMission.id}
+                        </div>
+                        <div className="text-xs text-yt-text-secondary">
+                          {(airportsById.get(selectedLogisticsMission.source_airport_id)?.displayName || selectedLogisticsMission.source_airport_id)}
+                          {' -> '}
+                          {(airportsById.get(selectedLogisticsMission.airport_id)?.displayName || selectedLogisticsMission.airport_id)}
+                          {' - '}
+                          {selectedLogisticsMission.status}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedLogisticsMission(null)}
+                        className="rounded border border-yt-border px-2 py-1 text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
+                      >
+                        Close
+                      </button>
+                    </div>
+
+                    <div className="rounded-lg border border-yt-border/70 bg-yt-bg-tertiary/60 px-3 py-2 text-xs shadow-inner">
+                      <div className="flex items-center justify-between">
+                        <span className="text-yt-text-secondary">Container ISO</span>
+                        <span className="text-yt-text-primary font-semibold">
+                          Used {formatIsoUnits(logisticsDetailIsoPlan.totalUsed)}
+                        </span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3">
+                        {logisticsDetailIsoPlan.containers.filter((container) => container.used > 0).map((container) => {
+                          const fillPercent = container.capacity > 0 ? Math.min(100, (container.used / container.capacity) * 100) : 0;
+                          return (
+                            <div key={container.id} className="rounded-lg border border-yt-border/70 bg-[#0c1320] p-2 shadow-inner">
+                              <div className="mb-1 flex items-center justify-between text-[10px] text-yt-text-secondary">
+                                <span>{container.small ? 'ISO Small' : 'ISO Container'}</span>
+                                <span className="font-mono">{formatIsoUnits(container.used)} / {formatIsoUnits(container.capacity)}</span>
+                              </div>
+                              <div className="mb-1.5 h-1.5 overflow-hidden rounded-full bg-yt-border/40">
+                                <div className="h-full bg-fuchsia-500" style={{ width: `${fillPercent}%` }} />
+                              </div>
+                              <div className="space-y-1">
+                                {container.items.map((item, idx) => {
+                                  const qty = getItemQuantity(item);
+                                  return (
+                                    <div key={`${container.id}-${idx}`} className="flex items-center justify-between text-[10px]">
+                                      <span className="font-mono text-yt-text-primary">{getWeaponDisplayName(item.weapon_id)}</span>
+                                      <span className="font-mono text-yt-text-secondary">{qty !== null ? `x${qty}` : '-'}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 space-y-2">
+                      {logisticsDetailOrders.map((order, index) => {
+                        const containerCount = getOrderContainers(order);
+                        const totalWeight = Number(order.total_weight_lbs || 0);
+                        const weightPerContainer = containerCount > 0 ? (totalWeight / containerCount) : totalWeight;
+                        return (
+                          <div key={`detail-order-${index}`} className="rounded-lg border border-yt-border bg-yt-bg-tertiary/60 p-2">
+                            <div className="text-xs font-semibold text-yt-text-primary">
+                              {getWeaponDisplayName(order.weapon_id || 'cargo')}
+                            </div>
+                            <div className="text-[11px] text-yt-text-secondary">
+                              Containers: {containerCount} | Qty: {Number(order.quantity_needed || 0)} | Weight/container: {weightPerContainer > 0 ? `${weightPerContainer.toFixed(1)} lbs` : '-'} | Priority: {getPriorityText(order.priority || selectedLogisticsMission.priority)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
