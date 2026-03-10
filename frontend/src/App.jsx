@@ -1,11 +1,7 @@
-import { useState, useEffect } from 'react';
-import { Plane, Package, Activity, AlertCircle, Shield, Target, MapPin } from 'lucide-react';
-import Dashboard from './components/Dashboard';
+import { useState, useEffect, useMemo } from 'react';
+import { Package, Activity, AlertCircle, Target } from 'lucide-react';
 import MissionDispatch from './components/MissionDispatch';
-import AirportsDirectory from './components/AirportsDirectory';
-import AirportDetails from './components/AirportDetails';
 import FrontlineMap from './components/FrontlineMap';
-import AdminPanel from './components/AdminPanel';
 import UserMenu from './components/UserMenu';
 import UserProfile from './components/UserProfile';
 import * as api from './services/api';
@@ -34,7 +30,7 @@ function buildFrontlineSummary(zones = []) {
 }
 
 function App() {
-  const [currentView, setCurrentView] = useState('dashboard');
+  const [currentView, setCurrentView] = useState('frontline');
   const [airports, setAirports] = useState({});
   const [missions, setMissions] = useState([]);
   const [combatMissions, setCombatMissions] = useState([]);
@@ -42,8 +38,6 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [highlightedMissionId, setHighlightedMissionId] = useState(null);
-  const [selectedAirportId, setSelectedAirportId] = useState(null);
-  const [selectedAirportToken, setSelectedAirportToken] = useState(0);
   const [frontlineSummary, setFrontlineSummary] = useState({
     total: 0,
     RED: 0,
@@ -52,10 +46,21 @@ function App() {
     UNDER_ATTACK: 0,
   });
   const { user } = useUser();
+  const allowedViews = useMemo(() => new Set(['frontline', 'missions', 'profile']), []);
+
+  const goToView = (view) => {
+    setCurrentView(allowedViews.has(view) ? view : 'frontline');
+  };
 
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (!allowedViews.has(currentView)) {
+      setCurrentView('frontline');
+    }
+  }, [currentView, allowedViews]);
 
   useEffect(() => {
     socketService.connect();
@@ -138,16 +143,6 @@ function App() {
     }
   };
 
-  const handleAirportSelect = (airportId) => {
-    setSelectedAirportId(airportId);
-    setSelectedAirportToken((prev) => prev + 1);
-    setCurrentView('airport');
-  };
-
-  const handleAirportBack = () => {
-    setCurrentView('airports');
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-yt-bg-primary flex items-center justify-center">
@@ -185,9 +180,9 @@ function App() {
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setCurrentView(user ? 'profile' : 'dashboard')}
+                onClick={() => goToView(user ? 'profile' : 'frontline')}
                 className="flex items-center gap-3 text-left hover:opacity-90 transition-opacity"
-                title={user ? 'Apri profilo' : 'Dashboard'}
+                title={user ? 'Apri profilo' : 'Frontline'}
               >
                 <img
                   src={bannerImg}
@@ -233,29 +228,7 @@ function App() {
             <div className="flex items-center gap-3">
               <nav className="flex items-center gap-1">
                 <button
-                  onClick={() => setCurrentView('dashboard')}
-                  className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1 transition-all ${
-                    currentView === 'dashboard'
-                      ? 'bg-yt-bg-tertiary text-yt-text-primary'
-                      : 'text-yt-text-secondary hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary'
-                  }`}
-                >
-                  <Plane className="w-4 h-4" />
-                  <span className="hidden sm:inline">{t('general.navigation.dashboard')}</span>
-                </button>
-                <button
-                  onClick={() => setCurrentView('airports')}
-                  className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1 transition-all ${
-                    currentView === 'airports'
-                      ? 'bg-yt-bg-tertiary text-yt-text-primary'
-                      : 'text-yt-text-secondary hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary'
-                  }`}
-                >
-                  <MapPin className="w-4 h-4" />
-                  <span className="hidden sm:inline">{t('general.navigation.airports')}</span>
-                </button>
-                <button
-                  onClick={() => setCurrentView('missions')}
+                  onClick={() => goToView('missions')}
                   className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1 transition-all ${
                     currentView === 'missions'
                       ? 'bg-yt-bg-tertiary text-yt-text-primary'
@@ -266,7 +239,7 @@ function App() {
                   <span className="hidden sm:inline">{t('general.navigation.missions')}</span>
                 </button>
                 <button
-                  onClick={() => setCurrentView('frontline')}
+                  onClick={() => goToView('frontline')}
                   className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1 transition-all ${
                     currentView === 'frontline'
                       ? 'bg-yt-bg-tertiary text-yt-text-primary'
@@ -276,17 +249,6 @@ function App() {
                   <Target className="w-4 h-4" />
                   <span className="hidden sm:inline">ATO</span>
                 </button>
-                <button
-                  onClick={() => setCurrentView('admin')}
-                  className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1 transition-all ${
-                    currentView === 'admin'
-                      ? 'bg-red-500/20 text-red-400'
-                      : 'text-yt-text-secondary hover:bg-red-500/10 hover:text-red-400'
-                  }`}
-                >
-                  <Shield className="w-4 h-4" />
-                  <span className="hidden sm:inline">{t('general.navigation.admin')}</span>
-                </button>
               </nav>
 
               <UserMenu onProfileOpen={() => setCurrentView('profile')} />
@@ -295,30 +257,7 @@ function App() {
         </div>
       </header>
 
-      <main className={`flex-1 ${currentView === 'frontline' || currentView === 'admin' ? 'overflow-hidden' : currentView === 'dashboard' ? 'max-w-[1800px] mx-auto px-4 py-4 overflow-y-auto w-full' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
-        {currentView === 'dashboard' && (
-          <Dashboard
-            airports={airports}
-            missions={missions}
-            combatMissions={combatMissions}
-            stats={stats}
-          />
-        )}
-        {currentView === 'airports' && (
-          <AirportsDirectory
-            airports={airports}
-            missions={missions}
-            onSelectAirport={handleAirportSelect}
-          />
-        )}
-        {currentView === 'airport' && (
-          <AirportDetails
-            airport={selectedAirportId ? airports[selectedAirportId] : null}
-            missions={missions}
-            onMissionsUpdate={handleMissionUpdate}
-            onBack={handleAirportBack}
-          />
-        )}
+      <main className={`flex-1 ${currentView === 'frontline' ? 'overflow-hidden' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
         {currentView === 'missions' && (
           <MissionDispatch
             missions={missions}
@@ -330,15 +269,12 @@ function App() {
         {currentView === 'frontline' && (
           <FrontlineMap airportsData={Object.values(airports)} />
         )}
-        {currentView === 'admin' && (
-          <AdminPanel />
-        )}
         {currentView === 'profile' && (
           <UserProfile />
         )}
       </main>
 
-      {currentView !== 'frontline' && currentView !== 'admin' && (
+      {currentView !== 'frontline' && (
         <footer className="bg-yt-bg-secondary border-t border-yt-border mt-8">
           <div className="container mx-auto px-4 py-3 text-center text-xs text-yt-text-secondary">
             <p>DCS Italia Warehouse Viewer v1.0 - Real-time logistics management</p>

@@ -1,12 +1,12 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import createGlobe from 'cobe';
-import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Polyline, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Clock3, MapPin } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import socketService from '../services/socket';
-import { getCombatMissions, getFrontlineZones } from '../services/api';
+import { getCombatMissions, getFrontlineZones, getMissions } from '../services/api';
 
 function getZoneColor(status) {
   switch (status) {
@@ -90,6 +90,43 @@ function getControlText(status) {
   if (status === 'BLUE') return 'blue control';
   if (status === 'UNDER_ATTACK') return 'contested control';
   return 'no control';
+}
+
+function getWeaponDisplayName(weaponId = '') {
+  return weaponId.replace(/^weapons\.(missiles|bombs|nurs|containers|droptanks|torpedoes|adapters)\./, '');
+}
+
+function getMissionOrders(mission) {
+  if (Array.isArray(mission?.orders) && mission.orders.length > 0) {
+    return mission.orders;
+  }
+  if (mission?.weapon_id) {
+    return [{
+      weapon_id: mission.weapon_id,
+      quantity_needed: mission.quantity_needed,
+      total_weight_lbs: mission.total_weight_lbs,
+      iso_units: mission.total_iso_units,
+      priority: mission.priority,
+    }];
+  }
+  return [];
+}
+
+function getPriorityText(priority) {
+  if (!priority) return 'medium';
+  const val = String(priority).toLowerCase();
+  if (val.includes('critical')) return 'critical';
+  if (val.includes('high')) return 'high';
+  if (val.includes('medium')) return 'medium';
+  return val;
+}
+
+function getOrderContainers(order) {
+  const isoUnits = Number(order?.iso_units || 0);
+  if (Number.isFinite(isoUnits) && isoUnits > 0) {
+    return Math.max(1, Math.ceil(isoUnits));
+  }
+  return 1;
 }
 
 function GlobeCanvas({ points, focusCoordinates, onScaleChange, mapMode, forcedScale }) {
@@ -303,14 +340,23 @@ function FlatMapZoomWatcher({ onZoomChange }) {
 function FlatMapView({
   zones,
   airportsData,
+  logisticsMissions,
   selectedZoneId,
   onZoneSelect,
   focusCoordinates,
   onZoomChange,
   onZoneHover,
+  onAirportClick,
+  showAto,
   showAirports,
+  showLogistics,
 }) {
   const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
+  const airportsById = useMemo(() => {
+    const map = new Map();
+    airportsData.forEach((airport) => map.set(airport.id, airport));
+    return map;
+  }, [airportsData]);
 
   return (
     <div className="h-full w-full">
@@ -329,7 +375,33 @@ function FlatMapView({
         <FlatMapZoomWatcher onZoomChange={onZoomChange} />
         <FlatMapFocus center={focusCoordinates} />
 
-        {zones.map((zone) => {
+        {showLogistics && logisticsMissions.map((mission) => {
+          const sourceAirport = airportsById.get(mission.source_airport_id);
+          const destinationAirport = airportsById.get(mission.airport_id);
+          if (!sourceAirport || !destinationAirport) return null;
+
+          return (
+            <Polyline
+              key={`route-${mission.id}`}
+              positions={[
+                [sourceAirport.coordinates.lat, sourceAirport.coordinates.lon],
+                [destinationAirport.coordinates.lat, destinationAirport.coordinates.lon],
+              ]}
+              pathOptions={{
+                color: mission.status === 'accepted' ? '#f97316' : '#4ec5ff',
+                weight: mission.status === 'accepted' ? 3 : 2,
+                opacity: 0.85,
+                dashArray: mission.status === 'pending' ? '8,6' : undefined,
+              }}
+            >
+              <Tooltip direction="center" opacity={0.9}>
+                {(sourceAirport.displayName || sourceAirport.name)} -> {(destinationAirport.displayName || destinationAirport.name)}
+              </Tooltip>
+            </Polyline>
+          );
+        })}
+
+        {showAto && zones.map((zone) => {
           const isSelected = zone.id === selectedZoneId;
           const color =
             zone.status === 'RED'
@@ -375,6 +447,9 @@ function FlatMapView({
               fillOpacity: 0.85,
               weight: 2,
             }}
+            eventHandlers={{
+              click: () => onAirportClick && onAirportClick(airport.id),
+            }}
           >
             <Tooltip direction="top" offset={[0, -4]} opacity={0.95}>
               {airport.displayName}
@@ -389,8 +464,10 @@ function FlatMapView({
 export default function FrontlineMap({ airportsData }) {
   const [selectedZoneId, setSelectedZoneId] = useState(null);
   const [hoveredZoneId, setHoveredZoneId] = useState(null);
+  const [selectedAirportId, setSelectedAirportId] = useState(null);
   const [zones, setZones] = useState(frontlineZones);
   const [combatMissions, setCombatMissions] = useState([]);
+  const [logisticsMissions, setLogisticsMissions] = useState([]);
   const [zoneStatusMeta, setZoneStatusMeta] = useState({});
   const [mapMode, setMapMode] = useState(false);
   const [forcedGlobeScale, setForcedGlobeScale] = useState(null);
@@ -400,20 +477,25 @@ export default function FrontlineMap({ airportsData }) {
     priority: 'all',
     task: 'all',
     activity: 'all',
+    showAto: true,
+    showLogistics: true,
     showAirports: true,
   });
   const mapModeRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
-    Promise.all([getFrontlineZones(), getCombatMissions()])
-      .then(([zonesData, missionsData]) => {
+    Promise.all([getFrontlineZones(), getCombatMissions(), getMissions()])
+      .then(([zonesData, missionsData, logisticsData]) => {
         const nextZones = zonesData?.zones || zonesData;
         if (isMounted && Array.isArray(nextZones)) {
           setZones(nextZones);
         }
         if (isMounted && Array.isArray(missionsData)) {
           setCombatMissions(missionsData);
+        }
+        if (isMounted && Array.isArray(logisticsData)) {
+          setLogisticsMissions(logisticsData);
         }
       })
       .catch((error) => {
@@ -439,9 +521,16 @@ export default function FrontlineMap({ airportsData }) {
       }
     });
 
+    const unsubscribeLogistics = socketService.on('missions:updated', (data) => {
+      if (data?.missions && Array.isArray(data.missions)) {
+        setLogisticsMissions(data.missions);
+      }
+    });
+
     return () => {
       unsubscribe && unsubscribe();
       unsubscribeMissions && unsubscribeMissions();
+      unsubscribeLogistics && unsubscribeLogistics();
     };
   }, []);
 
@@ -510,6 +599,15 @@ export default function FrontlineMap({ airportsData }) {
     });
   }, [validZones, combatMissionByZone, filters]);
 
+  const filteredLogisticsMissions = useMemo(() => {
+    return logisticsMissions.filter((mission) => {
+      if (!mission?.airport_id || !mission?.source_airport_id) return false;
+      if (mission.status !== 'pending' && mission.status !== 'accepted') return false;
+      if (filters.missionStatus !== 'all' && mission.status !== filters.missionStatus) return false;
+      return true;
+    });
+  }, [logisticsMissions, filters.missionStatus]);
+
   const focusedZone = useMemo(
     () => (selectedZoneId ? filteredZones.find((zone) => zone.id === selectedZoneId) || validZones.find((zone) => zone.id === selectedZoneId) || null : null),
     [selectedZoneId, filteredZones, validZones]
@@ -519,6 +617,12 @@ export default function FrontlineMap({ airportsData }) {
     const id = hoveredZoneId || selectedZoneId;
     return id ? filteredZones.find((zone) => zone.id === id) || validZones.find((zone) => zone.id === id) || null : null;
   }, [hoveredZoneId, selectedZoneId, filteredZones, validZones]);
+
+  const airportsById = useMemo(() => {
+    const map = new Map();
+    validAirports.forEach((airport) => map.set(airport.id, airport));
+    return map;
+  }, [validAirports]);
 
   const overlayTagOptions = useMemo(
     () => [
@@ -553,18 +657,18 @@ export default function FrontlineMap({ airportsData }) {
   );
 
   const globePoints = useMemo(() => {
-    const zonePoints = filteredZones.map((zone) => ({
+    const zonePoints = filters.showAto ? filteredZones.map((zone) => ({
       lat: zone.coordinates.lat,
       lon: zone.coordinates.lon,
       size: zone.id === selectedZoneId ? 0.14 : zone.isActive ? 0.1 : 0.07,
-    }));
+    })) : [];
     const airportPoints = filters.showAirports ? validAirports.map((airport) => ({
       lat: airport.coordinates.lat,
       lon: airport.coordinates.lon,
       size: airport.isMainBase ? 0.11 : 0.08,
     })) : [];
     return [...zonePoints, ...airportPoints];
-  }, [filteredZones, validAirports, selectedZoneId, filters.showAirports]);
+  }, [filteredZones, validAirports, selectedZoneId, filters.showAto, filters.showAirports]);
 
   const theaterCenter = useMemo(() => {
     const source = validAirports.length > 0 ? validAirports : validZones;
@@ -616,6 +720,13 @@ export default function FrontlineMap({ airportsData }) {
       ].filter(Boolean)
     : [];
 
+  const airportLogistics = useMemo(() => {
+    if (!selectedAirportId) return [];
+    return filteredLogisticsMissions.filter((mission) => mission.airport_id === selectedAirportId);
+  }, [selectedAirportId, filteredLogisticsMissions]);
+
+  const selectedAirport = selectedAirportId ? airportsById.get(selectedAirportId) : null;
+
   return (
     <div className="h-full overflow-hidden bg-yt-bg-primary p-3">
       <div className="h-full">
@@ -636,12 +747,16 @@ export default function FrontlineMap({ airportsData }) {
                   <FlatMapView
                     zones={filteredZones}
                     airportsData={validAirports}
+                    logisticsMissions={filteredLogisticsMissions}
                     selectedZoneId={selectedZoneId}
                     onZoneSelect={setSelectedZoneId}
                     focusCoordinates={focusCoordinates}
                     onZoomChange={handleFlatMapZoomChange}
                     onZoneHover={setHoveredZoneId}
+                    onAirportClick={setSelectedAirportId}
+                    showAto={filters.showAto}
                     showAirports={filters.showAirports}
+                    showLogistics={filters.showLogistics}
                   />
                 </div>
               )}
@@ -660,6 +775,31 @@ export default function FrontlineMap({ airportsData }) {
                     onClick={() => setFilters((current) => ({ ...current, showAirports: !current.showAirports }))}
                   >
                     Airports
+                  </button>
+                </div>
+
+                <div className="mb-2 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFilters((current) => ({ ...current, showAto: !current.showAto }))}
+                    className={`rounded border px-2 py-1 text-[11px] font-semibold ${
+                      filters.showAto
+                        ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
+                        : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
+                    }`}
+                  >
+                    ATO
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilters((current) => ({ ...current, showLogistics: !current.showLogistics }))}
+                    className={`rounded border px-2 py-1 text-[11px] font-semibold ${
+                      filters.showLogistics
+                        ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
+                        : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
+                    }`}
+                  >
+                    Logistics
                   </button>
                 </div>
 
