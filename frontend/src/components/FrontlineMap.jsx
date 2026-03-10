@@ -7,6 +7,7 @@ import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import socketService from '../services/socket';
 import { getCombatMissions, getFrontlineZones, getMissions } from '../services/api';
+import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 
 function getZoneColor(status) {
   switch (status) {
@@ -127,6 +128,22 @@ function getOrderContainers(order) {
     return Math.max(1, Math.ceil(isoUnits));
   }
   return 1;
+}
+
+function getItemQuantity(item) {
+  const orderQty = Number(item.order_quantity_needed || 0);
+  const orderIsoUnits = Number(item.order_iso_units || 0);
+  const usedUnits = Number(item.units || 0);
+  if (!Number.isFinite(orderQty) || orderQty <= 0 || !Number.isFinite(usedUnits) || usedUnits <= 0) {
+    return null;
+  }
+  if (Number.isFinite(orderIsoUnits) && orderIsoUnits > 1) {
+    return Math.floor((usedUnits / orderIsoUnits) * orderQty);
+  }
+  if (Number.isFinite(orderIsoUnits) && orderIsoUnits > 0 && usedUnits >= orderIsoUnits) {
+    return Math.floor(orderQty);
+  }
+  return Math.floor(usedUnits * orderQty);
 }
 
 function GlobeCanvas({ points, focusCoordinates, onScaleChange, mapMode, forcedScale }) {
@@ -465,6 +482,7 @@ export default function FrontlineMap({ airportsData }) {
   const [selectedZoneId, setSelectedZoneId] = useState(null);
   const [hoveredZoneId, setHoveredZoneId] = useState(null);
   const [selectedAirportId, setSelectedAirportId] = useState(null);
+  const [selectedLogisticsMission, setSelectedLogisticsMission] = useState(null);
   const [zones, setZones] = useState(frontlineZones);
   const [combatMissions, setCombatMissions] = useState([]);
   const [logisticsMissions, setLogisticsMissions] = useState([]);
