@@ -1532,6 +1532,12 @@ loadAirbaseStatus();
 // Load initial data
 await loadFromBuffer();
 
+// Reset convoy state at each backend restart
+convoysService.clearAllConvoys();
+io.emit('convoys:updated', {
+  convoys: convoysService.getConvoys(),
+});
+
 httpServer.listen(PORT, () => {
   const activeAirports = airbaseStatusManager.getActiveAirports();
   logger.info(`
