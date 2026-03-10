@@ -5,9 +5,10 @@ import * as mgrs from 'mgrs';
 import { MapContainer, TileLayer, CircleMarker, Marker, Polyline, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import { divIcon } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { ArrowUp, ChevronLeft, ChevronRight, Clock3, Drone, MapPin, PersonStanding } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock3, MapPin, PersonStanding } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
+import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
 import { acceptDcsarTask, acceptMission, cancelDcsarTask, cancelMission, completeDcsarTask, completeMission, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getMissions } from '../services/api';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
@@ -288,36 +289,50 @@ function hashString(text = '') {
 
 function computeBearingDeg(start, end) {
   if (!start || !end) return 0;
-  const dLon = end[1] - start[1];
-  const dLat = end[0] - start[0];
-  return (Math.atan2(dLon, dLat) * 180) / Math.PI;
+  // Great-circle initial bearing: 0=north, 90=east.
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const toDeg = (rad) => (rad * 180) / Math.PI;
+  const lat1 = toRad(start[0]);
+  const lat2 = toRad(end[0]);
+  const dLon = toRad(end[1] - start[1]);
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
 }
 
-function createConvoyMovingIcon(bearingDeg, color = '#ef4444') {
+function createConvoyMovingIcon(bearingDeg) {
+  // Tank SVG baseline points roughly to the right (east), so offset heading from north-based bearing.
+  const iconHeadingDeg = bearingDeg - 90;
   const html = renderToStaticMarkup(
     <div
       style={{
-        width: '24px',
-        height: '24px',
-        transform: `rotate(${bearingDeg}deg)`,
+        width: '30px',
+        height: '30px',
+        transform: `rotate(${iconHeadingDeg}deg)`,
         transformOrigin: '50% 50%',
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         pointerEvents: 'none',
       }}
     >
-      <Drone size={14} color={color} strokeWidth={2.2} />
-      <ArrowUp size={12} color={color} strokeWidth={2.8} />
+      <img
+        src={tankIcon}
+        alt="Convoy"
+        style={{
+          width: '28px',
+          height: '28px',
+          filter: 'drop-shadow(0 0 4px rgba(0,0,0,0.75))',
+        }}
+      />
     </div>
   );
 
   return divIcon({
     html,
     className: 'convoy-moving-icon',
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
   });
 }
 
@@ -698,7 +713,7 @@ function FlatMapView({
               <Marker
                 key={`convoy-marker-${convoy.convoy_id}`}
                 position={markerPosition}
-                icon={createConvoyMovingIcon(convoy.bearing || 0, '#ef4444')}
+                icon={createConvoyMovingIcon(convoy.bearing || 0)}
                 interactive={false}
               >
                 <Tooltip direction="top" offset={[0, -3]} opacity={0.95}>
@@ -1148,7 +1163,7 @@ export default function FrontlineMap({ airportsData }) {
 
       let movingPosition = null;
       if ((convoy.status || 'active') === 'active' && routeLine.length >= 2) {
-        const cycleMs = 9000;
+        const cycleMs = 18000;
         const offset = hashString(convoy.convoy_id || 'convoy') % cycleMs;
         const progress = ((animationTick + offset) % cycleMs) / cycleMs;
         movingPosition = interpolateLatLon(routeLine[0], routeLine[1], progress);
