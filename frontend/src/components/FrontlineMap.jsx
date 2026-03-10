@@ -551,25 +551,43 @@ export default function FrontlineMap({ airportsData }) {
 
   useEffect(() => {
     let isMounted = true;
-    Promise.all([getFrontlineZones(), getCombatMissions(), getMissions(), getFeed(200)])
-      .then(([zonesData, missionsData, logisticsData, feedData]) => {
-        const nextZones = zonesData?.zones || zonesData;
-        if (isMounted && Array.isArray(nextZones)) {
-          setZones(nextZones);
+    Promise.allSettled([getFrontlineZones(), getCombatMissions(), getMissions(), getFeed(200)])
+      .then(([zonesResult, combatResult, logisticsResult, feedResult]) => {
+        if (!isMounted) return;
+
+        if (zonesResult.status === 'fulfilled') {
+          const nextZones = zonesResult.value?.zones || zonesResult.value;
+          if (Array.isArray(nextZones)) {
+            setZones(nextZones);
+          }
+        } else {
+          console.error('Failed to load frontline zones:', zonesResult.reason);
         }
-        if (isMounted && Array.isArray(missionsData)) {
-          setCombatMissions(missionsData);
+
+        if (combatResult.status === 'fulfilled') {
+          if (Array.isArray(combatResult.value)) {
+            setCombatMissions(combatResult.value);
+          }
+        } else {
+          console.error('Failed to load combat missions:', combatResult.reason);
         }
-        if (isMounted && Array.isArray(logisticsData)) {
-          setLogisticsMissions(logisticsData);
+
+        if (logisticsResult.status === 'fulfilled') {
+          if (Array.isArray(logisticsResult.value)) {
+            setLogisticsMissions(logisticsResult.value);
+          }
+        } else {
+          console.error('Failed to load logistics missions:', logisticsResult.reason);
         }
-        const nextFeed = feedData?.events || feedData;
-        if (isMounted && Array.isArray(nextFeed)) {
-          setFeedEvents(nextFeed);
+
+        if (feedResult.status === 'fulfilled') {
+          const nextFeed = feedResult.value?.events || feedResult.value;
+          if (Array.isArray(nextFeed)) {
+            setFeedEvents(nextFeed);
+          }
+        } else {
+          console.error('Failed to load feed events:', feedResult.reason);
         }
-      })
-      .catch((error) => {
-        console.error('Failed to load frontline data:', error);
       });
 
     return () => {
@@ -623,6 +641,22 @@ export default function FrontlineMap({ airportsData }) {
         console.error('Failed to refresh logistics missions:', error);
       }
     }, 15000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const latestFeed = await getFeed(200);
+        const nextFeed = latestFeed?.events || latestFeed;
+        if (Array.isArray(nextFeed)) {
+          setFeedEvents(nextFeed);
+        }
+      } catch (error) {
+        console.error('Failed to refresh feed events:', error);
+      }
+    }, 20000);
 
     return () => clearInterval(interval);
   }, []);
