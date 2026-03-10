@@ -87,6 +87,15 @@ function getZoneNumber(zone) {
   return match ? match[0] : source || 'Unknown';
 }
 
+function getZoneGridIndex(zone) {
+  const source = String(zone?.id || zone?.name || '');
+  const match = source.match(/(\d{2})(?!\d)/);
+  if (!match) return null;
+  const value = Number.parseInt(match[1], 10);
+  if (!Number.isFinite(value) || value < 0 || value > 99) return null;
+  return value;
+}
+
 function getControlText(status) {
   if (status === 'RED') return 'red control';
   if (status === 'BLUE') return 'blue control';
@@ -375,6 +384,7 @@ function FlatMapView({
   zones,
   airportsData,
   logisticsMissions,
+  gridConnections,
   selectedZoneId,
   onZoneSelect,
   focusCoordinates,
@@ -408,6 +418,20 @@ function FlatMapView({
         />
         <FlatMapZoomWatcher onZoomChange={onZoomChange} />
         <FlatMapFocus center={focusCoordinates} />
+
+        {showAto && gridConnections.map((connection) => (
+          <Polyline
+            key={connection.id}
+            positions={connection.positions}
+            pathOptions={{
+              color: '#9aaec4',
+              weight: 1,
+              opacity: 0.22,
+              dashArray: '3,7',
+              interactive: false,
+            }}
+          />
+        ))}
 
         {showLogistics && logisticsMissions.map((mission) => {
           const sourceAirport = airportsById.get(mission.source_airport_id);
@@ -622,6 +646,48 @@ export default function FrontlineMap({ airportsData }) {
     });
     return map;
   }, [combatMissions]);
+
+  const gridConnections = useMemo(() => {
+    const zoneByIndex = new Map();
+
+    validZones.forEach((zone) => {
+      const index = getZoneGridIndex(zone);
+      if (index === null || !zone?.coordinates) return;
+      zoneByIndex.set(index, zone);
+    });
+
+    const links = [];
+    zoneByIndex.forEach((zone, index) => {
+      const row = Math.floor(index / 10);
+      const col = index % 10;
+      const rightIndex = col < 9 ? index + 1 : null;
+      const downIndex = row < 9 ? index + 10 : null;
+
+      if (rightIndex !== null && zoneByIndex.has(rightIndex)) {
+        const target = zoneByIndex.get(rightIndex);
+        links.push({
+          id: `grid-${index}-${rightIndex}`,
+          positions: [
+            [zone.coordinates.lat, zone.coordinates.lon],
+            [target.coordinates.lat, target.coordinates.lon],
+          ],
+        });
+      }
+
+      if (downIndex !== null && zoneByIndex.has(downIndex)) {
+        const target = zoneByIndex.get(downIndex);
+        links.push({
+          id: `grid-${index}-${downIndex}`,
+          positions: [
+            [zone.coordinates.lat, zone.coordinates.lon],
+            [target.coordinates.lat, target.coordinates.lon],
+          ],
+        });
+      }
+    });
+
+    return links;
+  }, [validZones]);
 
   useEffect(() => {
     if (validZones.length === 0) return;
@@ -917,6 +983,7 @@ export default function FrontlineMap({ airportsData }) {
                     zones={filteredZones}
                     airportsData={validAirports}
                     logisticsMissions={filteredLogisticsMissions}
+                    gridConnections={gridConnections}
                     selectedZoneId={selectedZoneId}
                     onZoneSelect={setSelectedZoneId}
                     focusCoordinates={focusCoordinates}
