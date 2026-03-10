@@ -230,6 +230,36 @@ export async function getDcsar() {
 }
 
 /**
+ * Accept a DCSAR rescue task
+ */
+export async function acceptDcsarTask(taskId, userId) {
+  return fetchAPI(`/dcsar/${encodeURIComponent(taskId)}/accept`, {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  });
+}
+
+/**
+ * Complete a DCSAR rescue task
+ */
+export async function completeDcsarTask(taskId, userId) {
+  return fetchAPI(`/dcsar/${encodeURIComponent(taskId)}/complete`, {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  });
+}
+
+/**
+ * Cancel a DCSAR rescue task
+ */
+export async function cancelDcsarTask(taskId, userId) {
+  return fetchAPI(`/dcsar/${encodeURIComponent(taskId)}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  });
+}
+
+/**
  * Post convoy event (external integration/testing)
  */
 export async function postConvoyEvent(eventPayload, convoyToken = null) {
@@ -311,6 +341,9 @@ export default {
   getFeed,
   getConvoys,
   getDcsar,
+  acceptDcsarTask,
+  completeDcsarTask,
+  cancelDcsarTask,
   postConvoyEvent,
   getUserProfile,
   saveUserProfile,

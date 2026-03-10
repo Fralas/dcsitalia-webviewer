@@ -9,7 +9,7 @@ import { ArrowUp, ChevronLeft, ChevronRight, Clock3, Drone, MapPin, PersonStandi
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import socketService from '../services/socket';
-import { acceptMission, cancelMission, completeMission, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getMissions } from '../services/api';
+import { acceptDcsarTask, acceptMission, cancelDcsarTask, cancelMission, completeDcsarTask, completeMission, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getMissions } from '../services/api';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
@@ -161,6 +161,7 @@ function getFeedTypeStyle(type) {
   if (type?.startsWith('logistics.')) return 'border-sky-500/40 bg-sky-500/10 text-sky-200';
   if (type?.startsWith('ato.')) return 'border-orange-500/40 bg-orange-500/10 text-orange-200';
   if (type?.startsWith('convoy.')) return 'border-yellow-500/40 bg-yellow-500/10 text-yellow-200';
+  if (type?.startsWith('dcsar.')) return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
   if (type?.startsWith('user.')) return 'border-green-500/40 bg-green-500/10 text-green-200';
   return 'border-slate-500/40 bg-slate-500/10 text-slate-200';
 }
@@ -170,6 +171,7 @@ function getFeedTypeLabel(type) {
   if (type?.startsWith('logistics.')) return 'Logistics';
   if (type?.startsWith('ato.')) return 'ATO';
   if (type?.startsWith('convoy.')) return 'Convoy';
+  if (type?.startsWith('dcsar.')) return 'CSAR';
   if (type?.startsWith('user.')) return 'User';
   return 'System';
 }
@@ -604,6 +606,7 @@ function FlatMapView({
   showConvoys,
   showDcsar,
   onDcsarHover,
+  onDcsarSelect,
   animationTick,
 }) {
   const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
@@ -760,6 +763,7 @@ function FlatMapView({
               eventHandlers={{
                 mouseover: () => onDcsarHover && onDcsarHover(point.id),
                 mouseout: () => onDcsarHover && onDcsarHover(null),
+                click: () => onDcsarSelect && onDcsarSelect(point),
               }}
             >
               <Tooltip direction="top" offset={[0, -3]} opacity={0.95}>
@@ -836,11 +840,14 @@ export default function FrontlineMap({ airportsData }) {
   const [selectedZoneId, setSelectedZoneId] = useState(null);
   const [hoveredZoneId, setHoveredZoneId] = useState(null);
   const [hoveredDcsarId, setHoveredDcsarId] = useState(null);
+  const [selectedDcsarId, setSelectedDcsarId] = useState(null);
   const [zoneCoordinatesFormat, setZoneCoordinatesFormat] = useState('dms');
   const [dcsarCoordinatesFormat, setDcsarCoordinatesFormat] = useState('dms');
   const [selectedAirportId, setSelectedAirportId] = useState(null);
   const [selectedLogisticsMission, setSelectedLogisticsMission] = useState(null);
   const [acceptingMissionId, setAcceptingMissionId] = useState(null);
+  const [acceptingDcsarId, setAcceptingDcsarId] = useState(null);
+  const [updatingDcsarId, setUpdatingDcsarId] = useState(null);
   const [updatingMissionId, setUpdatingMissionId] = useState(null);
   const [animationTick, setAnimationTick] = useState(Date.now());
   const [zones, setZones] = useState(frontlineZones);
@@ -1311,7 +1318,17 @@ export default function FrontlineMap({ airportsData }) {
     return { lat: sum.lat / validAirports.length, lon: sum.lon / validAirports.length };
   }, [validAirports, validZones]);
 
-  const focusCoordinates = focusedZone?.coordinates || zoneTheaterCenter || fallbackCenter || null;
+  const selectedDcsarFocus = useMemo(() => {
+    if (!selectedDcsarId) return null;
+    const point = dcsarPoints.find((entry) => String(entry?.id || '') === String(selectedDcsarId));
+    if (!point) return null;
+    const lat = Number(point?.lat);
+    const lon = Number(point?.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    return { lat, lon };
+  }, [selectedDcsarId, dcsarPoints]);
+
+  const focusCoordinates = selectedDcsarFocus || focusedZone?.coordinates || zoneTheaterCenter || fallbackCenter || null;
 
   const handleScaleChange = (scale) => {
     if (scale >= 2.1 && !mapModeRef.current) {
@@ -1405,6 +1422,10 @@ export default function FrontlineMap({ airportsData }) {
     if (!hoveredDcsarId) return null;
     return dcsarPointsWithNearest.find((point) => point.id === hoveredDcsarId) || null;
   }, [hoveredDcsarId, dcsarPointsWithNearest]);
+  const selectedDcsarTask = useMemo(() => {
+    if (!selectedDcsarId) return null;
+    return dcsarPointsWithNearest.find((point) => point.id === selectedDcsarId) || null;
+  }, [selectedDcsarId, dcsarPointsWithNearest]);
   const logisticsDetailOrders = selectedLogisticsMission ? getMissionOrders(selectedLogisticsMission) : [];
   const logisticsDetailIsoPlan = useMemo(
     () => (selectedLogisticsMission ? buildIsoContainerPlan(logisticsDetailOrders) : null),
@@ -1427,6 +1448,7 @@ export default function FrontlineMap({ airportsData }) {
   useEffect(() => {
     if (!filters.showDcsar) {
       setHoveredDcsarId(null);
+      setSelectedDcsarId(null);
     }
   }, [filters.showDcsar]);
 
@@ -1511,6 +1533,75 @@ export default function FrontlineMap({ airportsData }) {
     }
   };
 
+  const handleSelectDcsarTask = (point) => {
+    if (!point || !Number.isFinite(Number(point.lat)) || !Number.isFinite(Number(point.lon))) return;
+    setSelectedDcsarId(point.id);
+    setHoveredDcsarId(point.id);
+    setSelectedLogisticsMission(null);
+  };
+
+  const handleAcceptDcsarTask = async (task) => {
+    if (!task || task.status === 'accepted') return;
+    if (!user) {
+      window.location.href = '/api/auth/discord';
+      return;
+    }
+
+    const userName = user.globalName || user.username || user.id;
+    setAcceptingDcsarId(task.id);
+    try {
+      await acceptDcsarTask(task.id, userName);
+      const latestPoints = await getDcsar();
+      const nextPoints = latestPoints?.points || latestPoints;
+      if (Array.isArray(nextPoints)) setDcsarPoints(nextPoints);
+    } catch (error) {
+      console.error('Failed to accept DCSAR task:', error);
+      alert(`Failed to accept DCSAR task: ${error.message}`);
+    } finally {
+      setAcceptingDcsarId(null);
+    }
+  };
+
+  const handleCompleteDcsarTask = async (task) => {
+    if (!task || task.status !== 'accepted') return;
+    const userName = user?.globalName || user?.username || user?.id;
+    if (!userName || task.accepted_by !== userName) return;
+
+    setUpdatingDcsarId(task.id);
+    try {
+      await completeDcsarTask(task.id, userName);
+      const latestPoints = await getDcsar();
+      const nextPoints = latestPoints?.points || latestPoints;
+      if (Array.isArray(nextPoints)) setDcsarPoints(nextPoints);
+      setSelectedDcsarId(null);
+      setHoveredDcsarId(null);
+    } catch (error) {
+      console.error('Failed to complete DCSAR task:', error);
+      alert(`Failed to complete DCSAR task: ${error.message}`);
+    } finally {
+      setUpdatingDcsarId(null);
+    }
+  };
+
+  const handleCancelDcsarTask = async (task) => {
+    if (!task || task.status !== 'accepted') return;
+    const userName = user?.globalName || user?.username || user?.id;
+    if (!userName || task.accepted_by !== userName) return;
+
+    setUpdatingDcsarId(task.id);
+    try {
+      await cancelDcsarTask(task.id, userName);
+      const latestPoints = await getDcsar();
+      const nextPoints = latestPoints?.points || latestPoints;
+      if (Array.isArray(nextPoints)) setDcsarPoints(nextPoints);
+    } catch (error) {
+      console.error('Failed to cancel DCSAR task:', error);
+      alert(`Failed to cancel DCSAR task: ${error.message}`);
+    } finally {
+      setUpdatingDcsarId(null);
+    }
+  };
+
   return (
     <div className="h-full overflow-hidden bg-yt-bg-primary p-3">
       <div className="h-full">
@@ -1541,6 +1632,7 @@ export default function FrontlineMap({ airportsData }) {
                     onZoomChange={handleFlatMapZoomChange}
                     onZoneHover={setHoveredZoneId}
                     onDcsarHover={setHoveredDcsarId}
+                    onDcsarSelect={handleSelectDcsarTask}
                     onAirportClick={setSelectedAirportId}
                     showAto={filters.showAto}
                     showAirports={filters.showAirports}
@@ -2086,6 +2178,111 @@ export default function FrontlineMap({ airportsData }) {
                           </div>
                         );
                       })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedDcsarTask && (
+                <div className="fixed inset-0 z-[1200] flex items-center justify-center">
+                  <button
+                    type="button"
+                    className="absolute inset-0 bg-black/70"
+                    onClick={() => setSelectedDcsarId(null)}
+                    aria-label="Close CSAR task details"
+                  />
+                  <div className="relative w-[min(760px,92vw)] max-h-[84vh] overflow-y-auto rounded-2xl border border-yt-border bg-[#0f1727] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-yt-text-primary">
+                          CSAR Task {selectedDcsarTask.id}
+                        </div>
+                        <div className="text-xs text-yt-text-secondary">
+                          {selectedDcsarTask.nearest_airbase?.name
+                            ? `Nearest Airbase: ${selectedDcsarTask.nearest_airbase.name}`
+                            : 'Nearest Airbase: n/a'}
+                          {selectedDcsarTask.nearest_distance_nm ? ` - ${selectedDcsarTask.nearest_distance_nm.toFixed(1)} nm` : ''}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {selectedDcsarTask.status === 'pending' && (
+                          <button
+                            type="button"
+                            onClick={() => handleAcceptDcsarTask(selectedDcsarTask)}
+                            disabled={acceptingDcsarId === selectedDcsarTask.id}
+                            className="rounded border border-green-500/50 bg-green-500/15 px-2.5 py-1 text-xs font-semibold text-green-300 hover:bg-green-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {acceptingDcsarId === selectedDcsarTask.id ? 'Accepting...' : 'Accept Task'}
+                          </button>
+                        )}
+                        {selectedDcsarTask.status === 'accepted' && (
+                          <span className="rounded border border-blue-500/50 bg-blue-500/15 px-2.5 py-1 text-xs font-semibold text-blue-300">
+                            Accepted
+                          </span>
+                        )}
+                        {selectedDcsarTask.status === 'accepted' && selectedDcsarTask.accepted_by && (
+                          <span className="text-[10px] text-blue-200">
+                            {selectedDcsarTask.accepted_by}
+                          </span>
+                        )}
+                        {!user && selectedDcsarTask.status === 'pending' && (
+                          <span className="text-[10px] text-yt-text-secondary">Discord login required</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDcsarId(null)}
+                          className="rounded border border-yt-border px-2 py-1 text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+
+                    {selectedDcsarTask.status === 'accepted' && user && (
+                      <div className="mb-3 flex items-center gap-2">
+                        {(selectedDcsarTask.accepted_by === (user.globalName || user.username || user.id)) ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleCompleteDcsarTask(selectedDcsarTask)}
+                              disabled={updatingDcsarId === selectedDcsarTask.id}
+                              className="rounded border border-green-500/50 bg-green-500/15 px-3 py-1.5 text-xs font-semibold text-green-300 hover:bg-green-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {updatingDcsarId === selectedDcsarTask.id ? 'Completing...' : 'Complete'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleCancelDcsarTask(selectedDcsarTask)}
+                              disabled={updatingDcsarId === selectedDcsarTask.id}
+                              className="rounded border border-red-500/50 bg-red-500/15 px-3 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {updatingDcsarId === selectedDcsarTask.id ? 'Cancelling...' : 'Cancel'}
+                            </button>
+                          </>
+                        ) : (
+                          <div className="text-[11px] text-yt-text-secondary">
+                            Only the assigned pilot can complete or cancel this task.
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="rounded-lg border border-yt-border/70 bg-yt-bg-tertiary/60 p-3">
+                      <div className="mb-2 text-xs font-semibold text-yt-text-primary">Task Details</div>
+                      <div className="grid grid-cols-1 gap-2 text-[11px] text-yt-text-secondary md:grid-cols-2">
+                        <div>
+                          Status: <span className="font-semibold text-yt-text-primary">{selectedDcsarTask.status}</span>
+                        </div>
+                        <div>
+                          Accepted by: <span className="font-semibold text-yt-text-primary">{selectedDcsarTask.accepted_by || '-'}</span>
+                        </div>
+                        <div className="md:col-span-2">
+                          Coordinates: <span className="font-mono text-yt-text-primary">{formatZoneCoordinates({ lat: selectedDcsarTask.lat, lon: selectedDcsarTask.lon }, 'dms')}</span>
+                        </div>
+                        <div className="md:col-span-2">
+                          MGRS: <span className="font-mono text-yt-text-primary">{formatZoneCoordinates({ lat: selectedDcsarTask.lat, lon: selectedDcsarTask.lon }, 'mgrs')}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -305,6 +305,28 @@ function syncDcsarFromFile() {
   }
 }
 
+function persistDcsarToFile(points) {
+  const lines = (Array.isArray(points) ? points : [])
+    .map((point, index) => {
+      const lat = Number(point?.lat);
+      const lon = Number(point?.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+      const id = String(point?.id || `dcsar_${index + 1}`).trim();
+      const status = String(point?.status || 'pending').trim().toLowerCase() === 'accepted' ? 'accepted' : 'pending';
+      const acceptedBy = point?.accepted_by ? String(point.accepted_by).trim() : '';
+      const meta = [
+        `id=${id}`,
+        `status=${status}`,
+        acceptedBy ? `accepted_by=${acceptedBy.replace(/\s+/g, '_')}` : null,
+      ].filter(Boolean).join(' ');
+      return `${lat.toFixed(6)},${lon.toFixed(6)} ${meta}`.trim();
+    })
+    .filter(Boolean);
+
+  fs.writeFileSync(DCSAR_SYNC_FILE, `${lines.join('\n')}${lines.length > 0 ? '\n' : ''}`, 'utf8');
+  dcsarSyncSignature = fs.readFileSync(DCSAR_SYNC_FILE, 'utf8');
+}
+
 /**
  * Load airbase status from airbase_status.lua file
  */
@@ -993,6 +1015,187 @@ app.get('/api/feed', (req, res) => {
  */
 app.get('/api/dcsar', (req, res) => {
   res.json({ points: dcsarPoints });
+});
+
+/**
+ * POST /api/dcsar/:id/accept - Accept a DCSAR rescue task
+ */
+app.post('/api/dcsar/:id/accept', (req, res) => {
+  const dcsarId = String(req.params.id || '').trim();
+  const userId = String(req.body?.userId || '').trim();
+
+  if (!dcsarId) {
+    return res.status(400).json({ error: 'DCSAR id is required' });
+  }
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  const index = dcsarPoints.findIndex((point) => String(point?.id || '') === dcsarId);
+  if (index < 0) {
+    return res.status(404).json({ error: 'DCSAR task not found' });
+  }
+
+  const current = dcsarPoints[index];
+  const alreadyAccepted = String(current?.status || '').toLowerCase() === 'accepted' || Boolean(current?.accepted);
+  if (alreadyAccepted && current?.accepted_by && current.accepted_by !== userId) {
+    return res.status(409).json({ error: `Task already accepted by ${current.accepted_by}` });
+  }
+
+  const updated = {
+    ...current,
+    status: 'accepted',
+    accepted: true,
+    accepted_by: userId,
+  };
+
+  dcsarPoints = [
+    ...dcsarPoints.slice(0, index),
+    updated,
+    ...dcsarPoints.slice(index + 1),
+  ];
+
+  try {
+    persistDcsarToFile(dcsarPoints);
+  } catch (error) {
+    console.error('Failed to persist DCSAR task:', error.message);
+    return res.status(500).json({ error: 'Failed to persist DCSAR task' });
+  }
+
+  io.emit('dcsar:updated', {
+    points: dcsarPoints,
+  });
+
+  pushFeedEvent({
+    type: 'dcsar.accepted',
+    title: 'CSAR task accepted',
+    message: `${userId} accepted CSAR task ${dcsarId}`,
+    metadata: {
+      dcsar_id: dcsarId,
+      accepted_by: userId,
+    },
+  });
+
+  res.json({ success: true, task: updated });
+});
+
+/**
+ * POST /api/dcsar/:id/complete - Complete a DCSAR rescue task
+ */
+app.post('/api/dcsar/:id/complete', (req, res) => {
+  const dcsarId = String(req.params.id || '').trim();
+  const userId = String(req.body?.userId || '').trim();
+
+  if (!dcsarId) {
+    return res.status(400).json({ error: 'DCSAR id is required' });
+  }
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  const index = dcsarPoints.findIndex((point) => String(point?.id || '') === dcsarId);
+  if (index < 0) {
+    return res.status(404).json({ error: 'DCSAR task not found' });
+  }
+
+  const current = dcsarPoints[index];
+  if (String(current?.status || '').toLowerCase() !== 'accepted') {
+    return res.status(400).json({ error: 'Task must be accepted before completion' });
+  }
+  if (current?.accepted_by && current.accepted_by !== userId) {
+    return res.status(403).json({ error: 'Only the assigned user can complete this task' });
+  }
+
+  const removed = current;
+  dcsarPoints = dcsarPoints.filter((point) => String(point?.id || '') !== dcsarId);
+
+  try {
+    persistDcsarToFile(dcsarPoints);
+  } catch (error) {
+    console.error('Failed to persist DCSAR completion:', error.message);
+    return res.status(500).json({ error: 'Failed to persist DCSAR completion' });
+  }
+
+  io.emit('dcsar:updated', {
+    points: dcsarPoints,
+  });
+
+  pushFeedEvent({
+    type: 'dcsar.completed',
+    title: 'CSAR task completed',
+    message: `${userId} completed CSAR task ${dcsarId}`,
+    metadata: {
+      dcsar_id: dcsarId,
+      completed_by: userId,
+      previous: removed,
+    },
+  });
+
+  res.json({ success: true });
+});
+
+/**
+ * POST /api/dcsar/:id/cancel - Cancel a DCSAR rescue task
+ */
+app.post('/api/dcsar/:id/cancel', (req, res) => {
+  const dcsarId = String(req.params.id || '').trim();
+  const userId = String(req.body?.userId || '').trim();
+
+  if (!dcsarId) {
+    return res.status(400).json({ error: 'DCSAR id is required' });
+  }
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  const index = dcsarPoints.findIndex((point) => String(point?.id || '') === dcsarId);
+  if (index < 0) {
+    return res.status(404).json({ error: 'DCSAR task not found' });
+  }
+
+  const current = dcsarPoints[index];
+  if (String(current?.status || '').toLowerCase() !== 'accepted') {
+    return res.status(400).json({ error: 'Task must be accepted before cancellation' });
+  }
+  if (current?.accepted_by && current.accepted_by !== userId) {
+    return res.status(403).json({ error: 'Only the assigned user can cancel this task' });
+  }
+
+  const updated = {
+    ...current,
+    status: 'pending',
+    accepted: false,
+    accepted_by: null,
+  };
+
+  dcsarPoints = [
+    ...dcsarPoints.slice(0, index),
+    updated,
+    ...dcsarPoints.slice(index + 1),
+  ];
+
+  try {
+    persistDcsarToFile(dcsarPoints);
+  } catch (error) {
+    console.error('Failed to persist DCSAR cancellation:', error.message);
+    return res.status(500).json({ error: 'Failed to persist DCSAR cancellation' });
+  }
+
+  io.emit('dcsar:updated', {
+    points: dcsarPoints,
+  });
+
+  pushFeedEvent({
+    type: 'dcsar.cancelled',
+    title: 'CSAR task cancelled',
+    message: `${userId} cancelled CSAR task ${dcsarId}`,
+    metadata: {
+      dcsar_id: dcsarId,
+      cancelled_by: userId,
+    },
+  });
+
+  res.json({ success: true, task: updated });
 });
 
 /**
