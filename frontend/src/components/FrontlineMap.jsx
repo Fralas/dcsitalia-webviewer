@@ -395,7 +395,7 @@ function FlatMapView({
               }}
             >
               <Tooltip direction="center" opacity={0.9}>
-                {(sourceAirport.displayName || sourceAirport.name)} -> {(destinationAirport.displayName || destinationAirport.name)}
+                {(sourceAirport.displayName || sourceAirport.name)} {' -> '} {(destinationAirport.displayName || destinationAirport.name)}
               </Tooltip>
             </Polyline>
           );
@@ -727,6 +727,18 @@ export default function FrontlineMap({ airportsData }) {
 
   const selectedAirport = selectedAirportId ? airportsById.get(selectedAirportId) : null;
 
+  useEffect(() => {
+    if (!filters.showLogistics) {
+      setSelectedAirportId(null);
+    }
+  }, [filters.showLogistics]);
+
+  useEffect(() => {
+    if (!filters.showAto) {
+      setHoveredZoneId(null);
+    }
+  }, [filters.showAto]);
+
   return (
     <div className="h-full overflow-hidden bg-yt-bg-primary p-3">
       <div className="h-full">
@@ -865,7 +877,7 @@ export default function FrontlineMap({ airportsData }) {
                 </div>
               </div>
 
-              {selectedZone && (
+              {filters.showAto && selectedZone && (
                 <div className="absolute bottom-4 left-4 z-[1000] w-[330px] rounded-xl border border-yt-border bg-[#1b1d2af0] p-3 shadow-2xl backdrop-blur">
                   <div className="mb-2 flex flex-wrap gap-1.5">
                     {selectedTags.slice(0, 8).map((tag) => (
@@ -897,6 +909,70 @@ export default function FrontlineMap({ airportsData }) {
                       View Details
                     </button>
                   </div>
+                </div>
+              )}
+
+              {filters.showLogistics && selectedAirport && (
+                <div className="absolute right-4 bottom-4 z-[1000] w-[430px] max-h-[62vh] overflow-y-auto rounded-xl border border-yt-border bg-[#101827f2] p-3 shadow-2xl backdrop-blur">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="text-sm font-semibold text-yt-text-primary">
+                      {selectedAirport.displayName || selectedAirport.name}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAirportId(null)}
+                      className="text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  {airportLogistics.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-yt-border px-3 py-3 text-xs text-yt-text-secondary">
+                      No logistics tasks for this airport.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {airportLogistics.map((mission) => {
+                        const sourceAirport = airportsById.get(mission.source_airport_id);
+                        const orders = getMissionOrders(mission);
+                        return (
+                          <div key={mission.id} className="rounded-lg border border-yt-border bg-yt-bg-tertiary/60 p-2">
+                            <div className="mb-1 text-xs font-semibold text-yt-text-primary">
+                              From: {sourceAirport?.displayName || sourceAirport?.name || mission.source_airport_id}
+                            </div>
+                            <div className="mb-2 text-[11px] text-yt-text-secondary">
+                              Mission {mission.id} - {mission.status}
+                            </div>
+                            <div className="space-y-1.5">
+                              {orders.map((order, index) => {
+                                const containerCount = getOrderContainers(order);
+                                const totalWeight = Number(order.total_weight_lbs || 0);
+                                const weightPerContainer = containerCount > 0 ? (totalWeight / containerCount) : totalWeight;
+                                const priority = getPriorityText(order.priority || mission.priority);
+                                return (
+                                  <div key={`${mission.id}-${order.weapon_id || index}`} className="rounded border border-yt-border/70 bg-[#0c1320] px-2 py-1.5">
+                                    <div className="text-[11px] font-semibold text-yt-text-primary">
+                                      {containerCount} container{containerCount > 1 ? 's' : ''} - {getWeaponDisplayName(order.weapon_id || 'cargo')}
+                                    </div>
+                                    <div className="text-[10px] text-yt-text-secondary">
+                                      Content: Qty {Number(order.quantity_needed || 0)}
+                                    </div>
+                                    <div className="text-[10px] text-yt-text-secondary">
+                                      Weight/container: {weightPerContainer > 0 ? `${weightPerContainer.toFixed(1)} lbs` : '-'}
+                                    </div>
+                                    <div className="text-[10px] text-yt-text-secondary">
+                                      Priority: {priority}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
