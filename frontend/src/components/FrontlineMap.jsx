@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, Clock3, MapPin } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import socketService from '../services/socket';
-import { acceptMission, cancelMission, completeMission, getCombatMissions, getFeed, getFrontlineZones, getMissions } from '../services/api';
+import { acceptMission, cancelMission, completeMission, getCombatMissions, getConvoys, getFeed, getFrontlineZones, getMissions } from '../services/api';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
@@ -120,6 +120,7 @@ function getFeedTypeStyle(type) {
   if (type === 'zone.status_changed') return 'border-red-500/40 bg-red-500/10 text-red-200';
   if (type?.startsWith('logistics.')) return 'border-sky-500/40 bg-sky-500/10 text-sky-200';
   if (type?.startsWith('ato.')) return 'border-orange-500/40 bg-orange-500/10 text-orange-200';
+  if (type?.startsWith('convoy.')) return 'border-yellow-500/40 bg-yellow-500/10 text-yellow-200';
   if (type?.startsWith('user.')) return 'border-green-500/40 bg-green-500/10 text-green-200';
   return 'border-slate-500/40 bg-slate-500/10 text-slate-200';
 }
@@ -128,8 +129,43 @@ function getFeedTypeLabel(type) {
   if (type === 'zone.status_changed') return 'Zone';
   if (type?.startsWith('logistics.')) return 'Logistics';
   if (type?.startsWith('ato.')) return 'ATO';
+  if (type?.startsWith('convoy.')) return 'Convoy';
   if (type?.startsWith('user.')) return 'User';
   return 'System';
+}
+
+function getConvoyStyle(status) {
+  if (status === 'arrived') {
+    return {
+      color: '#22c55e',
+      weight: 3,
+      opacity: 0.85,
+      dashArray: undefined,
+      markerColor: '#22c55e',
+      markerRadius: 5,
+      markerOpacity: 0.95,
+    };
+  }
+  if (status === 'destroyed') {
+    return {
+      color: '#ef4444',
+      weight: 2,
+      opacity: 0.7,
+      dashArray: '6,6',
+      markerColor: '#ef4444',
+      markerRadius: 5,
+      markerOpacity: 0.9,
+    };
+  }
+  return {
+    color: '#f59e0b',
+    weight: 3,
+    opacity: 0.9,
+    dashArray: '8,5',
+    markerColor: '#f59e0b',
+    markerRadius: 5,
+    markerOpacity: 0.95,
+  };
 }
 
 function getWeaponDisplayName(weaponId = '') {
@@ -167,6 +203,14 @@ function getOrderContainers(order) {
     return Math.max(1, Math.ceil(isoUnits));
   }
   return 1;
+}
+
+function toLatLngPoint(position) {
+  if (!position || typeof position !== 'object') return null;
+  const lat = Number(position.lat);
+  const lon = Number(position.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  return [lat, lon];
 }
 
 function getItemQuantity(item) {
@@ -415,6 +459,7 @@ function FlatMapView({
   airportsData,
   logisticsMissions,
   gridConnections,
+  convoys,
   selectedZoneId,
   onZoneSelect,
   focusCoordinates,
@@ -424,6 +469,7 @@ function FlatMapView({
   showAto,
   showAirports,
   showLogistics,
+  showConvoys,
 }) {
   const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
   const airportsById = useMemo(() => {
@@ -487,6 +533,67 @@ function FlatMapView({
               </Tooltip>
             </Polyline>
           );
+        })}
+
+        {showConvoys && convoys.map((convoy) => {
+          const style = getConvoyStyle(convoy.status);
+          const layers = [];
+          if (Array.isArray(convoy.routeLine) && convoy.routeLine.length >= 2) {
+            layers.push(
+              <Polyline
+                key={`convoy-route-${convoy.convoy_id}`}
+                positions={convoy.routeLine}
+                pathOptions={{
+                  color: '#f8fafc',
+                  weight: 1,
+                  opacity: 0.35,
+                  dashArray: '2,7',
+                  interactive: false,
+                }}
+              />
+            );
+          }
+
+          if (Array.isArray(convoy.pathLine) && convoy.pathLine.length >= 2) {
+            layers.push(
+              <Polyline
+                key={`convoy-path-${convoy.convoy_id}`}
+                positions={convoy.pathLine}
+                pathOptions={{
+                  color: style.color,
+                  weight: style.weight,
+                  opacity: style.opacity,
+                  dashArray: style.dashArray,
+                }}
+              >
+                <Tooltip direction="top" offset={[0, -3]} opacity={0.95}>
+                  Convoy {convoy.convoy_id} ({convoy.status})
+                </Tooltip>
+              </Polyline>
+            );
+          }
+
+          if (convoy.lastPosition) {
+            layers.push(
+              <CircleMarker
+                key={`convoy-marker-${convoy.convoy_id}`}
+                center={convoy.lastPosition}
+                radius={style.markerRadius}
+                pathOptions={{
+                  color: style.markerColor,
+                  fillColor: style.markerColor,
+                  fillOpacity: style.markerOpacity,
+                  weight: 2,
+                }}
+              >
+                <Tooltip direction="top" offset={[0, -3]} opacity={0.95}>
+                  Convoy {convoy.convoy_id} ({convoy.status})
+                </Tooltip>
+              </CircleMarker>
+            );
+          }
+
+          return layers;
         })}
 
         {showAto && zones.map((zone) => {
@@ -560,6 +667,7 @@ export default function FrontlineMap({ airportsData }) {
   const [zones, setZones] = useState(frontlineZones);
   const [combatMissions, setCombatMissions] = useState([]);
   const [logisticsMissions, setLogisticsMissions] = useState([]);
+  const [convoys, setConvoys] = useState([]);
   const [feedEvents, setFeedEvents] = useState([]);
   const [overlayCollapsed, setOverlayCollapsed] = useState(false);
   const [feedCollapsed, setFeedCollapsed] = useState(false);
@@ -576,13 +684,14 @@ export default function FrontlineMap({ airportsData }) {
     showAto: true,
     showLogistics: true,
     showAirports: true,
+    showConvoys: true,
   });
   const mapModeRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
-    Promise.allSettled([getFrontlineZones(), getCombatMissions(), getMissions(), getFeed(200)])
-      .then(([zonesResult, combatResult, logisticsResult, feedResult]) => {
+    Promise.allSettled([getFrontlineZones(), getCombatMissions(), getMissions(), getFeed(200), getConvoys()])
+      .then(([zonesResult, combatResult, logisticsResult, feedResult, convoysResult]) => {
         if (!isMounted) return;
 
         if (zonesResult.status === 'fulfilled') {
@@ -618,6 +727,15 @@ export default function FrontlineMap({ airportsData }) {
         } else {
           console.error('Failed to load feed events:', feedResult.reason);
         }
+
+        if (convoysResult.status === 'fulfilled') {
+          const nextConvoys = convoysResult.value?.convoys || convoysResult.value;
+          if (Array.isArray(nextConvoys)) {
+            setConvoys(nextConvoys);
+          }
+        } else {
+          console.error('Failed to load convoys:', convoysResult.reason);
+        }
       });
 
     return () => {
@@ -652,11 +770,19 @@ export default function FrontlineMap({ airportsData }) {
       }
     });
 
+    const unsubscribeConvoys = socketService.on('convoys:updated', (data) => {
+      const nextConvoys = data?.convoys || data;
+      if (Array.isArray(nextConvoys)) {
+        setConvoys(nextConvoys);
+      }
+    });
+
     return () => {
       unsubscribe && unsubscribe();
       unsubscribeMissions && unsubscribeMissions();
       unsubscribeLogistics && unsubscribeLogistics();
       unsubscribeFeed && unsubscribeFeed();
+      unsubscribeConvoys && unsubscribeConvoys();
     };
   }, []);
 
@@ -685,6 +811,22 @@ export default function FrontlineMap({ airportsData }) {
         }
       } catch (error) {
         console.error('Failed to refresh feed events:', error);
+      }
+    }, 20000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const latestConvoys = await getConvoys();
+        const nextConvoys = latestConvoys?.convoys || latestConvoys;
+        if (Array.isArray(nextConvoys)) {
+          setConvoys(nextConvoys);
+        }
+      } catch (error) {
+        console.error('Failed to refresh convoys:', error);
       }
     }, 20000);
 
@@ -752,6 +894,39 @@ export default function FrontlineMap({ airportsData }) {
 
     return links;
   }, [validZones]);
+
+  const zoneCoordinatesById = useMemo(() => {
+    const map = new Map();
+    validZones.forEach((zone) => {
+      if (zone?.id && zone?.coordinates) {
+        map.set(zone.id, zone.coordinates);
+      }
+    });
+    return map;
+  }, [validZones]);
+
+  const convoyRenderData = useMemo(() => {
+    return convoys.map((convoy) => {
+      const originPosition = zoneCoordinatesById.get(convoy.origin_zone) || convoy.origin_position || null;
+      const destinationPosition = zoneCoordinatesById.get(convoy.destination_zone) || convoy.destination_position || null;
+      const originPoint = toLatLngPoint(originPosition);
+      const destinationPoint = toLatLngPoint(destinationPosition);
+
+      const pathLine = Array.isArray(convoy.path)
+        ? convoy.path.map((point) => toLatLngPoint(point)).filter(Boolean)
+        : [];
+      const lastPosition = toLatLngPoint(convoy.last_position) || pathLine[pathLine.length - 1] || null;
+      const routeLine = originPoint && destinationPoint ? [originPoint, destinationPoint] : [];
+
+      return {
+        convoy_id: convoy.convoy_id,
+        status: convoy.status || 'active',
+        routeLine,
+        pathLine,
+        lastPosition,
+      };
+    }).filter((convoy) => convoy.routeLine.length >= 2 || convoy.pathLine.length >= 2 || convoy.lastPosition);
+  }, [convoys, zoneCoordinatesById]);
 
   useEffect(() => {
     if (validZones.length === 0) return;
@@ -1059,6 +1234,7 @@ export default function FrontlineMap({ airportsData }) {
                     airportsData={validAirports}
                     logisticsMissions={filteredLogisticsMissions}
                     gridConnections={gridConnections}
+                    convoys={convoyRenderData}
                     selectedZoneId={selectedZoneId}
                     onZoneSelect={setSelectedZoneId}
                     focusCoordinates={focusCoordinates}
@@ -1068,6 +1244,7 @@ export default function FrontlineMap({ airportsData }) {
                     showAto={filters.showAto}
                     showAirports={filters.showAirports}
                     showLogistics={filters.showLogistics}
+                    showConvoys={filters.showConvoys}
                   />
                 </div>
               )}
@@ -1108,7 +1285,7 @@ export default function FrontlineMap({ airportsData }) {
 
                 {!overlayCollapsed && (
                   <>
-                    <div className="mb-3 grid grid-cols-2 gap-3">
+                    <div className="mb-3 grid grid-cols-3 gap-3">
                       <button
                         type="button"
                         onClick={() => setFilters((current) => ({ ...current, showAto: !current.showAto }))}
@@ -1130,6 +1307,17 @@ export default function FrontlineMap({ airportsData }) {
                         }`}
                       >
                         Logistics
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFilters((current) => ({ ...current, showConvoys: !current.showConvoys }))}
+                        className={`rounded border px-2 py-1 text-[11px] font-semibold ${
+                          filters.showConvoys
+                            ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
+                            : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
+                        }`}
+                      >
+                        Convoys
                       </button>
                     </div>
 

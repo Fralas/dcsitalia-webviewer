@@ -31,6 +31,7 @@ import * as luaZoneSync from './services/luaZoneSync.js';
 import * as activeUsers from './services/activeUsers.js';
 import * as userProfiles from './services/userProfiles.js';
 import * as feedService from './services/feed.js';
+import * as convoysService from './services/convoys.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,6 +53,7 @@ const io = new Server(httpServer, {
 });
 
 const PORT = process.env.PORT || 3001;
+const CONVOY_API_TOKEN = process.env.CONVOY_API_TOKEN || '';
 
 // CSV Directory - configurable via environment variable
 const CSV_DIR = process.env.CSV_DIR
@@ -847,6 +849,63 @@ app.get('/api/feed', (req, res) => {
 });
 
 /**
+ * GET /api/convoys - Get convoy states
+ */
+app.get('/api/convoys', (req, res) => {
+  const status = typeof req.query.status === 'string' ? req.query.status.trim().toLowerCase() : null;
+  const convoys = status ? convoysService.getConvoys(status) : convoysService.getConvoys();
+  res.json({ convoys });
+});
+
+/**
+ * POST /api/convoys/events - Upsert convoy event from external scripts (Lua/DCS)
+ */
+app.post('/api/convoys/events', (req, res) => {
+  const token = req.headers['x-convoy-token'];
+  if (CONVOY_API_TOKEN && token !== CONVOY_API_TOKEN) {
+    return res.status(401).json({ error: 'Invalid convoy token' });
+  }
+
+  const eventType = String(req.body?.event || '').toLowerCase();
+  if (!convoysService.CONVOY_EVENT_TYPES.has(eventType)) {
+    return res.status(400).json({
+      error: `Invalid event type. Allowed: ${Array.from(convoysService.CONVOY_EVENT_TYPES).join(', ')}`
+    });
+  }
+
+  try {
+    const convoy = convoysService.recordConvoyEvent(req.body || {});
+
+    io.emit('convoys:updated', {
+      convoys: convoysService.getConvoys()
+    });
+
+    if (eventType === 'spawned' || eventType === 'arrived' || eventType === 'destroyed') {
+      const action = eventType === 'spawned'
+        ? 'spawned'
+        : eventType === 'arrived'
+          ? 'arrived'
+          : 'destroyed';
+      pushFeedEvent({
+        type: `convoy.${eventType}`,
+        title: 'Convoy event',
+        message: `Convoy ${convoy.convoy_id} ${action} (${convoy.origin_zone || '?'} -> ${convoy.destination_zone || '?'})`,
+        metadata: {
+          convoy_id: convoy.convoy_id,
+          status: convoy.status,
+          origin_zone: convoy.origin_zone,
+          destination_zone: convoy.destination_zone,
+        },
+      });
+    }
+
+    res.json({ success: true, convoy });
+  } catch (error) {
+    res.status(400).json({ error: error.message || 'Failed to process convoy event' });
+  }
+});
+
+/**
  * GET /api/mock-users - Get mock users for testing (development only)
  */
 app.get('/api/mock-users', (req, res) => {
@@ -1343,6 +1402,9 @@ io.on('connection', (socket) => {
   });
   socket.emit('feed:updated', {
     events: feedService.getFeedEvents(250),
+  });
+  socket.emit('convoys:updated', {
+    convoys: convoysService.getConvoys(),
   });
 
   socket.on('disconnect', () => {
