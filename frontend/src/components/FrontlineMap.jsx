@@ -2,11 +2,11 @@ import { useMemo, useState, useEffect, useRef } from 'react';
 import createGlobe from 'cobe';
 import { MapContainer, TileLayer, CircleMarker, Polyline, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Clock3, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock3, MapPin } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import socketService from '../services/socket';
-import { acceptMission, cancelMission, completeMission, getCombatMissions, getFrontlineZones, getMissions } from '../services/api';
+import { acceptMission, cancelMission, completeMission, getCombatMissions, getFeed, getFrontlineZones, getMissions } from '../services/api';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
@@ -92,6 +92,22 @@ function getControlText(status) {
   if (status === 'BLUE') return 'blue control';
   if (status === 'UNDER_ATTACK') return 'contested control';
   return 'no control';
+}
+
+function getFeedTypeStyle(type) {
+  if (type === 'zone.status_changed') return 'border-red-500/40 bg-red-500/10 text-red-200';
+  if (type?.startsWith('logistics.')) return 'border-sky-500/40 bg-sky-500/10 text-sky-200';
+  if (type?.startsWith('ato.')) return 'border-orange-500/40 bg-orange-500/10 text-orange-200';
+  if (type?.startsWith('user.')) return 'border-green-500/40 bg-green-500/10 text-green-200';
+  return 'border-slate-500/40 bg-slate-500/10 text-slate-200';
+}
+
+function getFeedTypeLabel(type) {
+  if (type === 'zone.status_changed') return 'Zone';
+  if (type?.startsWith('logistics.')) return 'Logistics';
+  if (type?.startsWith('ato.')) return 'ATO';
+  if (type?.startsWith('user.')) return 'User';
+  return 'System';
 }
 
 function getWeaponDisplayName(weaponId = '') {
@@ -490,6 +506,9 @@ export default function FrontlineMap({ airportsData }) {
   const [zones, setZones] = useState(frontlineZones);
   const [combatMissions, setCombatMissions] = useState([]);
   const [logisticsMissions, setLogisticsMissions] = useState([]);
+  const [feedEvents, setFeedEvents] = useState([]);
+  const [overlayCollapsed, setOverlayCollapsed] = useState(false);
+  const [feedCollapsed, setFeedCollapsed] = useState(false);
   const [zoneStatusMeta, setZoneStatusMeta] = useState({});
   const [mapMode, setMapMode] = useState(false);
   const [forcedGlobeScale, setForcedGlobeScale] = useState(null);
@@ -508,8 +527,8 @@ export default function FrontlineMap({ airportsData }) {
 
   useEffect(() => {
     let isMounted = true;
-    Promise.all([getFrontlineZones(), getCombatMissions(), getMissions()])
-      .then(([zonesData, missionsData, logisticsData]) => {
+    Promise.all([getFrontlineZones(), getCombatMissions(), getMissions(), getFeed(200)])
+      .then(([zonesData, missionsData, logisticsData, feedData]) => {
         const nextZones = zonesData?.zones || zonesData;
         if (isMounted && Array.isArray(nextZones)) {
           setZones(nextZones);
@@ -519,6 +538,10 @@ export default function FrontlineMap({ airportsData }) {
         }
         if (isMounted && Array.isArray(logisticsData)) {
           setLogisticsMissions(logisticsData);
+        }
+        const nextFeed = feedData?.events || feedData;
+        if (isMounted && Array.isArray(nextFeed)) {
+          setFeedEvents(nextFeed);
         }
       })
       .catch((error) => {
@@ -550,10 +573,18 @@ export default function FrontlineMap({ airportsData }) {
       }
     });
 
+    const unsubscribeFeed = socketService.on('feed:updated', (data) => {
+      const nextFeed = data?.events || data;
+      if (Array.isArray(nextFeed)) {
+        setFeedEvents(nextFeed);
+      }
+    });
+
     return () => {
       unsubscribe && unsubscribe();
       unsubscribeMissions && unsubscribeMissions();
       unsubscribeLogistics && unsubscribeLogistics();
+      unsubscribeFeed && unsubscribeFeed();
     };
   }, []);
 
@@ -904,114 +935,191 @@ export default function FrontlineMap({ airportsData }) {
                 </div>
               )}
 
-              <div className="absolute left-3 top-3 z-[1000] w-[320px] rounded-xl border border-yt-border bg-[#151925f2] p-3 shadow-2xl backdrop-blur">
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-yt-text-secondary">Overlays</div>
+              <div
+                className={`absolute left-3 top-3 z-[1000] rounded-xl border border-yt-border bg-[#151925f2] shadow-2xl backdrop-blur transition-all duration-200 ${
+                  overlayCollapsed ? 'w-[46px] p-1.5' : 'w-[320px] p-3'
+                }`}
+              >
+                <div className={`flex items-center ${overlayCollapsed ? 'justify-center' : 'mb-2 justify-between'}`}>
+                  {!overlayCollapsed && (
+                    <>
+                      <div className="text-[11px] uppercase tracking-[0.18em] text-yt-text-secondary">Overlays</div>
+                      <button
+                        type="button"
+                        className={`rounded px-2 py-1 text-[10px] font-semibold ${filters.showAirports ? 'bg-yt-accent/25 text-yt-text-primary' : 'bg-yt-bg-tertiary text-yt-text-secondary'}`}
+                        onClick={() => setFilters((current) => ({ ...current, showAirports: !current.showAirports }))}
+                      >
+                        Airports
+                      </button>
+                    </>
+                  )}
                   <button
                     type="button"
-                    className={`rounded px-2 py-1 text-[10px] font-semibold ${filters.showAirports ? 'bg-yt-accent/25 text-yt-text-primary' : 'bg-yt-bg-tertiary text-yt-text-secondary'}`}
-                    onClick={() => setFilters((current) => ({ ...current, showAirports: !current.showAirports }))}
+                    onClick={() => setOverlayCollapsed((value) => !value)}
+                    className="rounded border border-yt-border bg-yt-bg-tertiary/60 p-1 text-yt-text-secondary transition-colors hover:text-yt-text-primary"
+                    aria-label={overlayCollapsed ? 'Open overlays' : 'Close overlays'}
+                    title={overlayCollapsed ? 'Open overlays' : 'Close overlays'}
                   >
-                    Airports
+                    {overlayCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
                   </button>
                 </div>
 
-                <div className="mb-2 grid grid-cols-2 gap-2">
+                {!overlayCollapsed && (
+                  <>
+                    <div className="mb-3 grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setFilters((current) => ({ ...current, showAto: !current.showAto }))}
+                        className={`rounded border px-2 py-1 text-[11px] font-semibold ${
+                          filters.showAto
+                            ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
+                            : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
+                        }`}
+                      >
+                        ATO
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFilters((current) => ({ ...current, showLogistics: !current.showLogistics }))}
+                        className={`rounded border px-2 py-1 text-[11px] font-semibold ${
+                          filters.showLogistics
+                            ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
+                            : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
+                        }`}
+                      >
+                        Logistics
+                      </button>
+                    </div>
+
+                    <div className="mb-2 flex flex-wrap gap-1.5">
+                      {overlayTagOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setFilters((current) => ({ ...current, control: option.value }))}
+                          className={`rounded border px-2 py-1 text-[11px] ${
+                            filters.control === option.value
+                              ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
+                              : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="mb-2 grid grid-cols-2 gap-2">
+                      <select
+                        value={filters.atoMissionStatus}
+                        onChange={(event) => setFilters((current) => ({ ...current, atoMissionStatus: event.target.value }))}
+                        className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
+                      >
+                        {missionStatusOptions.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={filters.logisticsStatus}
+                        onChange={(event) => setFilters((current) => ({ ...current, logisticsStatus: event.target.value }))}
+                        className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
+                      >
+                        {logisticsStatusOptions.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="mb-3 grid grid-cols-2 gap-3">
+                      <select
+                        value={filters.priority}
+                        onChange={(event) => setFilters((current) => ({ ...current, priority: event.target.value }))}
+                        className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
+                      >
+                        {priorityOptions.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={filters.task}
+                        onChange={(event) => setFilters((current) => ({ ...current, task: event.target.value }))}
+                        className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
+                      >
+                        <option value="all">Any Task</option>
+                        <option value="LOGISTICS">LOGISTICS</option>
+                        <option value="SEAD">SEAD</option>
+                        <option value="DEAD">DEAD</option>
+                        <option value="CAS">CAS</option>
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3">
+                      <select
+                        value={filters.activity}
+                        onChange={(event) => setFilters((current) => ({ ...current, activity: event.target.value }))}
+                        className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
+                      >
+                        <option value="all">All Activity</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div
+                className={`absolute right-3 top-3 z-[1000] rounded-xl border border-yt-border bg-[#151925f2] shadow-2xl backdrop-blur transition-all duration-200 ${
+                  feedCollapsed ? 'w-[46px] p-1.5' : 'w-[360px] p-3'
+                }`}
+              >
+                <div className={`flex items-center ${feedCollapsed ? 'justify-center' : 'mb-2 justify-between'}`}>
+                  {!feedCollapsed && (
+                    <>
+                      <div className="text-[11px] uppercase tracking-[0.18em] text-yt-text-secondary">Feed</div>
+                      <div className="flex items-center gap-2">
+                        <div className="rounded bg-yt-bg-tertiary px-2 py-0.5 text-[10px] font-semibold text-yt-text-secondary">
+                          {feedEvents.length}
+                        </div>
+                      </div>
+                    </>
+                  )}
                   <button
                     type="button"
-                    onClick={() => setFilters((current) => ({ ...current, showAto: !current.showAto }))}
-                    className={`rounded border px-2 py-1 text-[11px] font-semibold ${
-                      filters.showAto
-                        ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
-                        : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
-                    }`}
+                    onClick={() => setFeedCollapsed((value) => !value)}
+                    className="rounded border border-yt-border bg-yt-bg-tertiary/60 p-1 text-yt-text-secondary transition-colors hover:text-yt-text-primary"
+                    aria-label={feedCollapsed ? 'Open feed' : 'Close feed'}
+                    title={feedCollapsed ? 'Open feed' : 'Close feed'}
                   >
-                    ATO
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFilters((current) => ({ ...current, showLogistics: !current.showLogistics }))}
-                    className={`rounded border px-2 py-1 text-[11px] font-semibold ${
-                      filters.showLogistics
-                        ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
-                        : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
-                    }`}
-                  >
-                    Logistics
+                    {feedCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   </button>
                 </div>
 
-                <div className="mb-2 flex flex-wrap gap-1.5">
-                  {overlayTagOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setFilters((current) => ({ ...current, control: option.value }))}
-                      className={`rounded border px-2 py-1 text-[11px] ${
-                        filters.control === option.value
-                          ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
-                          : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mb-2 grid grid-cols-2 gap-2">
-                  <select
-                    value={filters.atoMissionStatus}
-                    onChange={(event) => setFilters((current) => ({ ...current, atoMissionStatus: event.target.value }))}
-                    className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
-                  >
-                    {missionStatusOptions.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
+                {!feedCollapsed && (
+                  <div className="max-h-[48vh] space-y-2 overflow-y-auto pr-1">
+                    {feedEvents.length === 0 && (
+                      <div className="rounded border border-dashed border-yt-border px-3 py-3 text-xs text-yt-text-secondary">
+                        No events yet.
+                      </div>
+                    )}
+                    {feedEvents.map((event) => (
+                      <div key={event.id || `${event.type}-${event.timestamp}`} className="rounded-lg border border-yt-border bg-yt-bg-tertiary/40 p-2">
+                        <div className="mb-1 flex items-start justify-between gap-2">
+                          <span className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase ${getFeedTypeStyle(event.type)}`}>
+                            {getFeedTypeLabel(event.type)}
+                          </span>
+                          <span className="text-[10px] text-yt-text-secondary">{formatRelativeTime(event.timestamp)}</span>
+                        </div>
+                        <div className="text-xs font-semibold text-yt-text-primary">
+                          {event.title || 'Activity update'}
+                        </div>
+                        {event.message && (
+                          <div className="mt-0.5 text-[11px] text-yt-text-secondary">
+                            {event.message}
+                          </div>
+                        )}
+                      </div>
                     ))}
-                  </select>
-                  <select
-                    value={filters.logisticsStatus}
-                    onChange={(event) => setFilters((current) => ({ ...current, logisticsStatus: event.target.value }))}
-                    className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
-                  >
-                    {logisticsStatusOptions.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <select
-                    value={filters.priority}
-                    onChange={(event) => setFilters((current) => ({ ...current, priority: event.target.value }))}
-                    className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
-                  >
-                    {priorityOptions.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={filters.task}
-                    onChange={(event) => setFilters((current) => ({ ...current, task: event.target.value }))}
-                    className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
-                  >
-                    <option value="all">Any Task</option>
-                    <option value="LOGISTICS">LOGISTICS</option>
-                    <option value="SEAD">SEAD</option>
-                    <option value="DEAD">DEAD</option>
-                    <option value="CAS">CAS</option>
-                  </select>
-                </div>
-                <div className="grid grid-cols-1 gap-2">
-                  <select
-                    value={filters.activity}
-                    onChange={(event) => setFilters((current) => ({ ...current, activity: event.target.value }))}
-                    className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
-                  >
-                    <option value="all">All Activity</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
+                  </div>
+                )}
               </div>
 
               {filters.showAto && selectedZone && (
@@ -1078,9 +1186,28 @@ export default function FrontlineMap({ airportsData }) {
                             <div className="mb-1 text-xs font-semibold text-yt-text-primary">
                               From: {sourceAirport?.displayName || sourceAirport?.name || mission.source_airport_id}
                             </div>
-                            <div className="mb-2 text-[11px] text-yt-text-secondary">
-                              Mission {mission.id} - {mission.status}
+                            <div className="mb-2 flex items-center justify-between gap-2">
+                              <div className="text-[11px] text-yt-text-secondary">
+                                Mission {mission.id}
+                              </div>
+                              <span className={`rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                                mission.status === 'accepted'
+                                  ? 'bg-blue-500/20 text-blue-300'
+                                  : 'bg-yellow-500/20 text-yellow-300'
+                              }`}>
+                                {mission.status}
+                              </span>
                             </div>
+                            {mission.status === 'accepted' && mission.accepted_by && (
+                              <div className="mb-2 text-[10px] text-blue-200">
+                                Accepted by {mission.accepted_by}
+                              </div>
+                            )}
+                            {mission.status === 'pending' && (
+                              <div className="mb-2 text-[10px] text-yellow-200">
+                                Available for assignment
+                              </div>
+                            )}
                             <div className="space-y-1.5">
                               {orders.map((order, index) => {
                                 const containerCount = getOrderContainers(order);
@@ -1160,6 +1287,11 @@ export default function FrontlineMap({ airportsData }) {
                             Accepted
                           </span>
                         )}
+                        {selectedLogisticsMission.status === 'accepted' && selectedLogisticsMission.accepted_by && (
+                          <span className="text-[10px] text-blue-200">
+                            {selectedLogisticsMission.accepted_by}
+                          </span>
+                        )}
                         {!user && selectedLogisticsMission.status === 'pending' && (
                           <span className="text-[10px] text-yt-text-secondary">Discord login required</span>
                         )}
@@ -1172,6 +1304,35 @@ export default function FrontlineMap({ airportsData }) {
                         </button>
                       </div>
                     </div>
+
+                    {selectedLogisticsMission.status === 'accepted' && user && (
+                      <div className="mb-3 flex items-center gap-2">
+                        {(selectedLogisticsMission.accepted_by === (user.globalName || user.username || user.id)) ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleCompleteLogisticsMission(selectedLogisticsMission)}
+                              disabled={updatingMissionId === selectedLogisticsMission.id}
+                              className="rounded border border-green-500/50 bg-green-500/15 px-3 py-1.5 text-xs font-semibold text-green-300 hover:bg-green-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {updatingMissionId === selectedLogisticsMission.id ? 'Completing...' : 'Complete'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleCancelLogisticsMission(selectedLogisticsMission)}
+                              disabled={updatingMissionId === selectedLogisticsMission.id}
+                              className="rounded border border-red-500/50 bg-red-500/15 px-3 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {updatingMissionId === selectedLogisticsMission.id ? 'Cancelling...' : 'Cancel'}
+                            </button>
+                          </>
+                        ) : (
+                          <div className="text-[11px] text-yt-text-secondary">
+                            Only the assigned pilot can complete or cancel this mission.
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <div className="rounded-lg border border-yt-border/70 bg-yt-bg-tertiary/60 px-3 py-2 text-xs shadow-inner">
                       <div className="flex items-center justify-between">

@@ -30,6 +30,7 @@ import * as combatMissionDispatch from './services/combatMissionDispatch.js';
 import * as luaZoneSync from './services/luaZoneSync.js';
 import * as activeUsers from './services/activeUsers.js';
 import * as userProfiles from './services/userProfiles.js';
+import * as feedService from './services/feed.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -129,6 +130,38 @@ const REFRESH_DEBOUNCE_MS = Number.parseInt(process.env.REFRESH_DEBOUNCE_MS, 10)
 const FRONTLINE_ZONES_FILE = process.env.DYZONE_OUTPUT_JSON
   ? path.resolve(process.env.DYZONE_OUTPUT_JSON)
   : path.resolve(__dirname, '../../frontend/src/config/frontlineZones.json');
+
+let lastZoneStatusById = new Map();
+
+function pushFeedEvent(event) {
+  const created = feedService.appendFeedEvent(event);
+  io.emit('feed:updated', {
+    events: feedService.getFeedEvents(250),
+    latest: created,
+  });
+  return created;
+}
+
+function getAirportDisplayName(airportId) {
+  const airport = getAirportById(airportId);
+  return airport?.displayName || airport?.name || airportId || 'Unknown';
+}
+
+function buildMissionSummary(mission) {
+  if (!mission) {
+    return {
+      sourceName: 'Unknown',
+      destinationName: 'Unknown',
+      orderCount: 0,
+    };
+  }
+
+  return {
+    sourceName: getAirportDisplayName(mission.source_airport_id),
+    destinationName: getAirportDisplayName(mission.airport_id),
+    orderCount: Array.isArray(mission.orders) ? mission.orders.length : 0,
+  };
+}
 
 /**
  * Load airbase status from airbase_status.lua file
@@ -323,6 +356,15 @@ app.get('/api/auth/discord/callback', async (req, res) => {
 
     // Register user as active
     activeUsers.addActiveUser(discordUser);
+    pushFeedEvent({
+      type: 'user.login',
+      title: 'User online',
+      message: `${discordUser.global_name || discordUser.username} logged into the site`,
+      actor: discordUser.global_name || discordUser.username || discordUser.id,
+      metadata: {
+        user_id: discordUser.id,
+      },
+    });
 
     // Store tokens for potential future use
     req.session.discordTokens = {
@@ -357,6 +399,7 @@ app.get('/api/auth/user', (req, res) => {
  * POST /api/auth/logout - Logout current user
  */
 app.post('/api/auth/logout', async (req, res) => {
+  const logoutUser = req.session?.user;
   const tokens = req.session.discordTokens;
   const clientId = process.env.DISCORD_CLIENT_ID;
   const clientSecret = process.env.DISCORD_CLIENT_SECRET;
@@ -370,6 +413,17 @@ app.post('/api/auth/logout', async (req, res) => {
   req.session.destroy((err) => {
     if (err) {
       return res.status(500).json({ error: 'Failed to logout' });
+    }
+    if (logoutUser) {
+      pushFeedEvent({
+        type: 'user.logout',
+        title: 'User offline',
+        message: `${logoutUser.globalName || logoutUser.username || logoutUser.id} logged out`,
+        actor: logoutUser.globalName || logoutUser.username || logoutUser.id,
+        metadata: {
+          user_id: logoutUser.id,
+        },
+      });
     }
     res.clearCookie('connect.sid');
     res.json({ success: true });
@@ -474,6 +528,8 @@ app.post('/api/missions/:id/accept', (req, res) => {
     return res.status(400).json({ error: 'userId is required' });
   }
 
+  const activeMissions = historicalData.getActiveMissions();
+  const missionBeforeUpdate = activeMissions.find((mission) => mission.id === req.params.id) || null;
   const success = historicalData.acceptMission(req.params.id, userId);
 
   if (!success) {
@@ -485,6 +541,20 @@ app.post('/api/missions/:id/accept', (req, res) => {
     missions: historicalData.getActiveMissions()
   });
 
+  const summary = buildMissionSummary(missionBeforeUpdate);
+  pushFeedEvent({
+    type: 'logistics.accepted',
+    title: 'Logistics mission accepted',
+    message: `${userId} accepted mission from ${summary.sourceName} to ${summary.destinationName}`,
+    actor: userId,
+    mission_id: req.params.id,
+    metadata: {
+      source_airport_id: missionBeforeUpdate?.source_airport_id || null,
+      airport_id: missionBeforeUpdate?.airport_id || null,
+      order_count: summary.orderCount,
+    },
+  });
+
   res.json({ success: true, message: 'Mission accepted' });
 });
 
@@ -492,6 +562,8 @@ app.post('/api/missions/:id/accept', (req, res) => {
  * POST /api/missions/:id/complete - Complete a mission
  */
 app.post('/api/missions/:id/complete', (req, res) => {
+  const activeMissions = historicalData.getActiveMissions();
+  const missionBeforeUpdate = activeMissions.find((mission) => mission.id === req.params.id) || null;
   const success = historicalData.completeMission(req.params.id);
 
   if (!success) {
@@ -503,6 +575,20 @@ app.post('/api/missions/:id/complete', (req, res) => {
     missions: historicalData.getActiveMissions()
   });
 
+  const summary = buildMissionSummary(missionBeforeUpdate);
+  pushFeedEvent({
+    type: 'logistics.completed',
+    title: 'Logistics mission completed',
+    message: `${missionBeforeUpdate?.accepted_by || 'A pilot'} completed route ${summary.sourceName} -> ${summary.destinationName}`,
+    actor: missionBeforeUpdate?.accepted_by || '',
+    mission_id: req.params.id,
+    metadata: {
+      source_airport_id: missionBeforeUpdate?.source_airport_id || null,
+      airport_id: missionBeforeUpdate?.airport_id || null,
+      order_count: summary.orderCount,
+    },
+  });
+
   res.json({ success: true, message: 'Mission completed' });
 });
 
@@ -510,6 +596,8 @@ app.post('/api/missions/:id/complete', (req, res) => {
  * POST /api/missions/:id/cancel - Cancel a mission
  */
 app.post('/api/missions/:id/cancel', (req, res) => {
+  const activeMissions = historicalData.getActiveMissions();
+  const missionBeforeUpdate = activeMissions.find((mission) => mission.id === req.params.id) || null;
   const success = historicalData.cancelMission(req.params.id);
 
   if (!success) {
@@ -519,6 +607,20 @@ app.post('/api/missions/:id/cancel', (req, res) => {
   // Broadcast mission update to all clients
   io.emit('missions:updated', {
     missions: historicalData.getActiveMissions()
+  });
+
+  const summary = buildMissionSummary(missionBeforeUpdate);
+  pushFeedEvent({
+    type: 'logistics.cancelled',
+    title: 'Logistics mission cancelled',
+    message: `${missionBeforeUpdate?.accepted_by || 'A pilot'} cancelled route ${summary.sourceName} -> ${summary.destinationName}`,
+    actor: missionBeforeUpdate?.accepted_by || '',
+    mission_id: req.params.id,
+    metadata: {
+      source_airport_id: missionBeforeUpdate?.source_airport_id || null,
+      airport_id: missionBeforeUpdate?.airport_id || null,
+      order_count: summary.orderCount,
+    },
   });
 
   res.json({ success: true, message: 'Mission cancelled' });
@@ -568,6 +670,19 @@ app.post('/api/combat-missions/:id/assign', (req, res) => {
     missions: combatMissionDispatch.getAllCombatMissions()
   });
 
+  pushFeedEvent({
+    type: 'ato.assigned',
+    title: 'ATO mission assigned',
+    message: `${pilotName} assigned to ${mission.zone_name || mission.zone_id} (${(mission.tasks || []).join(', ')})`,
+    actor: pilotName,
+    zone_id: mission.zone_id || '',
+    mission_id: mission.id,
+    metadata: {
+      aircraft,
+      tasks: mission.tasks || [],
+    },
+  });
+
   res.json({ success: true, mission });
 });
 
@@ -592,6 +707,19 @@ app.post('/api/combat-missions/:id/add-user', (req, res) => {
     missions: combatMissionDispatch.getAllCombatMissions()
   });
 
+  pushFeedEvent({
+    type: 'ato.joined',
+    title: 'Pilot joined ATO mission',
+    message: `${pilotName} joined mission in ${mission.zone_name || mission.zone_id}`,
+    actor: pilotName,
+    zone_id: mission.zone_id || '',
+    mission_id: mission.id,
+    metadata: {
+      aircraft,
+      tasks: mission.tasks || [],
+    },
+  });
+
   res.json({ success: true, mission });
 });
 
@@ -610,6 +738,18 @@ app.post('/api/combat-missions/:id/complete', (req, res) => {
     missions: combatMissionDispatch.getAllCombatMissions()
   });
 
+  pushFeedEvent({
+    type: 'ato.completed',
+    title: 'ATO mission completed',
+    message: `${mission.assigned_to || 'Pilot'} completed mission in ${mission.zone_name || mission.zone_id}`,
+    actor: mission.assigned_to || '',
+    zone_id: mission.zone_id || '',
+    mission_id: mission.id,
+    metadata: {
+      tasks: mission.tasks || [],
+    },
+  });
+
   res.json({ success: true, mission });
 });
 
@@ -626,6 +766,18 @@ app.post('/api/combat-missions/:id/abort', (req, res) => {
   // Broadcast combat mission update to all clients
   io.emit('combat-missions:updated', {
     missions: combatMissionDispatch.getAllCombatMissions()
+  });
+
+  pushFeedEvent({
+    type: 'ato.aborted',
+    title: 'ATO mission aborted',
+    message: `${mission.assigned_to || 'Pilot'} aborted mission in ${mission.zone_name || mission.zone_id}`,
+    actor: mission.assigned_to || '',
+    zone_id: mission.zone_id || '',
+    mission_id: mission.id,
+    metadata: {
+      tasks: mission.tasks || [],
+    },
   });
 
   res.json({ success: true, mission });
@@ -683,6 +835,15 @@ app.get('/api/frontline-zones', (req, res) => {
     console.error('Error loading frontline zones:', error.message);
     res.status(500).json({ error: 'Failed to load frontline zones' });
   }
+});
+
+/**
+ * GET /api/feed - Get shared activity feed
+ */
+app.get('/api/feed', (req, res) => {
+  const limit = Number.parseInt(req.query.limit, 10) || 200;
+  const events = feedService.getFeedEvents(limit);
+  res.json({ events });
 });
 
 /**
@@ -1180,6 +1341,9 @@ io.on('connection', (socket) => {
   socket.emit('missions:updated', {
     missions: historicalData.getActiveMissions()
   });
+  socket.emit('feed:updated', {
+    events: feedService.getFeedEvents(250),
+  });
 
   socket.on('disconnect', () => {
     console.log('🔌 Client disconnected:', socket.id);
@@ -1237,6 +1401,28 @@ airbaseStatusWatcher.on('error', (error) => {
 const luaZoneWatcher = luaZoneSync.initialize((result) => {
   if (result.success) {
     console.log(`🎯 Lua zones synced (${result.count} zones) - regenerating combat missions...`);
+
+    const nextStatusMap = new Map();
+    (Array.isArray(result.zones) ? result.zones : []).forEach((zone) => {
+      if (!zone?.id) return;
+      const status = zone.status || 'UNKNOWN';
+      nextStatusMap.set(zone.id, status);
+
+      const previousStatus = lastZoneStatusById.get(zone.id);
+      if (previousStatus && previousStatus !== status) {
+        pushFeedEvent({
+          type: 'zone.status_changed',
+          title: 'Zone control changed',
+          message: `${zone.name || zone.id} changed from ${previousStatus} to ${status}`,
+          zone_id: zone.id,
+          metadata: {
+            previous_status: previousStatus,
+            next_status: status,
+          },
+        });
+      }
+    });
+    lastZoneStatusById = nextStatusMap;
 
     // Regenerate combat missions from updated zones
     const missions = combatMissionDispatch.refreshCombatMissions();

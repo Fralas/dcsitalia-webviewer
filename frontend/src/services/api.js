@@ -208,6 +208,13 @@ export async function getFrontlineZones() {
 }
 
 /**
+ * Get shared activity feed
+ */
+export async function getFeed(limit = 200) {
+  return fetchAPI(`/feed?limit=${limit}`);
+}
+
+/**
  * Add user to an assigned combat mission
  */
 export async function addUserToCombatMission(missionId, pilotName, aircraft) {
@@ -274,6 +281,7 @@ export default {
   clearCombatMissions,
   getPilotCombatMissions,
   getFrontlineZones,
+  getFeed,
   getUserProfile,
   saveUserProfile,
 };
