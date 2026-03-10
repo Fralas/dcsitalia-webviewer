@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { LogOut, User, ChevronDown, UserCircle, X } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 
@@ -51,6 +52,41 @@ export default function UserMenu({ onProfileOpen }) {
   }
 
   if (!user) {
+    const loginModal = loginModalOpen ? (
+      <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4">
+        <button
+          type="button"
+          className="absolute inset-0 bg-[#05070bcc] backdrop-blur-md"
+          onClick={() => setLoginModalOpen(false)}
+          aria-label="Close login modal"
+        />
+        <div className="relative w-[min(560px,94vw)] rounded-2xl border border-yt-border/90 bg-[#101722f2] p-6 shadow-[0_24px_72px_rgba(0,0,0,0.6)]">
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <div className="text-lg font-semibold text-yt-text-primary">Sign in</div>
+              <div className="text-sm text-yt-text-secondary">Authenticate to accept and manage missions</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLoginModalOpen(false)}
+              className="rounded border border-yt-border p-1.5 text-yt-text-secondary transition-colors hover:text-yt-text-primary"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <button
+            onClick={handleLogin}
+            aria-label="Login with Discord"
+            className="w-full rounded-lg border border-[#5a68ea] bg-[#5865f2] px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-[#4a56d4]"
+          >
+            Continue with Discord
+          </button>
+        </div>
+      </div>
+    ) : null;
+
     return (
       <>
         <button
@@ -61,40 +97,7 @@ export default function UserMenu({ onProfileOpen }) {
           Login
         </button>
 
-        {loginModalOpen && (
-          <div className="fixed inset-0 z-[2000] grid place-items-center p-4">
-            <button
-              type="button"
-              className="absolute inset-0 bg-[#05070bcc] backdrop-blur-sm"
-              onClick={() => setLoginModalOpen(false)}
-              aria-label="Close login modal"
-            />
-            <div className="relative w-[min(420px,92vw)] rounded-xl border border-yt-border bg-[#101722] p-4 shadow-[0_16px_48px_rgba(0,0,0,0.55)]">
-              <div className="mb-3 flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-semibold text-yt-text-primary">Sign in</div>
-                  <div className="text-[11px] text-yt-text-secondary">Authenticate to accept and manage missions</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setLoginModalOpen(false)}
-                  className="rounded border border-yt-border p-1 text-yt-text-secondary transition-colors hover:text-yt-text-primary"
-                  aria-label="Close"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              <button
-                onClick={handleLogin}
-                aria-label="Login with Discord"
-                className="w-full rounded border border-[#5a68ea] bg-[#5865f2] px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#4a56d4]"
-              >
-                Continue with Discord
-              </button>
-            </div>
-          </div>
-        )}
+        {typeof document !== 'undefined' && createPortal(loginModal, document.body)}
       </>
     );
   }
