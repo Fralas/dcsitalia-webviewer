@@ -119,6 +119,13 @@ export function getConvoyById(convoyId) {
   return convoysById.get(convoyId) || null;
 }
 
+export function clearAllConvoys() {
+  convoysCache = [];
+  convoysById = new Map();
+  scheduleWrite();
+  return true;
+}
+
 export function recordConvoyEvent(payload = {}) {
   const eventType = sanitizeString(payload.event).toLowerCase();
   if (!CONVOY_EVENT_TYPES.has(eventType)) {
@@ -212,5 +219,6 @@ export default {
   CONVOY_EVENT_TYPES,
   getConvoys,
   getConvoyById,
+  clearAllConvoys,
   recordConvoyEvent,
 };

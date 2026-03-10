@@ -1,8 +1,10 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import createGlobe from 'cobe';
-import { MapContainer, TileLayer, CircleMarker, Polyline, Tooltip, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Marker, Polyline, Tooltip, useMap, useMapEvents } from 'react-leaflet';
+import { divIcon } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { ChevronLeft, ChevronRight, Clock3, MapPin } from 'lucide-react';
+import { ArrowUp, ChevronLeft, ChevronRight, Clock3, Drone, MapPin } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import socketService from '../services/socket';
@@ -158,11 +160,11 @@ function getConvoyStyle(status) {
     };
   }
   return {
-    color: '#f59e0b',
+    color: '#ef4444',
     weight: 3,
     opacity: 0.9,
     dashArray: '8,5',
-    markerColor: '#f59e0b',
+    markerColor: '#ef4444',
     markerRadius: 5,
     markerOpacity: 0.95,
   };
@@ -211,6 +213,58 @@ function toLatLngPoint(position) {
   const lon = Number(position.lon);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
   return [lat, lon];
+}
+
+function interpolateLatLon(start, end, progress) {
+  if (!start || !end) return null;
+  const clamped = Math.max(0, Math.min(1, progress));
+  return [
+    start[0] + (end[0] - start[0]) * clamped,
+    start[1] + (end[1] - start[1]) * clamped,
+  ];
+}
+
+function hashString(text = '') {
+  let hash = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+function computeBearingDeg(start, end) {
+  if (!start || !end) return 0;
+  const dLon = end[1] - start[1];
+  const dLat = end[0] - start[0];
+  return (Math.atan2(dLon, dLat) * 180) / Math.PI;
+}
+
+function createConvoyMovingIcon(bearingDeg, color = '#ef4444') {
+  const html = renderToStaticMarkup(
+    <div
+      style={{
+        width: '24px',
+        height: '24px',
+        transform: `rotate(${bearingDeg}deg)`,
+        transformOrigin: '50% 50%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        pointerEvents: 'none',
+      }}
+    >
+      <Drone size={14} color={color} strokeWidth={2.2} />
+      <ArrowUp size={12} color={color} strokeWidth={2.8} />
+    </div>
+  );
+
+  return divIcon({
+    html,
+    className: 'convoy-moving-icon',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
 }
 
 function getItemQuantity(item) {
@@ -544,52 +598,29 @@ function FlatMapView({
                 key={`convoy-route-${convoy.convoy_id}`}
                 positions={convoy.routeLine}
                 pathOptions={{
-                  color: '#f8fafc',
-                  weight: 1,
-                  opacity: 0.35,
-                  dashArray: '2,7',
+                  color: style.color,
+                  weight: style.weight,
+                  opacity: style.opacity,
+                  dashArray: style.dashArray,
                   interactive: false,
                 }}
               />
             );
           }
 
-          if (Array.isArray(convoy.pathLine) && convoy.pathLine.length >= 2) {
+          const markerPosition = convoy.movingPosition || convoy.lastPosition || null;
+          if (markerPosition) {
             layers.push(
-              <Polyline
-                key={`convoy-path-${convoy.convoy_id}`}
-                positions={convoy.pathLine}
-                pathOptions={{
-                  color: style.color,
-                  weight: style.weight,
-                  opacity: style.opacity,
-                  dashArray: style.dashArray,
-                }}
-              >
-                <Tooltip direction="top" offset={[0, -3]} opacity={0.95}>
-                  Convoy {convoy.convoy_id} ({convoy.status})
-                </Tooltip>
-              </Polyline>
-            );
-          }
-
-          if (convoy.lastPosition) {
-            layers.push(
-              <CircleMarker
+              <Marker
                 key={`convoy-marker-${convoy.convoy_id}`}
-                center={convoy.lastPosition}
-                radius={style.markerRadius}
-                pathOptions={{
-                  color: style.markerColor,
-                  fillColor: style.markerColor,
-                  fillOpacity: style.markerOpacity,
-                  weight: 2,
-                }}
+                position={markerPosition}
+                icon={createConvoyMovingIcon(convoy.bearing || 0, '#ef4444')}
+                interactive={false}
               >
                 <Tooltip direction="top" offset={[0, -3]} opacity={0.95}>
                   Convoy {convoy.convoy_id} ({convoy.status})
                 </Tooltip>
-              </CircleMarker>
+              </Marker>
             );
           }
 
@@ -664,6 +695,7 @@ export default function FrontlineMap({ airportsData }) {
   const [selectedLogisticsMission, setSelectedLogisticsMission] = useState(null);
   const [acceptingMissionId, setAcceptingMissionId] = useState(null);
   const [updatingMissionId, setUpdatingMissionId] = useState(null);
+  const [animationTick, setAnimationTick] = useState(Date.now());
   const [zones, setZones] = useState(frontlineZones);
   const [combatMissions, setCombatMissions] = useState([]);
   const [logisticsMissions, setLogisticsMissions] = useState([]);
@@ -833,6 +865,14 @@ export default function FrontlineMap({ airportsData }) {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setAnimationTick(Date.now());
+    }, 120);
+
+    return () => clearInterval(interval);
+  }, []);
+
   const validZones = useMemo(
     () => zones.filter((zone) => zone.coordinates && Number.isFinite(zone.coordinates.lat) && Number.isFinite(zone.coordinates.lon)),
     [zones]
@@ -911,22 +951,32 @@ export default function FrontlineMap({ airportsData }) {
       const destinationPosition = zoneCoordinatesById.get(convoy.destination_zone) || convoy.destination_position || null;
       const originPoint = toLatLngPoint(originPosition);
       const destinationPoint = toLatLngPoint(destinationPosition);
-
-      const pathLine = Array.isArray(convoy.path)
-        ? convoy.path.map((point) => toLatLngPoint(point)).filter(Boolean)
-        : [];
-      const lastPosition = toLatLngPoint(convoy.last_position) || pathLine[pathLine.length - 1] || null;
       const routeLine = originPoint && destinationPoint ? [originPoint, destinationPoint] : [];
+      const bearing = routeLine.length >= 2 ? computeBearingDeg(routeLine[0], routeLine[1]) : 0;
+      const lastPosition = toLatLngPoint(convoy.last_position) || destinationPoint || originPoint || null;
+
+      let movingPosition = null;
+      if ((convoy.status || 'active') === 'active' && routeLine.length >= 2) {
+        const cycleMs = 9000;
+        const offset = hashString(convoy.convoy_id || 'convoy') % cycleMs;
+        const progress = ((animationTick + offset) % cycleMs) / cycleMs;
+        movingPosition = interpolateLatLon(routeLine[0], routeLine[1], progress);
+      } else if (convoy.status === 'arrived' && destinationPoint) {
+        movingPosition = destinationPoint;
+      } else if (convoy.status === 'destroyed') {
+        movingPosition = toLatLngPoint(convoy.last_position) || originPoint;
+      }
 
       return {
         convoy_id: convoy.convoy_id,
         status: convoy.status || 'active',
         routeLine,
-        pathLine,
+        bearing,
+        movingPosition,
         lastPosition,
       };
-    }).filter((convoy) => convoy.routeLine.length >= 2 || convoy.pathLine.length >= 2 || convoy.lastPosition);
-  }, [convoys, zoneCoordinatesById]);
+    }).filter((convoy) => convoy.routeLine.length >= 2 || convoy.movingPosition || convoy.lastPosition);
+  }, [convoys, zoneCoordinatesById, animationTick]);
 
   useEffect(() => {
     if (validZones.length === 0) return;
