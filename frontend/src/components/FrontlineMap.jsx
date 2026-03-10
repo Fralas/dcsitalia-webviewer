@@ -96,6 +96,19 @@ function getZoneGridIndex(zone) {
   return value;
 }
 
+function toGlobeAngles(coordinates) {
+  if (!coordinates) {
+    return { phi: 0, theta: 0 };
+  }
+  const lon = Number(coordinates.lon || 0);
+  const lat = Number(coordinates.lat || 0);
+  return {
+    // cobe uses phi as globe rotation around vertical axis; negative lon centers the area.
+    phi: (-lon * Math.PI) / 180,
+    theta: (lat * Math.PI) / 180,
+  };
+}
+
 function getControlText(status) {
   if (status === 'RED') return 'red control';
   if (status === 'BLUE') return 'blue control';
@@ -184,13 +197,21 @@ function GlobeCanvas({ points, focusCoordinates, onScaleChange, mapMode, forcedS
   const targetScaleRef = useRef(1.15);
   const pointerDownRef = useRef(false);
   const pointerPosRef = useRef({ x: 0, y: 0 });
+  const initializedFocusRef = useRef(false);
 
   useEffect(() => {
     if (!focusCoordinates) return;
-    const lon = focusCoordinates.lon || 0;
-    const lat = focusCoordinates.lat || 0;
-    targetPhiRef.current = (lon * Math.PI) / 180;
-    targetThetaRef.current = (lat * Math.PI) / 180;
+    const { phi: nextPhi, theta: nextTheta } = toGlobeAngles(focusCoordinates);
+
+    targetPhiRef.current = nextPhi;
+    targetThetaRef.current = nextTheta;
+
+    // Ensure first render starts already centered on the active theater.
+    if (!initializedFocusRef.current) {
+      phiRef.current = nextPhi;
+      thetaRef.current = nextTheta;
+      initializedFocusRef.current = true;
+    }
   }, [focusCoordinates]);
 
   useEffect(() => {
@@ -202,7 +223,16 @@ function GlobeCanvas({ points, focusCoordinates, onScaleChange, mapMode, forcedS
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
-    if (!canvas || !container) return undefined;
+    if (!canvas || !container || !focusCoordinates) return undefined;
+
+    const { phi: initialPhi, theta: initialTheta } = toGlobeAngles(focusCoordinates);
+    if (!initializedFocusRef.current) {
+      phiRef.current = initialPhi;
+      thetaRef.current = initialTheta;
+      targetPhiRef.current = initialPhi;
+      targetThetaRef.current = initialTheta;
+      initializedFocusRef.current = true;
+    }
 
     const onPointerDown = (event) => {
       pointerDownRef.current = true;
@@ -294,7 +324,7 @@ function GlobeCanvas({ points, focusCoordinates, onScaleChange, mapMode, forcedS
       resizeObserver.disconnect();
       window.cancelAnimationFrame(rafId);
     };
-  }, [points, onScaleChange, mapMode]);
+  }, [points, onScaleChange, mapMode, focusCoordinates]);
 
   const zoomIn = () => {
     targetScaleRef.current = Math.min(3.2, targetScaleRef.current + 0.16);
@@ -848,20 +878,31 @@ export default function FrontlineMap({ airportsData }) {
     return [...zonePoints, ...airportPoints];
   }, [filteredZones, validAirports, selectedZoneId, filters.showAto, filters.showAirports]);
 
-  const theaterCenter = useMemo(() => {
-    const source = validAirports.length > 0 ? validAirports : validZones;
-    if (source.length === 0) return null;
-    const sum = source.reduce(
+  const zoneTheaterCenter = useMemo(() => {
+    if (validZones.length === 0) return null;
+    const sum = validZones.reduce(
       (acc, item) => ({
         lat: acc.lat + item.coordinates.lat,
         lon: acc.lon + item.coordinates.lon,
       }),
       { lat: 0, lon: 0 }
     );
-    return { lat: sum.lat / source.length, lon: sum.lon / source.length };
+    return { lat: sum.lat / validZones.length, lon: sum.lon / validZones.length };
+  }, [validZones]);
+
+  const fallbackCenter = useMemo(() => {
+    if (validAirports.length === 0) return null;
+    const sum = validAirports.reduce(
+      (acc, item) => ({
+        lat: acc.lat + item.coordinates.lat,
+        lon: acc.lon + item.coordinates.lon,
+      }),
+      { lat: 0, lon: 0 }
+    );
+    return { lat: sum.lat / validAirports.length, lon: sum.lon / validAirports.length };
   }, [validAirports, validZones]);
 
-  const focusCoordinates = focusedZone?.coordinates || (filteredZones[0] && filteredZones[0].coordinates) || theaterCenter || null;
+  const focusCoordinates = focusedZone?.coordinates || zoneTheaterCenter || fallbackCenter || null;
 
   const handleScaleChange = (scale) => {
     if (scale >= 2.1 && !mapModeRef.current) {
