@@ -57,6 +57,9 @@ const CONVOY_API_TOKEN = process.env.CONVOY_API_TOKEN || '';
 const CONVOY_SYNC_FILE = process.env.CONVOY_SYNC_FILE
   ? path.resolve(process.env.CONVOY_SYNC_FILE)
   : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DMAP\\Export_Ground_Convoys.json';
+const DCSAR_SYNC_FILE = process.env.DCSAR_SYNC_FILE
+  ? path.resolve(process.env.DCSAR_SYNC_FILE)
+  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DMAP\\Export_DCSAR_Positions.json';
 
 // CSV Directory - configurable via environment variable
 const CSV_DIR = process.env.CSV_DIR
@@ -139,6 +142,8 @@ const FRONTLINE_ZONES_FILE = process.env.DYZONE_OUTPUT_JSON
 let lastZoneStatusById = new Map();
 let convoySyncSignature = '';
 let convoyEventById = new Map();
+let dcsarSyncSignature = '';
+let dcsarPoints = [];
 
 function pushFeedEvent(event) {
   const created = feedService.appendFeedEvent(event);
@@ -245,6 +250,48 @@ function syncConvoysFromFile() {
     });
   } catch (error) {
     console.error('Failed convoy sync from file:', error.message);
+  }
+}
+
+function parseDcsarLine(line, index) {
+  const cleaned = String(line || '').trim();
+  if (!cleaned || cleaned.startsWith('#') || cleaned.startsWith('//')) return null;
+
+  const nums = cleaned.match(/-?\d+(?:\.\d+)?/g);
+  if (!nums || nums.length < 2) return null;
+  const lat = Number(nums[0]);
+  const lon = Number(nums[1]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+  return {
+    id: `dcsar_${index + 1}`,
+    lat,
+    lon,
+    raw: cleaned,
+  };
+}
+
+function syncDcsarFromFile() {
+  try {
+    if (!fs.existsSync(DCSAR_SYNC_FILE)) return;
+
+    const raw = fs.readFileSync(DCSAR_SYNC_FILE, 'utf8');
+    if (raw === dcsarSyncSignature) return;
+    dcsarSyncSignature = raw;
+
+    const lines = String(raw || '').split(/\r?\n/);
+    const parsed = [];
+    lines.forEach((line, idx) => {
+      const point = parseDcsarLine(line, idx);
+      if (point) parsed.push(point);
+    });
+    dcsarPoints = parsed;
+
+    io.emit('dcsar:updated', {
+      points: dcsarPoints,
+    });
+  } catch (error) {
+    console.error('Failed DCSAR sync from file:', error.message);
   }
 }
 
@@ -932,6 +979,13 @@ app.get('/api/feed', (req, res) => {
 });
 
 /**
+ * GET /api/dcsar - Get current DCSAR positions exported from mission script
+ */
+app.get('/api/dcsar', (req, res) => {
+  res.json({ points: dcsarPoints });
+});
+
+/**
  * GET /api/convoys - Get convoy states
  */
 app.get('/api/convoys', (req, res) => {
@@ -1493,6 +1547,9 @@ io.on('connection', (socket) => {
   socket.emit('convoys:updated', {
     convoys: convoysService.getConvoys(),
   });
+  socket.emit('dcsar:updated', {
+    points: dcsarPoints,
+  });
 
   socket.on('disconnect', () => {
     console.log('🔌 Client disconnected:', socket.id);
@@ -1616,6 +1673,11 @@ setInterval(() => {
   syncConvoysFromFile();
 }, 2000);
 
+// Poll DCSAR exported positions (line-based file of coordinates)
+setInterval(() => {
+  syncDcsarFromFile();
+}, 2000);
+
 // ==================== START SERVER ====================
 
 // Load airbase status first
@@ -1632,6 +1694,7 @@ io.emit('convoys:updated', {
 
 // Initial convoy sync from local JSON exported by DCS scripts
 syncConvoysFromFile();
+syncDcsarFromFile();
 
 httpServer.listen(PORT, () => {
   const activeAirports = airbaseStatusManager.getActiveAirports();

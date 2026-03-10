@@ -223,6 +223,13 @@ export async function getConvoys(status = null) {
 }
 
 /**
+ * Get DCSAR exported points
+ */
+export async function getDcsar() {
+  return fetchAPI('/dcsar');
+}
+
+/**
  * Post convoy event (external integration/testing)
  */
 export async function postConvoyEvent(eventPayload, convoyToken = null) {
@@ -303,6 +310,7 @@ export default {
   getFrontlineZones,
   getFeed,
   getConvoys,
+  getDcsar,
   postConvoyEvent,
   getUserProfile,
   saveUserProfile,

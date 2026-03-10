@@ -5,11 +5,11 @@ import * as mgrs from 'mgrs';
 import { MapContainer, TileLayer, CircleMarker, Marker, Polyline, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import { divIcon } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { ArrowUp, ChevronLeft, ChevronRight, Clock3, Drone, MapPin } from 'lucide-react';
+import { ArrowUp, ChevronLeft, ChevronRight, Clock3, Drone, MapPin, PersonStanding } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import socketService from '../services/socket';
-import { acceptMission, cancelMission, completeMission, getCombatMissions, getConvoys, getFeed, getFrontlineZones, getMissions } from '../services/api';
+import { acceptMission, cancelMission, completeMission, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getMissions } from '../services/api';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
@@ -305,6 +305,31 @@ function createConvoyMovingIcon(bearingDeg, color = '#ef4444') {
   });
 }
 
+function createDcsarIcon(color = '#f8fafc') {
+  const html = renderToStaticMarkup(
+    <div
+      style={{
+        width: '20px',
+        height: '20px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        pointerEvents: 'none',
+        filter: 'drop-shadow(0 0 4px rgba(0,0,0,0.7))',
+      }}
+    >
+      <PersonStanding size={18} color={color} strokeWidth={2.4} />
+    </div>
+  );
+
+  return divIcon({
+    html,
+    className: 'dcsar-person-icon',
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+  });
+}
+
 function getItemQuantity(item) {
   const orderQty = Number(item.order_quantity_needed || 0);
   const orderIsoUnits = Number(item.order_iso_units || 0);
@@ -552,6 +577,7 @@ function FlatMapView({
   logisticsMissions,
   gridConnections,
   convoys,
+  dcsarPoints,
   selectedZoneId,
   onZoneSelect,
   focusCoordinates,
@@ -562,6 +588,7 @@ function FlatMapView({
   showAirports,
   showLogistics,
   showConvoys,
+  showDcsar,
 }) {
   const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
   const airportsById = useMemo(() => {
@@ -665,6 +692,19 @@ function FlatMapView({
           return layers;
         })}
 
+        {showDcsar && dcsarPoints.map((point) => (
+          <Marker
+            key={`dcsar-${point.id}`}
+            position={[point.lat, point.lon]}
+            icon={createDcsarIcon('#f8fafc')}
+            interactive={false}
+          >
+            <Tooltip direction="top" offset={[0, -3]} opacity={0.95}>
+              Survivor {point.id}
+            </Tooltip>
+          </Marker>
+        ))}
+
         {showAto && zones.map((zone) => {
           const isSelected = zone.id === selectedZoneId;
           const color =
@@ -739,6 +779,7 @@ export default function FrontlineMap({ airportsData }) {
   const [combatMissions, setCombatMissions] = useState([]);
   const [logisticsMissions, setLogisticsMissions] = useState([]);
   const [convoys, setConvoys] = useState([]);
+  const [dcsarPoints, setDcsarPoints] = useState([]);
   const [feedEvents, setFeedEvents] = useState([]);
   const [overlayCollapsed, setOverlayCollapsed] = useState(false);
   const [feedCollapsed, setFeedCollapsed] = useState(false);
@@ -756,13 +797,14 @@ export default function FrontlineMap({ airportsData }) {
     showLogistics: true,
     showAirports: true,
     showConvoys: true,
+    showDcsar: true,
   });
   const mapModeRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
-    Promise.allSettled([getFrontlineZones(), getCombatMissions(), getMissions(), getFeed(200), getConvoys()])
-      .then(([zonesResult, combatResult, logisticsResult, feedResult, convoysResult]) => {
+    Promise.allSettled([getFrontlineZones(), getCombatMissions(), getMissions(), getFeed(200), getConvoys(), getDcsar()])
+      .then(([zonesResult, combatResult, logisticsResult, feedResult, convoysResult, dcsarResult]) => {
         if (!isMounted) return;
 
         if (zonesResult.status === 'fulfilled') {
@@ -807,6 +849,15 @@ export default function FrontlineMap({ airportsData }) {
         } else {
           console.error('Failed to load convoys:', convoysResult.reason);
         }
+
+        if (dcsarResult.status === 'fulfilled') {
+          const nextPoints = dcsarResult.value?.points || dcsarResult.value;
+          if (Array.isArray(nextPoints)) {
+            setDcsarPoints(nextPoints);
+          }
+        } else {
+          console.error('Failed to load DCSAR points:', dcsarResult.reason);
+        }
       });
 
     return () => {
@@ -848,12 +899,20 @@ export default function FrontlineMap({ airportsData }) {
       }
     });
 
+    const unsubscribeDcsar = socketService.on('dcsar:updated', (data) => {
+      const nextPoints = data?.points || data;
+      if (Array.isArray(nextPoints)) {
+        setDcsarPoints(nextPoints);
+      }
+    });
+
     return () => {
       unsubscribe && unsubscribe();
       unsubscribeMissions && unsubscribeMissions();
       unsubscribeLogistics && unsubscribeLogistics();
       unsubscribeFeed && unsubscribeFeed();
       unsubscribeConvoys && unsubscribeConvoys();
+      unsubscribeDcsar && unsubscribeDcsar();
     };
   }, []);
 
@@ -900,6 +959,22 @@ export default function FrontlineMap({ airportsData }) {
         console.error('Failed to refresh convoys:', error);
       }
     }, 20000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const latestPoints = await getDcsar();
+        const nextPoints = latestPoints?.points || latestPoints;
+        if (Array.isArray(nextPoints)) {
+          setDcsarPoints(nextPoints);
+        }
+      } catch (error) {
+        console.error('Failed to refresh DCSAR points:', error);
+      }
+    }, 3000);
 
     return () => clearInterval(interval);
   }, []);
@@ -1333,6 +1408,7 @@ export default function FrontlineMap({ airportsData }) {
                     logisticsMissions={filteredLogisticsMissions}
                     gridConnections={gridConnections}
                     convoys={convoyRenderData}
+                    dcsarPoints={dcsarPoints}
                     selectedZoneId={selectedZoneId}
                     onZoneSelect={setSelectedZoneId}
                     focusCoordinates={focusCoordinates}
@@ -1343,6 +1419,7 @@ export default function FrontlineMap({ airportsData }) {
                     showAirports={filters.showAirports}
                     showLogistics={filters.showLogistics}
                     showConvoys={filters.showConvoys}
+                    showDcsar={filters.showDcsar}
                   />
                 </div>
               )}
@@ -1383,7 +1460,7 @@ export default function FrontlineMap({ airportsData }) {
 
                 {!overlayCollapsed && (
                   <>
-                    <div className="mb-3 grid grid-cols-3 gap-3">
+                    <div className="mb-3 grid grid-cols-4 gap-3">
                       <button
                         type="button"
                         onClick={() => setFilters((current) => ({ ...current, showAto: !current.showAto }))}
@@ -1416,6 +1493,17 @@ export default function FrontlineMap({ airportsData }) {
                         }`}
                       >
                         Convoys
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFilters((current) => ({ ...current, showDcsar: !current.showDcsar }))}
+                        className={`rounded border px-2 py-1 text-[11px] font-semibold ${
+                          filters.showDcsar
+                            ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
+                            : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
+                        }`}
+                      >
+                        DCSAR
                       </button>
                     </div>
 
