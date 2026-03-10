@@ -1,11 +1,6 @@
-import { useState, useEffect } from 'react';
-import { Plane, Package, Activity, AlertCircle, Shield, Target, MapPin } from 'lucide-react';
-import Dashboard from './components/Dashboard';
-import MissionDispatch from './components/MissionDispatch';
-import AirportsDirectory from './components/AirportsDirectory';
-import AirportDetails from './components/AirportDetails';
+import { useState, useEffect, useMemo } from 'react';
+import { Activity, AlertCircle } from 'lucide-react';
 import FrontlineMap from './components/FrontlineMap';
-import AdminPanel from './components/AdminPanel';
 import UserMenu from './components/UserMenu';
 import UserProfile from './components/UserProfile';
 import * as api from './services/api';
@@ -14,62 +9,76 @@ import { t } from './utils/locale';
 import bannerImg from '../img/DCS_ITALIA_ICON.png';
 import { useUser } from './contexts/UserContext';
 
+function buildFrontlineSummary(zones = []) {
+  const summary = {
+    total: 0,
+    RED: 0,
+    BLUE: 0,
+    NEUTRAL: 0,
+    UNDER_ATTACK: 0,
+  };
+
+  zones.forEach((zone) => {
+    summary.total += 1;
+    if (summary[zone.status] !== undefined) {
+      summary[zone.status] += 1;
+    }
+  });
+
+  return summary;
+}
+
 function App() {
-  const [currentView, setCurrentView] = useState('dashboard'); // dashboard, airports, airport, missions
+  const [currentView, setCurrentView] = useState('frontline');
   const [airports, setAirports] = useState({});
-  const [missions, setMissions] = useState([]);
-  const [combatMissions, setCombatMissions] = useState([]);
-  const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [connectionStatus, setConnectionStatus] = useState('connecting');
-  const [highlightedMissionId, setHighlightedMissionId] = useState(null);
-  const [selectedAirportId, setSelectedAirportId] = useState(null);
-  const [selectedAirportToken, setSelectedAirportToken] = useState(0);
+  const [frontlineSummary, setFrontlineSummary] = useState({
+    total: 0,
+    RED: 0,
+    BLUE: 0,
+    NEUTRAL: 0,
+    UNDER_ATTACK: 0,
+  });
   const { user } = useUser();
+  const allowedViews = useMemo(() => new Set(['frontline', 'profile']), []);
 
-  // Load initial data
+  const goToView = (view) => {
+    setCurrentView(allowedViews.has(view) ? view : 'frontline');
+  };
+
   useEffect(() => {
     loadData();
   }, []);
 
-  // Setup WebSocket
+  useEffect(() => {
+    if (!allowedViews.has(currentView)) {
+      setCurrentView('frontline');
+    }
+  }, [currentView, allowedViews]);
+
   useEffect(() => {
     socketService.connect();
 
-    const unsubscribeConnect = socketService.on('connect', () => {
-      setConnectionStatus('connected');
-      console.log('✅ WebSocket connected');
-    });
-
-    const unsubscribeDisconnect = socketService.on('disconnect', () => {
-      setConnectionStatus('disconnected');
-      console.log('❌ WebSocket disconnected');
-    });
-
     const unsubscribeInitial = socketService.on('data:initial', (data) => {
-      console.log('📊 Received initial data');
       setAirports(data);
     });
 
     const unsubscribeUpdated = socketService.on('data:updated', (data) => {
-      console.log('🔄 Data updated');
       setAirports(data);
-      loadStats(); // Reload stats
     });
 
-    const unsubscribeMissions = socketService.on('missions:updated', (data) => {
-      console.log('🚨 Missions updated');
-      setMissions(data.missions);
-      loadStats(); // Reload stats
+    const unsubscribeFrontline = socketService.on('frontline:updated', (data) => {
+      const zones = data?.zones || [];
+      if (Array.isArray(zones)) {
+        setFrontlineSummary(buildFrontlineSummary(zones));
+      }
     });
 
     return () => {
-      unsubscribeConnect();
-      unsubscribeDisconnect();
       unsubscribeInitial();
       unsubscribeUpdated();
-      unsubscribeMissions();
+      unsubscribeFrontline();
       socketService.disconnect();
     };
   }, []);
@@ -78,52 +87,23 @@ function App() {
     try {
       setLoading(true);
       setError(null);
-      const [airportsData, missionsData, combatMissionsData, statsData] = await Promise.all([
+      const [airportsData, zonesData] = await Promise.all([
         api.getAirports(),
-        api.getMissions(),
-        api.getCombatMissions(),
-        api.getStats(),
+        api.getFrontlineZones(),
       ]);
+
       setAirports(airportsData);
-      setMissions(missionsData);
-      setCombatMissions(combatMissionsData);
-      setStats(statsData);
+
+      const zones = zonesData?.zones || zonesData;
+      if (Array.isArray(zones)) {
+        setFrontlineSummary(buildFrontlineSummary(zones));
+      }
     } catch (err) {
       setError(err.message);
       console.error('Failed to load data:', err);
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadStats = async () => {
-    try {
-      const statsData = await api.getStats();
-      setStats(statsData);
-    } catch (err) {
-      console.error('Failed to load stats:', err);
-    }
-  };
-
-  const handleMissionUpdate = async () => {
-    // Reload missions after an update
-    try {
-      const missionsData = await api.getMissions();
-      setMissions(missionsData);
-      await loadStats();
-    } catch (err) {
-      console.error('Failed to reload missions:', err);
-    }
-  };
-
-  const handleAirportSelect = (airportId) => {
-    setSelectedAirportId(airportId);
-    setSelectedAirportToken((prev) => prev + 1);
-    setCurrentView('airport');
-  };
-
-  const handleAirportBack = () => {
-    setCurrentView('airports');
   };
 
   if (loading) {
@@ -157,144 +137,77 @@ function App() {
 
   return (
     <div className="h-screen bg-yt-bg-primary flex flex-col overflow-hidden">
-      {/* Header - Compatto stile YouTube */}
-      <header className="bg-yt-bg-secondary border-b border-yt-border sticky top-0 z-50 shadow-lg">
-        <div className="container mx-auto px-4 py-1.5">
-          <div className="flex items-center justify-between">
-            {/* Logo compatto */}
-            <button
-              type="button"
-              onClick={() => setCurrentView(user ? 'profile' : 'dashboard')}
-              className="flex items-center gap-3 text-left hover:opacity-90 transition-opacity"
-              title={user ? 'Apri profilo' : 'Dashboard'}
-            >
-              <img
-                src={bannerImg}
-                alt="DCS Italia"
-                className="h-10 w-10 object-contain"
-              />
-              <div className="leading-tight">
-                <div className="text-xl font-extrabold text-yt-text-primary">DCS Frontline</div>
-                <div className="text-[11px] text-yt-text-secondary">Gestione Campagna dinamica</div>
-              </div>
-            </button>
+      <header className="sticky top-0 z-50 border-b border-yt-border/80 bg-[#0b1119f2] shadow-[0_8px_28px_rgba(0,0,0,0.35)] backdrop-blur-md">
+        <div className="mx-auto w-full px-4 py-1.5">
+          <div className="flex h-10 items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <button
+                type="button"
+                onClick={() => goToView(user ? 'profile' : 'frontline')}
+                className="flex items-center gap-2 text-left transition-opacity hover:opacity-90"
+                title={user ? 'Apri profilo' : 'Frontline'}
+              >
+                <img
+                  src={bannerImg}
+                  alt="DCS Italia"
+                  className="h-7 w-7 object-contain"
+                />
+                <div className="leading-tight">
+                  <div className="text-[13px] font-bold uppercase tracking-[0.12em] text-yt-text-primary">Monitor DCS Frontline</div>
+                  <div className="text-[10px] uppercase tracking-[0.12em] text-yt-text-secondary">Realtime theater status</div>
+                </div>
+              </button>
 
-            <div className="flex items-center gap-3">
-              {/* Navigation - compatta e moderna */}
-              <nav className="flex items-center gap-1">
-                <button
-                  onClick={() => setCurrentView('dashboard')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
-                    currentView === 'dashboard'
-                      ? 'bg-yt-bg-tertiary text-yt-text-primary'
-                      : 'text-yt-text-secondary hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary'
-                  }`}
-                >
-                  <Plane className="w-4 h-4" />
-                  <span className="hidden sm:inline">{t('general.navigation.dashboard')}</span>
-                </button>
-                <button
-                  onClick={() => setCurrentView('airports')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
-                    currentView === 'airports'
-                      ? 'bg-yt-bg-tertiary text-yt-text-primary'
-                      : 'text-yt-text-secondary hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary'
-                  }`}
-                >
-                  <MapPin className="w-4 h-4" />
-                  <span className="hidden sm:inline">{t('general.navigation.airports')}</span>
-                </button>
-                <button
-                  onClick={() => setCurrentView('missions')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
-                    currentView === 'missions'
-                      ? 'bg-yt-bg-tertiary text-yt-text-primary'
-                      : 'text-yt-text-secondary hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary'
-                  }`}
-                >
-                  <Package className="w-4 h-4" />
-                  <span className="hidden sm:inline">{t('general.navigation.missions')}</span>
-                </button>
-                <button
-                  onClick={() => setCurrentView('frontline')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
-                    currentView === 'frontline'
-                      ? 'bg-yt-bg-tertiary text-yt-text-primary'
-                      : 'text-yt-text-secondary hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary'
-                  }`}
-                >
-                  <Target className="w-4 h-4" />
-                  <span className="hidden sm:inline">ATO</span>
-                </button>
-                <button
-                  onClick={() => setCurrentView('admin')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
-                    currentView === 'admin'
-                      ? 'bg-red-500/20 text-red-400'
-                      : 'text-yt-text-secondary hover:bg-red-500/10 hover:text-red-400'
-                  }`}
-                >
-                  <Shield className="w-4 h-4" />
-                  <span className="hidden sm:inline">{t('general.navigation.admin')}</span>
-                </button>
-              </nav>
+              {currentView === 'frontline' && (
+                <div className="hidden lg:flex items-center gap-1.5 rounded-md border border-yt-border/80 bg-[#141b25] px-2 py-1">
+                  <span className="inline-flex items-center gap-1 rounded-sm bg-green-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-green-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
+                    Live
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-200">
+                    <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
+                    {frontlineSummary.total}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
+                    {frontlineSummary.RED}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+                    {frontlineSummary.BLUE}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                    {frontlineSummary.NEUTRAL}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-orange-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
+                    {frontlineSummary.UNDER_ATTACK}
+                  </span>
+                </div>
+              )}
+            </div>
 
-              {/* User Menu */}
+            <div className="flex items-center gap-2">
               <UserMenu onProfileOpen={() => setCurrentView('profile')} />
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content - padding ridotto */}
-      <main className={`flex-1 ${currentView === 'frontline' || currentView === 'admin' ? 'overflow-hidden' : currentView === 'dashboard' ? 'max-w-[1800px] mx-auto px-4 py-4 overflow-y-auto w-full' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
-        {currentView === 'dashboard' && (
-          <Dashboard
-            airports={airports}
-            missions={missions}
-            combatMissions={combatMissions}
-            stats={stats}
-          />
-        )}
-        {currentView === 'airports' && (
-          <AirportsDirectory
-            airports={airports}
-            missions={missions}
-            onSelectAirport={handleAirportSelect}
-          />
-        )}
-        {currentView === 'airport' && (
-          <AirportDetails
-            airport={selectedAirportId ? airports[selectedAirportId] : null}
-            missions={missions}
-            onMissionsUpdate={handleMissionUpdate}
-            onBack={handleAirportBack}
-          />
-        )}
-        {currentView === 'missions' && (
-          <MissionDispatch
-            missions={missions}
-            airports={Object.values(airports)}
-            onUpdate={handleMissionUpdate}
-            highlightedMissionId={highlightedMissionId}
-          />
-        )}
+      <main className={`flex-1 ${currentView === 'frontline' ? 'overflow-hidden' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
         {currentView === 'frontline' && (
           <FrontlineMap airportsData={Object.values(airports)} />
-        )}
-        {currentView === 'admin' && (
-          <AdminPanel />
         )}
         {currentView === 'profile' && (
           <UserProfile />
         )}
       </main>
 
-      {/* Footer - compatto (hidden on map/frontline/admin views) */}
-      {currentView !== 'frontline' && currentView !== 'admin' && (
+      {currentView !== 'frontline' && (
         <footer className="bg-yt-bg-secondary border-t border-yt-border mt-8">
           <div className="container mx-auto px-4 py-3 text-center text-xs text-yt-text-secondary">
-            <p>DCS Italia Warehouse Viewer v1.0 • Real-time logistics management</p>
+            <p>DCS Italia Warehouse Viewer v1.0 - Real-time logistics management</p>
           </div>
         </footer>
       )}

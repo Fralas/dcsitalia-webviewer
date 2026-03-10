@@ -208,6 +208,33 @@ export async function getFrontlineZones() {
 }
 
 /**
+ * Get shared activity feed
+ */
+export async function getFeed(limit = 200) {
+  return fetchAPI(`/feed?limit=${limit}`);
+}
+
+/**
+ * Get convoys state
+ */
+export async function getConvoys(status = null) {
+  const query = status ? `?status=${encodeURIComponent(status)}` : '';
+  return fetchAPI(`/convoys${query}`);
+}
+
+/**
+ * Post convoy event (external integration/testing)
+ */
+export async function postConvoyEvent(eventPayload, convoyToken = null) {
+  const headers = convoyToken ? { 'x-convoy-token': convoyToken } : undefined;
+  return fetchAPI('/convoys/events', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(eventPayload),
+  });
+}
+
+/**
  * Add user to an assigned combat mission
  */
 export async function addUserToCombatMission(missionId, pilotName, aircraft) {
@@ -274,6 +301,9 @@ export default {
   clearCombatMissions,
   getPilotCombatMissions,
   getFrontlineZones,
+  getFeed,
+  getConvoys,
+  postConvoyEvent,
   getUserProfile,
   saveUserProfile,
 };

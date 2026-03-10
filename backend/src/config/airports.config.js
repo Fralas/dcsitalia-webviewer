@@ -76,6 +76,7 @@ export const airports = [
     csvPrefix: 'Tiyas',
     coordinates: { lat: 34.527303, lon: 37.633076 },
   },
+  
   {
     id: 'palmyra',
     name: 'Palmyra',
