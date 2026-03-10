@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { LogOut, User, ChevronDown, UserCircle } from 'lucide-react';
+import { LogOut, User, ChevronDown, UserCircle, X } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
-import discordLogo from '../../img/discord_logo.png';
 
 /**
  * User Menu Component - Discord Authentication
@@ -9,6 +8,7 @@ import discordLogo from '../../img/discord_logo.png';
 export default function UserMenu({ onProfileOpen }) {
   const { user, loading, setUser } = useUser();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
 
   const handleLogin = () => {
     window.location.href = '/api/auth/discord';
@@ -52,17 +52,50 @@ export default function UserMenu({ onProfileOpen }) {
 
   if (!user) {
     return (
-      <button
-        onClick={handleLogin}
-        aria-label="Login con Discord"
-        className="p-1.5 rounded text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 transition-all"
-      >
-        <img
-          src={discordLogo}
-          alt="Discord"
-          className="h-8 w-auto object-contain"
-        />
-      </button>
+      <>
+        <button
+          onClick={() => setLoginModalOpen(true)}
+          aria-label="Open login window"
+          className="rounded border border-yt-border/80 bg-[#151b25] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-yt-text-primary transition-colors hover:border-yt-accent hover:text-white"
+        >
+          Login
+        </button>
+
+        {loginModalOpen && (
+          <div className="fixed inset-0 z-[2000] grid place-items-center p-4">
+            <button
+              type="button"
+              className="absolute inset-0 bg-[#05070bcc] backdrop-blur-sm"
+              onClick={() => setLoginModalOpen(false)}
+              aria-label="Close login modal"
+            />
+            <div className="relative w-[min(420px,92vw)] rounded-xl border border-yt-border bg-[#101722] p-4 shadow-[0_16px_48px_rgba(0,0,0,0.55)]">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-yt-text-primary">Sign in</div>
+                  <div className="text-[11px] text-yt-text-secondary">Authenticate to accept and manage missions</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLoginModalOpen(false)}
+                  className="rounded border border-yt-border p-1 text-yt-text-secondary transition-colors hover:text-yt-text-primary"
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <button
+                onClick={handleLogin}
+                aria-label="Login with Discord"
+                className="w-full rounded border border-[#5a68ea] bg-[#5865f2] px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#4a56d4]"
+              >
+                Continue with Discord
+              </button>
+            </div>
+          </div>
+        )}
+      </>
     );
   }
 

@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Activity, AlertCircle } from 'lucide-react';
-import MissionDispatch from './components/MissionDispatch';
 import FrontlineMap from './components/FrontlineMap';
 import UserMenu from './components/UserMenu';
 import UserProfile from './components/UserProfile';
@@ -32,12 +31,8 @@ function buildFrontlineSummary(zones = []) {
 function App() {
   const [currentView, setCurrentView] = useState('frontline');
   const [airports, setAirports] = useState({});
-  const [missions, setMissions] = useState([]);
-  const [combatMissions, setCombatMissions] = useState([]);
-  const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [highlightedMissionId, setHighlightedMissionId] = useState(null);
   const [frontlineSummary, setFrontlineSummary] = useState({
     total: 0,
     RED: 0,
@@ -71,12 +66,6 @@ function App() {
 
     const unsubscribeUpdated = socketService.on('data:updated', (data) => {
       setAirports(data);
-      loadStats();
-    });
-
-    const unsubscribeMissions = socketService.on('missions:updated', (data) => {
-      setMissions(data.missions);
-      loadStats();
     });
 
     const unsubscribeFrontline = socketService.on('frontline:updated', (data) => {
@@ -89,7 +78,6 @@ function App() {
     return () => {
       unsubscribeInitial();
       unsubscribeUpdated();
-      unsubscribeMissions();
       unsubscribeFrontline();
       socketService.disconnect();
     };
@@ -99,18 +87,12 @@ function App() {
     try {
       setLoading(true);
       setError(null);
-      const [airportsData, missionsData, combatMissionsData, statsData, zonesData] = await Promise.all([
+      const [airportsData, zonesData] = await Promise.all([
         api.getAirports(),
-        api.getMissions(),
-        api.getCombatMissions(),
-        api.getStats(),
         api.getFrontlineZones(),
       ]);
 
       setAirports(airportsData);
-      setMissions(missionsData);
-      setCombatMissions(combatMissionsData);
-      setStats(statsData);
 
       const zones = zonesData?.zones || zonesData;
       if (Array.isArray(zones)) {
@@ -121,25 +103,6 @@ function App() {
       console.error('Failed to load data:', err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadStats = async () => {
-    try {
-      const statsData = await api.getStats();
-      setStats(statsData);
-    } catch (err) {
-      console.error('Failed to load stats:', err);
-    }
-  };
-
-  const handleMissionUpdate = async () => {
-    try {
-      const missionsData = await api.getMissions();
-      setMissions(missionsData);
-      await loadStats();
-    } catch (err) {
-      console.error('Failed to reload missions:', err);
     }
   };
 
@@ -174,50 +137,50 @@ function App() {
 
   return (
     <div className="h-screen bg-yt-bg-primary flex flex-col overflow-hidden">
-      <header className="sticky top-0 z-50 border-b border-yt-border/90 bg-[#0f1721e6] shadow-[0_8px_24px_rgba(0,0,0,0.3)] backdrop-blur-md">
-        <div className="container mx-auto px-4 py-1">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-50 border-b border-yt-border/80 bg-[#0b1119f2] shadow-[0_8px_28px_rgba(0,0,0,0.35)] backdrop-blur-md">
+        <div className="mx-auto w-full px-4 py-1.5">
+          <div className="flex h-10 items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
                 onClick={() => goToView(user ? 'profile' : 'frontline')}
-                className="flex items-center gap-3 text-left hover:opacity-90 transition-opacity"
+                className="flex items-center gap-2 text-left transition-opacity hover:opacity-90"
                 title={user ? 'Apri profilo' : 'Frontline'}
               >
                 <img
                   src={bannerImg}
                   alt="DCS Italia"
-                  className="h-8 w-8 object-contain"
+                  className="h-7 w-7 object-contain"
                 />
                 <div className="leading-tight">
-                  <div className="text-lg font-extrabold text-yt-text-primary">DCS Frontline</div>
-                  <div className="text-[10px] text-yt-text-secondary">Gestione Campagna dinamica</div>
+                  <div className="text-[13px] font-bold uppercase tracking-[0.12em] text-yt-text-primary">Monitor DCS Frontline</div>
+                  <div className="text-[10px] uppercase tracking-[0.12em] text-yt-text-secondary">Realtime theater status</div>
                 </div>
               </button>
 
               {currentView === 'frontline' && (
-                <div className="hidden lg:flex items-center gap-1 rounded-xl border border-yt-border/90 bg-yt-bg-tertiary/70 px-2 py-1">
-                  <span className="inline-flex items-center gap-1 rounded-md bg-green-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-green-300">
+                <div className="hidden lg:flex items-center gap-1.5 rounded-md border border-yt-border/80 bg-[#141b25] px-2 py-1">
+                  <span className="inline-flex items-center gap-1 rounded-sm bg-green-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-green-300">
                     <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
                     Live
                   </span>
-                  <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold text-yt-text-secondary">
-                    <span className="h-1.5 w-1.5 rounded-full bg-yt-text-secondary/80" />
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-200">
+                    <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
                     {frontlineSummary.total}
                   </span>
-                  <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold text-red-300">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-300">
                     <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
                     {frontlineSummary.RED}
                   </span>
-                  <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold text-blue-300">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-300">
                     <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
                     {frontlineSummary.BLUE}
                   </span>
-                  <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold text-slate-300">
-                    <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
                     {frontlineSummary.NEUTRAL}
                   </span>
-                  <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold text-orange-300">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-orange-300">
                     <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
                     {frontlineSummary.UNDER_ATTACK}
                   </span>
@@ -225,7 +188,7 @@ function App() {
               )}
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <UserMenu onProfileOpen={() => setCurrentView('profile')} />
             </div>
           </div>
