@@ -179,8 +179,8 @@ function App() {
 
   return (
     <div className="h-screen bg-yt-bg-primary flex flex-col overflow-hidden">
-      <header className="sticky top-0 z-50 border-b border-yt-border/90 bg-[#0f1721e6] shadow-[0_10px_35px_rgba(0,0,0,0.35)] backdrop-blur-md">
-        <div className="container mx-auto px-4 py-1.5">
+      <header className="sticky top-0 z-50 border-b border-yt-border/90 bg-[#0f1721e6] shadow-[0_8px_24px_rgba(0,0,0,0.3)] backdrop-blur-md">
+        <div className="container mx-auto px-4 py-1">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button
@@ -192,11 +192,11 @@ function App() {
                 <img
                   src={bannerImg}
                   alt="DCS Italia"
-                  className="h-10 w-10 object-contain"
+                  className="h-8 w-8 object-contain"
                 />
                 <div className="leading-tight">
-                  <div className="text-xl font-extrabold text-yt-text-primary">DCS Frontline</div>
-                  <div className="text-[11px] text-yt-text-secondary">Gestione Campagna dinamica</div>
+                  <div className="text-lg font-extrabold text-yt-text-primary">DCS Frontline</div>
+                  <div className="text-[10px] text-yt-text-secondary">Gestione Campagna dinamica</div>
                 </div>
               </button>
 
@@ -234,7 +234,7 @@ function App() {
               <nav className="flex items-center gap-1">
                 <button
                   onClick={() => setCurrentView('dashboard')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
+                  className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1 transition-all ${
                     currentView === 'dashboard'
                       ? 'bg-yt-bg-tertiary text-yt-text-primary'
                       : 'text-yt-text-secondary hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary'
@@ -245,7 +245,7 @@ function App() {
                 </button>
                 <button
                   onClick={() => setCurrentView('airports')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
+                  className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1 transition-all ${
                     currentView === 'airports'
                       ? 'bg-yt-bg-tertiary text-yt-text-primary'
                       : 'text-yt-text-secondary hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary'
@@ -256,7 +256,7 @@ function App() {
                 </button>
                 <button
                   onClick={() => setCurrentView('missions')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
+                  className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1 transition-all ${
                     currentView === 'missions'
                       ? 'bg-yt-bg-tertiary text-yt-text-primary'
                       : 'text-yt-text-secondary hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary'
@@ -267,7 +267,7 @@ function App() {
                 </button>
                 <button
                   onClick={() => setCurrentView('frontline')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
+                  className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1 transition-all ${
                     currentView === 'frontline'
                       ? 'bg-yt-bg-tertiary text-yt-text-primary'
                       : 'text-yt-text-secondary hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary'
@@ -278,7 +278,7 @@ function App() {
                 </button>
                 <button
                   onClick={() => setCurrentView('admin')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1.5 transition-all ${
+                  className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1 transition-all ${
                     currentView === 'admin'
                       ? 'bg-red-500/20 text-red-400'
                       : 'text-yt-text-secondary hover:bg-red-500/10 hover:text-red-400'

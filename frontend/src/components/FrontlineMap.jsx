@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef } from 'react';
 import createGlobe from 'cobe';
 import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Clock3, Globe2, Map as MapIcon, MapPin } from 'lucide-react';
+import { Clock3, MapPin } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import socketService from '../services/socket';
@@ -509,24 +509,6 @@ export default function FrontlineMap({ airportsData }) {
       return true;
     });
   }, [validZones, combatMissionByZone, filters]);
-
-  const zoneStats = useMemo(() => {
-    const stats = {
-      NEUTRAL: 0,
-      BLUE: 0,
-      RED: 0,
-      UNDER_ATTACK: 0,
-      total: validZones.length,
-      active: 0,
-      filtered: filteredZones.length,
-    };
-
-    validZones.forEach((zone) => {
-      if (stats[zone.status] !== undefined) stats[zone.status] += 1;
-      if (zone.isActive) stats.active += 1;
-    });
-    return stats;
-  }, [validZones, filteredZones.length]);
 
   const focusedZone = useMemo(
     () => (selectedZoneId ? filteredZones.find((zone) => zone.id === selectedZoneId) || validZones.find((zone) => zone.id === selectedZoneId) || null : null),
