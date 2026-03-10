@@ -253,6 +253,20 @@ function toLatLngPoint(position) {
   return [lat, lon];
 }
 
+function haversineNm(lat1, lon1, lat2, lon2) {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const rKm = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const km = rKm * c;
+  return km / 1.852;
+}
+
 function interpolateLatLon(start, end, progress) {
   if (!start || !end) return null;
   const clamped = Math.max(0, Math.min(1, progress));
@@ -589,6 +603,8 @@ function FlatMapView({
   showLogistics,
   showConvoys,
   showDcsar,
+  onDcsarHover,
+  animationTick,
 }) {
   const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
   const airportsById = useMemo(() => {
@@ -692,18 +708,68 @@ function FlatMapView({
           return layers;
         })}
 
-        {showDcsar && dcsarPoints.map((point) => (
-          <Marker
-            key={`dcsar-${point.id}`}
-            position={[point.lat, point.lon]}
-            icon={createDcsarIcon('#f8fafc')}
-            interactive={false}
-          >
-            <Tooltip direction="top" offset={[0, -3]} opacity={0.95}>
-              Survivor {point.id}
-            </Tooltip>
-          </Marker>
-        ))}
+        {showDcsar && dcsarPoints.flatMap((point) => {
+          const isAccepted = point.status === 'accepted' || point.accepted === true;
+          const pulseCycleMs = 1800;
+          const offset = hashString(point.id || 'dcsar') % pulseCycleMs;
+          const phase = ((animationTick + offset) % pulseCycleMs) / pulseCycleMs;
+          const pulseRadius = 9 + phase * 8;
+          const pulseOpacity = (1 - phase) * (isAccepted ? 0.35 : 0.45);
+          const iconColor = isAccepted ? '#22c55e' : '#f8fafc';
+          const nearestAirport = point.nearest_airbase;
+          const lineLayers = [];
+
+          if (nearestAirport?.coordinates) {
+            lineLayers.push(
+              <Polyline
+                key={`dcsar-link-${point.id}`}
+                positions={[
+                  [point.lat, point.lon],
+                  [nearestAirport.coordinates.lat, nearestAirport.coordinates.lon],
+                ]}
+                pathOptions={{
+                  color: isAccepted ? '#22c55e' : '#ffffff',
+                  weight: isAccepted ? 2.8 : 2.2,
+                  opacity: 0.9,
+                  dashArray: isAccepted ? undefined : '7,7',
+                }}
+                interactive={false}
+              />
+            );
+          }
+
+          return [
+            ...lineLayers,
+            <CircleMarker
+              key={`dcsar-pulse-${point.id}`}
+              center={[point.lat, point.lon]}
+              radius={pulseRadius}
+              pathOptions={{
+                color: isAccepted ? '#22c55e' : '#ffffff',
+                fillColor: isAccepted ? '#22c55e' : '#ffffff',
+                fillOpacity: pulseOpacity * 0.35,
+                opacity: pulseOpacity,
+                weight: 1.8,
+              }}
+              interactive={false}
+            />,
+            <Marker
+              key={`dcsar-${point.id}`}
+              position={[point.lat, point.lon]}
+              icon={createDcsarIcon(iconColor)}
+              eventHandlers={{
+                mouseover: () => onDcsarHover && onDcsarHover(point.id),
+                mouseout: () => onDcsarHover && onDcsarHover(null),
+              }}
+            >
+              <Tooltip direction="top" offset={[0, -3]} opacity={0.95}>
+                {nearestAirport?.name
+                  ? `CSAR ${point.id} -> ${nearestAirport.name}`
+                  : `CSAR ${point.id}`}
+              </Tooltip>
+            </Marker>,
+          ];
+        })}
 
         {showAto && zones.map((zone) => {
           const isSelected = zone.id === selectedZoneId;
@@ -769,7 +835,9 @@ export default function FrontlineMap({ airportsData }) {
   const { user } = useUser();
   const [selectedZoneId, setSelectedZoneId] = useState(null);
   const [hoveredZoneId, setHoveredZoneId] = useState(null);
+  const [hoveredDcsarId, setHoveredDcsarId] = useState(null);
   const [zoneCoordinatesFormat, setZoneCoordinatesFormat] = useState('dms');
+  const [dcsarCoordinatesFormat, setDcsarCoordinatesFormat] = useState('dms');
   const [selectedAirportId, setSelectedAirportId] = useState(null);
   const [selectedLogisticsMission, setSelectedLogisticsMission] = useState(null);
   const [acceptingMissionId, setAcceptingMissionId] = useState(null);
@@ -1289,6 +1357,54 @@ export default function FrontlineMap({ airportsData }) {
   }, [selectedAirportId, filteredLogisticsMissions]);
 
   const selectedAirport = selectedAirportId ? airportsById.get(selectedAirportId) : null;
+  const dcsarPointsWithNearest = useMemo(() => {
+    return dcsarPoints
+      .map((point, index) => {
+        const lat = Number(point?.lat);
+        const lon = Number(point?.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+        let nearestAirport = null;
+        let nearestDistanceNm = Number.POSITIVE_INFINITY;
+
+        validAirports.forEach((airport) => {
+          const airportLat = Number(airport?.coordinates?.lat);
+          const airportLon = Number(airport?.coordinates?.lon);
+          if (!Number.isFinite(airportLat) || !Number.isFinite(airportLon)) return;
+          const distanceNm = haversineNm(lat, lon, airportLat, airportLon);
+          if (distanceNm < nearestDistanceNm) {
+            nearestDistanceNm = distanceNm;
+            nearestAirport = {
+              id: airport.id,
+              name: airport.displayName || airport.name || airport.id,
+              coordinates: {
+                lat: airportLat,
+                lon: airportLon,
+              },
+            };
+          }
+        });
+
+        const statusRaw = String(point?.status || '').toLowerCase();
+        const accepted = point?.accepted === true || statusRaw === 'accepted' || Boolean(point?.accepted_by);
+
+        return {
+          ...point,
+          id: point?.id || `dcsar_${index + 1}`,
+          lat,
+          lon,
+          status: accepted ? 'accepted' : 'pending',
+          accepted,
+          nearest_airbase: nearestAirport,
+          nearest_distance_nm: Number.isFinite(nearestDistanceNm) ? nearestDistanceNm : null,
+        };
+      })
+      .filter(Boolean);
+  }, [dcsarPoints, validAirports]);
+  const hoveredDcsarPoint = useMemo(() => {
+    if (!hoveredDcsarId) return null;
+    return dcsarPointsWithNearest.find((point) => point.id === hoveredDcsarId) || null;
+  }, [hoveredDcsarId, dcsarPointsWithNearest]);
   const logisticsDetailOrders = selectedLogisticsMission ? getMissionOrders(selectedLogisticsMission) : [];
   const logisticsDetailIsoPlan = useMemo(
     () => (selectedLogisticsMission ? buildIsoContainerPlan(logisticsDetailOrders) : null),
@@ -1309,8 +1425,18 @@ export default function FrontlineMap({ airportsData }) {
   }, [filters.showAto]);
 
   useEffect(() => {
+    if (!filters.showDcsar) {
+      setHoveredDcsarId(null);
+    }
+  }, [filters.showDcsar]);
+
+  useEffect(() => {
     setZoneCoordinatesFormat('dms');
   }, [selectedZone?.id]);
+
+  useEffect(() => {
+    setDcsarCoordinatesFormat('dms');
+  }, [hoveredDcsarPoint?.id]);
 
   useEffect(() => {
     if (!selectedLogisticsMission?.id) return;
@@ -1408,18 +1534,20 @@ export default function FrontlineMap({ airportsData }) {
                     logisticsMissions={filteredLogisticsMissions}
                     gridConnections={gridConnections}
                     convoys={convoyRenderData}
-                    dcsarPoints={dcsarPoints}
+                    dcsarPoints={dcsarPointsWithNearest}
                     selectedZoneId={selectedZoneId}
                     onZoneSelect={setSelectedZoneId}
                     focusCoordinates={focusCoordinates}
                     onZoomChange={handleFlatMapZoomChange}
                     onZoneHover={setHoveredZoneId}
+                    onDcsarHover={setHoveredDcsarId}
                     onAirportClick={setSelectedAirportId}
                     showAto={filters.showAto}
                     showAirports={filters.showAirports}
                     showLogistics={filters.showLogistics}
                     showConvoys={filters.showConvoys}
                     showDcsar={filters.showDcsar}
+                    animationTick={animationTick}
                   />
                 </div>
               )}
@@ -1678,6 +1806,54 @@ export default function FrontlineMap({ airportsData }) {
                       View Details
                     </button>
                   </div>
+                </div>
+              )}
+
+              {mapMode && filters.showDcsar && hoveredDcsarPoint && (
+                <div className={`absolute bottom-4 z-[1000] w-[360px] rounded-xl border border-yt-border bg-[#1b1d2af0] p-3 shadow-2xl backdrop-blur ${filters.showAto && selectedZone ? 'left-[348px]' : 'left-4'}`}>
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    <span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${hoveredDcsarPoint.accepted ? 'bg-green-500/20 text-green-200' : 'bg-slate-200/20 text-slate-100'}`}>
+                      {hoveredDcsarPoint.accepted ? 'Accepted' : 'Awaiting Rescue'}
+                    </span>
+                    {hoveredDcsarPoint.accepted_by && (
+                      <span className="rounded bg-blue-500/20 px-2 py-0.5 text-[11px] font-semibold text-blue-200">
+                        {hoveredDcsarPoint.accepted_by}
+                      </span>
+                    )}
+                    {hoveredDcsarPoint.nearest_airbase?.name && (
+                      <span className="rounded bg-[#2f3a24] px-2 py-0.5 text-[11px] font-semibold text-[#d8f08c]">
+                        {hoveredDcsarPoint.nearest_airbase.name}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="text-xl font-semibold leading-6 text-yt-text-primary">
+                    {`CSAR: '${hoveredDcsarPoint.id}'`}
+                  </div>
+
+                  <div className="mt-3 flex items-center gap-2 text-sm text-yt-text-secondary">
+                    <Clock3 className="h-4 w-4" />
+                    <span>
+                      {hoveredDcsarPoint.nearest_distance_nm
+                        ? `Nearest airbase at ${hoveredDcsarPoint.nearest_distance_nm.toFixed(1)} nm`
+                        : 'Nearest airbase unavailable'}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setDcsarCoordinatesFormat((current) => (current === 'dms' ? 'mgrs' : 'dms'))}
+                    className="mt-2 flex w-full items-center gap-2 text-left text-sm text-yt-text-secondary transition-colors hover:text-yt-text-primary"
+                    title={dcsarCoordinatesFormat === 'dms' ? 'Click to switch to MGRS' : 'Click to switch to DMS'}
+                  >
+                    <MapPin className="h-4 w-4" />
+                    <span className="font-mono">
+                      {formatZoneCoordinates({ lat: hoveredDcsarPoint.lat, lon: hoveredDcsarPoint.lon }, dcsarCoordinatesFormat)}
+                    </span>
+                    <span className="ml-auto rounded border border-yt-border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">
+                      {dcsarCoordinatesFormat}
+                    </span>
+                  </button>
                 </div>
               )}
 

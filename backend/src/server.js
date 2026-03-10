@@ -263,10 +263,20 @@ function parseDcsarLine(line, index) {
   const lon = Number(nums[1]);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
 
+  const acceptedByMatch = cleaned.match(/accepted_by\s*=\s*([^\s|,;]+)/i);
+  const statusMatch = cleaned.match(/status\s*=\s*([^\s|,;]+)/i);
+  const idMatch = cleaned.match(/id\s*=\s*([^\s|,;]+)/i);
+  const acceptedBy = acceptedByMatch ? String(acceptedByMatch[1] || '').trim() : '';
+  const status = statusMatch ? String(statusMatch[1] || '').trim().toLowerCase() : '';
+  const accepted = status === 'accepted' || acceptedBy !== '';
+
   return {
-    id: `dcsar_${index + 1}`,
+    id: idMatch ? String(idMatch[1] || '').trim() : `dcsar_${index + 1}`,
     lat,
     lon,
+    status: status || (accepted ? 'accepted' : 'pending'),
+    accepted_by: acceptedBy || null,
+    accepted,
     raw: cleaned,
   };
 }
