@@ -54,6 +54,9 @@ const io = new Server(httpServer, {
 
 const PORT = process.env.PORT || 3001;
 const CONVOY_API_TOKEN = process.env.CONVOY_API_TOKEN || '';
+const CONVOY_SYNC_FILE = process.env.CONVOY_SYNC_FILE
+  ? path.resolve(process.env.CONVOY_SYNC_FILE)
+  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DMAP\\Export_Ground_Convoys.json';
 
 // CSV Directory - configurable via environment variable
 const CSV_DIR = process.env.CSV_DIR
@@ -134,6 +137,8 @@ const FRONTLINE_ZONES_FILE = process.env.DYZONE_OUTPUT_JSON
   : path.resolve(__dirname, '../../frontend/src/config/frontlineZones.json');
 
 let lastZoneStatusById = new Map();
+let convoySyncSignature = '';
+let convoyEventById = new Map();
 
 function pushFeedEvent(event) {
   const created = feedService.appendFeedEvent(event);
@@ -163,6 +168,79 @@ function buildMissionSummary(mission) {
     destinationName: getAirportDisplayName(mission.airport_id),
     orderCount: Array.isArray(mission.orders) ? mission.orders.length : 0,
   };
+}
+
+function normalizeConvoyEntry(entry) {
+  return {
+    convoy_id: String(entry?.convoy_id || '').trim(),
+    origin_zone: String(entry?.origin_zone || '').trim() || null,
+    destination_zone: String(entry?.destination_zone || '').trim() || null,
+    status: String(entry?.status || 'active').trim().toLowerCase(),
+    last_event: String(entry?.last_event || '').trim().toLowerCase(),
+    event_at: Number.isFinite(Number(entry?.event_at)) ? Number(entry.event_at) : Date.now(),
+    feed_message: String(entry?.feed_message || '').trim(),
+    last_update: Number.isFinite(Number(entry?.event_at)) ? Number(entry.event_at) : Date.now(),
+  };
+}
+
+function syncConvoysFromFile() {
+  try {
+    if (!fs.existsSync(CONVOY_SYNC_FILE)) {
+      return;
+    }
+
+    const raw = fs.readFileSync(CONVOY_SYNC_FILE, 'utf8');
+    if (!raw || raw.trim() === '') return;
+    if (raw === convoySyncSignature) return;
+
+    convoySyncSignature = raw;
+    const parsed = JSON.parse(raw);
+    const incoming = Array.isArray(parsed?.convoys) ? parsed.convoys : [];
+    const normalized = incoming.map(normalizeConvoyEntry).filter((entry) => entry.convoy_id !== '');
+
+    convoysService.replaceConvoys(normalized);
+
+    const nextEventMap = new Map();
+    normalized.forEach((convoy) => {
+      const prev = convoyEventById.get(convoy.convoy_id);
+      const nextKey = `${convoy.last_event}:${convoy.event_at}`;
+      nextEventMap.set(convoy.convoy_id, nextKey);
+
+      const shouldEmitFeed = !prev || prev !== nextKey;
+      if (!shouldEmitFeed) return;
+
+      if (convoy.status === 'arrived') {
+        pushFeedEvent({
+          type: 'convoy.arrived',
+          title: 'Convoy event',
+          message: convoy.feed_message || `Enemy convoy reached zone: ${convoy.destination_zone || 'unknown'}`,
+          metadata: {
+            convoy_id: convoy.convoy_id,
+            origin_zone: convoy.origin_zone,
+            destination_zone: convoy.destination_zone,
+          },
+        });
+      } else if (convoy.status === 'destroyed') {
+        pushFeedEvent({
+          type: 'convoy.destroyed',
+          title: 'Convoy event',
+          message: convoy.feed_message || 'Enemy convoy destroyed',
+          metadata: {
+            convoy_id: convoy.convoy_id,
+            origin_zone: convoy.origin_zone,
+            destination_zone: convoy.destination_zone,
+          },
+        });
+      }
+    });
+    convoyEventById = nextEventMap;
+
+    io.emit('convoys:updated', {
+      convoys: convoysService.getConvoys(),
+    });
+  } catch (error) {
+    console.error('Failed convoy sync from file:', error.message);
+  }
 }
 
 /**
@@ -875,6 +953,8 @@ app.post('/api/convoys/events', (req, res) => {
 
   try {
     const convoy = convoysService.recordConvoyEvent(req.body || {});
+    const customFeedMessage = typeof req.body?.feed_message === 'string' ? req.body.feed_message.trim() : '';
+    const customFeedTitle = typeof req.body?.feed_title === 'string' ? req.body.feed_title.trim() : '';
 
     io.emit('convoys:updated', {
       convoys: convoysService.getConvoys()
@@ -888,8 +968,10 @@ app.post('/api/convoys/events', (req, res) => {
           : 'destroyed';
       pushFeedEvent({
         type: `convoy.${eventType}`,
-        title: 'Convoy event',
-        message: `Convoy ${convoy.convoy_id} ${action} (${convoy.origin_zone || '?'} -> ${convoy.destination_zone || '?'})`,
+        title: customFeedTitle !== '' ? customFeedTitle : 'Convoy event',
+        message: customFeedMessage !== ''
+          ? customFeedMessage
+          : `Convoy ${convoy.convoy_id} ${action} (${convoy.origin_zone || '?'} -> ${convoy.destination_zone || '?'})`,
         metadata: {
           convoy_id: convoy.convoy_id,
           status: convoy.status,
@@ -1524,6 +1606,11 @@ setInterval(() => {
   scheduleRefresh('scheduled');
 }, 5 * 60 * 1000); // Every 5 minutes
 
+// Poll local DCS convoy export (file-based integration, no external API calls from mission)
+setInterval(() => {
+  syncConvoysFromFile();
+}, 2000);
+
 // ==================== START SERVER ====================
 
 // Load airbase status first
@@ -1537,6 +1624,9 @@ convoysService.clearAllConvoys();
 io.emit('convoys:updated', {
   convoys: convoysService.getConvoys(),
 });
+
+// Initial convoy sync from local JSON exported by DCS scripts
+syncConvoysFromFile();
 
 httpServer.listen(PORT, () => {
   const activeAirports = airbaseStatusManager.getActiveAirports();

@@ -946,7 +946,9 @@ export default function FrontlineMap({ airportsData }) {
   }, [validZones]);
 
   const convoyRenderData = useMemo(() => {
-    return convoys.map((convoy) => {
+    return convoys
+      .filter((convoy) => (convoy?.status || 'active') === 'active')
+      .map((convoy) => {
       const originPosition = zoneCoordinatesById.get(convoy.origin_zone) || convoy.origin_position || null;
       const destinationPosition = zoneCoordinatesById.get(convoy.destination_zone) || convoy.destination_position || null;
       const originPoint = toLatLngPoint(originPosition);

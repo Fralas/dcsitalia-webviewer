@@ -119,6 +119,38 @@ export function getConvoyById(convoyId) {
   return convoysById.get(convoyId) || null;
 }
 
+export function replaceConvoys(convoys = []) {
+  if (!Array.isArray(convoys)) {
+    throw new Error('replaceConvoys expects an array');
+  }
+
+  convoysCache = convoys.map((convoy) => ({
+    convoy_id: sanitizeString(convoy.convoy_id),
+    origin_zone: sanitizeString(convoy.origin_zone) || null,
+    destination_zone: sanitizeString(convoy.destination_zone) || null,
+    origin_position: sanitizePosition(convoy.origin_position),
+    destination_position: sanitizePosition(convoy.destination_position),
+    group_name: sanitizeString(convoy.group_name) || null,
+    status: sanitizeString(convoy.status, 'active'),
+    spawned_at: Number.isFinite(convoy.spawned_at) ? Number(convoy.spawned_at) : null,
+    arrived_at: Number.isFinite(convoy.arrived_at) ? Number(convoy.arrived_at) : null,
+    destroyed_at: Number.isFinite(convoy.destroyed_at) ? Number(convoy.destroyed_at) : null,
+    last_update: Number.isFinite(convoy.last_update) ? Number(convoy.last_update) : Date.now(),
+    units_total: Number.isFinite(convoy.units_total) ? Number(convoy.units_total) : null,
+    units_alive: Number.isFinite(convoy.units_alive) ? Number(convoy.units_alive) : null,
+    last_position: sanitizePosition(convoy.last_position),
+    path: Array.isArray(convoy.path) ? convoy.path.map((p) => sanitizePosition(p)).filter(Boolean) : [],
+    history: Array.isArray(convoy.history) ? convoy.history : [],
+    last_event: sanitizeString(convoy.last_event),
+    event_at: Number.isFinite(convoy.event_at) ? Number(convoy.event_at) : null,
+    feed_message: sanitizeString(convoy.feed_message),
+  })).filter((convoy) => convoy.convoy_id);
+
+  rebuildIndex();
+  scheduleWrite();
+  return convoysCache;
+}
+
 export function clearAllConvoys() {
   convoysCache = [];
   convoysById = new Map();
@@ -219,6 +251,7 @@ export default {
   CONVOY_EVENT_TYPES,
   getConvoys,
   getConvoyById,
+  replaceConvoys,
   clearAllConvoys,
   recordConvoyEvent,
 };
