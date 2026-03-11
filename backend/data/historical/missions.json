@@ -1,0 +1,1274 @@
+[
+  {
+    "id": "mission_1773207073150_2sh7874ug",
+    "airport_id": "adana-sakirpasa",
+    "source_airport_id": "aleppo",
+    "distance_nm": 126.5,
+    "orders": [
+      {
+        "weapon_id": "weapons.missiles.AGM_88",
+        "quantity_needed": 22,
+        "current_quantity": 0,
+        "iso_units": 2,
+        "total_weight_lbs": 17490,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.ADM_141A",
+        "quantity_needed": 9,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 3564,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 21054,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207073150,
+    "expires_at": 1773293473150,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207073150_8vo3fo44p",
+    "airport_id": "adana-sakirpasa",
+    "source_airport_id": "aleppo",
+    "distance_nm": 126.5,
+    "orders": [
+      {
+        "weapon_id": "weapons.missiles.ADM_141A",
+        "quantity_needed": 27,
+        "current_quantity": 0,
+        "iso_units": 1.5,
+        "total_weight_lbs": 10692,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.GBU_12",
+        "quantity_needed": 13,
+        "current_quantity": 0,
+        "iso_units": 1,
+        "total_weight_lbs": 6591,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 17283,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207073150,
+    "expires_at": 1773293473150,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207073151_1yeoqr6ct",
+    "airport_id": "adana-sakirpasa",
+    "source_airport_id": "aleppo",
+    "distance_nm": 126.5,
+    "orders": [
+      {
+        "weapon_id": "weapons.bombs.GBU_12",
+        "quantity_needed": 13,
+        "current_quantity": 0,
+        "iso_units": 1,
+        "total_weight_lbs": 6591,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AIM_120C",
+        "quantity_needed": 50,
+        "current_quantity": 0,
+        "iso_units": 1,
+        "total_weight_lbs": 16500,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGR_20_M282",
+        "quantity_needed": 50,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 1600,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 24691,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207073151,
+    "expires_at": 1773293473151,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207073151_0nqycudb7",
+    "airport_id": "adana-sakirpasa",
+    "source_airport_id": "aleppo",
+    "distance_nm": 126.5,
+    "orders": [
+      {
+        "weapon_id": "weapons.missiles.AGR_20_M282",
+        "quantity_needed": 50,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 1600,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGR_20A",
+        "quantity_needed": 100,
+        "current_quantity": 0,
+        "iso_units": 1,
+        "total_weight_lbs": 3200,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.GBU_24",
+        "quantity_needed": 12,
+        "current_quantity": 0,
+        "iso_units": 0.9,
+        "total_weight_lbs": 28176,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGM_65D",
+        "quantity_needed": 5,
+        "current_quantity": 0,
+        "iso_units": 0.10000000000000009,
+        "total_weight_lbs": 2586.6666666666692,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 35562.66666666667,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207073151,
+    "expires_at": 1773293473151,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207073151_junm4wrq1",
+    "airport_id": "adana-sakirpasa",
+    "source_airport_id": "aleppo",
+    "distance_nm": 126.5,
+    "orders": [
+      {
+        "weapon_id": "weapons.missiles.AGM_65D",
+        "quantity_needed": 26,
+        "current_quantity": 0,
+        "iso_units": 0.4999999999999999,
+        "total_weight_lbs": 12933.33333333333,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGM_114K",
+        "quantity_needed": 64,
+        "current_quantity": 0,
+        "iso_units": 0.6,
+        "total_weight_lbs": 6336,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGM_114",
+        "quantity_needed": 64,
+        "current_quantity": 0,
+        "iso_units": 0.6,
+        "total_weight_lbs": 7040,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AIM_9X",
+        "quantity_needed": 50,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 9350,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.GBU_31_V_3B",
+        "quantity_needed": 9,
+        "current_quantity": 0,
+        "iso_units": 0.30000000000000027,
+        "total_weight_lbs": 20755.20000000002,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 56414.53333333335,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207073151,
+    "expires_at": 1773293473151,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207073151_rstz7dt9u",
+    "airport_id": "adana-sakirpasa",
+    "source_airport_id": "aleppo",
+    "distance_nm": 126.5,
+    "orders": [
+      {
+        "weapon_id": "weapons.bombs.GBU_31_V_3B",
+        "quantity_needed": 6,
+        "current_quantity": 0,
+        "iso_units": 0.19999999999999973,
+        "total_weight_lbs": 13836.799999999981,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.GBU_38",
+        "quantity_needed": 48,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 26784,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGM_65F",
+        "quantity_needed": 24,
+        "current_quantity": 0,
+        "iso_units": 0.4,
+        "total_weight_lbs": 16176,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGM_65H",
+        "quantity_needed": 24,
+        "current_quantity": 0,
+        "iso_units": 0.4,
+        "total_weight_lbs": 11160,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.CBU_105",
+        "quantity_needed": 24,
+        "current_quantity": 0,
+        "iso_units": 0.3,
+        "total_weight_lbs": 23280,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 91236.79999999999,
+    "total_iso_units": 1.7999999999999996,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207073151,
+    "expires_at": 1773293473151,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207073154_eow1bhiyh",
+    "airport_id": "incirlik",
+    "source_airport_id": "aleppo",
+    "distance_nm": 120,
+    "orders": [
+      {
+        "weapon_id": "weapons.missiles.AGM_88",
+        "quantity_needed": 22,
+        "current_quantity": 0,
+        "iso_units": 2,
+        "total_weight_lbs": 17490,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.ADM_141A",
+        "quantity_needed": 9,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 3564,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 21054,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207073154,
+    "expires_at": 1773293473154,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207073154_m16wgwekq",
+    "airport_id": "incirlik",
+    "source_airport_id": "aleppo",
+    "distance_nm": 120,
+    "orders": [
+      {
+        "weapon_id": "weapons.missiles.ADM_141A",
+        "quantity_needed": 27,
+        "current_quantity": 0,
+        "iso_units": 1.5,
+        "total_weight_lbs": 10692,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.GBU_12",
+        "quantity_needed": 13,
+        "current_quantity": 0,
+        "iso_units": 1,
+        "total_weight_lbs": 6591,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 17283,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207073154,
+    "expires_at": 1773293473154,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207073154_hxq2zdmre",
+    "airport_id": "incirlik",
+    "source_airport_id": "aleppo",
+    "distance_nm": 120,
+    "orders": [
+      {
+        "weapon_id": "weapons.bombs.GBU_12",
+        "quantity_needed": 13,
+        "current_quantity": 0,
+        "iso_units": 1,
+        "total_weight_lbs": 6591,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AIM_120C",
+        "quantity_needed": 50,
+        "current_quantity": 0,
+        "iso_units": 1,
+        "total_weight_lbs": 16500,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGR_20_M282",
+        "quantity_needed": 50,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 1600,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 24691,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207073154,
+    "expires_at": 1773293473154,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207073154_o3hbvmwzr",
+    "airport_id": "incirlik",
+    "source_airport_id": "aleppo",
+    "distance_nm": 120,
+    "orders": [
+      {
+        "weapon_id": "weapons.missiles.AGR_20_M282",
+        "quantity_needed": 50,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 1600,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGR_20A",
+        "quantity_needed": 100,
+        "current_quantity": 0,
+        "iso_units": 1,
+        "total_weight_lbs": 3200,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.GBU_24",
+        "quantity_needed": 12,
+        "current_quantity": 0,
+        "iso_units": 0.9,
+        "total_weight_lbs": 28176,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGM_65D",
+        "quantity_needed": 5,
+        "current_quantity": 0,
+        "iso_units": 0.10000000000000009,
+        "total_weight_lbs": 2586.6666666666692,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 35562.66666666667,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207073154,
+    "expires_at": 1773293473154,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207073155_5fj0ljm0s",
+    "airport_id": "incirlik",
+    "source_airport_id": "aleppo",
+    "distance_nm": 120,
+    "orders": [
+      {
+        "weapon_id": "weapons.missiles.AGM_65D",
+        "quantity_needed": 26,
+        "current_quantity": 0,
+        "iso_units": 0.4999999999999999,
+        "total_weight_lbs": 12933.33333333333,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGM_114K",
+        "quantity_needed": 64,
+        "current_quantity": 0,
+        "iso_units": 0.6,
+        "total_weight_lbs": 6336,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGM_114",
+        "quantity_needed": 64,
+        "current_quantity": 0,
+        "iso_units": 0.6,
+        "total_weight_lbs": 7040,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AIM_9X",
+        "quantity_needed": 50,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 9350,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.GBU_31_V_3B",
+        "quantity_needed": 9,
+        "current_quantity": 0,
+        "iso_units": 0.30000000000000027,
+        "total_weight_lbs": 20755.20000000002,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 56414.53333333335,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207073155,
+    "expires_at": 1773293473155,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207073155_pvprk2bif",
+    "airport_id": "incirlik",
+    "source_airport_id": "aleppo",
+    "distance_nm": 120,
+    "orders": [
+      {
+        "weapon_id": "weapons.bombs.GBU_31_V_3B",
+        "quantity_needed": 6,
+        "current_quantity": 0,
+        "iso_units": 0.19999999999999973,
+        "total_weight_lbs": 13836.799999999981,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.GBU_38",
+        "quantity_needed": 48,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 26784,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGM_65F",
+        "quantity_needed": 24,
+        "current_quantity": 0,
+        "iso_units": 0.4,
+        "total_weight_lbs": 16176,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGM_65H",
+        "quantity_needed": 24,
+        "current_quantity": 0,
+        "iso_units": 0.4,
+        "total_weight_lbs": 11160,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.CBU_105",
+        "quantity_needed": 24,
+        "current_quantity": 0,
+        "iso_units": 0.3,
+        "total_weight_lbs": 23280,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 91236.79999999999,
+    "total_iso_units": 1.7999999999999996,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207073155,
+    "expires_at": 1773293473155,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207073157_z8erqzf7j",
+    "airport_id": "carrier-1",
+    "source_airport_id": "aleppo",
+    "distance_nm": 157.8,
+    "orders": [
+      {
+        "weapon_id": "weapons.missiles.AGM_88",
+        "quantity_needed": 22,
+        "current_quantity": 0,
+        "iso_units": 2,
+        "total_weight_lbs": 17490,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.ADM_141A",
+        "quantity_needed": 9,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 3564,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 21054,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207073157,
+    "expires_at": 1773293473157,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207073157_1fxk61adp",
+    "airport_id": "carrier-1",
+    "source_airport_id": "aleppo",
+    "distance_nm": 157.8,
+    "orders": [
+      {
+        "weapon_id": "weapons.missiles.ADM_141A",
+        "quantity_needed": 27,
+        "current_quantity": 0,
+        "iso_units": 1.5,
+        "total_weight_lbs": 10692,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.GBU_12",
+        "quantity_needed": 13,
+        "current_quantity": 0,
+        "iso_units": 1,
+        "total_weight_lbs": 6591,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 17283,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207073157,
+    "expires_at": 1773293473157,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207073157_hvyq7p9g7",
+    "airport_id": "carrier-1",
+    "source_airport_id": "aleppo",
+    "distance_nm": 157.8,
+    "orders": [
+      {
+        "weapon_id": "weapons.bombs.GBU_12",
+        "quantity_needed": 13,
+        "current_quantity": 0,
+        "iso_units": 1,
+        "total_weight_lbs": 6591,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AIM_120C",
+        "quantity_needed": 50,
+        "current_quantity": 0,
+        "iso_units": 1,
+        "total_weight_lbs": 16500,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.GBU_24",
+        "quantity_needed": 6,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 15653.333333333334,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 38744.333333333336,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207073157,
+    "expires_at": 1773293473157,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207073157_xbodbl268",
+    "airport_id": "carrier-1",
+    "source_airport_id": "aleppo",
+    "distance_nm": 157.8,
+    "orders": [
+      {
+        "weapon_id": "weapons.bombs.GBU_24",
+        "quantity_needed": 5,
+        "current_quantity": 0,
+        "iso_units": 0.4,
+        "total_weight_lbs": 12522.666666666668,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AIM_9X",
+        "quantity_needed": 50,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 9350,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.GBU_31_V_3B",
+        "quantity_needed": 16,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 34592,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.GBU_38",
+        "quantity_needed": 48,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 26784,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGM_65F",
+        "quantity_needed": 24,
+        "current_quantity": 0,
+        "iso_units": 0.4,
+        "total_weight_lbs": 16176,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 99424.66666666667,
+    "total_iso_units": 2.3,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207073157,
+    "expires_at": 1773293473157,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207587056_tg5lvt1ml",
+    "airport_id": "abu-al-duhur",
+    "source_airport_id": "aleppo",
+    "distance_nm": 27.8,
+    "orders": [
+      {
+        "weapon_id": "weapons.missiles.AGM_88",
+        "quantity_needed": 22,
+        "current_quantity": 0,
+        "iso_units": 2,
+        "total_weight_lbs": 17490,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.ADM_141A",
+        "quantity_needed": 9,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 3564,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 21054,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207587056,
+    "expires_at": 1773293987056,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207587056_0qufpci5e",
+    "airport_id": "abu-al-duhur",
+    "source_airport_id": "aleppo",
+    "distance_nm": 27.8,
+    "orders": [
+      {
+        "weapon_id": "weapons.missiles.ADM_141A",
+        "quantity_needed": 27,
+        "current_quantity": 0,
+        "iso_units": 1.5,
+        "total_weight_lbs": 10692,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.GBU_12",
+        "quantity_needed": 13,
+        "current_quantity": 0,
+        "iso_units": 1,
+        "total_weight_lbs": 6591,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 17283,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207587056,
+    "expires_at": 1773293987056,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207587056_huv7mp0u2",
+    "airport_id": "abu-al-duhur",
+    "source_airport_id": "aleppo",
+    "distance_nm": 27.8,
+    "orders": [
+      {
+        "weapon_id": "weapons.bombs.GBU_12",
+        "quantity_needed": 13,
+        "current_quantity": 0,
+        "iso_units": 1,
+        "total_weight_lbs": 6591,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AIM_120C",
+        "quantity_needed": 50,
+        "current_quantity": 0,
+        "iso_units": 1,
+        "total_weight_lbs": 16500,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGR_20_M282",
+        "quantity_needed": 50,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 1600,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 24691,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207587056,
+    "expires_at": 1773293987056,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207587056_jbcserr1b",
+    "airport_id": "abu-al-duhur",
+    "source_airport_id": "aleppo",
+    "distance_nm": 27.8,
+    "orders": [
+      {
+        "weapon_id": "weapons.missiles.AGR_20_M282",
+        "quantity_needed": 50,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 1600,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGR_20A",
+        "quantity_needed": 100,
+        "current_quantity": 0,
+        "iso_units": 1,
+        "total_weight_lbs": 3200,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.GBU_24",
+        "quantity_needed": 12,
+        "current_quantity": 0,
+        "iso_units": 0.9,
+        "total_weight_lbs": 28176,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGM_65D",
+        "quantity_needed": 5,
+        "current_quantity": 0,
+        "iso_units": 0.10000000000000009,
+        "total_weight_lbs": 2586.6666666666692,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 35562.66666666667,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207587056,
+    "expires_at": 1773293987056,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207587056_0ehqkqrs4",
+    "airport_id": "abu-al-duhur",
+    "source_airport_id": "aleppo",
+    "distance_nm": 27.8,
+    "orders": [
+      {
+        "weapon_id": "weapons.missiles.AGM_65D",
+        "quantity_needed": 26,
+        "current_quantity": 0,
+        "iso_units": 0.4999999999999999,
+        "total_weight_lbs": 12933.33333333333,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGM_114K",
+        "quantity_needed": 64,
+        "current_quantity": 0,
+        "iso_units": 0.6,
+        "total_weight_lbs": 6336,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGM_114",
+        "quantity_needed": 64,
+        "current_quantity": 0,
+        "iso_units": 0.6,
+        "total_weight_lbs": 7040,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AIM_9X",
+        "quantity_needed": 50,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 9350,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.GBU_31_V_3B",
+        "quantity_needed": 9,
+        "current_quantity": 0,
+        "iso_units": 0.30000000000000027,
+        "total_weight_lbs": 20755.20000000002,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 56414.53333333335,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207587056,
+    "expires_at": 1773293987056,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207587056_m56ch172x",
+    "airport_id": "abu-al-duhur",
+    "source_airport_id": "aleppo",
+    "distance_nm": 27.8,
+    "orders": [
+      {
+        "weapon_id": "weapons.bombs.GBU_31_V_3B",
+        "quantity_needed": 6,
+        "current_quantity": 0,
+        "iso_units": 0.19999999999999973,
+        "total_weight_lbs": 13836.799999999981,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.GBU_38",
+        "quantity_needed": 48,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 26784,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGM_65F",
+        "quantity_needed": 24,
+        "current_quantity": 0,
+        "iso_units": 0.4,
+        "total_weight_lbs": 16176,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGM_65H",
+        "quantity_needed": 24,
+        "current_quantity": 0,
+        "iso_units": 0.4,
+        "total_weight_lbs": 11160,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.CBU_105",
+        "quantity_needed": 24,
+        "current_quantity": 0,
+        "iso_units": 0.3,
+        "total_weight_lbs": 23280,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 91236.79999999999,
+    "total_iso_units": 1.7999999999999996,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207587056,
+    "expires_at": 1773293987056,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207587060_3nqroee0n",
+    "airport_id": "bassel-al-assad",
+    "source_airport_id": "aleppo",
+    "distance_nm": 90,
+    "orders": [
+      {
+        "weapon_id": "weapons.missiles.AGM_88",
+        "quantity_needed": 22,
+        "current_quantity": 0,
+        "iso_units": 2,
+        "total_weight_lbs": 17490,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.ADM_141A",
+        "quantity_needed": 9,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 3564,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 21054,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207587060,
+    "expires_at": 1773293987060,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207587060_frlpoapn3",
+    "airport_id": "bassel-al-assad",
+    "source_airport_id": "aleppo",
+    "distance_nm": 90,
+    "orders": [
+      {
+        "weapon_id": "weapons.missiles.ADM_141A",
+        "quantity_needed": 27,
+        "current_quantity": 0,
+        "iso_units": 1.5,
+        "total_weight_lbs": 10692,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.GBU_12",
+        "quantity_needed": 13,
+        "current_quantity": 0,
+        "iso_units": 1,
+        "total_weight_lbs": 6591,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 17283,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207587060,
+    "expires_at": 1773293987060,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207587060_r797jftmq",
+    "airport_id": "bassel-al-assad",
+    "source_airport_id": "aleppo",
+    "distance_nm": 90,
+    "orders": [
+      {
+        "weapon_id": "weapons.bombs.GBU_12",
+        "quantity_needed": 13,
+        "current_quantity": 0,
+        "iso_units": 1,
+        "total_weight_lbs": 6591,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AIM_120C",
+        "quantity_needed": 50,
+        "current_quantity": 0,
+        "iso_units": 1,
+        "total_weight_lbs": 16500,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGR_20_M282",
+        "quantity_needed": 50,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 1600,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 24691,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207587060,
+    "expires_at": 1773293987060,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207587061_uamz3h6ul",
+    "airport_id": "bassel-al-assad",
+    "source_airport_id": "aleppo",
+    "distance_nm": 90,
+    "orders": [
+      {
+        "weapon_id": "weapons.missiles.AGR_20_M282",
+        "quantity_needed": 50,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 1600,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGR_20A",
+        "quantity_needed": 100,
+        "current_quantity": 0,
+        "iso_units": 1,
+        "total_weight_lbs": 3200,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.GBU_24",
+        "quantity_needed": 12,
+        "current_quantity": 0,
+        "iso_units": 0.9,
+        "total_weight_lbs": 28176,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGM_65D",
+        "quantity_needed": 5,
+        "current_quantity": 0,
+        "iso_units": 0.10000000000000009,
+        "total_weight_lbs": 2586.6666666666692,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 35562.66666666667,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207587061,
+    "expires_at": 1773293987061,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207587061_3iq9getqp",
+    "airport_id": "bassel-al-assad",
+    "source_airport_id": "aleppo",
+    "distance_nm": 90,
+    "orders": [
+      {
+        "weapon_id": "weapons.missiles.AGM_65D",
+        "quantity_needed": 26,
+        "current_quantity": 0,
+        "iso_units": 0.4999999999999999,
+        "total_weight_lbs": 12933.33333333333,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGM_114K",
+        "quantity_needed": 64,
+        "current_quantity": 0,
+        "iso_units": 0.6,
+        "total_weight_lbs": 6336,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGM_114",
+        "quantity_needed": 64,
+        "current_quantity": 0,
+        "iso_units": 0.6,
+        "total_weight_lbs": 7040,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AIM_9X",
+        "quantity_needed": 50,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 9350,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.GBU_31_V_3B",
+        "quantity_needed": 9,
+        "current_quantity": 0,
+        "iso_units": 0.30000000000000027,
+        "total_weight_lbs": 20755.20000000002,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 56414.53333333335,
+    "total_iso_units": 2.5,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207587061,
+    "expires_at": 1773293987061,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  },
+  {
+    "id": "mission_1773207587061_rczilchi2",
+    "airport_id": "bassel-al-assad",
+    "source_airport_id": "aleppo",
+    "distance_nm": 90,
+    "orders": [
+      {
+        "weapon_id": "weapons.bombs.GBU_31_V_3B",
+        "quantity_needed": 6,
+        "current_quantity": 0,
+        "iso_units": 0.19999999999999973,
+        "total_weight_lbs": 13836.799999999981,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.GBU_38",
+        "quantity_needed": 48,
+        "current_quantity": 0,
+        "iso_units": 0.5,
+        "total_weight_lbs": 26784,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGM_65F",
+        "quantity_needed": 24,
+        "current_quantity": 0,
+        "iso_units": 0.4,
+        "total_weight_lbs": 16176,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.missiles.AGM_65H",
+        "quantity_needed": 24,
+        "current_quantity": 0,
+        "iso_units": 0.4,
+        "total_weight_lbs": 11160,
+        "priority": "critical"
+      },
+      {
+        "weapon_id": "weapons.bombs.CBU_105",
+        "quantity_needed": 24,
+        "current_quantity": 0,
+        "iso_units": 0.3,
+        "total_weight_lbs": 23280,
+        "priority": "critical"
+      }
+    ],
+    "total_weight_lbs": 91236.79999999999,
+    "total_iso_units": 1.7999999999999996,
+    "priority": "critical",
+    "status": "pending",
+    "recommended_aircraft": "airplane",
+    "created_at": 1773207587061,
+    "expires_at": 1773293987061,
+    "accepted_at": null,
+    "accepted_by": null,
+    "completed_at": null
+  }
+]

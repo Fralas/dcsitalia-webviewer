@@ -1,1 +1,11 @@
-{}
+{
+  "714087060343881778": {
+    "selectedAircraft": [
+      "C-130J"
+    ],
+    "stats": {
+      "missionsCompleted": 0,
+      "ordersCompleted": 0
+    }
+  }
+}
