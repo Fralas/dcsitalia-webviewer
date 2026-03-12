@@ -87,8 +87,8 @@ function formatRelativeTime(timestamp) {
 
 // March 13, 2026 17:00 Europe/Rome (CET, UTC+1 => 16:00 UTC)
 const LAUNCH_TARGET_UTC_MS = Date.UTC(2026, 2, 13, 16, 0, 0);
-// March 12, 2026 17:00 Europe/Rome (CET, UTC+1 => 16:00 UTC)
-const COUNTDOWN_REVEAL_UTC_MS = Date.UTC(2026, 2, 12, 16, 0, 0);
+// March 12, 2026 19:00 Europe/Rome (CET, UTC+1 => 18:00 UTC)
+const COUNTDOWN_REVEAL_UTC_MS = Date.UTC(2026, 2, 12, 18, 0, 0);
 
 function getCountdownParts(remainingMs) {
   const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
