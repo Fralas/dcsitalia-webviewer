@@ -10,7 +10,7 @@ import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
-import { acceptDcsarTask, acceptMission, cancelDcsarTask, cancelMission, completeDcsarTask, completeMission, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getMissions, getServerTime } from '../services/api';
+import { acceptDcsarTask, acceptMission, cancelMission, completeDcsarTask, completeMission, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getMissions, getServerTime } from '../services/api';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
@@ -878,26 +878,46 @@ function FlatMapView({
           );
         })}
 
-        {showAirports && airportsData.map((airport) => (
-          <CircleMarker
-            key={airport.id}
-            center={[airport.coordinates.lat, airport.coordinates.lon]}
-            radius={airport.isMainBase ? 6 : 4}
-            pathOptions={{
-              color: airport.isMainBase ? '#4ec5ff' : '#6ea3c8',
-              fillColor: airport.isMainBase ? '#4ec5ff' : '#6ea3c8',
-              fillOpacity: 0.85,
-              weight: 2,
-            }}
-            eventHandlers={{
-              click: () => onAirportClick && onAirportClick(airport.id),
-            }}
-          >
-            <Tooltip direction="top" offset={[0, -4]} opacity={0.95}>
-              {airport.displayName}
-            </Tooltip>
-          </CircleMarker>
-        ))}
+        {showAirports && airportsData.flatMap((airport) => {
+          const center = [airport.coordinates.lat, airport.coordinates.lon];
+          const isMain = Boolean(airport.isMainBase);
+          const coreColor = isMain ? '#4ec5ff' : '#93c5fd';
+          const ringColor = isMain ? '#38bdf8' : '#60a5fa';
+
+          return [
+            <CircleMarker
+              key={`airport-glow-${airport.id}`}
+              center={center}
+              radius={isMain ? 11 : 9}
+              pathOptions={{
+                color: ringColor,
+                fillColor: ringColor,
+                fillOpacity: 0.16,
+                opacity: 0.55,
+                weight: 1.8,
+              }}
+              interactive={false}
+            />,
+            <CircleMarker
+              key={`airport-core-${airport.id}`}
+              center={center}
+              radius={isMain ? 7 : 5.5}
+              pathOptions={{
+                color: '#f8fafc',
+                fillColor: coreColor,
+                fillOpacity: 0.98,
+                weight: 2.3,
+              }}
+              eventHandlers={{
+                click: () => onAirportClick && onAirportClick(airport.id),
+              }}
+            >
+              <Tooltip direction="top" offset={[0, -4]} opacity={0.95}>
+                {airport.displayName}
+              </Tooltip>
+            </CircleMarker>,
+          ];
+        })}
       </MapContainer>
     </div>
   );
@@ -1742,25 +1762,6 @@ export default function FrontlineMap({ airportsData }) {
     }
   };
 
-  const handleCancelDcsarTask = async (task) => {
-    if (!task || task.status !== 'accepted') return;
-    const userName = user?.globalName || user?.username || user?.id;
-    if (!userName || task.accepted_by !== userName) return;
-
-    setUpdatingDcsarId(task.id);
-    try {
-      await cancelDcsarTask(task.id, userName);
-      const latestPoints = await getDcsar();
-      const nextPoints = latestPoints?.points || latestPoints;
-      if (Array.isArray(nextPoints)) setDcsarPoints(nextPoints);
-    } catch (error) {
-      console.error('Failed to cancel DCSAR task:', error);
-      alert(`Failed to cancel DCSAR task: ${error.message}`);
-    } finally {
-      setUpdatingDcsarId(null);
-    }
-  };
-
   return (
     <div className="h-full overflow-hidden bg-yt-bg-primary p-3">
       <div className="h-full">
@@ -2414,18 +2415,10 @@ export default function FrontlineMap({ airportsData }) {
                             >
                               {updatingDcsarId === selectedDcsarTask.id ? 'Completing...' : 'Complete'}
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => handleCancelDcsarTask(selectedDcsarTask)}
-                              disabled={updatingDcsarId === selectedDcsarTask.id}
-                              className="rounded border border-red-500/50 bg-red-500/15 px-3 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {updatingDcsarId === selectedDcsarTask.id ? 'Cancelling...' : 'Cancel'}
-                            </button>
                           </>
                         ) : (
                           <div className="text-[11px] text-yt-text-secondary">
-                            Only the assigned pilot can complete or cancel this task.
+                            Only the assigned pilot can complete this task.
                           </div>
                         )}
                       </div>

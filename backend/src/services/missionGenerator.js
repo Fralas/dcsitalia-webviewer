@@ -46,8 +46,8 @@ function getMissionPriorityFromOrders(orders) {
 export function checkAndGenerateMissions(recipientAirportId, recipientWeapons, allAirportsData = {}) {
   const recipientAirport = getAirportById(recipientAirportId);
 
-  // Don't generate missions for the main base
-  if (!recipientAirport || recipientAirport.isMainBase) {
+  // Never generate logistics missions to main base or carrier destinations
+  if (!recipientAirport || recipientAirport.isMainBase || recipientAirport.isCarrier) {
     return [];
   }
 

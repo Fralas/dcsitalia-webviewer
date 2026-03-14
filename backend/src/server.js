@@ -297,7 +297,31 @@ function syncDcsarFromFile() {
       const point = parseDcsarLine(line, idx);
       if (point) parsed.push(point);
     });
-    dcsarPoints = parsed;
+    const previousById = new Map(
+      (Array.isArray(dcsarPoints) ? dcsarPoints : [])
+        .filter((point) => point && point.id)
+        .map((point) => [String(point.id), point])
+    );
+
+    dcsarPoints = parsed.map((incomingPoint) => {
+      const pointId = String(incomingPoint?.id || '');
+      const previousPoint = pointId ? previousById.get(pointId) : null;
+      const previousAccepted = String(previousPoint?.status || '').toLowerCase() === 'accepted' || Boolean(previousPoint?.accepted);
+      const incomingAccepted = String(incomingPoint?.status || '').toLowerCase() === 'accepted' || Boolean(incomingPoint?.accepted);
+
+      // Keep accepted assignment sticky to avoid accidental de-assignment when
+      // external file updates omit metadata or downgrade status.
+      if (previousAccepted && !incomingAccepted) {
+        return {
+          ...incomingPoint,
+          status: 'accepted',
+          accepted: true,
+          accepted_by: previousPoint?.accepted_by || incomingPoint?.accepted_by || null,
+        };
+      }
+
+      return incomingPoint;
+    });
 
     io.emit('dcsar:updated', {
       points: dcsarPoints,
@@ -362,6 +386,13 @@ function processData(data) {
 
   // Add isActive field to each airport based on airbase status
   Object.entries(airportDataMap).forEach(([airportId, airportData]) => {
+    // Keep static airport metadata (including coordinates) aligned with config,
+    // even when data is loaded from an old buffer snapshot.
+    const airportConfig = getAirportById(airportId);
+    if (airportConfig?.coordinates) {
+      airportData.coordinates = airportConfig.coordinates;
+    }
+
     // Add isActive field (carriers are always active)
     airportData.isActive = airportData.isMainBase ||
                            airportData.isCarrier ||
@@ -1017,6 +1048,12 @@ app.get('/api/frontline-zones', (req, res) => {
     console.error('Error loading frontline zones:', error.message);
     res.status(500).json({ error: 'Failed to load frontline zones' });
   }
+
+  // Enforce policy: carriers can never be logistics destinations
+  const expiredCarrierMissions = historicalData.expireCarrierDestinationMissions();
+  if (expiredCarrierMissions > 0) {
+    console.log(`🚫 Expired ${expiredCarrierMissions} missions targeting carrier destinations`);
+  }
 });
 
 /**
@@ -1156,64 +1193,9 @@ app.post('/api/dcsar/:id/complete', (req, res) => {
  * POST /api/dcsar/:id/cancel - Cancel a DCSAR rescue task
  */
 app.post('/api/dcsar/:id/cancel', (req, res) => {
-  const dcsarId = String(req.params.id || '').trim();
-  const userId = String(req.body?.userId || '').trim();
-
-  if (!dcsarId) {
-    return res.status(400).json({ error: 'DCSAR id is required' });
-  }
-  if (!userId) {
-    return res.status(400).json({ error: 'userId is required' });
-  }
-
-  const index = dcsarPoints.findIndex((point) => String(point?.id || '') === dcsarId);
-  if (index < 0) {
-    return res.status(404).json({ error: 'DCSAR task not found' });
-  }
-
-  const current = dcsarPoints[index];
-  if (String(current?.status || '').toLowerCase() !== 'accepted') {
-    return res.status(400).json({ error: 'Task must be accepted before cancellation' });
-  }
-  if (current?.accepted_by && current.accepted_by !== userId) {
-    return res.status(403).json({ error: 'Only the assigned user can cancel this task' });
-  }
-
-  const updated = {
-    ...current,
-    status: 'pending',
-    accepted: false,
-    accepted_by: null,
-  };
-
-  dcsarPoints = [
-    ...dcsarPoints.slice(0, index),
-    updated,
-    ...dcsarPoints.slice(index + 1),
-  ];
-
-  try {
-    persistDcsarToFile(dcsarPoints);
-  } catch (error) {
-    console.error('Failed to persist DCSAR cancellation:', error.message);
-    return res.status(500).json({ error: 'Failed to persist DCSAR cancellation' });
-  }
-
-  io.emit('dcsar:updated', {
-    points: dcsarPoints,
+  res.status(403).json({
+    error: 'CSAR task cancellation is disabled. Complete the task instead.'
   });
-
-  pushFeedEvent({
-    type: 'dcsar.cancelled',
-    title: 'CSAR task cancelled',
-    message: `${userId} cancelled CSAR task ${dcsarId}`,
-    metadata: {
-      dcsar_id: dcsarId,
-      cancelled_by: userId,
-    },
-  });
-
-  res.json({ success: true, task: updated });
 });
 
 /**
@@ -1442,6 +1424,9 @@ app.post('/api/test/generate-mission', (req, res) => {
   if (!airport) {
     return res.status(404).json({ error: 'Airport not found or not active' });
   }
+  if (airport.isCarrier) {
+    return res.status(400).json({ error: 'Cannot create missions to carrier destinations' });
+  }
 
   if (sourceAirportId) {
     const sourceAirport = airbaseStatusManager.getActiveAirportById(sourceAirportId);
@@ -1505,13 +1490,21 @@ app.post('/api/test/generate-random-missions', (req, res) => {
 
   let targetAirport = airportId;
   if (!targetAirport) {
-    // Pick random non-main-base airport from active airports only
+    // Pick random airport eligible as logistics recipient (exclude main base and carriers)
     const activeAirports = airbaseStatusManager.getActiveAirports();
-    const nonMainBases = activeAirports.filter(a => !a.isMainBase);
-    if (nonMainBases.length === 0) {
-      return res.status(400).json({ error: 'No non-main-base airports available' });
+    const eligibleRecipients = activeAirports.filter(a => !a.isMainBase && !a.isCarrier);
+    if (eligibleRecipients.length === 0) {
+      return res.status(400).json({ error: 'No eligible recipient airports available' });
     }
-    targetAirport = nonMainBases[Math.floor(Math.random() * nonMainBases.length)].id;
+    targetAirport = eligibleRecipients[Math.floor(Math.random() * eligibleRecipients.length)].id;
+  } else {
+    const targetAirportConfig = airbaseStatusManager.getActiveAirportById(targetAirport);
+    if (!targetAirportConfig) {
+      return res.status(404).json({ error: 'Target airport not found or not active' });
+    }
+    if (targetAirportConfig.isCarrier) {
+      return res.status(400).json({ error: 'Cannot create missions to carrier destinations' });
+    }
   }
 
   const generatedMissions = [];
@@ -1583,6 +1576,9 @@ app.post('/api/airports/:id/create-order', (req, res) => {
   const airport = airbaseStatusManager.getActiveAirportById(airportId);
   if (!airport) {
     return res.status(404).json({ error: 'Airport not found or not active' });
+  }
+  if (airport.isCarrier) {
+    return res.status(400).json({ error: 'Cannot create orders for carrier destinations' });
   }
 
   // Check if it's the main base
@@ -1684,12 +1680,12 @@ app.post('/api/debug/generate-orders', authenticateToken, requireAdmin, (req, re
 
   // Loop through all active airports
   activeAirports.forEach(airport => {
-    if (airport.isMainBase) {
+    if (airport.isMainBase || airport.isCarrier) {
       results.push({
         airportId: airport.id,
         airportName: airport.displayName,
         skipped: true,
-        reason: 'Main base - no orders generated'
+        reason: airport.isMainBase ? 'Main base - no orders generated' : 'Carrier destination - no orders generated'
       });
       return;
     }
@@ -1892,6 +1888,29 @@ setInterval(() => {
     });
   }
 }, 5 * 60 * 1000);
+
+// Keep policy enforced even if old data is loaded from storage
+setInterval(() => {
+  const expiredCarrierMissions = historicalData.expireCarrierDestinationMissions();
+  if (expiredCarrierMissions > 0) {
+    io.emit('missions:updated', {
+      missions: historicalData.getActiveMissions()
+    });
+  }
+}, 60 * 1000);
+
+// Regenerate unaccepted logistics missions every 10 minutes
+setInterval(() => {
+  const expiredPending = historicalData.expirePendingMissionsOlderThan(10 * 60 * 1000);
+  if (expiredPending > 0) {
+    console.log(`🔁 Expired ${expiredPending} stale pending missions (10-minute policy)`);
+    io.emit('missions:updated', {
+      missions: historicalData.getActiveMissions()
+    });
+  }
+
+  scheduleRefresh('pending-regeneration-10m');
+}, 10 * 60 * 1000);
 
 // Check for new orders every 5 minutes (automatic polling)
 setInterval(() => {
