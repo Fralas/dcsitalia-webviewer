@@ -146,6 +146,96 @@ let convoySyncSignature = '';
 let convoyEventById = new Map();
 let dcsarSyncSignature = '';
 let dcsarPoints = [];
+let zoneOperationsById = new Map();
+const ZONE_OPERATION_TTL_MS = 45 * 60 * 1000;
+const ZONE_OPERATION_MAX_PER_USER = 2;
+
+function loadFrontlineZonesFromFile() {
+  if (!fs.existsSync(FRONTLINE_ZONES_FILE)) {
+    return [];
+  }
+
+  try {
+    const data = fs.readFileSync(FRONTLINE_ZONES_FILE, 'utf8');
+    const zones = JSON.parse(data);
+    return Array.isArray(zones) ? zones : [];
+  } catch (error) {
+    console.error('Error loading frontline zones from file:', error.message);
+    return [];
+  }
+}
+
+function cleanupExpiredZoneOperations(now = Date.now()) {
+  let changed = false;
+  for (const [zoneId, operation] of zoneOperationsById.entries()) {
+    if (!operation) {
+      zoneOperationsById.delete(zoneId);
+      changed = true;
+      continue;
+    }
+
+    if (!Number.isFinite(operation.expires_at) || operation.expires_at <= now) {
+      zoneOperationsById.delete(zoneId);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+function pruneZoneOperationsForMissingZones(zones) {
+  const validZoneIds = new Set((Array.isArray(zones) ? zones : []).map((zone) => zone?.id).filter(Boolean));
+  let changed = false;
+  for (const zoneId of zoneOperationsById.keys()) {
+    if (!validZoneIds.has(zoneId)) {
+      zoneOperationsById.delete(zoneId);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+function getActiveOperationsForUser(userId, now = Date.now()) {
+  if (!userId) return [];
+  const normalizedUser = String(userId).trim();
+  if (!normalizedUser) return [];
+
+  const result = [];
+  for (const operation of zoneOperationsById.values()) {
+    if (!operation) continue;
+    if (operation.user_id !== normalizedUser) continue;
+    if (!Number.isFinite(operation.expires_at) || operation.expires_at <= now) continue;
+    result.push(operation);
+  }
+  return result;
+}
+
+function buildFrontlineZonesPayload(zones, now = Date.now()) {
+  cleanupExpiredZoneOperations(now);
+  pruneZoneOperationsForMissingZones(zones);
+
+  return (Array.isArray(zones) ? zones : []).map((zone) => {
+    const operation = zoneOperationsById.get(zone.id);
+    const activeOperation = operation && Number.isFinite(operation.expires_at) && operation.expires_at > now
+      ? operation
+      : null;
+
+    return {
+      ...zone,
+      operation_assigned: Boolean(activeOperation),
+      operation_assigned_to: activeOperation?.user_id || null,
+      operation_accepted_at: activeOperation?.accepted_at || null,
+      operation_expires_at: activeOperation?.expires_at || null,
+      operation_remaining_ms: activeOperation ? Math.max(0, activeOperation.expires_at - now) : 0,
+    };
+  });
+}
+
+function emitFrontlineUpdate(zonesFromSource = null) {
+  const sourceZones = Array.isArray(zonesFromSource) ? zonesFromSource : loadFrontlineZonesFromFile();
+  const zones = buildFrontlineZonesPayload(sourceZones);
+  io.emit('frontline:updated', { zones });
+  return zones;
+}
 
 function pushFeedEvent(event) {
   const created = feedService.appendFeedEvent(event);
@@ -1037,12 +1127,8 @@ app.get('/api/combat-missions/pilot/:pilotName', (req, res) => {
  */
 app.get('/api/frontline-zones', (req, res) => {
   try {
-    if (!fs.existsSync(FRONTLINE_ZONES_FILE)) {
-      return res.json({ zones: [] });
-    }
-
-    const data = fs.readFileSync(FRONTLINE_ZONES_FILE, 'utf8');
-    const zones = JSON.parse(data);
+    const zonesFromFile = loadFrontlineZonesFromFile();
+    const zones = buildFrontlineZonesPayload(zonesFromFile);
     res.json({ zones });
   } catch (error) {
     console.error('Error loading frontline zones:', error.message);
@@ -1054,6 +1140,83 @@ app.get('/api/frontline-zones', (req, res) => {
   if (expiredCarrierMissions > 0) {
     console.log(`🚫 Expired ${expiredCarrierMissions} missions targeting carrier destinations`);
   }
+});
+
+/**
+ * POST /api/frontline-zones/:id/accept - Accept a frontline zone operation
+ */
+app.post('/api/frontline-zones/:id/accept', (req, res) => {
+  const zoneId = String(req.params.id || '').trim();
+  const userId = String(req.body?.userId || '').trim();
+
+  if (!zoneId) {
+    return res.status(400).json({ error: 'zone id is required' });
+  }
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  const zonesFromFile = loadFrontlineZonesFromFile();
+  const zone = zonesFromFile.find((entry) => String(entry?.id || '') === zoneId);
+  if (!zone) {
+    return res.status(404).json({ error: 'Zone not found' });
+  }
+
+  const zoneTasks = Array.isArray(zone.tasks) ? zone.tasks.filter(Boolean) : [];
+  if (zoneTasks.length === 0) {
+    return res.status(400).json({ error: 'Zone must have at least one task to be accepted' });
+  }
+
+  const now = Date.now();
+  cleanupExpiredZoneOperations(now);
+  pruneZoneOperationsForMissingZones(zonesFromFile);
+
+  const current = zoneOperationsById.get(zoneId);
+  if (current && current.user_id === userId && Number.isFinite(current.expires_at) && current.expires_at > now) {
+    return res.status(409).json({ error: 'Zone already accepted by you' });
+  }
+  if (current && current.user_id !== userId && Number.isFinite(current.expires_at) && current.expires_at > now) {
+    return res.status(409).json({ error: `Zone already accepted by ${current.user_id}` });
+  }
+
+  const userOperations = getActiveOperationsForUser(userId, now)
+    .filter((operation) => operation.zone_id !== zoneId);
+  if (userOperations.length >= ZONE_OPERATION_MAX_PER_USER) {
+    return res.status(400).json({ error: `A user can accept at most ${ZONE_OPERATION_MAX_PER_USER} zones` });
+  }
+
+  const acceptedAt = now;
+  const expiresAt = now + ZONE_OPERATION_TTL_MS;
+  zoneOperationsById.set(zoneId, {
+    zone_id: zoneId,
+    user_id: userId,
+    accepted_at: acceptedAt,
+    expires_at: expiresAt,
+  });
+
+  const zones = emitFrontlineUpdate(zonesFromFile);
+  const updatedZone = zones.find((entry) => entry.id === zoneId) || null;
+
+  pushFeedEvent({
+    type: 'zone.operation.accepted',
+    title: 'Zone operation accepted',
+    message: `${userId} is operating on ${zone.name || zone.id}`,
+    actor: userId,
+    zone_id: zone.id || zoneId,
+    metadata: {
+      zone_id: zone.id || zoneId,
+      accepted_by: userId,
+      expires_at: expiresAt,
+      ttl_minutes: Math.round(ZONE_OPERATION_TTL_MS / 60000),
+      tasks: zoneTasks,
+    },
+  });
+
+  res.json({
+    success: true,
+    zone: updatedZone,
+    zones,
+  });
 });
 
 /**
@@ -1777,6 +1940,9 @@ io.on('connection', (socket) => {
   socket.emit('dcsar:updated', {
     points: dcsarPoints,
   });
+  socket.emit('frontline:updated', {
+    zones: buildFrontlineZonesPayload(loadFrontlineZonesFromFile()),
+  });
 
   socket.on('disconnect', () => {
     console.log('🔌 Client disconnected:', socket.id);
@@ -1865,9 +2031,7 @@ const luaZoneWatcher = luaZoneSync.initialize((result) => {
       missions: combatMissionDispatch.getAllCombatMissions()
     });
 
-    io.emit('frontline:updated', {
-      zones: result.zones
-    });
+    emitFrontlineUpdate(result.zones);
 
     console.log(`✅ Regenerated ${missions.length} combat missions`);
   }
@@ -1911,6 +2075,14 @@ setInterval(() => {
 
   scheduleRefresh('pending-regeneration-10m');
 }, 10 * 60 * 1000);
+
+// Expire accepted zone operations after TTL and broadcast updates
+setInterval(() => {
+  const changed = cleanupExpiredZoneOperations();
+  if (changed) {
+    emitFrontlineUpdate();
+  }
+}, 10 * 1000);
 
 // Check for new orders every 5 minutes (automatic polling)
 setInterval(() => {

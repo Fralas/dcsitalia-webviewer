@@ -215,6 +215,16 @@ export async function getFrontlineZones() {
 }
 
 /**
+ * Accept a frontline zone operation
+ */
+export async function acceptFrontlineZone(zoneId, userId) {
+  return fetchAPI(`/frontline-zones/${encodeURIComponent(zoneId)}/accept`, {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  });
+}
+
+/**
  * Get shared activity feed
  */
 export async function getFeed(limit = 200) {
@@ -346,6 +356,7 @@ export default {
   clearCombatMissions,
   getPilotCombatMissions,
   getFrontlineZones,
+  acceptFrontlineZone,
   getFeed,
   getConvoys,
   getDcsar,

@@ -10,7 +10,7 @@ import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
-import { acceptDcsarTask, acceptMission, cancelMission, completeDcsarTask, completeMission, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getMissions, getServerTime } from '../services/api';
+import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelMission, completeDcsarTask, completeMission, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getMissions, getServerTime } from '../services/api';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
@@ -83,6 +83,13 @@ function formatRelativeTime(timestamp) {
   if (hours < 24) return `about ${hours} hour${hours > 1 ? 's' : ''} ago`;
   const days = Math.floor(hours / 24);
   return `about ${days} day${days > 1 ? 's' : ''} ago`;
+}
+
+function formatDurationMmSs(durationMs) {
+  const totalSeconds = Math.max(0, Math.floor((Number(durationMs) || 0) / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
 // March 13, 2026 17:00 Europe/Rome (CET, UTC+1 => 16:00 UTC)
@@ -843,7 +850,7 @@ function FlatMapView({
           ];
         })}
 
-        {showAto && zones.map((zone) => {
+        {showAto && zones.flatMap((zone) => {
           const isSelected = zone.id === selectedZoneId;
           const color =
             zone.status === 'RED'
@@ -853,15 +860,41 @@ function FlatMapView({
                 : zone.status === 'UNDER_ATTACK'
                   ? '#f97316'
                   : '#e2e8f0';
+          const isAccepted = zone.operation_assigned === true && Number(zone.operation_remaining_ms || 0) > 0;
+          const layers = [];
 
-          return (
+          if (isAccepted) {
+            const pulseCycleMs = 1800;
+            const offset = hashString(zone.id || 'zone') % pulseCycleMs;
+            const phase = ((animationTick + offset) % pulseCycleMs) / pulseCycleMs;
+            const pulseRadius = (isSelected ? 10 : 7) + phase * 8;
+            const pulseOpacity = (1 - phase) * 0.42;
+
+            layers.push(
+              <CircleMarker
+                key={`zone-pulse-${zone.id}`}
+                center={[zone.coordinates.lat, zone.coordinates.lon]}
+                radius={pulseRadius}
+                pathOptions={{
+                  color: '#22c55e',
+                  fillColor: '#22c55e',
+                  fillOpacity: pulseOpacity * 0.35,
+                  opacity: pulseOpacity,
+                  weight: 1.8,
+                }}
+                interactive={false}
+              />
+            );
+          }
+
+          layers.push(
             <CircleMarker
               key={zone.id}
               center={[zone.coordinates.lat, zone.coordinates.lon]}
               radius={isSelected ? 9 : 6}
               pathOptions={{
-                color,
-                fillColor: color,
+                color: isAccepted ? '#22c55e' : color,
+                fillColor: isAccepted ? '#22c55e' : color,
                 fillOpacity: isSelected ? 0.9 : 0.65,
                 weight: isSelected ? 3 : 2,
               }}
@@ -876,6 +909,8 @@ function FlatMapView({
               </Tooltip>
             </CircleMarker>
           );
+
+          return layers;
         })}
 
         {showAirports && airportsData.flatMap((airport) => {
@@ -926,6 +961,7 @@ function FlatMapView({
 export default function FrontlineMap({ airportsData }) {
   const { user } = useUser();
   const [selectedZoneId, setSelectedZoneId] = useState(null);
+  const [selectedZoneDetailsId, setSelectedZoneDetailsId] = useState(null);
   const [hoveredZoneId, setHoveredZoneId] = useState(null);
   const [hoveredDcsarId, setHoveredDcsarId] = useState(null);
   const [selectedDcsarId, setSelectedDcsarId] = useState(null);
@@ -933,6 +969,7 @@ export default function FrontlineMap({ airportsData }) {
   const [dcsarCoordinatesFormat, setDcsarCoordinatesFormat] = useState('dms');
   const [selectedAirportId, setSelectedAirportId] = useState(null);
   const [selectedLogisticsMission, setSelectedLogisticsMission] = useState(null);
+  const [acceptingZoneOperationId, setAcceptingZoneOperationId] = useState(null);
   const [acceptingMissionId, setAcceptingMissionId] = useState(null);
   const [acceptingDcsarId, setAcceptingDcsarId] = useState(null);
   const [updatingDcsarId, setUpdatingDcsarId] = useState(null);
@@ -1255,6 +1292,16 @@ export default function FrontlineMap({ airportsData }) {
     return map;
   }, [combatMissions]);
 
+  const zoneByGridIndex = useMemo(() => {
+    const map = new Map();
+    validZones.forEach((zone) => {
+      const index = getZoneGridIndex(zone);
+      if (index === null) return;
+      map.set(index, zone);
+    });
+    return map;
+  }, [validZones]);
+
   const gridConnections = useMemo(() => {
     const zoneByIndex = new Map();
 
@@ -1546,6 +1593,65 @@ export default function FrontlineMap({ airportsData }) {
   const selectedZoneCoordinates = selectedZone
     ? formatZoneCoordinates(selectedZone.coordinates, zoneCoordinatesFormat)
     : '-';
+  const currentUserName = user?.globalName || user?.username || user?.id || '';
+  const activeAcceptedZonesByCurrentUser = useMemo(() => {
+    if (!currentUserName) return [];
+    return validZones.filter((zone) =>
+      zone.operation_assigned === true &&
+      zone.operation_assigned_to === currentUserName &&
+      Number(zone.operation_remaining_ms || 0) > 0
+    );
+  }, [validZones, currentUserName]);
+  const selectedZoneDetails = useMemo(() => {
+    if (!selectedZoneDetailsId) return null;
+    return validZones.find((zone) => zone.id === selectedZoneDetailsId) || null;
+  }, [selectedZoneDetailsId, validZones]);
+  const selectedZoneDetailsMission = selectedZoneDetails ? combatMissionByZone.get(selectedZoneDetails.id) : null;
+  const selectedZoneDetailsPriority = selectedZoneDetails
+    ? getZonePriority(selectedZoneDetails, selectedZoneDetailsMission)
+    : null;
+  const selectedZoneDetailsChangedAt = selectedZoneDetails
+    ? zoneStatusMeta[selectedZoneDetails.id]?.changedAt
+    : null;
+  const selectedZoneDetailsTags = selectedZoneDetails
+    ? [
+        getStatusLabel(selectedZoneDetails.status),
+        selectedZoneDetailsMission?.mission_status ? `Mission ${selectedZoneDetailsMission.mission_status}` : 'No Mission',
+        selectedZoneDetailsPriority ? getPriorityLabel(selectedZoneDetailsPriority) : null,
+        selectedZoneDetails.isActive ? 'Active' : 'Inactive',
+        ...new Set([...(selectedZoneDetails.tasks || []), ...(selectedZoneDetailsMission?.tasks || [])]),
+      ].filter(Boolean)
+    : [];
+  const selectedZoneDetailsRedNeighbors = useMemo(() => {
+    if (!selectedZoneDetails) return [];
+    const gridIndex = getZoneGridIndex(selectedZoneDetails);
+    if (gridIndex === null) return [];
+
+    const row = Math.floor(gridIndex / 10);
+    const col = gridIndex % 10;
+    const neighborIndexes = [];
+    if (row > 0) neighborIndexes.push(gridIndex - 10);
+    if (row < 9) neighborIndexes.push(gridIndex + 10);
+    if (col > 0) neighborIndexes.push(gridIndex - 1);
+    if (col < 9) neighborIndexes.push(gridIndex + 1);
+
+    return neighborIndexes
+      .map((index) => zoneByGridIndex.get(index))
+      .filter((zone) => zone && zone.status === 'RED');
+  }, [selectedZoneDetails, zoneByGridIndex]);
+  const selectedZoneDetailsHasTasks = Array.isArray(selectedZoneDetails?.tasks) && selectedZoneDetails.tasks.length > 0;
+  const selectedZoneDetailsAcceptedByOther = Boolean(
+    selectedZoneDetails?.operation_assigned &&
+    selectedZoneDetails?.operation_assigned_to &&
+    selectedZoneDetails.operation_assigned_to !== currentUserName &&
+    Number(selectedZoneDetails?.operation_remaining_ms || 0) > 0
+  );
+  const selectedZoneDetailsAcceptedByCurrentUser = Boolean(
+    selectedZoneDetails?.operation_assigned &&
+    selectedZoneDetails?.operation_assigned_to === currentUserName &&
+    Number(selectedZoneDetails?.operation_remaining_ms || 0) > 0
+  );
+  const canCurrentUserAcceptMoreZones = activeAcceptedZonesByCurrentUser.length < 2;
 
   const airportLogistics = useMemo(() => {
     if (!selectedAirportId) return [];
@@ -1621,6 +1727,7 @@ export default function FrontlineMap({ airportsData }) {
   useEffect(() => {
     if (!filters.showAto) {
       setHoveredZoneId(null);
+      setSelectedZoneDetailsId(null);
     }
   }, [filters.showAto]);
 
@@ -1738,6 +1845,35 @@ export default function FrontlineMap({ airportsData }) {
       alert(`Failed to accept DCSAR task: ${error.message}`);
     } finally {
       setAcceptingDcsarId(null);
+    }
+  };
+
+  const handleAcceptZoneOperation = async (zone) => {
+    if (!zone?.id) return;
+    if (!user) {
+      window.location.href = '/api/auth/discord';
+      return;
+    }
+
+    if (!currentUserName) return;
+
+    setAcceptingZoneOperationId(zone.id);
+    try {
+      const payload = await acceptFrontlineZone(zone.id, currentUserName);
+      if (Array.isArray(payload?.zones)) {
+        setZones(payload.zones);
+      } else {
+        const refreshed = await getFrontlineZones();
+        const fetchedZones = refreshed?.zones || refreshed;
+        if (Array.isArray(fetchedZones)) {
+          setZones(fetchedZones);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to accept zone operation:', error);
+      alert(`Failed to accept zone: ${error.message}`);
+    } finally {
+      setAcceptingZoneOperationId(null);
     }
   };
 
@@ -2058,6 +2194,7 @@ export default function FrontlineMap({ airportsData }) {
                   <div className="mt-3 border-t border-yt-border pt-2">
                     <button
                       type="button"
+                      onClick={() => setSelectedZoneDetailsId(selectedZone.id)}
                       className="inline-flex items-center gap-2 text-sm font-semibold text-[#4ca3ff] transition-colors hover:text-[#7cbcff]"
                     >
                       View Details
@@ -2343,6 +2480,142 @@ export default function FrontlineMap({ airportsData }) {
                           </div>
                         );
                       })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedZoneDetails && (
+                <div className="fixed inset-0 z-[1200] flex items-center justify-center">
+                  <button
+                    type="button"
+                    className="absolute inset-0 bg-black/70"
+                    onClick={() => setSelectedZoneDetailsId(null)}
+                    aria-label="Close zone details"
+                  />
+                  <div className="relative w-[min(860px,92vw)] max-h-[84vh] overflow-y-auto rounded-2xl border border-yt-border bg-[#0f1727] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-yt-text-primary">
+                          Zone {getZoneNumber(selectedZoneDetails)} Details
+                        </div>
+                        <div className="text-xs text-yt-text-secondary">
+                          {`Zone: '${getZoneNumber(selectedZoneDetails)}' under ${getControlText(selectedZoneDetails.status)}`}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {selectedZoneDetailsAcceptedByCurrentUser && (
+                          <span className="rounded border border-green-500/50 bg-green-500/15 px-2.5 py-1 text-xs font-semibold text-green-300">
+                            Accepted • {formatDurationMmSs(selectedZoneDetails.operation_remaining_ms)}
+                          </span>
+                        )}
+                        {!selectedZoneDetailsAcceptedByCurrentUser && selectedZoneDetails?.operation_assigned_to && (
+                          <span className="rounded border border-blue-500/50 bg-blue-500/15 px-2.5 py-1 text-xs font-semibold text-blue-300">
+                            Accepted by {selectedZoneDetails.operation_assigned_to}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleAcceptZoneOperation(selectedZoneDetails)}
+                          disabled={
+                            acceptingZoneOperationId === selectedZoneDetails.id ||
+                            !selectedZoneDetailsHasTasks ||
+                            selectedZoneDetailsAcceptedByCurrentUser ||
+                            selectedZoneDetailsAcceptedByOther ||
+                            (!selectedZoneDetailsAcceptedByCurrentUser && !canCurrentUserAcceptMoreZones)
+                          }
+                          className="rounded border border-green-500/50 bg-green-500/15 px-2.5 py-1 text-xs font-semibold text-green-300 hover:bg-green-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {acceptingZoneOperationId === selectedZoneDetails.id ? 'Accepting...' : 'Accept'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedZoneDetailsId(null)}
+                          className="rounded border border-yt-border px-2 py-1 text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mb-3 flex flex-wrap gap-1.5">
+                      {selectedZoneDetailsTags.map((tag) => (
+                        <span key={`zone-detail-tag-${tag}`} className="rounded bg-[#2f3a24] px-2 py-0.5 text-[11px] font-semibold text-[#d8f08c]">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="rounded-lg border border-yt-border/70 bg-yt-bg-tertiary/60 p-3">
+                      <div className="mb-2 text-xs font-semibold text-yt-text-primary">Zone Data</div>
+                      <div className="grid grid-cols-1 gap-2 text-[11px] text-yt-text-secondary md:grid-cols-2">
+                        <div>
+                          Status: <span className="font-semibold text-yt-text-primary">{selectedZoneDetails.status || '-'}</span>
+                        </div>
+                        <div>
+                          Control: <span className="font-semibold text-yt-text-primary">{getControlText(selectedZoneDetails.status)}</span>
+                        </div>
+                        <div>
+                          Priority: <span className="font-semibold text-yt-text-primary">{selectedZoneDetailsPriority ? getPriorityLabel(selectedZoneDetailsPriority) : '-'}</span>
+                        </div>
+                        <div>
+                          Mission: <span className="font-semibold text-yt-text-primary">{selectedZoneDetailsMission?.mission_status || 'none'}</span>
+                        </div>
+                        <div>
+                          Activity: <span className="font-semibold text-yt-text-primary">{selectedZoneDetails.isActive ? 'Active' : 'Inactive'}</span>
+                        </div>
+                        <div>
+                          Last Change: <span className="font-semibold text-yt-text-primary">{formatRelativeTime(selectedZoneDetailsChangedAt)}</span>
+                        </div>
+                        <div>
+                          Zone Acceptance: <span className="font-semibold text-yt-text-primary">{selectedZoneDetails.operation_assigned ? 'Accepted' : 'Available'}</span>
+                        </div>
+                        <div>
+                          Accepted by: <span className="font-semibold text-yt-text-primary">{selectedZoneDetails.operation_assigned_to || '-'}</span>
+                        </div>
+                        <div>
+                          Acceptance Timer: <span className="font-semibold text-yt-text-primary">{selectedZoneDetails.operation_assigned ? formatDurationMmSs(selectedZoneDetails.operation_remaining_ms) : '-'}</span>
+                        </div>
+                        <div className="md:col-span-2">
+                          Tasks: <span className="font-semibold text-yt-text-primary">{(selectedZoneDetails.tasks || []).length > 0 ? selectedZoneDetails.tasks.join(', ') : 'none'}</span>
+                        </div>
+                        <div className="md:col-span-2">
+                          Coordinates DMS: <span className="font-mono text-yt-text-primary">{formatZoneCoordinates(selectedZoneDetails.coordinates, 'dms')}</span>
+                        </div>
+                        <div className="md:col-span-2">
+                          Coordinates MGRS: <span className="font-mono text-yt-text-primary">{formatZoneCoordinates(selectedZoneDetails.coordinates, 'mgrs')}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 rounded-lg border border-yt-border/70 bg-yt-bg-tertiary/60 p-3">
+                      <div className="mb-2 text-xs font-semibold text-yt-text-primary">Surrounded By RED Zones</div>
+                      {selectedZoneDetailsRedNeighbors.length === 0 ? (
+                        <div className="text-[11px] text-yt-text-secondary">No adjacent RED zones.</div>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedZoneDetailsRedNeighbors.map((zone) => (
+                            <span key={`zone-red-neighbor-${zone.id}`} className="rounded border border-red-500/50 bg-red-500/15 px-2 py-0.5 text-[11px] font-semibold text-red-200">
+                              Zone {getZoneNumber(zone)} ({zone.id})
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-3 rounded-lg border border-yt-border/70 bg-yt-bg-tertiary/60 p-3 text-[11px] text-yt-text-secondary">
+                      {!selectedZoneDetailsHasTasks && (
+                        <div>Zone is not acceptable: it has no tasks.</div>
+                      )}
+                      {!selectedZoneDetailsAcceptedByCurrentUser && !canCurrentUserAcceptMoreZones && selectedZoneDetailsHasTasks && (
+                        <div>User limit reached: you can accept at most 2 zones.</div>
+                      )}
+                      {selectedZoneDetailsAcceptedByOther && (
+                        <div>This zone is currently locked by another pilot.</div>
+                      )}
+                      {selectedZoneDetailsAcceptedByCurrentUser && (
+                        <div>You are operating on this zone.</div>
+                      )}
                     </div>
                   </div>
                 </div>
