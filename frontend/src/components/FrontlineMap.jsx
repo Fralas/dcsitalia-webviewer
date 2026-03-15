@@ -1132,7 +1132,7 @@ function MapLibreFlatMapView({
   const MAX_PITCH = 85;
   const ZONE_DOME_RADIUS_METERS = 3000;
   const LOGISTICS_ROUTE_RADIUS_METERS = 120;
-  const LOGISTICS_C130_MODEL_SIZE_METERS = 62;
+  const LOGISTICS_C130_MODEL_SIZE_METERS = 110;
   const MIN_SAFE_ZOOM = 5;
   const MAX_SAFE_ZOOM = 11.8;
   const containerRef = useRef(null);
@@ -1569,11 +1569,8 @@ function MapLibreFlatMapView({
           const seed = hashString(String(`${mission.source_airport_id}-${mission.airport_id}`));
           const t = 0.2 + ((seed % 61) / 100); // 0.20..0.80
           const pos = curve.getPointAt(t);
-          const tangent = curve.getTangentAt(t);
-          const horizontalTangent = new THREE.Vector3(tangent.x, tangent.y, 0);
-          const headingYaw = horizontalTangent.lengthSq() > 1e-10
-            ? Math.atan2(horizontalTangent.y, horizontalTangent.x)
-            : 0;
+          const routeBearingDeg = computeBearingDeg([srcLat, srcLon], [dstLat, dstLon]);
+          const headingYaw = THREE.MathUtils.degToRad(routeBearingDeg) + Math.PI;
           const midMerc = maplibregl.MercatorCoordinate.fromLngLat(
             [(srcLon + dstLon) / 2, (srcLat + dstLat) / 2],
             0
@@ -1584,8 +1581,10 @@ function MapLibreFlatMapView({
 
           planeRoot.position.copy(pos);
           planeRoot.scale.set(modelScale, modelScale, modelScale);
-          // Keep aircraft level with horizon and align yaw to the route heading.
-          planeRoot.rotation.set(Math.PI / 2, 0, headingYaw);
+          // Base correction for GLB orientation + yaw from route bearing.
+          const headingQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), headingYaw);
+          const levelQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0, 'XYZ'));
+          planeRoot.quaternion.copy(headingQuat).multiply(levelQuat);
           planeRoot.renderOrder = 12;
 
           planeRoot.traverse((child) => {
@@ -1696,6 +1695,8 @@ function MapLibreFlatMapView({
         closeButton: false,
         closeOnClick: false,
         offset: 10,
+        className: 'frontline-hover-popup',
+        maxWidth: '180px',
       });
       // Enable real 3D terrain after style load; keep it resilient if terrain is unavailable.
       try {
