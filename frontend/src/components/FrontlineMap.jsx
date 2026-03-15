@@ -5,6 +5,8 @@ import * as mgrs from 'mgrs';
 import { MapContainer, TileLayer, CircleMarker, Marker, Polyline, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import { divIcon } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { ChevronLeft, ChevronRight, Clock3, MapPin, PersonStanding } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
@@ -13,6 +15,8 @@ import socketService from '../services/socket';
 import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelMission, completeDcsarTask, completeMission, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getMissions, getServerTime } from '../services/api';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
+
+const MAP_ENGINE = String(import.meta.env.VITE_MAP_ENGINE || 'leaflet').trim().toLowerCase();
 
 function getZoneColor(status) {
   switch (status) {
@@ -416,6 +420,100 @@ function createDcsarIcon(color = '#f8fafc') {
     iconSize: [20, 20],
     iconAnchor: [10, 10],
   });
+}
+
+function createDcsarMapLibreIconDataUrl(color = '#f8fafc') {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
+      <g fill="none" stroke="${color}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="14" cy="5.5" r="2.2" />
+        <path d="M14 8.8v7.2" />
+        <path d="M9.8 13.5l4.2-2.1 4.2 2.1" />
+        <path d="M11.3 26l2.1-7.3" />
+        <path d="M16.7 26l-2.1-7.3" />
+      </g>
+    </svg>
+  `.trim();
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function ensureDcsarMarkerStyles() {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById('dcsar-marker-anim-style')) return;
+  const style = document.createElement('style');
+  style.id = 'dcsar-marker-anim-style';
+  style.textContent = `
+    @keyframes dcsarPulseA {
+      0% { transform: scale(0.45); opacity: 0.78; }
+      75% { transform: scale(1.75); opacity: 0.10; }
+      100% { transform: scale(2.05); opacity: 0; }
+    }
+    @keyframes dcsarPulseB {
+      0% { transform: scale(0.55); opacity: 0.58; }
+      75% { transform: scale(1.5); opacity: 0.08; }
+      100% { transform: scale(1.85); opacity: 0; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function createMapLibreDcsarMarkerElement(isAccepted) {
+  const color = isAccepted ? '#22c55e' : '#f8fafc';
+  const wrapper = document.createElement('div');
+  wrapper.style.position = 'relative';
+  wrapper.style.width = '52px';
+  wrapper.style.height = '52px';
+  wrapper.style.cursor = 'pointer';
+  wrapper.style.display = 'flex';
+  wrapper.style.alignItems = 'center';
+  wrapper.style.justifyContent = 'center';
+
+  const pulseA = document.createElement('span');
+  pulseA.style.position = 'absolute';
+  pulseA.style.inset = '0';
+  pulseA.style.borderRadius = '9999px';
+  pulseA.style.border = `2px solid ${color}`;
+  pulseA.style.background = `${color}2e`;
+  pulseA.style.transformOrigin = 'center center';
+  pulseA.style.animation = 'dcsarPulseA 2.4s ease-out infinite';
+  pulseA.style.pointerEvents = 'none';
+  wrapper.appendChild(pulseA);
+
+  const pulseB = document.createElement('span');
+  pulseB.style.position = 'absolute';
+  pulseB.style.inset = '4px';
+  pulseB.style.borderRadius = '9999px';
+  pulseB.style.border = `1.6px solid ${color}`;
+  pulseB.style.background = `${color}1f`;
+  pulseB.style.transformOrigin = 'center center';
+  pulseB.style.animation = 'dcsarPulseB 2.4s ease-out infinite';
+  pulseB.style.animationDelay = '1.2s';
+  pulseB.style.pointerEvents = 'none';
+  wrapper.appendChild(pulseB);
+
+  const icon = document.createElement('div');
+  icon.style.position = 'relative';
+  icon.style.zIndex = '2';
+  icon.style.width = '24px';
+  icon.style.height = '24px';
+  icon.style.borderRadius = '9999px';
+  icon.style.background = '#0f1727cc';
+  icon.style.display = 'flex';
+  icon.style.alignItems = 'center';
+  icon.style.justifyContent = 'center';
+  icon.style.boxShadow = '0 0 10px rgba(0,0,0,0.55)';
+  icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 28 28">
+    <g fill="none" stroke="${color}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="14" cy="5.5" r="2.2" />
+      <path d="M14 8.8v7.2" />
+      <path d="M9.8 13.5l4.2-2.1 4.2 2.1" />
+      <path d="M11.3 26l2.1-7.3" />
+      <path d="M16.7 26l-2.1-7.3" />
+    </g>
+  </svg>`;
+  wrapper.appendChild(icon);
+
+  return wrapper;
 }
 
 function getItemQuantity(item) {
@@ -958,6 +1056,757 @@ function FlatMapView({
   );
 }
 
+function MapLibreFlatMapView({
+  zones,
+  airportsData,
+  logisticsMissions,
+  gridConnections,
+  convoys,
+  dcsarPoints,
+  selectedZoneId,
+  onZoneSelect,
+  focusCoordinates,
+  onZoomChange,
+  onZoneHover,
+  onAirportClick,
+  showAto,
+  showAirports,
+  showLogistics,
+  showConvoys,
+  showDcsar,
+  onDcsarHover,
+  onDcsarSelect,
+  animationTick,
+}) {
+  const MIN_PITCH = 15;
+  const MAX_PITCH = 80;
+  const MAX_ZOOM_AT_HIGH_PITCH = 9.5;
+  const HIGH_PITCH_THRESHOLD = 72;
+  const containerRef = useRef(null);
+  const mapRef = useRef(null);
+  const dcsarMarkersRef = useRef([]);
+  const dcsarByIdRef = useRef(new Map());
+  const popupRef = useRef(null);
+  const middleDragRef = useRef(null);
+  const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
+
+  const style = useMemo(() => ({
+    version: 8,
+    sources: {
+      cartoDarkMatter: {
+        type: 'raster',
+        tiles: [
+          'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+          'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+          'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+          'https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+        ],
+        tileSize: 256,
+        attribution: '&copy; OpenStreetMap contributors, &copy; CARTO',
+      },
+    },
+    layers: [
+      {
+        id: 'background',
+        type: 'background',
+        paint: {
+          'background-color': '#0b1220',
+        },
+      },
+      {
+        id: 'carto-darkmatter-raster',
+        type: 'raster',
+        source: 'cartoDarkMatter',
+      },
+    ],
+  }), []);
+
+  const fcGrid = useMemo(() => ({
+    type: 'FeatureCollection',
+    features: !showAto ? [] : (gridConnections || []).map((connection) => ({
+      type: 'Feature',
+      geometry: {
+        type: 'LineString',
+        coordinates: (connection.positions || []).map((point) => [point[1], point[0]]),
+      },
+      properties: {
+        id: connection.id || '',
+      },
+    })),
+  }), [gridConnections, showAto]);
+
+  const airportsById = useMemo(() => {
+    const map = new Map();
+    (airportsData || []).forEach((airport) => map.set(airport.id, airport));
+    return map;
+  }, [airportsData]);
+
+  const fcLogistics = useMemo(() => ({
+    type: 'FeatureCollection',
+    features: !showLogistics ? [] : (logisticsMissions || []).flatMap((mission) => {
+      const sourceAirport = airportsById.get(mission.source_airport_id);
+      const destinationAirport = airportsById.get(mission.airport_id);
+      if (!sourceAirport?.coordinates || !destinationAirport?.coordinates) return [];
+      return [{
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [sourceAirport.coordinates.lon, sourceAirport.coordinates.lat],
+            [destinationAirport.coordinates.lon, destinationAirport.coordinates.lat],
+          ],
+        },
+        properties: {
+          id: mission.id || '',
+          status: mission.status || 'pending',
+          source_name: sourceAirport.displayName || sourceAirport.name || mission.source_airport_id || '-',
+          destination_name: destinationAirport.displayName || destinationAirport.name || mission.airport_id || '-',
+        },
+      }];
+    }),
+  }), [logisticsMissions, showLogistics, airportsById]);
+
+  const fcConvoyLines = useMemo(() => ({
+    type: 'FeatureCollection',
+    features: !showConvoys ? [] : (convoys || []).flatMap((convoy) => {
+      if (!Array.isArray(convoy.routeLine) || convoy.routeLine.length < 2) return [];
+      return [{
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: convoy.routeLine.map((point) => [point[1], point[0]]),
+        },
+        properties: {
+          id: convoy.convoy_id || '',
+          status: convoy.status || 'active',
+          bearing: Number.isFinite(convoy.bearing) ? convoy.bearing : 0,
+        },
+      }];
+    }),
+  }), [convoys, showConvoys]);
+
+  const fcConvoyPoints = useMemo(() => ({
+    type: 'FeatureCollection',
+    features: !showConvoys ? [] : (convoys || []).flatMap((convoy) => {
+      const marker = convoy.movingPosition || convoy.lastPosition;
+      if (!Array.isArray(marker) || marker.length < 2) return [];
+      return [{
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [marker[1], marker[0]],
+        },
+        properties: {
+          id: convoy.convoy_id || '',
+          status: convoy.status || 'active',
+        },
+      }];
+    }),
+  }), [convoys, showConvoys]);
+
+  const fcDcsarLinks = useMemo(() => ({
+    type: 'FeatureCollection',
+    features: !showDcsar ? [] : (dcsarPoints || []).flatMap((point) => {
+      const nearest = point?.nearest_airbase?.coordinates;
+      if (!nearest || !Number.isFinite(point?.lat) || !Number.isFinite(point?.lon)) return [];
+      return [{
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [point.lon, point.lat],
+            [nearest.lon, nearest.lat],
+          ],
+        },
+        properties: {
+          id: point.id || '',
+          accepted: point.accepted ? 1 : 0,
+        },
+      }];
+    }),
+  }), [dcsarPoints, showDcsar]);
+
+  const fcDcsarPoints = useMemo(() => {
+    dcsarByIdRef.current = new Map();
+    return {
+      type: 'FeatureCollection',
+      features: !showDcsar ? [] : (dcsarPoints || []).flatMap((point) => {
+        if (!Number.isFinite(point?.lat) || !Number.isFinite(point?.lon)) return [];
+        const accepted = point.accepted ? 1 : 0;
+        const pulseCycleMs = 1450;
+        const offset = hashString(point.id || 'dcsar') % pulseCycleMs;
+        const phase = ((animationTick + offset) % pulseCycleMs) / pulseCycleMs;
+        const phase2 = (phase + 0.5) % 1;
+        const pulseRadius = 10 + phase * 24;
+        const pulseOpacity = (1 - phase) * (accepted ? 0.7 : 0.85);
+        const pulseRadius2 = 10 + phase2 * 20;
+        const pulseOpacity2 = (1 - phase2) * (accepted ? 0.55 : 0.7);
+
+        dcsarByIdRef.current.set(String(point.id || ''), point);
+
+        return [{
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [point.lon, point.lat],
+          },
+          properties: {
+            id: point.id || '',
+            accepted,
+            pulse_radius: pulseRadius,
+            pulse_opacity: pulseOpacity,
+            pulse_radius_2: pulseRadius2,
+            pulse_opacity_2: pulseOpacity2,
+          },
+        }];
+      }),
+    };
+  }, [dcsarPoints, showDcsar, animationTick]);
+
+  const fcZones = useMemo(() => ({
+    type: 'FeatureCollection',
+    features: !showAto ? [] : (zones || []).flatMap((zone) => {
+      if (!Number.isFinite(zone?.coordinates?.lat) || !Number.isFinite(zone?.coordinates?.lon)) return [];
+      const isAccepted = zone.operation_assigned === true && Number(zone.operation_remaining_ms || 0) > 0;
+      const pulseCycleMs = 1800;
+      const offset = hashString(zone.id || 'zone') % pulseCycleMs;
+      const phase = ((animationTick + offset) % pulseCycleMs) / pulseCycleMs;
+      const pulseRadius = (zone.id === selectedZoneId ? 10 : 7) + phase * 8;
+      const pulseOpacity = (1 - phase) * 0.42;
+
+      return [{
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [zone.coordinates.lon, zone.coordinates.lat],
+        },
+        properties: {
+          id: zone.id || '',
+          name: zone.name || zone.id || '',
+          status: zone.status || 'UNKNOWN',
+          selected: zone.id === selectedZoneId ? 1 : 0,
+          accepted: isAccepted ? 1 : 0,
+          pulse_radius: pulseRadius,
+          pulse_opacity: pulseOpacity,
+        },
+      }];
+    }),
+  }), [zones, showAto, animationTick, selectedZoneId]);
+
+  const fcAirports = useMemo(() => ({
+    type: 'FeatureCollection',
+    features: !showAirports ? [] : (airportsData || []).flatMap((airport) => {
+      if (!Number.isFinite(airport?.coordinates?.lat) || !Number.isFinite(airport?.coordinates?.lon)) return [];
+      return [{
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [airport.coordinates.lon, airport.coordinates.lat],
+        },
+        properties: {
+          id: airport.id || '',
+          name: airport.displayName || airport.name || airport.id || '',
+          main: airport.isMainBase ? 1 : 0,
+        },
+      }];
+    }),
+  }), [airportsData, showAirports]);
+
+  const layerCounts = useMemo(() => ({
+    zones: fcZones.features.length,
+    logistics: fcLogistics.features.length,
+    convoys: fcConvoyPoints.features.length,
+    dcsar: fcDcsarPoints.features.length,
+    airports: fcAirports.features.length,
+  }), [fcZones.features.length, fcLogistics.features.length, fcConvoyPoints.features.length, fcDcsarPoints.features.length, fcAirports.features.length]);
+
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+
+    const map = new maplibregl.Map({
+      container: containerRef.current,
+      style,
+      center: [center.lon, center.lat],
+      zoom: 7,
+      minZoom: 4,
+      maxZoom: 13,
+      pitch: MIN_PITCH,
+      bearing: 0,
+      minPitch: MIN_PITCH,
+      maxPitch: MAX_PITCH,
+    });
+    mapRef.current = map;
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+    map.on('error', (event) => {
+      console.error('MapLibre runtime error:', event?.error || event);
+    });
+
+    map.on('load', () => {
+      ensureDcsarMarkerStyles();
+      popupRef.current = new maplibregl.Popup({
+        closeButton: false,
+        closeOnClick: false,
+        offset: 10,
+      });
+
+      const showHoverPopup = (lngLat, html) => {
+        if (!popupRef.current || !html) return;
+        popupRef.current.setLngLat(lngLat).setHTML(html).addTo(map);
+      };
+      const hideHoverPopup = () => {
+        if (popupRef.current) {
+          popupRef.current.remove();
+        }
+      };
+
+      const addGeoSource = (id, data) => {
+        map.addSource(id, { type: 'geojson', data });
+      };
+
+      addGeoSource('grid-src', fcGrid);
+      addGeoSource('logistics-src', fcLogistics);
+      addGeoSource('convoy-lines-src', fcConvoyLines);
+      addGeoSource('convoy-points-src', fcConvoyPoints);
+      addGeoSource('dcsar-links-src', fcDcsarLinks);
+      addGeoSource('dcsar-points-src', fcDcsarPoints);
+      addGeoSource('zones-src', fcZones);
+      addGeoSource('airports-src', fcAirports);
+
+      map.addLayer({
+        id: 'grid-layer',
+        type: 'line',
+        source: 'grid-src',
+        paint: {
+          'line-color': '#9aaec4',
+          'line-width': 1,
+          'line-opacity': 0.22,
+          'line-dasharray': [3, 7],
+        },
+      });
+
+      map.addLayer({
+        id: 'logistics-layer-pending',
+        type: 'line',
+        source: 'logistics-src',
+        filter: ['==', ['get', 'status'], 'pending'],
+        paint: {
+          'line-color': '#4ec5ff',
+          'line-width': 2,
+          'line-opacity': 0.85,
+          'line-dasharray': [2, 2],
+        },
+      });
+      map.addLayer({
+        id: 'logistics-layer-accepted',
+        type: 'line',
+        source: 'logistics-src',
+        filter: ['==', ['get', 'status'], 'accepted'],
+        paint: {
+          'line-color': '#f97316',
+          'line-width': 3,
+          'line-opacity': 0.85,
+        },
+      });
+
+      map.addLayer({
+        id: 'convoy-lines-layer',
+        type: 'line',
+        source: 'convoy-lines-src',
+        paint: {
+          'line-color': ['case', ['==', ['get', 'status'], 'arrived'], '#22c55e', '#ef4444'],
+          'line-width': ['case', ['==', ['get', 'status'], 'arrived'], 3, 2.5],
+          'line-opacity': 0.8,
+        },
+      });
+
+      map.addLayer({
+        id: 'convoy-points-layer',
+        type: 'circle',
+        source: 'convoy-points-src',
+        paint: {
+          'circle-radius': 4.5,
+          'circle-color': ['case', ['==', ['get', 'status'], 'arrived'], '#22c55e', '#ef4444'],
+          'circle-stroke-color': '#f8fafc',
+          'circle-stroke-width': 1.2,
+        },
+      });
+
+      map.addLayer({
+        id: 'dcsar-links-accepted-layer',
+        type: 'line',
+        source: 'dcsar-links-src',
+        filter: ['==', ['get', 'accepted'], 1],
+        paint: {
+          'line-color': '#22c55e',
+          'line-width': 2.8,
+          'line-opacity': 0.9,
+        },
+      });
+      map.addLayer({
+        id: 'dcsar-links-pending-layer',
+        type: 'line',
+        source: 'dcsar-links-src',
+        filter: ['!=', ['get', 'accepted'], 1],
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': 2.2,
+          'line-opacity': 0.9,
+          'line-dasharray': [2, 2],
+        },
+      });
+
+
+      map.addLayer({
+        id: 'zone-pulse-layer',
+        type: 'circle',
+        source: 'zones-src',
+        filter: ['==', ['get', 'accepted'], 1],
+        paint: {
+          'circle-radius': ['get', 'pulse_radius'],
+          'circle-color': '#22c55e',
+          'circle-opacity': ['*', ['get', 'pulse_opacity'], 0.35],
+        },
+      });
+
+      map.addLayer({
+        id: 'zones-layer',
+        type: 'circle',
+        source: 'zones-src',
+        paint: {
+          'circle-radius': ['case', ['==', ['get', 'selected'], 1], 9, 6],
+          'circle-color': [
+            'case',
+            ['==', ['get', 'accepted'], 1], '#22c55e',
+            ['==', ['get', 'status'], 'RED'], '#ef4444',
+            ['==', ['get', 'status'], 'BLUE'], '#3b82f6',
+            ['==', ['get', 'status'], 'UNDER_ATTACK'], '#f97316',
+            '#e2e8f0',
+          ],
+          'circle-opacity': ['case', ['==', ['get', 'selected'], 1], 0.9, 0.65],
+          'circle-stroke-color': '#f8fafc',
+          'circle-stroke-width': ['case', ['==', ['get', 'selected'], 1], 3, 2],
+        },
+      });
+
+      map.addLayer({
+        id: 'airports-glow-layer',
+        type: 'circle',
+        source: 'airports-src',
+        paint: {
+          'circle-radius': ['case', ['==', ['get', 'main'], 1], 11, 9],
+          'circle-color': ['case', ['==', ['get', 'main'], 1], '#38bdf8', '#60a5fa'],
+          'circle-opacity': 0.16,
+        },
+      });
+
+      map.addLayer({
+        id: 'airports-core-layer',
+        type: 'circle',
+        source: 'airports-src',
+        paint: {
+          'circle-radius': ['case', ['==', ['get', 'main'], 1], 7, 5.5],
+          'circle-color': ['case', ['==', ['get', 'main'], 1], '#4ec5ff', '#93c5fd'],
+          'circle-stroke-color': '#f8fafc',
+          'circle-stroke-width': 2,
+          'circle-opacity': 0.98,
+        },
+      });
+
+      map.on('click', 'zones-layer', (event) => {
+        const feature = event?.features?.[0];
+        const zoneId = feature?.properties?.id;
+        if (zoneId && onZoneSelect) onZoneSelect(zoneId);
+      });
+
+      map.on('mousemove', 'zones-layer', (event) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const feature = event?.features?.[0];
+        const zoneId = feature?.properties?.id;
+        if (onZoneHover) onZoneHover(zoneId || null);
+        const name = feature?.properties?.name || zoneId || 'Zone';
+        showHoverPopup(event.lngLat, `<div style="font-size:11px;font-weight:600;">${name}</div>`);
+      });
+      map.on('mouseleave', 'zones-layer', () => {
+        map.getCanvas().style.cursor = '';
+        if (onZoneHover) onZoneHover(null);
+        hideHoverPopup();
+      });
+
+      map.on('click', 'airports-core-layer', (event) => {
+        const feature = event?.features?.[0];
+        const airportId = feature?.properties?.id;
+        if (airportId && onAirportClick) onAirportClick(airportId);
+      });
+      map.on('mousemove', 'airports-core-layer', (event) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const feature = event?.features?.[0];
+        const airportName = feature?.properties?.name || feature?.properties?.id || 'Airport';
+        showHoverPopup(event.lngLat, `<div style="font-size:11px;font-weight:600;">${airportName}</div>`);
+      });
+      map.on('mouseleave', 'airports-core-layer', () => {
+        map.getCanvas().style.cursor = '';
+        hideHoverPopup();
+      });
+
+      map.on('mousemove', 'logistics-layer-pending', (event) => {
+        const feature = event?.features?.[0];
+        const src = feature?.properties?.source_name || '-';
+        const dst = feature?.properties?.destination_name || '-';
+        const status = feature?.properties?.status || 'pending';
+        showHoverPopup(event.lngLat, `<div style="font-size:11px;"><div style="font-weight:600;">${src} -> ${dst}</div><div>Status: ${status}</div></div>`);
+      });
+      map.on('mousemove', 'logistics-layer-accepted', (event) => {
+        const feature = event?.features?.[0];
+        const src = feature?.properties?.source_name || '-';
+        const dst = feature?.properties?.destination_name || '-';
+        const status = feature?.properties?.status || 'accepted';
+        showHoverPopup(event.lngLat, `<div style="font-size:11px;"><div style="font-weight:600;">${src} -> ${dst}</div><div>Status: ${status}</div></div>`);
+      });
+      map.on('mouseleave', 'logistics-layer-pending', hideHoverPopup);
+      map.on('mouseleave', 'logistics-layer-accepted', hideHoverPopup);
+
+      map.on('mousemove', 'convoy-points-layer', (event) => {
+        const feature = event?.features?.[0];
+        const id = feature?.properties?.id || '-';
+        const status = feature?.properties?.status || 'active';
+        showHoverPopup(event.lngLat, `<div style="font-size:11px;font-weight:600;">Convoy ${id} (${status})</div>`);
+      });
+      map.on('mouseleave', 'convoy-points-layer', hideHoverPopup);
+
+      map.on('zoomend', () => {
+        if (onZoomChange) onZoomChange(map.getZoom());
+      });
+      map.on('move', () => {
+        const currentPitch = map.getPitch();
+        const clampedPitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, currentPitch));
+        if (Math.abs(clampedPitch - currentPitch) > 0.001) {
+          map.setPitch(clampedPitch);
+        }
+        if (clampedPitch >= HIGH_PITCH_THRESHOLD && map.getZoom() > MAX_ZOOM_AT_HIGH_PITCH) {
+          map.setZoom(MAX_ZOOM_AT_HIGH_PITCH);
+        }
+      });
+      if (onZoomChange) onZoomChange(map.getZoom());
+
+      // Initial framing: ensure zones are visible at first render.
+      if (fcZones.features.length > 0) {
+        const bounds = new maplibregl.LngLatBounds();
+        fcZones.features.forEach((feature) => {
+          const coords = feature?.geometry?.coordinates;
+          if (Array.isArray(coords) && coords.length >= 2) {
+            bounds.extend([coords[0], coords[1]]);
+          }
+        });
+        if (!bounds.isEmpty()) {
+          map.fitBounds(bounds, { padding: 60, duration: 0 });
+        }
+      }
+
+      setTimeout(() => map.resize(), 0);
+      setTimeout(() => map.resize(), 300);
+    });
+
+    return () => {
+      dcsarMarkersRef.current.forEach(({ marker, cleanup }) => {
+        if (typeof cleanup === 'function') cleanup();
+        marker.remove();
+      });
+      dcsarMarkersRef.current = [];
+      map.remove();
+      mapRef.current = null;
+    };
+  }, [style]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    dcsarMarkersRef.current.forEach(({ marker, cleanup }) => {
+      if (typeof cleanup === 'function') cleanup();
+      marker.remove();
+    });
+    dcsarMarkersRef.current = [];
+
+    if (!showDcsar) return;
+
+    (dcsarPoints || []).forEach((point) => {
+      const lat = Number(point?.lat);
+      const lon = Number(point?.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+      const isAccepted = point.status === 'accepted' || point.accepted === true;
+      const element = createMapLibreDcsarMarkerElement(isAccepted);
+      const marker = new maplibregl.Marker({ element, anchor: 'center' })
+        .setLngLat([lon, lat])
+        .addTo(map);
+
+      const onMouseEnter = () => {
+        map.getCanvas().style.cursor = 'pointer';
+        if (onDcsarHover) onDcsarHover(point.id || null);
+        if (popupRef.current) {
+          popupRef.current
+            .setLngLat([lon, lat])
+            .setHTML(`<div style="font-size:11px;font-weight:600;">CSAR ${point.id || '-'}</div>`)
+            .addTo(map);
+        }
+      };
+      const onMouseLeave = () => {
+        map.getCanvas().style.cursor = '';
+        if (onDcsarHover) onDcsarHover(null);
+        if (popupRef.current) popupRef.current.remove();
+      };
+      const onClick = () => {
+        if (onDcsarSelect) onDcsarSelect(point);
+      };
+
+      element.addEventListener('mouseenter', onMouseEnter);
+      element.addEventListener('mouseleave', onMouseLeave);
+      element.addEventListener('click', onClick);
+
+      dcsarMarkersRef.current.push({
+        marker,
+        cleanup: () => {
+          element.removeEventListener('mouseenter', onMouseEnter);
+          element.removeEventListener('mouseleave', onMouseLeave);
+          element.removeEventListener('click', onClick);
+        },
+      });
+    });
+
+    return () => {
+      dcsarMarkersRef.current.forEach(({ marker, cleanup }) => {
+        if (typeof cleanup === 'function') cleanup();
+        marker.remove();
+      });
+      dcsarMarkersRef.current = [];
+    };
+  }, [dcsarPoints, showDcsar, onDcsarHover, onDcsarSelect]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const source = map.getSource('grid-src');
+    if (source?.setData) source.setData(fcGrid);
+  }, [fcGrid]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const source = map.getSource('logistics-src');
+    if (source?.setData) source.setData(fcLogistics);
+  }, [fcLogistics]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const source = map.getSource('convoy-lines-src');
+    if (source?.setData) source.setData(fcConvoyLines);
+  }, [fcConvoyLines]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const source = map.getSource('convoy-points-src');
+    if (source?.setData) source.setData(fcConvoyPoints);
+  }, [fcConvoyPoints]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const source = map.getSource('dcsar-links-src');
+    if (source?.setData) source.setData(fcDcsarLinks);
+  }, [fcDcsarLinks]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const source = map.getSource('dcsar-points-src');
+    if (source?.setData) source.setData(fcDcsarPoints);
+  }, [fcDcsarPoints]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const source = map.getSource('zones-src');
+    if (source?.setData) source.setData(fcZones);
+  }, [fcZones]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const source = map.getSource('airports-src');
+    if (source?.setData) source.setData(fcAirports);
+  }, [fcAirports]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !focusCoordinates) return;
+    map.easeTo({
+      center: [focusCoordinates.lon, focusCoordinates.lat],
+      zoom: Math.max(map.getZoom(), 8),
+      duration: 700,
+    });
+  }, [focusCoordinates]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const canvas = map.getCanvas();
+
+    const onMouseDown = (event) => {
+      if (event.button !== 1) return;
+      event.preventDefault();
+      middleDragRef.current = { x: event.clientX, y: event.clientY };
+    };
+
+    const onMouseMove = (event) => {
+      const state = middleDragRef.current;
+      if (!state) return;
+      event.preventDefault();
+
+      const dx = event.clientX - state.x;
+      const dy = event.clientY - state.y;
+      const nextBearing = map.getBearing() + (dx * 0.25);
+      const nextPitchRaw = map.getPitch() - (dy * 0.2);
+      const nextPitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, nextPitchRaw));
+
+      map.setBearing(nextBearing);
+      map.setPitch(nextPitch);
+
+      if (nextPitch >= HIGH_PITCH_THRESHOLD && map.getZoom() > MAX_ZOOM_AT_HIGH_PITCH) {
+        map.setZoom(MAX_ZOOM_AT_HIGH_PITCH);
+      }
+
+      middleDragRef.current = { x: event.clientX, y: event.clientY };
+    };
+
+    const onMouseUp = () => {
+      middleDragRef.current = null;
+    };
+
+    canvas.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+
+    return () => {
+      canvas.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
+
+  return (
+    <div className="relative h-full w-full">
+      <div ref={containerRef} className="h-full w-full" />
+      <div className="pointer-events-none absolute left-2 top-2 rounded border border-yt-border bg-[#101827dd] px-2 py-1 text-[10px] text-yt-text-secondary">
+        <div>MapLibre</div>
+        <div>Z:{layerCounts.zones} L:{layerCounts.logistics} C:{layerCounts.convoys} D:{layerCounts.dcsar} A:{layerCounts.airports}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function FrontlineMap({ airportsData }) {
   const { user } = useUser();
   const [selectedZoneId, setSelectedZoneId] = useState(null);
@@ -1004,6 +1853,21 @@ export default function FrontlineMap({ airportsData }) {
     showDcsar: true,
   });
   const mapModeRef = useRef(false);
+
+  useEffect(() => {
+    if (MAP_ENGINE === 'maplibre') {
+      mapModeRef.current = true;
+      setMapMode(true);
+      setFilters((current) => ({
+        ...current,
+        showAto: true,
+        showLogistics: true,
+        showAirports: true,
+        showConvoys: true,
+        showDcsar: true,
+      }));
+    }
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -1354,6 +2218,8 @@ export default function FrontlineMap({ airportsData }) {
     return map;
   }, [validZones]);
 
+  const mapAnimationTick = animationTick;
+
   const convoyRenderData = useMemo(() => {
     return convoys
       .filter((convoy) => (convoy?.status || 'active') === 'active')
@@ -1370,7 +2236,7 @@ export default function FrontlineMap({ airportsData }) {
       if ((convoy.status || 'active') === 'active' && routeLine.length >= 2) {
         const cycleMs = 18000;
         const offset = hashString(convoy.convoy_id || 'convoy') % cycleMs;
-        const progress = ((animationTick + offset) % cycleMs) / cycleMs;
+        const progress = ((mapAnimationTick + offset) % cycleMs) / cycleMs;
         const interpolated = interpolateLatLon(routeLine[0], routeLine[1], progress);
         movingPosition = applyLateralOffset(routeLine[0], routeLine[1], interpolated, 0.5);
       } else if (convoy.status === 'arrived' && destinationPoint) {
@@ -1393,7 +2259,7 @@ export default function FrontlineMap({ airportsData }) {
         lastPosition,
       };
     }).filter((convoy) => convoy.routeLine.length >= 2 || convoy.movingPosition || convoy.lastPosition);
-  }, [convoys, zoneCoordinatesById, animationTick]);
+  }, [convoys, zoneCoordinatesById, mapAnimationTick]);
 
   useEffect(() => {
     if (validZones.length === 0) return;
@@ -1920,28 +2786,53 @@ export default function FrontlineMap({ airportsData }) {
               </div>
               {mapMode && (
                 <div className="absolute inset-0">
-                  <FlatMapView
-                    zones={filteredZones}
-                    airportsData={validAirports}
-                    logisticsMissions={filteredLogisticsMissions}
-                    gridConnections={gridConnections}
-                    convoys={convoyRenderData}
-                    dcsarPoints={dcsarPointsWithNearest}
-                    selectedZoneId={selectedZoneId}
-                    onZoneSelect={setSelectedZoneId}
-                    focusCoordinates={focusCoordinates}
-                    onZoomChange={handleFlatMapZoomChange}
-                    onZoneHover={setHoveredZoneId}
-                    onDcsarHover={setHoveredDcsarId}
-                    onDcsarSelect={handleSelectDcsarTask}
-                    onAirportClick={setSelectedAirportId}
-                    showAto={filters.showAto}
-                    showAirports={filters.showAirports}
-                    showLogistics={filters.showLogistics}
-                    showConvoys={filters.showConvoys}
-                    showDcsar={filters.showDcsar}
-                    animationTick={animationTick}
-                  />
+                  {MAP_ENGINE === 'maplibre' ? (
+                    <MapLibreFlatMapView
+                      zones={filteredZones}
+                      airportsData={validAirports}
+                      logisticsMissions={filteredLogisticsMissions}
+                      gridConnections={gridConnections}
+                      convoys={convoyRenderData}
+                      dcsarPoints={dcsarPointsWithNearest}
+                      selectedZoneId={selectedZoneId}
+                      onZoneSelect={setSelectedZoneId}
+                      focusCoordinates={focusCoordinates}
+                      onZoomChange={handleFlatMapZoomChange}
+                      onZoneHover={setHoveredZoneId}
+                      onDcsarHover={setHoveredDcsarId}
+                      onDcsarSelect={handleSelectDcsarTask}
+                      onAirportClick={setSelectedAirportId}
+                      showAto={filters.showAto}
+                      showAirports={filters.showAirports}
+                      showLogistics={filters.showLogistics}
+                      showConvoys={filters.showConvoys}
+                      showDcsar={filters.showDcsar}
+                      animationTick={animationTick}
+                    />
+                  ) : (
+                    <FlatMapView
+                      zones={filteredZones}
+                      airportsData={validAirports}
+                      logisticsMissions={filteredLogisticsMissions}
+                      gridConnections={gridConnections}
+                      convoys={convoyRenderData}
+                      dcsarPoints={dcsarPointsWithNearest}
+                      selectedZoneId={selectedZoneId}
+                      onZoneSelect={setSelectedZoneId}
+                      focusCoordinates={focusCoordinates}
+                      onZoomChange={handleFlatMapZoomChange}
+                      onZoneHover={setHoveredZoneId}
+                      onDcsarHover={setHoveredDcsarId}
+                      onDcsarSelect={handleSelectDcsarTask}
+                      onAirportClick={setSelectedAirportId}
+                      showAto={filters.showAto}
+                      showAirports={filters.showAirports}
+                      showLogistics={filters.showLogistics}
+                      showConvoys={filters.showConvoys}
+                      showDcsar={filters.showDcsar}
+                      animationTick={animationTick}
+                    />
+                  )}
                 </div>
               )}
               {mapMode && (
