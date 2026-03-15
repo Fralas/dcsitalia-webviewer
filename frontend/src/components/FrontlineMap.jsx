@@ -791,6 +791,7 @@ function FlatMapView({
   onDcsarSelect,
   animationTick,
   basemapMode,
+  focusTargetKey,
 }) {
   const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
   const activeBasemap = BASEMAP_CONFIG[basemapMode] || BASEMAP_CONFIG[BASEMAP_MODE_DARK];
@@ -815,7 +816,7 @@ function FlatMapView({
           url={activeBasemap.leafletUrl}
         />
         <FlatMapZoomWatcher onZoomChange={onZoomChange} />
-        <FlatMapFocus center={focusCoordinates} />
+        <FlatMapFocus center={focusTargetKey ? focusCoordinates : null} />
 
         {showAto && gridConnections.map((connection) => (
           <Polyline
@@ -1089,6 +1090,7 @@ function MapLibreFlatMapView({
   onDcsarSelect,
   animationTick,
   basemapMode,
+  focusTargetKey,
 }) {
   const MIN_PITCH = 28;
   const MAX_PITCH = 85;
@@ -1099,6 +1101,7 @@ function MapLibreFlatMapView({
   const popupRef = useRef(null);
   const middleDragRef = useRef(null);
   const lastAutoFocusRef = useRef(null);
+  const userCameraLockUntilRef = useRef(0);
   const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
 
   const style = useMemo(() => ({
@@ -1365,8 +1368,23 @@ function MapLibreFlatMapView({
     });
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+    const markUserCameraInteraction = () => {
+      userCameraLockUntilRef.current = Date.now() + 2500;
+    };
     map.on('error', (event) => {
       console.error('MapLibre runtime error:', event?.error || event);
+    });
+    map.on('dragstart', (event) => {
+      if (event?.originalEvent) markUserCameraInteraction();
+    });
+    map.on('zoomstart', (event) => {
+      if (event?.originalEvent) markUserCameraInteraction();
+    });
+    map.on('rotatestart', (event) => {
+      if (event?.originalEvent) markUserCameraInteraction();
+    });
+    map.on('pitchstart', (event) => {
+      if (event?.originalEvent) markUserCameraInteraction();
     });
 
     map.on('load', () => {
@@ -1811,7 +1829,9 @@ function MapLibreFlatMapView({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !focusCoordinates) return;
+    if (!map || !focusCoordinates || !focusTargetKey) return;
+    if (Date.now() < userCameraLockUntilRef.current) return;
+    if (map.isMoving()) return;
 
     const nextLat = Number(focusCoordinates.lat);
     const nextLon = Number(focusCoordinates.lon);
@@ -1832,7 +1852,7 @@ function MapLibreFlatMapView({
       zoom: Math.max(map.getZoom(), 8),
       duration: 700,
     });
-  }, [focusCoordinates]);
+  }, [focusTargetKey, focusCoordinates]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1843,6 +1863,7 @@ function MapLibreFlatMapView({
     const onMouseDown = (event) => {
       if (event.button !== 1) return;
       event.preventDefault();
+      userCameraLockUntilRef.current = Date.now() + 2500;
       middleDragRef.current = { x: event.clientX, y: event.clientY };
     };
 
@@ -1891,6 +1912,7 @@ function MapLibreFlatMapView({
 
 export default function FrontlineMap({ airportsData }) {
   const { user } = useUser();
+  const isMapLibreEngine = MAP_ENGINE === 'maplibre';
   const [selectedZoneId, setSelectedZoneId] = useState(null);
   const [selectedZoneDetailsId, setSelectedZoneDetailsId] = useState(null);
   const [hoveredZoneId, setHoveredZoneId] = useState(null);
@@ -1938,7 +1960,7 @@ export default function FrontlineMap({ airportsData }) {
   const mapModeRef = useRef(false);
 
   useEffect(() => {
-    if (MAP_ENGINE === 'maplibre') {
+    if (isMapLibreEngine) {
       mapModeRef.current = true;
       setMapMode(true);
       setFilters((current) => ({
@@ -1950,7 +1972,7 @@ export default function FrontlineMap({ airportsData }) {
         showDcsar: true,
       }));
     }
-  }, []);
+  }, [isMapLibreEngine]);
 
   useEffect(() => {
     let isMounted = true;
@@ -2212,12 +2234,13 @@ export default function FrontlineMap({ airportsData }) {
   }, [isCountdownEncrypted, countdownParts, countdownTick, scrambleTick]);
 
   useEffect(() => {
+    if (isMapLibreEngine) return;
     if (!isPreLaunchCountdownActive) return;
     if (mapModeRef.current || mapMode) {
       mapModeRef.current = false;
       setMapMode(false);
     }
-  }, [isPreLaunchCountdownActive, mapMode]);
+  }, [isMapLibreEngine, isPreLaunchCountdownActive, mapMode]);
 
   const validZones = useMemo(
     () => zones.filter((zone) => zone.coordinates && Number.isFinite(zone.coordinates.lat) && Number.isFinite(zone.coordinates.lon)),
@@ -2505,8 +2528,10 @@ export default function FrontlineMap({ airportsData }) {
 
   const focusCoordinates = selectedDcsarFocus || focusedZone?.coordinates || zoneTheaterCenter || fallbackCenter || null;
   const tacticalFocusCoordinates = selectedDcsarFocus || focusedZone?.coordinates || null;
+  const tacticalFocusTargetKey = selectedDcsarId || selectedZoneId || null;
 
   const handleScaleChange = (scale) => {
+    if (isMapLibreEngine) return;
     if (scale >= 2.1 && !mapModeRef.current) {
       mapModeRef.current = true;
       setMapMode(true);
@@ -2520,7 +2545,7 @@ export default function FrontlineMap({ airportsData }) {
   };
 
   const handleFlatMapZoomChange = (zoom) => {
-    if (MAP_ENGINE === 'maplibre') return;
+    if (isMapLibreEngine) return;
     if (zoom <= 5 && mapModeRef.current) {
       mapModeRef.current = false;
       setMapMode(false);
@@ -2859,19 +2884,21 @@ export default function FrontlineMap({ airportsData }) {
                 isPreLaunchCountdownActive ? 'pointer-events-none select-none blur-[8px]' : ''
               }`}
             >
-              <div className={`${mapMode ? 'pointer-events-none absolute inset-0 opacity-0' : 'relative h-full w-full opacity-100'} transition-opacity duration-300`}>
-                <GlobeCanvas
-                  points={globePoints}
-                  focusCoordinates={focusCoordinates}
-                  onScaleChange={handleScaleChange}
-                  mapMode={mapMode}
-                  forcedScale={forcedGlobeScale}
-                  autoSpin={isPreLaunchCountdownActive}
-                />
-              </div>
-              {mapMode && (
+              {!isMapLibreEngine && (
+                <div className={`${mapMode ? 'pointer-events-none absolute inset-0 opacity-0' : 'relative h-full w-full opacity-100'} transition-opacity duration-300`}>
+                  <GlobeCanvas
+                    points={globePoints}
+                    focusCoordinates={focusCoordinates}
+                    onScaleChange={handleScaleChange}
+                    mapMode={mapMode}
+                    forcedScale={forcedGlobeScale}
+                    autoSpin={isPreLaunchCountdownActive}
+                  />
+                </div>
+              )}
+              {(isMapLibreEngine || mapMode) && (
                 <div className="absolute inset-0">
-                  {MAP_ENGINE === 'maplibre' ? (
+                  {isMapLibreEngine ? (
                     <MapLibreFlatMapView
                       zones={filteredZones}
                       airportsData={validAirports}
@@ -2894,6 +2921,7 @@ export default function FrontlineMap({ airportsData }) {
                       showDcsar={filters.showDcsar}
                       animationTick={animationTick}
                       basemapMode={basemapMode}
+                      focusTargetKey={tacticalFocusTargetKey}
                     />
                   ) : (
                     <FlatMapView
@@ -2918,11 +2946,12 @@ export default function FrontlineMap({ airportsData }) {
                       showDcsar={filters.showDcsar}
                       animationTick={animationTick}
                       basemapMode={basemapMode}
+                      focusTargetKey={tacticalFocusTargetKey}
                     />
                   )}
                 </div>
               )}
-              {mapMode && (
+              {!isMapLibreEngine && mapMode && (
                 <div className="pointer-events-none absolute inset-x-0 top-3 mx-auto w-fit rounded-full border border-yt-border/80 bg-yt-bg-secondary/90 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-yt-text-secondary">
                   Tactical 2D Map (zoom threshold reached)
                 </div>
