@@ -446,8 +446,8 @@ function createMapLibreDcsarDomMarker(isAccepted) {
 
   const root = document.createElement('div');
   root.style.position = 'relative';
-  root.style.width = '110px';
-  root.style.height = '110px';
+  root.style.width = '60px';
+  root.style.height = '60px';
   root.style.pointerEvents = 'auto';
   root.style.cursor = 'pointer';
 
@@ -455,8 +455,8 @@ function createMapLibreDcsarDomMarker(isAccepted) {
   ring.style.position = 'absolute';
   ring.style.left = '50%';
   ring.style.top = '50%';
-  ring.style.width = '78px';
-  ring.style.height = '78px';
+  ring.style.width = '30px';
+  ring.style.height = '30px';
   ring.style.borderRadius = '9999px';
   ring.style.border = `3px solid ${color}`;
   ring.style.boxShadow = `0 0 10px ${color}66`;
@@ -466,20 +466,20 @@ function createMapLibreDcsarDomMarker(isAccepted) {
   if (typeof ring.animate === 'function') {
     ring.animate(
       [
-        { transform: 'translate(-50%, -50%) scale(0.15)', opacity: 0.95 },
-        { transform: 'translate(-50%, -50%) scale(0.55)', opacity: 0.86, offset: 0.15 },
-        { transform: 'translate(-50%, -50%) scale(2.8)', opacity: 0.32, offset: 0.65 },
-        { transform: 'translate(-50%, -50%) scale(3.25)', opacity: 0.1, offset: 0.85 },
-        { transform: 'translate(-50%, -50%) scale(3.5)', opacity: 0 },
+        { transform: 'translate(-50%, -50%) scale(0.65)', opacity: 0.92 },
+        { transform: 'translate(-50%, -50%) scale(0.95)', opacity: 0.86, offset: 0.18 },
+        { transform: 'translate(-50%, -50%) scale(1.35)', opacity: 0.32, offset: 0.65 },
+        { transform: 'translate(-50%, -50%) scale(1.55)', opacity: 0.1, offset: 0.85 },
+        { transform: 'translate(-50%, -50%) scale(1.7)', opacity: 0 },
       ],
       {
-        duration: 7000,
+        duration: 3375,
         iterations: Infinity,
         easing: 'ease-out',
       }
     );
   } else {
-    ring.style.animation = 'dcsarRingPulse 7s ease-out infinite';
+    ring.style.animation = 'dcsarRingPulse 3.375s ease-out infinite';
   }
   ring.style.pointerEvents = 'none';
   root.appendChild(ring);
@@ -1072,13 +1072,13 @@ function MapLibreFlatMapView({
   onDcsarSelect,
   animationTick,
 }) {
-  const MIN_PITCH = 15;
+  const MIN_PITCH = 28;
   const MAX_PITCH = 80;
-  const MAX_ZOOM_AT_HIGH_PITCH = 9.5;
-  const HIGH_PITCH_THRESHOLD = 72;
+  const MAX_ZOOM_AT_HIGH_PITCH = 11;
+  const HIGH_PITCH_THRESHOLD = 70;
   const containerRef = useRef(null);
   const mapRef = useRef(null);
-  const dcsarMarkersRef = useRef([]);
+  const dcsarMarkersRef = useRef(new Map());
   const dcsarByIdRef = useRef(new Map());
   const popupRef = useRef(null);
   const middleDragRef = useRef(null);
@@ -1097,6 +1097,16 @@ function MapLibreFlatMapView({
         ],
         tileSize: 256,
         attribution: '&copy; OpenStreetMap contributors, &copy; CARTO',
+      },
+      terrainDem: {
+        type: 'raster-dem',
+        tiles: [
+          'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png',
+        ],
+        tileSize: 256,
+        maxzoom: 14,
+        encoding: 'terrarium',
+        attribution: 'Elevation tiles by AWS Terrain Tiles',
       },
     },
     layers: [
@@ -1312,7 +1322,7 @@ function MapLibreFlatMapView({
       zoom: 7,
       minZoom: 4,
       maxZoom: 13,
-      pitch: MIN_PITCH,
+      pitch: 66,
       bearing: 0,
       minPitch: MIN_PITCH,
       maxPitch: MAX_PITCH,
@@ -1330,6 +1340,12 @@ function MapLibreFlatMapView({
         closeOnClick: false,
         offset: 10,
       });
+      // Enable real 3D terrain after style load; keep it resilient if terrain is unavailable.
+      try {
+        map.setTerrain({ source: 'terrainDem', exaggeration: 2.6 });
+      } catch (error) {
+        console.warn('Terrain could not be enabled, continuing without 3D terrain:', error);
+      }
 
       const showHoverPopup = (lngLat, html) => {
         if (!popupRef.current || !html) return;
@@ -1595,7 +1611,7 @@ function MapLibreFlatMapView({
         if (typeof cleanup === 'function') cleanup();
         marker.remove();
       });
-      dcsarMarkersRef.current = [];
+      dcsarMarkersRef.current.clear();
       map.remove();
       mapRef.current = null;
     };
@@ -1604,33 +1620,52 @@ function MapLibreFlatMapView({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    if (!showDcsar) {
+      dcsarMarkersRef.current.forEach(({ marker, cleanup }) => {
+        if (typeof cleanup === 'function') cleanup();
+        marker.remove();
+      });
+      dcsarMarkersRef.current.clear();
+      return;
+    }
 
-    dcsarMarkersRef.current.forEach(({ marker, cleanup }) => {
-      if (typeof cleanup === 'function') cleanup();
-      marker.remove();
-    });
-    dcsarMarkersRef.current = [];
-
-    if (!showDcsar) return;
-
+    const nextIds = new Set();
     (dcsarPoints || []).forEach((point) => {
+      const id = String(point?.id || '').trim();
       const lat = Number(point?.lat);
       const lon = Number(point?.lon);
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+      if (!id || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+      nextIds.add(id);
 
       const isAccepted = point.status === 'accepted' || point.accepted === true;
+      const existing = dcsarMarkersRef.current.get(id);
+
+      if (existing) {
+        existing.marker.setLngLat([lon, lat]);
+        if (existing.accepted !== isAccepted) {
+          if (typeof existing.cleanup === 'function') existing.cleanup();
+          existing.marker.remove();
+          dcsarMarkersRef.current.delete(id);
+        } else {
+          existing.point = point;
+          return;
+        }
+      }
+
       const element = createMapLibreDcsarDomMarker(isAccepted);
       const marker = new maplibregl.Marker({ element, anchor: 'center' })
         .setLngLat([lon, lat])
         .addTo(map);
 
+      const entry = { marker, accepted: isAccepted, point, cleanup: null };
+
       const onMouseEnter = () => {
         map.getCanvas().style.cursor = 'pointer';
-        if (onDcsarHover) onDcsarHover(point.id || null);
+        if (onDcsarHover) onDcsarHover(id);
         if (popupRef.current) {
           popupRef.current
             .setLngLat([lon, lat])
-            .setHTML(`<div style="font-size:11px;font-weight:600;">CSAR ${point.id || '-'}</div>`)
+            .setHTML(`<div style="font-size:11px;font-weight:600;">CSAR ${id}</div>`)
             .addTo(map);
         }
       };
@@ -1640,30 +1675,26 @@ function MapLibreFlatMapView({
         if (popupRef.current) popupRef.current.remove();
       };
       const onClick = () => {
-        if (onDcsarSelect) onDcsarSelect(point);
+        if (onDcsarSelect) onDcsarSelect(entry.point);
       };
 
       element.addEventListener('mouseenter', onMouseEnter);
       element.addEventListener('mouseleave', onMouseLeave);
       element.addEventListener('click', onClick);
-
-      dcsarMarkersRef.current.push({
-        marker,
-        cleanup: () => {
-          element.removeEventListener('mouseenter', onMouseEnter);
-          element.removeEventListener('mouseleave', onMouseLeave);
-          element.removeEventListener('click', onClick);
-        },
-      });
+      entry.cleanup = () => {
+        element.removeEventListener('mouseenter', onMouseEnter);
+        element.removeEventListener('mouseleave', onMouseLeave);
+        element.removeEventListener('click', onClick);
+      };
+      dcsarMarkersRef.current.set(id, entry);
     });
 
-    return () => {
-      dcsarMarkersRef.current.forEach(({ marker, cleanup }) => {
-        if (typeof cleanup === 'function') cleanup();
-        marker.remove();
-      });
-      dcsarMarkersRef.current = [];
-    };
+    dcsarMarkersRef.current.forEach((entry, id) => {
+      if (nextIds.has(id)) return;
+      if (typeof entry.cleanup === 'function') entry.cleanup();
+      entry.marker.remove();
+      dcsarMarkersRef.current.delete(id);
+    });
   }, [dcsarPoints, showDcsar, onDcsarHover, onDcsarSelect]);
 
   useEffect(() => {
