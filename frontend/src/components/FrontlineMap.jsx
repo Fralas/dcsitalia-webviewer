@@ -4041,7 +4041,7 @@ export default function FrontlineMap({ airportsData }) {
                     onClick={() => setShowLogisticsComposeWindow(false)}
                     aria-label="Close logistics compose window"
                   />
-                  <div className="relative w-[min(980px,94vw)] max-h-[86vh] overflow-y-auto rounded-2xl border border-yt-border bg-[#0f1727] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
+                  <div className="relative flex h-[86vh] w-[min(980px,94vw)] flex-col rounded-2xl border border-yt-border bg-[#0f1727] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
                     <div className="mb-3 flex items-center justify-between">
                       <div>
                         <div className="text-sm font-semibold text-yt-text-primary">
@@ -4096,13 +4096,14 @@ export default function FrontlineMap({ airportsData }) {
                       />
                     </div>
 
-                    {filteredAirportContainerItems.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-yt-border px-3 py-3 text-xs text-yt-text-secondary">
-                        {airportContainerItems.length === 0 ? 'No pending containers for this airport.' : 'No containers match this weapon search.'}
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {filteredAirportContainerItems.map((containerItem) => {
+                    <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                      {filteredAirportContainerItems.length === 0 ? (
+                        <div className="rounded-lg border border-dashed border-yt-border px-3 py-3 text-xs text-yt-text-secondary">
+                          {airportContainerItems.length === 0 ? 'No pending containers for this airport.' : 'No containers match this weapon search.'}
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {filteredAirportContainerItems.map((containerItem) => {
                           const isoUnits = Number(containerItem.units) || 0;
                           const typeLabel = getIsoContainerTypeLabel(isoUnits);
                           const selectionState = evaluateContainerSelection(containerItem);
@@ -4168,9 +4169,10 @@ export default function FrontlineMap({ airportsData }) {
                               </div>
                             </div>
                           );
-                        })}
-                      </div>
-                    )}
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
