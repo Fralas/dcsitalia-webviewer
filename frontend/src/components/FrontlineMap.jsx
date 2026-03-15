@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import createGlobe from 'cobe';
 import * as mgrs from 'mgrs';
@@ -7,6 +7,9 @@ import { divIcon } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import c130ModelUrl from '../assets/3D/yc-130prototype_of_c-130.glb';
 import { ChevronLeft, ChevronRight, Clock3, MapPin, PersonStanding } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
@@ -1128,17 +1131,42 @@ function MapLibreFlatMapView({
   const MIN_PITCH = 28;
   const MAX_PITCH = 85;
   const ZONE_DOME_RADIUS_METERS = 3000;
-  const ZONE_DOME_RINGS = 8;
+  const LOGISTICS_ROUTE_RADIUS_METERS = 120;
+  const LOGISTICS_C130_MODEL_SIZE_METERS = 62;
+  const MIN_SAFE_ZOOM = 5;
+  const MAX_SAFE_ZOOM = 11.8;
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const dcsarMarkersRef = useRef(new Map());
   const dcsarByIdRef = useRef(new Map());
+  const domes3dRef = useRef({
+    scene: null,
+    camera: null,
+    renderer: null,
+    group: null,
+    geometry: null,
+    domes: [],
+    routes: [],
+    planeTemplate: null,
+    planeLoaderPromise: null,
+  });
   const popupRef = useRef(null);
   const middleDragRef = useRef(null);
   const lastAutoFocusRef = useRef(null);
   const userCameraLockUntilRef = useRef(0);
-  const [zoneTerrainById, setZoneTerrainById] = useState({});
+  const zoomGuardRef = useRef(false);
+  const lastUserInputAtRef = useRef(0);
+  const prevCameraRef = useRef(null);
+  const lastStableCameraRef = useRef(null);
   const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
+  const mapDebugEnabled = typeof window !== 'undefined' && window.localStorage.getItem('map-debug') === '1';
+
+  const logMapDebug = useCallback((event, payload = {}) => {
+    if (!mapDebugEnabled) return;
+    const ts = new Date().toISOString();
+    // eslint-disable-next-line no-console
+    console.log(`[map-debug] ${ts} ${event}`, payload);
+  }, [mapDebugEnabled]);
 
   const style = useMemo(() => ({
     version: 8,
@@ -1353,55 +1381,6 @@ function MapLibreFlatMapView({
     }),
   }), [zones, showAto, selectedZoneId]);
 
-  const fcZoneDomes = useMemo(() => ({
-    type: 'FeatureCollection',
-    features: !showAto ? [] : (zones || []).flatMap((zone) => {
-      const lat = Number(zone?.coordinates?.lat);
-      const lon = Number(zone?.coordinates?.lon);
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return [];
-
-      const isAccepted = zone.operation_assigned === true && Number(zone.operation_remaining_ms || 0) > 0;
-      const status = zone.status || 'UNKNOWN';
-      const selected = zone.id === selectedZoneId ? 1 : 0;
-      const zoneId = String(zone.id || '');
-      const sampledTerrain = Number(zoneTerrainById[zoneId]);
-      // Fallback base keeps domes visible even before terrain elevation becomes available.
-      const domeBase = (Number.isFinite(sampledTerrain) ? sampledTerrain : 1200) + 20;
-      const features = [];
-
-      for (let ring = 0; ring < ZONE_DOME_RINGS; ring += 1) {
-        const innerRadius = (ring / ZONE_DOME_RINGS) * ZONE_DOME_RADIUS_METERS;
-        const outerRadius = ((ring + 1) / ZONE_DOME_RINGS) * ZONE_DOME_RADIUS_METERS;
-        const midRadius = (innerRadius + outerRadius) / 2;
-        const domeHeight = Math.sqrt(
-          Math.max(0, (ZONE_DOME_RADIUS_METERS * ZONE_DOME_RADIUS_METERS) - (midRadius * midRadius))
-        );
-
-        const outerRing = createCircleRing(lat, lon, outerRadius, 48);
-        const innerRing = innerRadius > 1 ? createCircleRing(lat, lon, innerRadius, 48).reverse() : null;
-
-        features.push({
-          type: 'Feature',
-          geometry: {
-            type: 'Polygon',
-            coordinates: innerRing ? [outerRing, innerRing] : [outerRing],
-          },
-          properties: {
-            id: zone.id || '',
-            name: zone.name || zone.id || '',
-            status,
-            selected,
-            accepted: isAccepted ? 1 : 0,
-            dome_base: domeBase,
-            dome_height: domeBase + domeHeight,
-          },
-        });
-      }
-
-      return features;
-    }),
-  }), [zones, showAto, selectedZoneId, zoneTerrainById]);
-
   const fcAirports = useMemo(() => ({
     type: 'FeatureCollection',
     features: !showAirports ? [] : (airportsData || []).flatMap((airport) => {
@@ -1429,28 +1408,274 @@ function MapLibreFlatMapView({
     airports: fcAirports.features.length,
   }), [fcZones.features.length, fcLogistics.features.length, fcConvoyPoints.features.length, fcDcsarPoints.features.length, fcAirports.features.length]);
 
+  const rebuildThreeDomes = useCallback(() => {
+    const map = mapRef.current;
+    const group = domes3dRef.current.group;
+    if (!map || !group) return;
+
+    while (group.children.length > 0) {
+      const child = group.children.pop();
+      if (child?.geometry?.dispose && child?.userData?.disposeGeometry) {
+        child.geometry.dispose();
+      }
+      if (child?.material?.dispose) {
+        child.material.dispose();
+      }
+    }
+    domes3dRef.current.domes = [];
+    domes3dRef.current.routes = [];
+
+    if (!showAto) {
+      map.triggerRepaint();
+      return;
+    }
+
+    if (!domes3dRef.current.geometry) {
+      const domeGeometry = new THREE.SphereGeometry(1, 64, 48, 0, Math.PI * 2, 0, Math.PI / 2);
+      domeGeometry.rotateX(Math.PI / 2);
+      domes3dRef.current.geometry = domeGeometry;
+    }
+
+    (zones || []).forEach((zone) => {
+      const lat = Number(zone?.coordinates?.lat);
+      const lon = Number(zone?.coordinates?.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+      const isAccepted = zone.operation_assigned === true && Number(zone.operation_remaining_ms || 0) > 0;
+      const isSelected = zone.id === selectedZoneId;
+
+      let color = '#e2e8f0';
+      if (isAccepted) color = '#22c55e';
+      else if (zone.status === 'RED') color = '#ef4444';
+      else if (zone.status === 'BLUE') color = '#3b82f6';
+      else if (zone.status === 'UNDER_ATTACK') color = '#f97316';
+
+      const terrainElevation = map.queryTerrainElevation([lon, lat]);
+      const altitudeMeters = (Number.isFinite(terrainElevation) ? terrainElevation : 0) + 20;
+      const merc = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], altitudeMeters);
+      const scale = merc.meterInMercatorCoordinateUnits() * ZONE_DOME_RADIUS_METERS;
+
+      const material = new THREE.MeshPhongMaterial({
+        color,
+        transparent: true,
+        opacity: isSelected ? 0.55 : 0.42,
+        depthTest: true,
+        depthWrite: true,
+        side: THREE.DoubleSide,
+        emissive: new THREE.Color(color),
+        emissiveIntensity: 0.08,
+      });
+      const mesh = new THREE.Mesh(domes3dRef.current.geometry, material);
+      mesh.position.set(merc.x, merc.y, merc.z);
+      mesh.scale.set(scale, scale, scale);
+      mesh.renderOrder = 10;
+      group.add(mesh);
+
+      const glowMaterial = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: isSelected ? 0.28 : 0.2,
+        blending: THREE.AdditiveBlending,
+        depthTest: true,
+        depthWrite: false,
+        side: THREE.BackSide,
+      });
+      const glowMesh = new THREE.Mesh(domes3dRef.current.geometry, glowMaterial);
+      glowMesh.position.set(merc.x, merc.y, merc.z);
+      glowMesh.scale.set(scale * 1.045, scale * 1.045, scale * 1.045);
+      glowMesh.renderOrder = 11;
+      group.add(glowMesh);
+
+      domes3dRef.current.domes.push({
+        lon,
+        lat,
+        isSelected,
+        main: mesh,
+        glow: glowMesh,
+        mainBaseOpacity: isSelected ? 0.55 : 0.42,
+        glowBaseOpacity: isSelected ? 0.28 : 0.2,
+      });
+    });
+
+    if (showLogistics) {
+      const routesByKey = new Map();
+      (logisticsMissions || []).forEach((mission) => {
+        const srcId = String(mission?.source_airport_id || '');
+        const dstId = String(mission?.airport_id || '');
+        if (!srcId || !dstId) return;
+        const routeKey = `${srcId}->${dstId}`;
+        const current = routesByKey.get(routeKey);
+        if (!current) {
+          routesByKey.set(routeKey, mission);
+          return;
+        }
+        if (current.status !== 'accepted' && mission.status === 'accepted') {
+          routesByKey.set(routeKey, mission);
+        }
+      });
+
+      Array.from(routesByKey.values()).forEach((mission) => {
+        const sourceAirport = airportsById.get(mission.source_airport_id);
+        const destinationAirport = airportsById.get(mission.airport_id);
+        const srcLat = Number(sourceAirport?.coordinates?.lat);
+        const srcLon = Number(sourceAirport?.coordinates?.lon);
+        const dstLat = Number(destinationAirport?.coordinates?.lat);
+        const dstLon = Number(destinationAirport?.coordinates?.lon);
+        if (!Number.isFinite(srcLat) || !Number.isFinite(srcLon) || !Number.isFinite(dstLat) || !Number.isFinite(dstLon)) {
+          return;
+        }
+
+        const distMeters = haversineNm(srcLat, srcLon, dstLat, dstLon) * 1852;
+        const arcPeakMeters = Math.max(1600, Math.min(9000, distMeters * 0.24));
+        const segments = 24;
+        const points = [];
+
+        for (let i = 0; i <= segments; i += 1) {
+          const t = i / segments;
+          const lat = srcLat + ((dstLat - srcLat) * t);
+          const lon = srcLon + ((dstLon - srcLon) * t);
+          const terrain = map.queryTerrainElevation([lon, lat]);
+          const lift = Math.sin(Math.PI * t) ** 1.25 * arcPeakMeters;
+          const alt = (Number.isFinite(terrain) ? terrain : 0) + lift;
+          const merc = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], alt);
+          points.push(new THREE.Vector3(merc.x, merc.y, merc.z));
+        }
+
+        const curve = new THREE.CatmullRomCurve3(points);
+        const midMerc = maplibregl.MercatorCoordinate.fromLngLat(
+          [(srcLon + dstLon) / 2, (srcLat + dstLat) / 2],
+          0
+        );
+        const tubeRadius = midMerc.meterInMercatorCoordinateUnits() * LOGISTICS_ROUTE_RADIUS_METERS;
+        const tubeGeometry = new THREE.TubeGeometry(curve, 64, tubeRadius, 10, false);
+        const routeColor = mission.status === 'accepted' ? '#f97316' : '#4ec5ff';
+        const routeMaterial = new THREE.MeshPhongMaterial({
+          color: routeColor,
+          emissive: new THREE.Color(routeColor),
+          emissiveIntensity: 0.14,
+          transparent: true,
+          opacity: 0.78,
+          depthTest: true,
+          depthWrite: true,
+        });
+
+        const routeMesh = new THREE.Mesh(tubeGeometry, routeMaterial);
+        routeMesh.userData.disposeGeometry = true;
+        routeMesh.renderOrder = 9;
+        group.add(routeMesh);
+
+        if (domes3dRef.current.planeTemplate) {
+          const planeRoot = domes3dRef.current.planeTemplate.clone(true);
+          const seed = hashString(String(`${mission.source_airport_id}-${mission.airport_id}`));
+          const t = 0.2 + ((seed % 61) / 100); // 0.20..0.80
+          const pos = curve.getPointAt(t);
+          const tangent = curve.getTangentAt(t);
+          const horizontalTangent = new THREE.Vector3(tangent.x, tangent.y, 0);
+          const headingYaw = horizontalTangent.lengthSq() > 1e-10
+            ? Math.atan2(horizontalTangent.y, horizontalTangent.x)
+            : 0;
+          const midMerc = maplibregl.MercatorCoordinate.fromLngLat(
+            [(srcLon + dstLon) / 2, (srcLat + dstLat) / 2],
+            0
+          );
+          const modelScale = midMerc.meterInMercatorCoordinateUnits() * LOGISTICS_C130_MODEL_SIZE_METERS;
+          const routeOpacity = 0.78;
+          const routeColorThree = new THREE.Color(routeColor);
+
+          planeRoot.position.copy(pos);
+          planeRoot.scale.set(modelScale, modelScale, modelScale);
+          // Keep aircraft level with horizon and align yaw to the route heading.
+          planeRoot.rotation.set(Math.PI / 2, 0, headingYaw);
+          planeRoot.renderOrder = 12;
+
+          planeRoot.traverse((child) => {
+            if (child?.isMesh) {
+              child.frustumCulled = false;
+              if (Array.isArray(child.material)) {
+                child.material = child.material.map((mat) => {
+                  if (!mat) return mat;
+                  const material = typeof mat.clone === 'function' ? mat.clone() : mat;
+                  material.depthTest = true;
+                  material.depthWrite = true;
+                  material.toneMapped = false;
+                  if (material.color) {
+                    material.color = routeColorThree.clone();
+                  }
+                  if (material.emissive) {
+                    material.emissive = routeColorThree.clone();
+                    material.emissiveIntensity = 0.14;
+                  }
+                  material.transparent = true;
+                  material.opacity = routeOpacity;
+                  material.needsUpdate = true;
+                  return material;
+                });
+              } else if (child.material) {
+                if (typeof child.material.clone === 'function') {
+                  const material = child.material.clone();
+                  material.depthTest = true;
+                  material.depthWrite = true;
+                  material.toneMapped = false;
+                  if (material.color) {
+                    material.color = routeColorThree.clone();
+                  }
+                  if (material.emissive) {
+                    material.emissive = routeColorThree.clone();
+                    material.emissiveIntensity = 0.14;
+                  }
+                  material.transparent = true;
+                  material.opacity = routeOpacity;
+                  material.needsUpdate = true;
+                  child.material = material;
+                } else {
+                  child.material.depthTest = true;
+                  child.material.depthWrite = true;
+                  child.material.toneMapped = false;
+                  child.material.transparent = true;
+                  child.material.opacity = routeOpacity;
+                }
+              }
+            }
+          });
+
+          group.add(planeRoot);
+        }
+      });
+    }
+
+    map.triggerRepaint();
+  }, [zones, showAto, selectedZoneId, showLogistics, logisticsMissions, airportsById]);
+
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
+    const initialCamera = lastStableCameraRef.current;
     const map = new maplibregl.Map({
       container: containerRef.current,
       style,
-      center: [center.lon, center.lat],
-      zoom: 7,
-      minZoom: 4,
-      maxZoom: 14,
-      pitch: 66,
-      bearing: 0,
+      antialias: true,
+      center: initialCamera ? [initialCamera.lng, initialCamera.lat] : [center.lon, center.lat],
+      zoom: initialCamera ? initialCamera.zoom : 7,
+      minZoom: MIN_SAFE_ZOOM,
+      maxZoom: MAX_SAFE_ZOOM,
+      pitch: initialCamera ? initialCamera.pitch : 66,
+      bearing: initialCamera ? initialCamera.bearing : 0,
       minPitch: MIN_PITCH,
       maxPitch: MAX_PITCH,
     });
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+    // Reduce zoom aggressiveness from fast wheel input to avoid unstable camera states.
+    map.scrollZoom.setWheelZoomRate(1 / 1500);
+    map.scrollZoom.setZoomRate(1 / 220);
     const markUserCameraInteraction = () => {
       userCameraLockUntilRef.current = Date.now() + 2500;
+      lastUserInputAtRef.current = Date.now();
     };
+    logMapDebug('map-mounted', { center: [center.lon, center.lat] });
     map.on('error', (event) => {
       console.error('MapLibre runtime error:', event?.error || event);
+      logMapDebug('map-error', { error: String(event?.error || event) });
     });
     map.on('dragstart', (event) => {
       if (event?.originalEvent) markUserCameraInteraction();
@@ -1500,8 +1725,86 @@ function MapLibreFlatMapView({
       addGeoSource('dcsar-links-src', fcDcsarLinks);
       addGeoSource('dcsar-points-src', fcDcsarPoints);
       addGeoSource('zones-src', fcZones);
-      addGeoSource('zone-domes-src', fcZoneDomes);
       addGeoSource('airports-src', fcAirports);
+
+      const domeLayer = {
+        id: 'zone-domes-3d-layer',
+        type: 'custom',
+        renderingMode: '3d',
+        onAdd: (_map, gl) => {
+          const scene = new THREE.Scene();
+          const camera = new THREE.Camera();
+          const renderer = new THREE.WebGLRenderer({
+            canvas: _map.getCanvas(),
+            context: gl,
+            antialias: true,
+          });
+          renderer.autoClear = false;
+
+          const group = new THREE.Group();
+          scene.add(group);
+
+          scene.add(new THREE.AmbientLight('#ffffff', 1.0));
+          const dirLight = new THREE.DirectionalLight('#ffffff', 1.25);
+          dirLight.position.set(0, -70, 120);
+          scene.add(dirLight);
+
+          domes3dRef.current.scene = scene;
+          domes3dRef.current.camera = camera;
+          domes3dRef.current.renderer = renderer;
+          domes3dRef.current.group = group;
+
+          if (!domes3dRef.current.planeLoaderPromise) {
+            const loader = new GLTFLoader();
+            domes3dRef.current.planeLoaderPromise = loader.loadAsync(c130ModelUrl)
+              .then((gltf) => {
+                const template = gltf?.scene;
+                if (!template) return;
+                template.traverse((child) => {
+                  if (child?.isMesh) {
+                    child.frustumCulled = false;
+                  }
+                });
+                domes3dRef.current.planeTemplate = template;
+                rebuildThreeDomes();
+                map.triggerRepaint();
+              })
+              .catch((error) => {
+                console.error('Failed to load C130 model:', error);
+              });
+          } else if (domes3dRef.current.planeTemplate) {
+            rebuildThreeDomes();
+            map.triggerRepaint();
+          }
+        },
+        render: (_gl, matrix, args) => {
+          const { renderer, scene, camera, domes } = domes3dRef.current;
+          if (!renderer || !scene || !camera) return;
+          const projectionMatrix = Array.isArray(matrix)
+            ? matrix
+            : (args?.modelViewProjectionMatrix || args?.projectionMatrix || matrix);
+          camera.projectionMatrix = new THREE.Matrix4().fromArray(projectionMatrix);
+
+          // Partial line-of-sight fade: domes outside the current view bearing fade out.
+          const center = map.getCenter();
+          const centerPoint = [center.lat, center.lng];
+          const viewBearing = (map.getBearing() + 360) % 360;
+          domes.forEach((dome) => {
+            const bearingToDome = computeBearingDeg(centerPoint, [dome.lat, dome.lon]);
+            const delta = Math.abs((((bearingToDome - viewBearing) % 360) + 540) % 360 - 180);
+            let visibilityFactor = 1;
+            if (delta > 125) visibilityFactor = 0.1;
+            else if (delta > 100) visibilityFactor = 0.3;
+            dome.main.material.opacity = dome.mainBaseOpacity * visibilityFactor;
+            dome.glow.material.opacity = dome.glowBaseOpacity * visibilityFactor;
+          });
+
+          renderer.resetState();
+          renderer.render(scene, camera);
+        },
+      };
+      map.addLayer(domeLayer);
+      rebuildThreeDomes();
 
       map.addLayer({
         id: 'grid-layer',
@@ -1516,26 +1819,25 @@ function MapLibreFlatMapView({
       });
 
       map.addLayer({
-        id: 'logistics-layer-pending',
+        id: 'logistics-hit-pending',
         type: 'line',
         source: 'logistics-src',
         filter: ['==', ['get', 'status'], 'pending'],
         paint: {
           'line-color': '#4ec5ff',
-          'line-width': 2,
-          'line-opacity': 0.85,
-          'line-dasharray': [2, 2],
+          'line-width': 14,
+          'line-opacity': 0.001,
         },
       });
       map.addLayer({
-        id: 'logistics-layer-accepted',
+        id: 'logistics-hit-accepted',
         type: 'line',
         source: 'logistics-src',
         filter: ['==', ['get', 'status'], 'accepted'],
         paint: {
           'line-color': '#f97316',
-          'line-width': 3,
-          'line-opacity': 0.85,
+          'line-width': 14,
+          'line-opacity': 0.001,
         },
       });
 
@@ -1589,22 +1891,13 @@ function MapLibreFlatMapView({
 
 
       map.addLayer({
-        id: 'zone-domes-layer',
-        type: 'fill-extrusion',
-        source: 'zone-domes-src',
+        id: 'zones-hit-layer',
+        type: 'circle',
+        source: 'zones-src',
         paint: {
-          'fill-extrusion-color': [
-            'case',
-            ['==', ['get', 'accepted'], 1], '#22c55e',
-            ['==', ['get', 'status'], 'RED'], '#ef4444',
-            ['==', ['get', 'status'], 'BLUE'], '#3b82f6',
-            ['==', ['get', 'status'], 'UNDER_ATTACK'], '#f97316',
-            '#e2e8f0',
-          ],
-          'fill-extrusion-height': ['get', 'dome_height'],
-          'fill-extrusion-base': ['get', 'dome_base'],
-          // MapLibre v4.7 does not support data-driven expressions for fill-extrusion-opacity.
-          'fill-extrusion-opacity': 0.78,
+          'circle-radius': 18,
+          'circle-color': '#000000',
+          'circle-opacity': 0.001,
         },
       });
 
@@ -1632,13 +1925,13 @@ function MapLibreFlatMapView({
         },
       });
 
-      map.on('click', 'zone-domes-layer', (event) => {
+      map.on('click', 'zones-hit-layer', (event) => {
         const feature = event?.features?.[0];
         const zoneId = feature?.properties?.id;
         if (zoneId && onZoneSelect) onZoneSelect(zoneId);
       });
 
-      map.on('mousemove', 'zone-domes-layer', (event) => {
+      map.on('mousemove', 'zones-hit-layer', (event) => {
         map.getCanvas().style.cursor = 'pointer';
         const feature = event?.features?.[0];
         const zoneId = feature?.properties?.id;
@@ -1646,7 +1939,7 @@ function MapLibreFlatMapView({
         const name = feature?.properties?.name || zoneId || 'Zone';
         showHoverPopup(event.lngLat, `<div style="font-size:11px;font-weight:600;">${name}</div>`);
       });
-      map.on('mouseleave', 'zone-domes-layer', () => {
+      map.on('mouseleave', 'zones-hit-layer', () => {
         map.getCanvas().style.cursor = '';
         if (onZoneHover) onZoneHover(null);
         hideHoverPopup();
@@ -1668,22 +1961,22 @@ function MapLibreFlatMapView({
         hideHoverPopup();
       });
 
-      map.on('mousemove', 'logistics-layer-pending', (event) => {
+      map.on('mousemove', 'logistics-hit-pending', (event) => {
         const feature = event?.features?.[0];
         const src = feature?.properties?.source_name || '-';
         const dst = feature?.properties?.destination_name || '-';
         const status = feature?.properties?.status || 'pending';
         showHoverPopup(event.lngLat, `<div style="font-size:11px;"><div style="font-weight:600;">${src} -> ${dst}</div><div>Status: ${status}</div></div>`);
       });
-      map.on('mousemove', 'logistics-layer-accepted', (event) => {
+      map.on('mousemove', 'logistics-hit-accepted', (event) => {
         const feature = event?.features?.[0];
         const src = feature?.properties?.source_name || '-';
         const dst = feature?.properties?.destination_name || '-';
         const status = feature?.properties?.status || 'accepted';
         showHoverPopup(event.lngLat, `<div style="font-size:11px;"><div style="font-weight:600;">${src} -> ${dst}</div><div>Status: ${status}</div></div>`);
       });
-      map.on('mouseleave', 'logistics-layer-pending', hideHoverPopup);
-      map.on('mouseleave', 'logistics-layer-accepted', hideHoverPopup);
+      map.on('mouseleave', 'logistics-hit-pending', hideHoverPopup);
+      map.on('mouseleave', 'logistics-hit-accepted', hideHoverPopup);
 
       map.on('mousemove', 'convoy-points-layer', (event) => {
         const feature = event?.features?.[0];
@@ -1697,6 +1990,40 @@ function MapLibreFlatMapView({
       map.on('zoomend', () => {
         if (onZoomChange) onZoomChange(map.getZoom());
       });
+      map.on('moveend', () => {
+        const c = map.getCenter();
+        const cam = {
+          lng: Number(c.lng.toFixed(6)),
+          lat: Number(c.lat.toFixed(6)),
+          zoom: Number(map.getZoom().toFixed(3)),
+          pitch: Number(map.getPitch().toFixed(2)),
+          bearing: Number(map.getBearing().toFixed(2)),
+        };
+        const prev = prevCameraRef.current;
+        const delta = prev ? {
+          dLng: Number((cam.lng - prev.lng).toFixed(6)),
+          dLat: Number((cam.lat - prev.lat).toFixed(6)),
+          dZoom: Number((cam.zoom - prev.zoom).toFixed(3)),
+          dPitch: Number((cam.pitch - prev.pitch).toFixed(2)),
+        } : null;
+        prevCameraRef.current = cam;
+        lastStableCameraRef.current = cam;
+        logMapDebug('moveend', {
+          cam,
+          delta,
+          msSinceUserInput: Date.now() - lastUserInputAtRef.current,
+        });
+      });
+      map.on('zoom', () => {
+        if (zoomGuardRef.current) return;
+        const currentZoom = map.getZoom();
+        const clampedZoom = Math.max(MIN_SAFE_ZOOM, Math.min(MAX_SAFE_ZOOM, currentZoom));
+        if (Math.abs(clampedZoom - currentZoom) > 0.001) {
+          zoomGuardRef.current = true;
+          map.setZoom(clampedZoom);
+          zoomGuardRef.current = false;
+        }
+      });
       map.on('move', () => {
         const currentPitch = map.getPitch();
         const clampedPitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, currentPitch));
@@ -1707,7 +2034,7 @@ function MapLibreFlatMapView({
       if (onZoomChange) onZoomChange(map.getZoom());
 
       // Initial framing: ensure zones are visible at first render.
-      if (fcZones.features.length > 0) {
+      if (!lastStableCameraRef.current && fcZones.features.length > 0) {
         const bounds = new maplibregl.LngLatBounds();
         fcZones.features.forEach((feature) => {
           const coords = feature?.geometry?.coordinates;
@@ -1720,84 +2047,38 @@ function MapLibreFlatMapView({
         }
       }
 
-      setTimeout(() => map.resize(), 0);
-      setTimeout(() => map.resize(), 300);
+      window.requestAnimationFrame(() => {
+        map.resize();
+        window.requestAnimationFrame(() => {
+          map.resize();
+        });
+      });
     });
 
     return () => {
+      logMapDebug('map-unmount');
       dcsarMarkersRef.current.forEach(({ marker, cleanup }) => {
         if (typeof cleanup === 'function') cleanup();
         marker.remove();
       });
       dcsarMarkersRef.current.clear();
+      if (domes3dRef.current.group) {
+        while (domes3dRef.current.group.children.length > 0) {
+          const child = domes3dRef.current.group.children.pop();
+          if (child?.material?.dispose) child.material.dispose();
+        }
+      }
+      if (domes3dRef.current.geometry) {
+        domes3dRef.current.geometry.dispose();
+        domes3dRef.current.geometry = null;
+      }
+      if (domes3dRef.current.renderer) {
+        domes3dRef.current.renderer.dispose();
+      }
       map.remove();
       mapRef.current = null;
     };
-  }, [style]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-
-    let disposed = false;
-    let intervalId = 0;
-    let attempts = 0;
-
-    const sampleTerrainAtZones = () => {
-      if (disposed) return;
-      const sampled = {};
-
-      (zones || []).forEach((zone) => {
-        const id = String(zone?.id || '');
-        const lat = Number(zone?.coordinates?.lat);
-        const lon = Number(zone?.coordinates?.lon);
-        if (!id || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
-
-        const elevation = map.queryTerrainElevation([lon, lat]);
-        if (Number.isFinite(elevation)) {
-          sampled[id] = elevation;
-        }
-      });
-
-      if (Object.keys(sampled).length === 0) return;
-
-      setZoneTerrainById((previous) => {
-        let changed = false;
-        const next = { ...previous };
-        Object.entries(sampled).forEach(([id, elevation]) => {
-          if (!Number.isFinite(previous[id]) || Math.abs(previous[id] - elevation) > 0.5) {
-            next[id] = elevation;
-            changed = true;
-          }
-        });
-        return changed ? next : previous;
-      });
-
-      // Stop sampling once we have coverage for current zones.
-      const zoneCount = (zones || []).filter((zone) => zone?.id && zone?.coordinates).length;
-      if (Object.keys(sampled).length >= zoneCount && intervalId) {
-        window.clearInterval(intervalId);
-        intervalId = 0;
-      }
-    };
-
-    sampleTerrainAtZones();
-    intervalId = window.setInterval(() => {
-      attempts += 1;
-      sampleTerrainAtZones();
-      if (attempts >= 20 && intervalId) {
-        window.clearInterval(intervalId);
-        intervalId = 0;
-      }
-    }, 1000);
-
-    return () => {
-      disposed = true;
-      if (intervalId) {
-        window.clearInterval(intervalId);
-      }
-    };
-  }, [zones]);
+  }, [style, logMapDebug]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1929,11 +2210,8 @@ function MapLibreFlatMapView({
   }, [fcZones]);
 
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    const source = map.getSource('zone-domes-src');
-    if (source?.setData) source.setData(fcZoneDomes);
-  }, [fcZoneDomes]);
+    rebuildThreeDomes();
+  }, [rebuildThreeDomes]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1984,13 +2262,19 @@ function MapLibreFlatMapView({
       return;
     }
     lastAutoFocusRef.current = { lat: nextLat, lon: nextLon };
+    logMapDebug('autofocus-easeTo', {
+      focusTargetKey,
+      target: { lon: nextLon, lat: nextLat },
+      currentZoom: Number(map.getZoom().toFixed(3)),
+    });
 
     map.easeTo({
       center: [nextLon, nextLat],
-      zoom: Math.max(map.getZoom(), 8),
-      duration: 700,
+      zoom: Math.min(MAX_SAFE_ZOOM, map.getZoom() + 0.35),
+      duration: 950,
+      easing: (t) => t * (2 - t),
     });
-  }, [focusTargetKey, focusCoordinates]);
+  }, [focusTargetKey, focusCoordinates, logMapDebug]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -2293,7 +2577,7 @@ export default function FrontlineMap({ airportsData }) {
   useEffect(() => {
     const interval = setInterval(() => {
       setAnimationTick(Date.now());
-    }, 120);
+    }, 280);
 
     return () => clearInterval(interval);
   }, []);
@@ -2341,7 +2625,7 @@ export default function FrontlineMap({ airportsData }) {
   useEffect(() => {
     const interval = setInterval(() => {
       setScrambleTick((value) => value + 1);
-    }, 90);
+    }, 320);
 
     return () => clearInterval(interval);
   }, []);

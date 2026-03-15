@@ -19,7 +19,8 @@
     "react-dom": "^18.2.0",
     "react-leaflet": "^4.2.1",
     "recharts": "^2.10.3",
-    "socket.io-client": "^4.7.2"
+    "socket.io-client": "^4.7.2",
+    "three": "^0.183.2"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
