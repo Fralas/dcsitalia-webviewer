@@ -1092,7 +1092,6 @@ function MapLibreFlatMapView({
 }) {
   const MIN_PITCH = 28;
   const MAX_PITCH = 85;
-  const MAX_ZOOM_AT_HIGH_PITCH = 13;
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const dcsarMarkersRef = useRef(new Map());
@@ -1100,23 +1099,7 @@ function MapLibreFlatMapView({
   const popupRef = useRef(null);
   const middleDragRef = useRef(null);
   const lastAutoFocusRef = useRef(null);
-  const cameraGuardLockRef = useRef(false);
   const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
-
-  const getMaxPitchForZoom = (zoom) => {
-    if (zoom >= 13.6) return 72;
-    if (zoom >= 13.0) return 75;
-    if (zoom >= 12.4) return 78;
-    return MAX_PITCH;
-  };
-
-  const getMaxZoomForPitch = (pitch) => {
-    if (pitch >= 82) return 11;
-    if (pitch >= 78) return 11.8;
-    if (pitch >= 74) return 12.4;
-    if (pitch >= 70) return MAX_ZOOM_AT_HIGH_PITCH;
-    return 14;
-  };
 
   const style = useMemo(() => ({
     version: 8,
@@ -1630,23 +1613,10 @@ function MapLibreFlatMapView({
         if (onZoomChange) onZoomChange(map.getZoom());
       });
       map.on('move', () => {
-        if (cameraGuardLockRef.current) return;
         const currentPitch = map.getPitch();
-        const currentZoom = map.getZoom();
-        const maxPitchForZoom = getMaxPitchForZoom(currentZoom);
-        const clampedPitch = Math.max(MIN_PITCH, Math.min(maxPitchForZoom, currentPitch));
-        const maxZoomForPitch = getMaxZoomForPitch(clampedPitch);
-        const clampedZoom = Math.min(currentZoom, maxZoomForPitch);
-
-        if (Math.abs(clampedPitch - currentPitch) > 0.001 || Math.abs(clampedZoom - currentZoom) > 0.001) {
-          cameraGuardLockRef.current = true;
-          map.jumpTo({
-            center: map.getCenter(),
-            zoom: clampedZoom,
-            bearing: map.getBearing(),
-            pitch: clampedPitch,
-          });
-          cameraGuardLockRef.current = false;
+        const clampedPitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, currentPitch));
+        if (Math.abs(clampedPitch - currentPitch) > 0.001) {
+          map.setPitch(clampedPitch);
         }
       });
       if (onZoomChange) onZoomChange(map.getZoom());
@@ -1885,8 +1855,7 @@ function MapLibreFlatMapView({
       const dy = event.clientY - state.y;
       const nextBearing = map.getBearing() + (dx * 0.25);
       const nextPitchRaw = map.getPitch() - (dy * 0.2);
-      const pitchCapForZoom = getMaxPitchForZoom(map.getZoom());
-      const nextPitch = Math.max(MIN_PITCH, Math.min(pitchCapForZoom, nextPitchRaw));
+      const nextPitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, nextPitchRaw));
 
       map.setBearing(nextBearing);
       map.setPitch(nextPitch);
