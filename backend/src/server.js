@@ -1769,6 +1769,12 @@ app.post('/api/airports/:id/create-order', (req, res) => {
     console.log(`?Y"S Auto-calculated quantity for ${weaponId}: ${quantity} (current: ${currentQuantity})`);
   }
 
+  // Auto pick ISO container size from desired quantity.
+  // <= 50% of default request => ISO small (0.5), otherwise ISO large (1.0).
+  const defaultOrderQuantity = Math.max(1, Number(getOrderQuantityForWeapon(weaponId)) || 1);
+  const requestedQuantity = Math.max(1, Number(quantity) || defaultOrderQuantity);
+  const autoIsoUnits = requestedQuantity <= (defaultOrderQuantity / 2) ? 0.5 : 1.0;
+
   // Find best source airport using donor selection algorithm
   const thresholds = getWeaponThresholds(weaponId);
   const bestSource = findBestSourceAirport({
@@ -1801,7 +1807,7 @@ app.post('/api/airports/:id/create-order', (req, res) => {
       weapon_id: weaponId,
       quantity_needed: quantity,
       current_quantity: currentQuantity,
-      iso_units: getIsoFillForWeapon(weaponId),
+      iso_units: autoIsoUnits,
       priority,
     }],
     priority,
@@ -1821,6 +1827,10 @@ app.post('/api/airports/:id/create-order', (req, res) => {
     success: true,
     orderId,
     message: 'Order created successfully',
+    container: {
+      type: autoIsoUnits >= 1 ? 'large' : 'small',
+      iso_units: autoIsoUnits,
+    },
     route: {
       from: bestSource.airportName,
       to: airport.displayName,

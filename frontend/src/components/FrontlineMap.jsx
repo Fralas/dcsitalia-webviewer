@@ -13,9 +13,10 @@ import c130ModelUrl from '../assets/3D/yc-130prototype_of_c-130.glb';
 import { ChevronLeft, ChevronRight, Clock3, MapPin, PersonStanding } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
+import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
 import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
-import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getMissions, getServerTime } from '../services/api';
+import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, createOrder, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getMissions, getServerTime } from '../services/api';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
@@ -2419,6 +2420,11 @@ export default function FrontlineMap({ airportsData }) {
   const [composingMission, setComposingMission] = useState(false);
   const [showLogisticsComposeWindow, setShowLogisticsComposeWindow] = useState(false);
   const [logisticsWeaponSearch, setLogisticsWeaponSearch] = useState('');
+  const [showLogisticsRequestWindow, setShowLogisticsRequestWindow] = useState(false);
+  const [requestWeaponSearch, setRequestWeaponSearch] = useState('');
+  const [requestWeaponId, setRequestWeaponId] = useState('');
+  const [requestQuantity, setRequestQuantity] = useState(0);
+  const [requestingOrder, setRequestingOrder] = useState(false);
   const [acceptingZoneOperationId, setAcceptingZoneOperationId] = useState(null);
   const [acceptingMissionId, setAcceptingMissionId] = useState(null);
   const [acceptingDcsarId, setAcceptingDcsarId] = useState(null);
@@ -3172,6 +3178,50 @@ export default function FrontlineMap({ airportsData }) {
     && selectedLargeContainerCount <= 2;
 
   const selectedAirport = selectedAirportId ? airportsById.get(selectedAirportId) : null;
+  const selectedAirportRequestedWeaponIds = useMemo(() => {
+    const set = new Set();
+    airportLogistics.forEach((mission) => {
+      getMissionOrders(mission).forEach((order) => {
+        if (order?.weapon_id) set.add(order.weapon_id);
+      });
+    });
+    return set;
+  }, [airportLogistics]);
+  const selectedAirportRequestableWeapons = useMemo(() => {
+    if (!selectedAirport) return [];
+    const isCarrier = selectedAirport.isCarrier === true;
+    const isHeliport = selectedAirport.isHeliport === true;
+    const baseWeapons = isCarrier
+      ? importantWeaponsCarriers
+      : (isHeliport ? importantWeaponsHeliports : [...importantWeaponsAirports, ...importantWeaponsHeliports]);
+    const unique = [...new Set(baseWeapons)];
+    return unique
+      .map((weaponId) => {
+        const inventoryWeapon = (selectedAirport?.data?.weapons || []).find((entry) => entry?.item === weaponId);
+        return {
+          weaponId,
+          displayName: getWeaponDisplayName(weaponId),
+          currentQty: Number(inventoryWeapon?.quantity || 0) || 0,
+          disabled: selectedAirportRequestedWeaponIds.has(weaponId),
+        };
+      })
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  }, [selectedAirport, selectedAirportRequestedWeaponIds]);
+  const selectedRequestWeapon = useMemo(
+    () => selectedAirportRequestableWeapons.find((entry) => entry.weaponId === requestWeaponId) || null,
+    [selectedAirportRequestableWeapons, requestWeaponId]
+  );
+  const requestWeaponSuggestions = useMemo(() => {
+    const query = requestWeaponSearch.trim().toLowerCase();
+    return selectedAirportRequestableWeapons
+      .filter((entry) => !entry.disabled)
+      .filter((entry) => (
+        !query
+        || entry.displayName.toLowerCase().includes(query)
+        || entry.weaponId.toLowerCase().includes(query)
+      ))
+      .slice(0, 8);
+  }, [requestWeaponSearch, selectedAirportRequestableWeapons]);
   const dcsarPointsWithNearest = useMemo(() => {
     return dcsarPoints
       .map((point, index) => {
@@ -3236,6 +3286,7 @@ export default function FrontlineMap({ airportsData }) {
       setSelectedLogisticsMission(null);
       setSelectedContainerIds([]);
       setShowLogisticsComposeWindow(false);
+      setShowLogisticsRequestWindow(false);
     }
   }, [filters.showLogistics]);
 
@@ -3243,6 +3294,10 @@ export default function FrontlineMap({ airportsData }) {
     setSelectedContainerIds([]);
     setShowLogisticsComposeWindow(false);
     setLogisticsWeaponSearch('');
+    setShowLogisticsRequestWindow(false);
+    setRequestWeaponSearch('');
+    setRequestWeaponId('');
+    setRequestQuantity(0);
   }, [selectedAirportId]);
 
   useEffect(() => {
@@ -3359,6 +3414,54 @@ export default function FrontlineMap({ airportsData }) {
       setComposingMission(false);
     }
   }, [canComposeSelectedMission, selectedAirportId, selectedContainerIds, selectedContainers, user]);
+
+  useEffect(() => {
+    if (!showLogisticsRequestWindow) return;
+    if (requestWeaponId && selectedAirportRequestableWeapons.some((entry) => entry.weaponId === requestWeaponId && !entry.disabled)) return;
+    const firstEnabled = selectedAirportRequestableWeapons.find((entry) => !entry.disabled);
+    setRequestWeaponId(firstEnabled?.weaponId || '');
+    setRequestWeaponSearch(firstEnabled?.displayName || '');
+    if (!Number.isFinite(Number(requestQuantity)) || Number(requestQuantity) <= 0) {
+      setRequestQuantity(50);
+    }
+  }, [showLogisticsRequestWindow, requestWeaponId, requestQuantity, selectedAirportRequestableWeapons]);
+
+  const handleCreateManualRequest = useCallback(async () => {
+    if (!selectedAirportId) return;
+    const quantityValue = Math.floor(Number(requestQuantity) || 0);
+    if (!requestWeaponId) {
+      alert('Select a weapon first.');
+      return;
+    }
+    if (!Number.isFinite(quantityValue) || quantityValue <= 0) {
+      alert('Quantity must be greater than 0.');
+      return;
+    }
+
+    const alreadyExists = selectedAirportRequestedWeaponIds.has(requestWeaponId);
+    if (alreadyExists) {
+      alert('An order for this weapon already exists for this airport.');
+      return;
+    }
+
+    setRequestingOrder(true);
+    try {
+      await createOrder(selectedAirportId, requestWeaponId, quantityValue);
+      const latest = await getMissions();
+      if (Array.isArray(latest)) {
+        setLogisticsMissions(latest);
+      }
+      setShowLogisticsRequestWindow(false);
+      setRequestWeaponSearch('');
+      setRequestWeaponId('');
+      setRequestQuantity(0);
+    } catch (error) {
+      console.error('Failed to create manual request:', error);
+      alert(`Failed to create request: ${error.message}`);
+    } finally {
+      setRequestingOrder(false);
+    }
+  }, [requestQuantity, requestWeaponId, selectedAirportId, selectedAirportRequestedWeaponIds]);
 
   const handleAcceptLogisticsMission = async (mission) => {
     if (!mission || mission.status !== 'pending') return;
@@ -3955,6 +4058,13 @@ export default function FrontlineMap({ airportsData }) {
                           </button>
                           <button
                             type="button"
+                            onClick={() => setShowLogisticsRequestWindow(true)}
+                            className="rounded border border-yt-border px-2.5 py-1.5 text-xs font-semibold text-yt-text-primary hover:bg-yt-bg-tertiary/50"
+                          >
+                            Request
+                          </button>
+                          <button
+                            type="button"
                             onClick={handleComposeLogisticsMission}
                             disabled={!canComposeSelectedMission || composingMission}
                             className="rounded border border-green-500/50 bg-green-500/15 px-2.5 py-1.5 text-xs font-semibold text-green-300 hover:bg-green-500/25 disabled:cursor-not-allowed disabled:opacity-60"
@@ -4110,15 +4220,19 @@ export default function FrontlineMap({ airportsData }) {
                           const dimmed = selectionState.disabled && !selectionState.selected;
 
                           return (
-                            <div
+                            <button
                               key={`pending-container-${containerItem.id}`}
+                              type="button"
+                              onClick={() => handleToggleContainerMission(containerItem)}
+                              disabled={selectionState.disabled && !selectionState.selected}
+                              title={selectionState.reason || ''}
                               className={`rounded-lg border p-2 transition ${
                                 selectionState.selected
                                   ? 'border-sky-400 bg-sky-500/12'
                                   : dimmed
                                     ? 'border-yt-border/40 bg-yt-bg-tertiary/25 opacity-45'
                                     : 'border-yt-border bg-yt-bg-tertiary/60'
-                              }`}
+                              } w-full text-left`}
                             >
                               <div className="mb-2 flex items-start justify-between gap-2">
                                 <div>
@@ -4132,19 +4246,13 @@ export default function FrontlineMap({ airportsData }) {
                                     Mission: {containerItem.missionId}
                                   </div>
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleContainerMission(containerItem)}
-                                  disabled={selectionState.disabled && !selectionState.selected}
-                                  title={selectionState.reason || ''}
-                                  className={`rounded border px-2 py-0.5 text-[10px] font-semibold uppercase ${
-                                    selectionState.selected
-                                      ? 'border-sky-400 bg-sky-500/20 text-sky-200'
-                                      : 'border-yt-border bg-[#101b2c] text-yt-text-secondary hover:text-yt-text-primary disabled:cursor-not-allowed disabled:opacity-60'
-                                  }`}
-                                >
-                                  {selectionState.selected ? 'Selected' : 'Select'}
-                                </button>
+                                <span className={`rounded border px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                                  selectionState.selected
+                                    ? 'border-sky-400 bg-sky-500/20 text-sky-200'
+                                    : 'border-yt-border bg-[#101b2c] text-yt-text-secondary'
+                                }`}>
+                                  {selectionState.selected ? 'Selected' : 'Available'}
+                                </span>
                               </div>
 
                               {selectionState.reason && !selectionState.selected && (
@@ -4167,11 +4275,126 @@ export default function FrontlineMap({ airportsData }) {
                                   Priority: {containerItem.priority}
                                 </div>
                               </div>
-                            </div>
+                            </button>
                           );
                           })}
                         </div>
                       )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {filters.showLogistics && selectedAirport && showLogisticsRequestWindow && (
+                <div className="fixed inset-0 z-[1200] flex items-center justify-center">
+                  <button
+                    type="button"
+                    className="absolute inset-0 bg-black/70"
+                    onClick={() => setShowLogisticsRequestWindow(false)}
+                    aria-label="Close logistics request window"
+                  />
+                  <div className="relative w-[min(700px,92vw)] rounded-2xl border border-yt-border bg-[#0f1727] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-yt-text-primary">
+                          Request Weapon Order
+                        </div>
+                        <div className="text-xs text-yt-text-secondary">
+                          {selectedAirport.displayName || selectedAirport.name}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowLogisticsRequestWindow(false)}
+                        className="rounded border border-yt-border px-2 py-1 text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
+                      >
+                        Close
+                      </button>
+                    </div>
+
+                    <div className="mb-2 text-[11px] text-yt-text-secondary">
+                      If an order for this weapon already exists at this airport, request is blocked.
+                    </div>
+
+                    <div className="mb-3">
+                      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">
+                        Weapon
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={requestWeaponSearch}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            setRequestWeaponSearch(value);
+                            const match = selectedAirportRequestableWeapons.find((entry) => (
+                              !entry.disabled
+                              && (
+                                entry.displayName.toLowerCase() === value.trim().toLowerCase()
+                                || entry.weaponId.toLowerCase() === value.trim().toLowerCase()
+                              )
+                            ));
+                            setRequestWeaponId(match?.weaponId || '');
+                          }}
+                          placeholder="Type weapon name..."
+                          className="w-full rounded border border-yt-border bg-[#0c1320] px-2.5 py-1.5 text-xs text-yt-text-primary outline-none placeholder:text-yt-text-secondary focus:border-yt-accent/60"
+                        />
+                        {requestWeaponSuggestions.length > 0 && (
+                          <div className="absolute z-20 mt-1 max-h-44 w-full overflow-y-auto rounded border border-yt-border bg-[#0c1320] p-1 shadow-xl">
+                            {requestWeaponSuggestions.map((weapon) => (
+                              <button
+                                key={weapon.weaponId}
+                                type="button"
+                                onClick={() => {
+                                  setRequestWeaponId(weapon.weaponId);
+                                  setRequestWeaponSearch(weapon.displayName);
+                                }}
+                                className="w-full rounded px-2 py-1 text-left text-xs text-yt-text-primary hover:bg-yt-bg-tertiary/60"
+                              >
+                                {weapon.displayName} <span className="text-yt-text-secondary">({weapon.currentQty})</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {selectedRequestWeapon?.disabled && (
+                        <div className="mt-1 text-[10px] text-amber-300">This weapon already has an active order for this airport.</div>
+                      )}
+                    </div>
+
+                    <div className="mb-4">
+                      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">
+                        Quantity
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={requestQuantity}
+                        onChange={(event) => setRequestQuantity(event.target.value)}
+                        className="w-full rounded border border-yt-border bg-[#0c1320] px-2.5 py-1.5 text-xs text-yt-text-primary outline-none focus:border-yt-accent/60"
+                      />
+                      <div className="mt-1 text-[10px] text-yt-text-secondary">
+                        ISO container size is chosen automatically (small/large) from requested quantity.
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowLogisticsRequestWindow(false)}
+                        className="rounded border border-yt-border px-2.5 py-1.5 text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCreateManualRequest}
+                        disabled={requestingOrder || !requestWeaponId}
+                        className="rounded border border-green-500/50 bg-green-500/15 px-2.5 py-1.5 text-xs font-semibold text-green-300 hover:bg-green-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {requestingOrder ? 'Requesting...' : 'Request Order'}
+                      </button>
                     </div>
                   </div>
                 </div>
