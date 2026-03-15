@@ -330,6 +330,39 @@ function interpolateLatLon(start, end, progress) {
   ];
 }
 
+function destinationPoint(lat, lon, bearingDeg, distanceMeters) {
+  const earthRadius = 6371008.8;
+  const brng = (bearingDeg * Math.PI) / 180;
+  const lat1 = (lat * Math.PI) / 180;
+  const lon1 = (lon * Math.PI) / 180;
+  const angularDistance = distanceMeters / earthRadius;
+
+  const sinLat1 = Math.sin(lat1);
+  const cosLat1 = Math.cos(lat1);
+  const sinAngular = Math.sin(angularDistance);
+  const cosAngular = Math.cos(angularDistance);
+
+  const lat2 = Math.asin((sinLat1 * cosAngular) + (cosLat1 * sinAngular * Math.cos(brng)));
+  const lon2 = lon1 + Math.atan2(
+    Math.sin(brng) * sinAngular * cosLat1,
+    cosAngular - (sinLat1 * Math.sin(lat2))
+  );
+
+  return [((lon2 * 180) / Math.PI + 540) % 360 - 180, (lat2 * 180) / Math.PI];
+}
+
+function createCircleRing(lat, lon, radiusMeters, segments = 40) {
+  const coords = [];
+  for (let i = 0; i < segments; i += 1) {
+    const bearing = (i / segments) * 360;
+    coords.push(destinationPoint(lat, lon, bearing, radiusMeters));
+  }
+  if (coords.length > 0) {
+    coords.push(coords[0]);
+  }
+  return coords;
+}
+
 function applyLateralOffset(start, end, point, offsetNm = 0.35) {
   if (!start || !end || !point) return point;
   const lat = Number(point[0]);
@@ -1094,6 +1127,8 @@ function MapLibreFlatMapView({
 }) {
   const MIN_PITCH = 28;
   const MAX_PITCH = 85;
+  const ZONE_DOME_RADIUS_METERS = 3000;
+  const ZONE_DOME_RINGS = 8;
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const dcsarMarkersRef = useRef(new Map());
@@ -1299,11 +1334,6 @@ function MapLibreFlatMapView({
     features: !showAto ? [] : (zones || []).flatMap((zone) => {
       if (!Number.isFinite(zone?.coordinates?.lat) || !Number.isFinite(zone?.coordinates?.lon)) return [];
       const isAccepted = zone.operation_assigned === true && Number(zone.operation_remaining_ms || 0) > 0;
-      const pulseCycleMs = 1800;
-      const offset = hashString(zone.id || 'zone') % pulseCycleMs;
-      const phase = ((animationTick + offset) % pulseCycleMs) / pulseCycleMs;
-      const pulseRadius = (zone.id === selectedZoneId ? 10 : 7) + phase * 8;
-      const pulseOpacity = (1 - phase) * 0.42;
 
       return [{
         type: 'Feature',
@@ -1317,12 +1347,52 @@ function MapLibreFlatMapView({
           status: zone.status || 'UNKNOWN',
           selected: zone.id === selectedZoneId ? 1 : 0,
           accepted: isAccepted ? 1 : 0,
-          pulse_radius: pulseRadius,
-          pulse_opacity: pulseOpacity,
         },
       }];
     }),
-  }), [zones, showAto, animationTick, selectedZoneId]);
+  }), [zones, showAto, selectedZoneId]);
+
+  const fcZoneDomes = useMemo(() => ({
+    type: 'FeatureCollection',
+    features: !showAto ? [] : (zones || []).flatMap((zone) => {
+      const lat = Number(zone?.coordinates?.lat);
+      const lon = Number(zone?.coordinates?.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return [];
+
+      const isAccepted = zone.operation_assigned === true && Number(zone.operation_remaining_ms || 0) > 0;
+      const status = zone.status || 'UNKNOWN';
+      const selected = zone.id === selectedZoneId ? 1 : 0;
+      const features = [];
+
+      for (let ring = 0; ring < ZONE_DOME_RINGS; ring += 1) {
+        const outerRadius = ((ring + 1) / ZONE_DOME_RINGS) * ZONE_DOME_RADIUS_METERS;
+        const midRadius = outerRadius;
+        const domeHeight = Math.sqrt(
+          Math.max(0, (ZONE_DOME_RADIUS_METERS * ZONE_DOME_RADIUS_METERS) - (midRadius * midRadius))
+        );
+
+        const outerRing = createCircleRing(lat, lon, outerRadius, 48);
+
+        features.push({
+          type: 'Feature',
+          geometry: {
+            type: 'Polygon',
+            coordinates: [outerRing],
+          },
+          properties: {
+            id: zone.id || '',
+            name: zone.name || zone.id || '',
+            status,
+            selected,
+            accepted: isAccepted ? 1 : 0,
+            dome_height: domeHeight,
+          },
+        });
+      }
+
+      return features;
+    }),
+  }), [zones, showAto, selectedZoneId]);
 
   const fcAirports = useMemo(() => ({
     type: 'FeatureCollection',
@@ -1422,6 +1492,7 @@ function MapLibreFlatMapView({
       addGeoSource('dcsar-links-src', fcDcsarLinks);
       addGeoSource('dcsar-points-src', fcDcsarPoints);
       addGeoSource('zones-src', fcZones);
+      addGeoSource('zone-domes-src', fcZoneDomes);
       addGeoSource('airports-src', fcAirports);
 
       map.addLayer({
@@ -1510,24 +1581,11 @@ function MapLibreFlatMapView({
 
 
       map.addLayer({
-        id: 'zone-pulse-layer',
-        type: 'circle',
-        source: 'zones-src',
-        filter: ['==', ['get', 'accepted'], 1],
+        id: 'zone-domes-layer',
+        type: 'fill-extrusion',
+        source: 'zone-domes-src',
         paint: {
-          'circle-radius': ['get', 'pulse_radius'],
-          'circle-color': '#22c55e',
-          'circle-opacity': ['*', ['get', 'pulse_opacity'], 0.35],
-        },
-      });
-
-      map.addLayer({
-        id: 'zones-layer',
-        type: 'circle',
-        source: 'zones-src',
-        paint: {
-          'circle-radius': ['case', ['==', ['get', 'selected'], 1], 9, 6],
-          'circle-color': [
+          'fill-extrusion-color': [
             'case',
             ['==', ['get', 'accepted'], 1], '#22c55e',
             ['==', ['get', 'status'], 'RED'], '#ef4444',
@@ -1535,9 +1593,9 @@ function MapLibreFlatMapView({
             ['==', ['get', 'status'], 'UNDER_ATTACK'], '#f97316',
             '#e2e8f0',
           ],
-          'circle-opacity': ['case', ['==', ['get', 'selected'], 1], 0.9, 0.65],
-          'circle-stroke-color': '#f8fafc',
-          'circle-stroke-width': ['case', ['==', ['get', 'selected'], 1], 3, 2],
+          'fill-extrusion-height': ['get', 'dome_height'],
+          'fill-extrusion-base': 0,
+          'fill-extrusion-opacity': ['case', ['==', ['get', 'selected'], 1], 0.78, 0.58],
         },
       });
 
@@ -1565,13 +1623,13 @@ function MapLibreFlatMapView({
         },
       });
 
-      map.on('click', 'zones-layer', (event) => {
+      map.on('click', 'zone-domes-layer', (event) => {
         const feature = event?.features?.[0];
         const zoneId = feature?.properties?.id;
         if (zoneId && onZoneSelect) onZoneSelect(zoneId);
       });
 
-      map.on('mousemove', 'zones-layer', (event) => {
+      map.on('mousemove', 'zone-domes-layer', (event) => {
         map.getCanvas().style.cursor = 'pointer';
         const feature = event?.features?.[0];
         const zoneId = feature?.properties?.id;
@@ -1579,7 +1637,7 @@ function MapLibreFlatMapView({
         const name = feature?.properties?.name || zoneId || 'Zone';
         showHoverPopup(event.lngLat, `<div style="font-size:11px;font-weight:600;">${name}</div>`);
       });
-      map.on('mouseleave', 'zones-layer', () => {
+      map.on('mouseleave', 'zone-domes-layer', () => {
         map.getCanvas().style.cursor = '';
         if (onZoneHover) onZoneHover(null);
         hideHoverPopup();
@@ -1796,6 +1854,13 @@ function MapLibreFlatMapView({
     const source = map.getSource('zones-src');
     if (source?.setData) source.setData(fcZones);
   }, [fcZones]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const source = map.getSource('zone-domes-src');
+    if (source?.setData) source.setData(fcZoneDomes);
+  }, [fcZoneDomes]);
 
   useEffect(() => {
     const map = mapRef.current;
