@@ -1137,6 +1137,7 @@ function MapLibreFlatMapView({
   const middleDragRef = useRef(null);
   const lastAutoFocusRef = useRef(null);
   const userCameraLockUntilRef = useRef(0);
+  const [zoneTerrainById, setZoneTerrainById] = useState({});
   const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
 
   const style = useMemo(() => ({
@@ -1362,22 +1363,28 @@ function MapLibreFlatMapView({
       const isAccepted = zone.operation_assigned === true && Number(zone.operation_remaining_ms || 0) > 0;
       const status = zone.status || 'UNKNOWN';
       const selected = zone.id === selectedZoneId ? 1 : 0;
+      const zoneId = String(zone.id || '');
+      const sampledTerrain = Number(zoneTerrainById[zoneId]);
+      // Fallback base keeps domes visible even before terrain elevation becomes available.
+      const domeBase = (Number.isFinite(sampledTerrain) ? sampledTerrain : 1200) + 20;
       const features = [];
 
       for (let ring = 0; ring < ZONE_DOME_RINGS; ring += 1) {
+        const innerRadius = (ring / ZONE_DOME_RINGS) * ZONE_DOME_RADIUS_METERS;
         const outerRadius = ((ring + 1) / ZONE_DOME_RINGS) * ZONE_DOME_RADIUS_METERS;
-        const midRadius = outerRadius;
+        const midRadius = (innerRadius + outerRadius) / 2;
         const domeHeight = Math.sqrt(
           Math.max(0, (ZONE_DOME_RADIUS_METERS * ZONE_DOME_RADIUS_METERS) - (midRadius * midRadius))
         );
 
         const outerRing = createCircleRing(lat, lon, outerRadius, 48);
+        const innerRing = innerRadius > 1 ? createCircleRing(lat, lon, innerRadius, 48).reverse() : null;
 
         features.push({
           type: 'Feature',
           geometry: {
             type: 'Polygon',
-            coordinates: [outerRing],
+            coordinates: innerRing ? [outerRing, innerRing] : [outerRing],
           },
           properties: {
             id: zone.id || '',
@@ -1385,14 +1392,15 @@ function MapLibreFlatMapView({
             status,
             selected,
             accepted: isAccepted ? 1 : 0,
-            dome_height: domeHeight,
+            dome_base: domeBase,
+            dome_height: domeBase + domeHeight,
           },
         });
       }
 
       return features;
     }),
-  }), [zones, showAto, selectedZoneId]);
+  }), [zones, showAto, selectedZoneId, zoneTerrainById]);
 
   const fcAirports = useMemo(() => ({
     type: 'FeatureCollection',
@@ -1594,8 +1602,9 @@ function MapLibreFlatMapView({
             '#e2e8f0',
           ],
           'fill-extrusion-height': ['get', 'dome_height'],
-          'fill-extrusion-base': 0,
-          'fill-extrusion-opacity': ['case', ['==', ['get', 'selected'], 1], 0.78, 0.58],
+          'fill-extrusion-base': ['get', 'dome_base'],
+          // MapLibre v4.7 does not support data-driven expressions for fill-extrusion-opacity.
+          'fill-extrusion-opacity': 0.78,
         },
       });
 
@@ -1725,6 +1734,70 @@ function MapLibreFlatMapView({
       mapRef.current = null;
     };
   }, [style]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    let disposed = false;
+    let intervalId = 0;
+    let attempts = 0;
+
+    const sampleTerrainAtZones = () => {
+      if (disposed) return;
+      const sampled = {};
+
+      (zones || []).forEach((zone) => {
+        const id = String(zone?.id || '');
+        const lat = Number(zone?.coordinates?.lat);
+        const lon = Number(zone?.coordinates?.lon);
+        if (!id || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+        const elevation = map.queryTerrainElevation([lon, lat]);
+        if (Number.isFinite(elevation)) {
+          sampled[id] = elevation;
+        }
+      });
+
+      if (Object.keys(sampled).length === 0) return;
+
+      setZoneTerrainById((previous) => {
+        let changed = false;
+        const next = { ...previous };
+        Object.entries(sampled).forEach(([id, elevation]) => {
+          if (!Number.isFinite(previous[id]) || Math.abs(previous[id] - elevation) > 0.5) {
+            next[id] = elevation;
+            changed = true;
+          }
+        });
+        return changed ? next : previous;
+      });
+
+      // Stop sampling once we have coverage for current zones.
+      const zoneCount = (zones || []).filter((zone) => zone?.id && zone?.coordinates).length;
+      if (Object.keys(sampled).length >= zoneCount && intervalId) {
+        window.clearInterval(intervalId);
+        intervalId = 0;
+      }
+    };
+
+    sampleTerrainAtZones();
+    intervalId = window.setInterval(() => {
+      attempts += 1;
+      sampleTerrainAtZones();
+      if (attempts >= 20 && intervalId) {
+        window.clearInterval(intervalId);
+        intervalId = 0;
+      }
+    }, 1000);
+
+    return () => {
+      disposed = true;
+      if (intervalId) {
+        window.clearInterval(intervalId);
+      }
+    };
+  }, [zones]);
 
   useEffect(() => {
     const map = mapRef.current;
