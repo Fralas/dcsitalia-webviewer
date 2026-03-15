@@ -17,6 +17,21 @@ import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
 const MAP_ENGINE = String(import.meta.env.VITE_MAP_ENGINE || 'leaflet').trim().toLowerCase();
+const BASEMAP_MODE_DARK = 'dark';
+const BASEMAP_MODE_SATELLITE = 'satellite';
+
+const BASEMAP_CONFIG = {
+  [BASEMAP_MODE_DARK]: {
+    leafletUrl: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
+    leafletAttribution: '&copy; OpenStreetMap contributors, &copy; CARTO',
+    maplibreLayerId: 'carto-darkmatter-raster',
+  },
+  [BASEMAP_MODE_SATELLITE]: {
+    leafletUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    leafletAttribution: 'Tiles &copy; Esri',
+    maplibreLayerId: 'esri-satellite-raster',
+  },
+};
 
 function getZoneColor(status) {
   switch (status) {
@@ -775,8 +790,10 @@ function FlatMapView({
   onDcsarHover,
   onDcsarSelect,
   animationTick,
+  basemapMode,
 }) {
   const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
+  const activeBasemap = BASEMAP_CONFIG[basemapMode] || BASEMAP_CONFIG[BASEMAP_MODE_DARK];
   const airportsById = useMemo(() => {
     const map = new Map();
     airportsData.forEach((airport) => map.set(airport.id, airport));
@@ -789,13 +806,13 @@ function FlatMapView({
         center={[center.lat, center.lon]}
         zoom={7}
         minZoom={4}
-        maxZoom={13}
+        maxZoom={14}
         style={{ height: '100%', width: '100%' }}
         scrollWheelZoom
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          attribution={activeBasemap.leafletAttribution}
+          url={activeBasemap.leafletUrl}
         />
         <FlatMapZoomWatcher onZoomChange={onZoomChange} />
         <FlatMapFocus center={focusCoordinates} />
@@ -1071,18 +1088,35 @@ function MapLibreFlatMapView({
   onDcsarHover,
   onDcsarSelect,
   animationTick,
+  basemapMode,
 }) {
   const MIN_PITCH = 28;
-  const MAX_PITCH = 80;
-  const MAX_ZOOM_AT_HIGH_PITCH = 11;
-  const HIGH_PITCH_THRESHOLD = 70;
+  const MAX_PITCH = 85;
+  const MAX_ZOOM_AT_HIGH_PITCH = 13;
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const dcsarMarkersRef = useRef(new Map());
   const dcsarByIdRef = useRef(new Map());
   const popupRef = useRef(null);
   const middleDragRef = useRef(null);
+  const lastAutoFocusRef = useRef(null);
+  const cameraGuardLockRef = useRef(false);
   const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
+
+  const getMaxPitchForZoom = (zoom) => {
+    if (zoom >= 13.6) return 72;
+    if (zoom >= 13.0) return 75;
+    if (zoom >= 12.4) return 78;
+    return MAX_PITCH;
+  };
+
+  const getMaxZoomForPitch = (pitch) => {
+    if (pitch >= 82) return 11;
+    if (pitch >= 78) return 11.8;
+    if (pitch >= 74) return 12.4;
+    if (pitch >= 70) return MAX_ZOOM_AT_HIGH_PITCH;
+    return 14;
+  };
 
   const style = useMemo(() => ({
     version: 8,
@@ -1090,13 +1124,21 @@ function MapLibreFlatMapView({
       cartoDarkMatter: {
         type: 'raster',
         tiles: [
-          'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-          'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-          'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-          'https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+          'https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png',
+          'https://b.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png',
+          'https://c.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png',
+          'https://d.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png',
         ],
         tileSize: 256,
         attribution: '&copy; OpenStreetMap contributors, &copy; CARTO',
+      },
+      esriSatellite: {
+        type: 'raster',
+        tiles: [
+          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        ],
+        tileSize: 256,
+        attribution: 'Tiles &copy; Esri',
       },
       terrainDem: {
         type: 'raster-dem',
@@ -1121,6 +1163,17 @@ function MapLibreFlatMapView({
         id: 'carto-darkmatter-raster',
         type: 'raster',
         source: 'cartoDarkMatter',
+        layout: {
+          visibility: 'visible',
+        },
+      },
+      {
+        id: 'esri-satellite-raster',
+        type: 'raster',
+        source: 'esriSatellite',
+        layout: {
+          visibility: 'none',
+        },
       },
     ],
   }), []);
@@ -1321,7 +1374,7 @@ function MapLibreFlatMapView({
       center: [center.lon, center.lat],
       zoom: 7,
       minZoom: 4,
-      maxZoom: 13,
+      maxZoom: 14,
       pitch: 66,
       bearing: 0,
       minPitch: MIN_PITCH,
@@ -1342,7 +1395,7 @@ function MapLibreFlatMapView({
       });
       // Enable real 3D terrain after style load; keep it resilient if terrain is unavailable.
       try {
-        map.setTerrain({ source: 'terrainDem', exaggeration: 2.6 });
+        map.setTerrain({ source: 'terrainDem', exaggeration: 1.0 });
       } catch (error) {
         console.warn('Terrain could not be enabled, continuing without 3D terrain:', error);
       }
@@ -1577,13 +1630,23 @@ function MapLibreFlatMapView({
         if (onZoomChange) onZoomChange(map.getZoom());
       });
       map.on('move', () => {
+        if (cameraGuardLockRef.current) return;
         const currentPitch = map.getPitch();
-        const clampedPitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, currentPitch));
-        if (Math.abs(clampedPitch - currentPitch) > 0.001) {
-          map.setPitch(clampedPitch);
-        }
-        if (clampedPitch >= HIGH_PITCH_THRESHOLD && map.getZoom() > MAX_ZOOM_AT_HIGH_PITCH) {
-          map.setZoom(MAX_ZOOM_AT_HIGH_PITCH);
+        const currentZoom = map.getZoom();
+        const maxPitchForZoom = getMaxPitchForZoom(currentZoom);
+        const clampedPitch = Math.max(MIN_PITCH, Math.min(maxPitchForZoom, currentPitch));
+        const maxZoomForPitch = getMaxZoomForPitch(clampedPitch);
+        const clampedZoom = Math.min(currentZoom, maxZoomForPitch);
+
+        if (Math.abs(clampedPitch - currentPitch) > 0.001 || Math.abs(clampedZoom - currentZoom) > 0.001) {
+          cameraGuardLockRef.current = true;
+          map.jumpTo({
+            center: map.getCenter(),
+            zoom: clampedZoom,
+            bearing: map.getBearing(),
+            pitch: clampedPitch,
+          });
+          cameraGuardLockRef.current = false;
         }
       });
       if (onZoomChange) onZoomChange(map.getZoom());
@@ -1755,9 +1818,47 @@ function MapLibreFlatMapView({
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map) return;
+
+    const applyBasemapVisibility = () => {
+      const darkVisible = basemapMode !== BASEMAP_MODE_SATELLITE;
+
+      if (map.getLayer('carto-darkmatter-raster')) {
+        map.setLayoutProperty('carto-darkmatter-raster', 'visibility', darkVisible ? 'visible' : 'none');
+      }
+      if (map.getLayer('esri-satellite-raster')) {
+        map.setLayoutProperty('esri-satellite-raster', 'visibility', darkVisible ? 'none' : 'visible');
+      }
+    };
+
+    if (map.isStyleLoaded()) {
+      applyBasemapVisibility();
+      return;
+    }
+
+    map.once('load', applyBasemapVisibility);
+  }, [basemapMode]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     if (!map || !focusCoordinates) return;
+
+    const nextLat = Number(focusCoordinates.lat);
+    const nextLon = Number(focusCoordinates.lon);
+    if (!Number.isFinite(nextLat) || !Number.isFinite(nextLon)) return;
+
+    const previous = lastAutoFocusRef.current;
+    if (
+      previous &&
+      Math.abs(previous.lat - nextLat) < 0.00001 &&
+      Math.abs(previous.lon - nextLon) < 0.00001
+    ) {
+      return;
+    }
+    lastAutoFocusRef.current = { lat: nextLat, lon: nextLon };
+
     map.easeTo({
-      center: [focusCoordinates.lon, focusCoordinates.lat],
+      center: [nextLon, nextLat],
       zoom: Math.max(map.getZoom(), 8),
       duration: 700,
     });
@@ -1784,14 +1885,11 @@ function MapLibreFlatMapView({
       const dy = event.clientY - state.y;
       const nextBearing = map.getBearing() + (dx * 0.25);
       const nextPitchRaw = map.getPitch() - (dy * 0.2);
-      const nextPitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, nextPitchRaw));
+      const pitchCapForZoom = getMaxPitchForZoom(map.getZoom());
+      const nextPitch = Math.max(MIN_PITCH, Math.min(pitchCapForZoom, nextPitchRaw));
 
       map.setBearing(nextBearing);
       map.setPitch(nextPitch);
-
-      if (nextPitch >= HIGH_PITCH_THRESHOLD && map.getZoom() > MAX_ZOOM_AT_HIGH_PITCH) {
-        map.setZoom(MAX_ZOOM_AT_HIGH_PITCH);
-      }
 
       middleDragRef.current = { x: event.clientX, y: event.clientY };
     };
@@ -1849,6 +1947,7 @@ export default function FrontlineMap({ airportsData }) {
   const [feedCollapsed, setFeedCollapsed] = useState(false);
   const [zoneStatusMeta, setZoneStatusMeta] = useState({});
   const [mapMode, setMapMode] = useState(false);
+  const [basemapMode, setBasemapMode] = useState(BASEMAP_MODE_DARK);
   const [forcedGlobeScale, setForcedGlobeScale] = useState(null);
   const [launchTargetUtcMs, setLaunchTargetUtcMs] = useState(LAUNCH_TARGET_UTC_MS);
   const [serverClockBase, setServerClockBase] = useState(null);
@@ -2436,6 +2535,7 @@ export default function FrontlineMap({ airportsData }) {
   }, [selectedDcsarId, dcsarPoints]);
 
   const focusCoordinates = selectedDcsarFocus || focusedZone?.coordinates || zoneTheaterCenter || fallbackCenter || null;
+  const tacticalFocusCoordinates = selectedDcsarFocus || focusedZone?.coordinates || null;
 
   const handleScaleChange = (scale) => {
     if (scale >= 2.1 && !mapModeRef.current) {
@@ -2451,6 +2551,7 @@ export default function FrontlineMap({ airportsData }) {
   };
 
   const handleFlatMapZoomChange = (zoom) => {
+    if (MAP_ENGINE === 'maplibre') return;
     if (zoom <= 5 && mapModeRef.current) {
       mapModeRef.current = false;
       setMapMode(false);
@@ -2811,7 +2912,7 @@ export default function FrontlineMap({ airportsData }) {
                       dcsarPoints={dcsarPointsWithNearest}
                       selectedZoneId={selectedZoneId}
                       onZoneSelect={setSelectedZoneId}
-                      focusCoordinates={focusCoordinates}
+                      focusCoordinates={tacticalFocusCoordinates}
                       onZoomChange={handleFlatMapZoomChange}
                       onZoneHover={setHoveredZoneId}
                       onDcsarHover={setHoveredDcsarId}
@@ -2823,6 +2924,7 @@ export default function FrontlineMap({ airportsData }) {
                       showConvoys={filters.showConvoys}
                       showDcsar={filters.showDcsar}
                       animationTick={animationTick}
+                      basemapMode={basemapMode}
                     />
                   ) : (
                     <FlatMapView
@@ -2834,7 +2936,7 @@ export default function FrontlineMap({ airportsData }) {
                       dcsarPoints={dcsarPointsWithNearest}
                       selectedZoneId={selectedZoneId}
                       onZoneSelect={setSelectedZoneId}
-                      focusCoordinates={focusCoordinates}
+                      focusCoordinates={tacticalFocusCoordinates}
                       onZoomChange={handleFlatMapZoomChange}
                       onZoneHover={setHoveredZoneId}
                       onDcsarHover={setHoveredDcsarId}
@@ -2846,6 +2948,7 @@ export default function FrontlineMap({ airportsData }) {
                       showConvoys={filters.showConvoys}
                       showDcsar={filters.showDcsar}
                       animationTick={animationTick}
+                      basemapMode={basemapMode}
                     />
                   )}
                 </div>
@@ -2871,6 +2974,19 @@ export default function FrontlineMap({ airportsData }) {
                         onClick={() => setFilters((current) => ({ ...current, showAirports: !current.showAirports }))}
                       >
                         Airports
+                      </button>
+                      <button
+                        type="button"
+                        className={`rounded px-2 py-1 text-[10px] font-semibold ${
+                          basemapMode === BASEMAP_MODE_SATELLITE
+                            ? 'bg-yt-accent/25 text-yt-text-primary'
+                            : 'bg-yt-bg-tertiary text-yt-text-secondary'
+                        }`}
+                        onClick={() => setBasemapMode((current) => (
+                          current === BASEMAP_MODE_SATELLITE ? BASEMAP_MODE_DARK : BASEMAP_MODE_SATELLITE
+                        ))}
+                      >
+                        Satellite
                       </button>
                     </>
                   )}
