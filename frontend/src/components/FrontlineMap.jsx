@@ -3417,14 +3417,13 @@ export default function FrontlineMap({ airportsData }) {
 
   useEffect(() => {
     if (!showLogisticsRequestWindow) return;
-    if (requestWeaponId && selectedAirportRequestableWeapons.some((entry) => entry.weaponId === requestWeaponId && !entry.disabled)) return;
-    const firstEnabled = selectedAirportRequestableWeapons.find((entry) => !entry.disabled);
-    setRequestWeaponId(firstEnabled?.weaponId || '');
-    setRequestWeaponSearch(firstEnabled?.displayName || '');
+    // Keep request field empty by default; user explicitly chooses from suggestions.
+    setRequestWeaponId('');
+    setRequestWeaponSearch('');
     if (!Number.isFinite(Number(requestQuantity)) || Number(requestQuantity) <= 0) {
       setRequestQuantity(50);
     }
-  }, [showLogisticsRequestWindow, requestWeaponId, requestQuantity, selectedAirportRequestableWeapons]);
+  }, [showLogisticsRequestWindow, requestQuantity]);
 
   const handleCreateManualRequest = useCallback(async () => {
     if (!selectedAirportId) return;
@@ -4339,7 +4338,7 @@ export default function FrontlineMap({ airportsData }) {
                           placeholder="Type weapon name..."
                           className="w-full rounded border border-yt-border bg-[#0c1320] px-2.5 py-1.5 text-xs text-yt-text-primary outline-none placeholder:text-yt-text-secondary focus:border-yt-accent/60"
                         />
-                        {requestWeaponSuggestions.length > 0 && (
+                        {requestWeaponSearch.trim() !== '' && !requestWeaponId && requestWeaponSuggestions.length > 0 && (
                           <div className="absolute z-20 mt-1 max-h-44 w-full overflow-y-auto rounded border border-yt-border bg-[#0c1320] p-1 shadow-xl">
                             {requestWeaponSuggestions.map((weapon) => (
                               <button
