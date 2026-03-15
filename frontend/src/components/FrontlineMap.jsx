@@ -2028,18 +2028,6 @@ function MapLibreFlatMapView({
       });
 
       map.addLayer({
-        id: 'convoy-points-layer',
-        type: 'circle',
-        source: 'convoy-points-src',
-        paint: {
-          'circle-radius': 4.5,
-          'circle-color': ['case', ['==', ['get', 'status'], 'arrived'], '#22c55e', '#ef4444'],
-          'circle-stroke-color': '#f8fafc',
-          'circle-stroke-width': 1.2,
-        },
-      });
-
-      map.addLayer({
         id: 'dcsar-links-accepted-layer',
         type: 'line',
         source: 'dcsar-links-src',
@@ -2142,15 +2130,6 @@ function MapLibreFlatMapView({
       map.on('mousemove', 'logistics-hit-accepted', () => {
         map.getCanvas().style.cursor = '';
       });
-
-      map.on('mousemove', 'convoy-points-layer', (event) => {
-        const feature = event?.features?.[0];
-        const id = feature?.properties?.id || '-';
-        const status = feature?.properties?.status || 'active';
-        showHoverPopup(event.lngLat, `<div style="font-size:11px;font-weight:600;">Convoy ${id} (${status})</div>`);
-      });
-      map.on('mouseleave', 'convoy-points-layer', hideHoverPopup);
-
 
       map.on('zoomend', () => {
         if (onZoomChange) onZoomChange(map.getZoom());
