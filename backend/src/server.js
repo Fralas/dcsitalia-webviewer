@@ -1830,6 +1830,213 @@ app.post('/api/airports/:id/create-order', (req, res) => {
   });
 });
 
+/**
+ * POST /api/airports/:id/compose-mission - Compose a new logistics mission from pending container missions
+ * Body: { containers: [{ missionId, orderIndex, units }] }
+ */
+app.post('/api/airports/:id/compose-mission', (req, res) => {
+  const airportId = req.params.id;
+  const containers = Array.isArray(req.body?.containers) ? req.body.containers : [];
+  if (containers.length === 0) {
+    return res.status(400).json({ error: 'containers is required' });
+  }
+
+  const activeMissions = historicalData.getActiveMissions();
+  const activeById = new Map(activeMissions.map((mission) => [mission.id, mission]));
+  const selectedContainers = [];
+
+  const normalizeUnits = (value) => {
+    const units = Math.round((Number(value) || 0) * 2) / 2;
+    return units;
+  };
+
+  for (const container of containers) {
+    const missionId = String(container?.missionId || '').trim();
+    const orderIndex = Number.parseInt(container?.orderIndex, 10);
+    const units = normalizeUnits(container?.units);
+    if (!missionId || !Number.isInteger(orderIndex) || orderIndex < 0 || !(units === 1 || units === 0.5)) {
+      return res.status(400).json({ error: 'Invalid container payload' });
+    }
+
+    const mission = activeById.get(missionId);
+    if (!mission) return res.status(404).json({ error: `Mission not found: ${missionId}` });
+    if (mission.status !== 'pending') return res.status(400).json({ error: `Mission is not pending: ${missionId}` });
+    if (mission.airport_id !== airportId) return res.status(400).json({ error: `Mission does not belong to airport ${airportId}: ${missionId}` });
+    if (!Array.isArray(mission.orders) || !mission.orders[orderIndex]) {
+      return res.status(400).json({ error: `Order not found in mission ${missionId}` });
+    }
+
+    const order = mission.orders[orderIndex];
+    const orderIso = Math.round((Number(order?.iso_units || 0) || 0) * 2) / 2;
+    if (orderIso <= 0) return res.status(400).json({ error: `Invalid order iso_units in mission ${missionId}` });
+
+    selectedContainers.push({
+      mission,
+      missionId,
+      orderIndex,
+      units,
+      order,
+    });
+  }
+
+  const consumeByOrderKey = new Map();
+  selectedContainers.forEach((entry) => {
+    const key = `${entry.missionId}:${entry.orderIndex}`;
+    consumeByOrderKey.set(key, (consumeByOrderKey.get(key) || 0) + entry.units);
+  });
+  for (const [key, consumedUnits] of consumeByOrderKey.entries()) {
+    const [missionId, orderIndexRaw] = key.split(':');
+    const orderIndex = Number.parseInt(orderIndexRaw, 10);
+    const mission = activeById.get(missionId);
+    const orderIso = Math.round((Number(mission?.orders?.[orderIndex]?.iso_units || 0) || 0) * 2) / 2;
+    if (consumedUnits > orderIso + 1e-6) {
+      return res.status(400).json({ error: `Selected containers exceed available units for ${missionId}#${orderIndex}` });
+    }
+  }
+
+  const sourceAirportId = selectedContainers[0]?.mission?.source_airport_id || null;
+  if (!sourceAirportId) {
+    return res.status(400).json({ error: 'Selected containers do not have a valid source airport' });
+  }
+
+  const mixedSource = selectedContainers.some((entry) => entry.mission.source_airport_id !== sourceAirportId);
+  if (mixedSource) {
+    return res.status(400).json({ error: 'All selected missions must have the same source airport' });
+  }
+
+  const totalIsoUnits = selectedContainers.reduce((sum, entry) => sum + entry.units, 0);
+  const totalLargeContainers = selectedContainers.reduce((sum, entry) => sum + (entry.units >= 1 ? 1 : 0), 0);
+
+  if (totalIsoUnits > 2.5 + 1e-6) {
+    return res.status(400).json({ error: 'Invalid selection: total ISO units cannot exceed 2.5' });
+  }
+  if (totalLargeContainers > 2) {
+    return res.status(400).json({ error: 'Invalid selection: cannot exceed 2 large containers' });
+  }
+
+  const allOrders = selectedContainers.map((entry) => {
+    const orderIso = Math.round((Number(entry.order?.iso_units || 0) || 0) * 2) / 2;
+    const ratio = orderIso > 0 ? entry.units / orderIso : 0;
+    const qty = Math.floor((Number(entry.order?.quantity_needed || 0) || 0) * ratio);
+    const totalWeight = (Number(entry.order?.total_weight_lbs || 0) || 0) * ratio;
+    return {
+      weapon_id: entry.order?.weapon_id,
+      quantity_needed: qty,
+      current_quantity: Number(entry.order?.current_quantity || 0) || 0,
+      iso_units: entry.units,
+      total_weight_lbs: totalWeight,
+      priority: entry.order?.priority || entry.mission?.priority || 'medium',
+    };
+  });
+  if (allOrders.length === 0) {
+    return res.status(400).json({ error: 'Selected missions do not contain valid orders' });
+  }
+
+  const priorityRank = { critical: 0, high: 1, medium: 2, ok: 3 };
+  const rankOf = (priority) => priorityRank[String(priority || '').toLowerCase()] ?? priorityRank.ok;
+  const bestPriority = allOrders.reduce((best, order) => {
+    const candidate = String(order?.priority || '').toLowerCase() || 'ok';
+    return rankOf(candidate) < rankOf(best) ? candidate : best;
+  }, 'ok');
+
+  const totalWeightLbs = allOrders.reduce((sum, order) => sum + (Number(order.total_weight_lbs) || 0), 0);
+
+  const missionIdsTouched = [...new Set(selectedContainers.map((entry) => entry.missionId))];
+  const remainderByMission = new Map();
+  missionIdsTouched.forEach((id) => {
+    const mission = activeById.get(id);
+    if (mission) {
+      remainderByMission.set(id, mission.orders.map((order) => ({ ...order })));
+    }
+  });
+
+  selectedContainers.forEach((entry) => {
+    const orders = remainderByMission.get(entry.missionId);
+    if (!orders || !orders[entry.orderIndex]) return;
+    const sourceOrder = orders[entry.orderIndex];
+    const orderIso = Math.round((Number(sourceOrder?.iso_units || 0) || 0) * 2) / 2;
+    const remainingIso = Math.round((orderIso - entry.units) * 2) / 2;
+    if (remainingIso <= 0) {
+      orders[entry.orderIndex] = null;
+      return;
+    }
+    const ratio = orderIso > 0 ? remainingIso / orderIso : 0;
+    orders[entry.orderIndex] = {
+      ...sourceOrder,
+      iso_units: remainingIso,
+      quantity_needed: Math.floor((Number(sourceOrder.quantity_needed || 0) || 0) * ratio),
+      total_weight_lbs: (Number(sourceOrder.total_weight_lbs || 0) || 0) * ratio,
+    };
+  });
+
+  const missionMetaById = new Map(missionIdsTouched.map((id) => [id, activeById.get(id)]));
+  missionIdsTouched.forEach((id) => historicalData.cancelMission(id));
+  remainderByMission.forEach((ordersRaw, id) => {
+    const baseMission = missionMetaById.get(id);
+    if (!baseMission) return;
+    const orders = ordersRaw.filter(Boolean).filter((order) => (Number(order?.iso_units || 0) || 0) > 0);
+    if (orders.length === 0) return;
+    const remainderIso = orders.reduce((sum, order) => sum + (Number(order.iso_units) || 0), 0);
+    const remainderWeight = orders.reduce((sum, order) => sum + (Number(order.total_weight_lbs) || 0), 0);
+    historicalData.createMission({
+      airportId: baseMission.airport_id,
+      sourceAirportId: baseMission.source_airport_id,
+      distance: baseMission.distance_nm,
+      recommendedAircraft: baseMission.recommended_aircraft || 'airplane',
+      orders,
+      totalWeightLbs: remainderWeight,
+      totalIsoUnits: remainderIso,
+      priority: baseMission.priority || 'medium',
+      expiryHours: 24,
+    });
+  });
+
+  const firstMission = selectedContainers[0]?.mission;
+  const distanceNm = Number(firstMission?.distance_nm) || null;
+  const recommendedAircraft = firstMission?.recommended_aircraft || 'airplane';
+
+  const missionId = historicalData.createMission({
+    airportId,
+    sourceAirportId,
+    distance: distanceNm,
+    recommendedAircraft,
+    orders: allOrders,
+    totalWeightLbs,
+    totalIsoUnits,
+    priority: bestPriority,
+    expiryHours: 24,
+  });
+
+  io.emit('missions:updated', {
+    missions: historicalData.getActiveMissions(),
+  });
+
+  const destinationName = getAirportDisplayName(airportId);
+  const sourceName = getAirportDisplayName(sourceAirportId);
+  pushFeedEvent({
+    type: 'logistics.composed',
+    title: 'Logistics mission composed',
+    message: `Composed route ${sourceName} -> ${destinationName} (${totalIsoUnits.toFixed(1)} ISO)`,
+    actor: '',
+    mission_id: missionId,
+    metadata: {
+      source_airport_id: sourceAirportId,
+      airport_id: airportId,
+      composed_from: missionIdsTouched,
+      total_iso_units: totalIsoUnits,
+      order_count: allOrders.length,
+    },
+  });
+
+  return res.json({
+    success: true,
+    missionId,
+    composedFrom: missionIdsTouched,
+    totalIsoUnits,
+    orderCount: allOrders.length,
+  });
+});
+
 // ==================== DEBUG ENDPOINTS ====================
 
 /**

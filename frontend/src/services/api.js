@@ -105,6 +105,16 @@ export async function cancelMission(missionId) {
 }
 
 /**
+ * Compose a logistics mission from selected pending container missions.
+ */
+export async function composeAirportLogisticsMission(airportId, containers = []) {
+  return fetchAPI(`/airports/${encodeURIComponent(airportId)}/compose-mission`, {
+    method: 'POST',
+    body: JSON.stringify({ containers }),
+  });
+}
+
+/**
  * Create a manual supply order
  */
 export async function createOrder(airportId, weaponId, quantity) {

@@ -15,7 +15,7 @@ import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
-import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelMission, completeDcsarTask, completeMission, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getMissions, getServerTime } from '../services/api';
+import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getMissions, getServerTime } from '../services/api';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
@@ -300,6 +300,76 @@ function getOrderContainers(order) {
     return Math.max(1, Math.ceil(isoUnits));
   }
   return 1;
+}
+
+function getMissionIsoUnits(mission) {
+  const directIso = Number(mission?.total_iso_units);
+  if (Number.isFinite(directIso) && directIso > 0) {
+    return Math.round(directIso * 2) / 2;
+  }
+  const orders = getMissionOrders(mission);
+  const sum = orders.reduce((acc, order) => acc + (Number(order?.iso_units) || 0), 0);
+  return Math.round(sum * 2) / 2;
+}
+
+function getLargeContainerCountFromIso(isoUnits) {
+  if (!Number.isFinite(isoUnits) || isoUnits <= 0) return 0;
+  const normalized = Math.round(isoUnits * 2) / 2;
+  return Math.floor(normalized + 1e-6);
+}
+
+function getIsoContainerTypeLabel(isoUnits) {
+  if (isoUnits >= 1) return 'ISO Large';
+  if (isoUnits > 0) return 'ISO Small';
+  return 'ISO Container';
+}
+
+function splitIsoUnitsToContainers(isoUnits) {
+  const chunks = [];
+  let remaining = Math.max(0, Math.round((Number(isoUnits) || 0) * 2) / 2);
+  while (remaining >= 1 - 1e-6) {
+    chunks.push(1.0);
+    remaining -= 1.0;
+  }
+  if (remaining >= 0.5 - 1e-6) {
+    chunks.push(0.5);
+  }
+  return chunks;
+}
+
+function buildPendingContainerItems(missions = [], airportsById = new Map()) {
+  const items = [];
+  missions.forEach((mission) => {
+    const sourceAirport = airportsById.get(mission.source_airport_id);
+    const orders = getMissionOrders(mission);
+    orders.forEach((order, orderIndex) => {
+      const orderIsoUnits = Math.max(0, Math.round((Number(order?.iso_units || 0) || 0) * 2) / 2);
+      if (orderIsoUnits <= 0) return;
+      const chunks = splitIsoUnitsToContainers(orderIsoUnits);
+      chunks.forEach((chunkUnits, chunkIndex) => {
+        const ratio = orderIsoUnits > 0 ? (chunkUnits / orderIsoUnits) : 0;
+        const qty = Math.floor((Number(order?.quantity_needed || 0) || 0) * ratio);
+        const totalWeight = Number(order?.total_weight_lbs || 0) || 0;
+        const weight = totalWeight * ratio;
+        const itemId = `${mission.id}:${orderIndex}:${chunkIndex}:${chunkUnits}`;
+        items.push({
+          id: itemId,
+          missionId: mission.id,
+          orderIndex,
+          chunkIndex,
+          units: chunkUnits,
+          airportId: mission.airport_id,
+          sourceAirportId: mission.source_airport_id,
+          sourceAirportName: sourceAirport?.displayName || sourceAirport?.name || mission.source_airport_id,
+          weaponId: order.weapon_id || 'cargo',
+          quantityNeeded: qty,
+          totalWeightLbs: weight,
+          priority: getPriorityText(order.priority || mission.priority),
+        });
+      });
+    });
+  });
+  return items;
 }
 
 function toLatLngPoint(position) {
@@ -2345,6 +2415,10 @@ export default function FrontlineMap({ airportsData }) {
   const [dcsarCoordinatesFormat, setDcsarCoordinatesFormat] = useState('dms');
   const [selectedAirportId, setSelectedAirportId] = useState(null);
   const [selectedLogisticsMission, setSelectedLogisticsMission] = useState(null);
+  const [selectedContainerIds, setSelectedContainerIds] = useState([]);
+  const [composingMission, setComposingMission] = useState(false);
+  const [showLogisticsComposeWindow, setShowLogisticsComposeWindow] = useState(false);
+  const [logisticsWeaponSearch, setLogisticsWeaponSearch] = useState('');
   const [acceptingZoneOperationId, setAcceptingZoneOperationId] = useState(null);
   const [acceptingMissionId, setAcceptingMissionId] = useState(null);
   const [acceptingDcsarId, setAcceptingDcsarId] = useState(null);
@@ -3056,6 +3130,46 @@ export default function FrontlineMap({ airportsData }) {
     if (!selectedAirportId) return [];
     return filteredLogisticsMissions.filter((mission) => mission.airport_id === selectedAirportId);
   }, [selectedAirportId, filteredLogisticsMissions]);
+  const airportPendingContainers = useMemo(
+    () => airportLogistics.filter((mission) => mission.status === 'pending'),
+    [airportLogistics]
+  );
+  const airportAssignedLogistics = useMemo(
+    () => airportLogistics.filter((mission) => mission.status === 'accepted'),
+    [airportLogistics]
+  );
+  const airportContainerItems = useMemo(
+    () => buildPendingContainerItems(airportPendingContainers, airportsById),
+    [airportPendingContainers, airportsById]
+  );
+  const filteredAirportContainerItems = useMemo(() => {
+    const query = logisticsWeaponSearch.trim().toLowerCase();
+    if (!query) return airportContainerItems;
+    return airportContainerItems.filter((item) => {
+      const weaponName = getWeaponDisplayName(item.weaponId || '').toLowerCase();
+      return weaponName.includes(query);
+    });
+  }, [airportContainerItems, logisticsWeaponSearch]);
+  const containerById = useMemo(
+    () => new Map(airportContainerItems.map((item) => [item.id, item])),
+    [airportContainerItems]
+  );
+  const selectedContainers = useMemo(
+    () => selectedContainerIds.map((id) => containerById.get(id)).filter(Boolean),
+    [selectedContainerIds, containerById]
+  );
+  const selectedContainersIsoTotal = useMemo(
+    () => selectedContainers.reduce((sum, item) => sum + (Number(item.units) || 0), 0),
+    [selectedContainers]
+  );
+  const selectedLargeContainerCount = useMemo(
+    () => selectedContainers.reduce((sum, item) => sum + (Number(item.units) >= 1 ? 1 : 0), 0),
+    [selectedContainers]
+  );
+  const selectedSourceAirportId = selectedContainers[0]?.sourceAirportId || null;
+  const canComposeSelectedMission = selectedContainerIds.length > 0
+    && selectedContainersIsoTotal <= 2.5 + 1e-6
+    && selectedLargeContainerCount <= 2;
 
   const selectedAirport = selectedAirportId ? airportsById.get(selectedAirportId) : null;
   const dcsarPointsWithNearest = useMemo(() => {
@@ -3120,8 +3234,16 @@ export default function FrontlineMap({ airportsData }) {
     if (!filters.showLogistics) {
       setSelectedAirportId(null);
       setSelectedLogisticsMission(null);
+      setSelectedContainerIds([]);
+      setShowLogisticsComposeWindow(false);
     }
   }, [filters.showLogistics]);
+
+  useEffect(() => {
+    setSelectedContainerIds([]);
+    setShowLogisticsComposeWindow(false);
+    setLogisticsWeaponSearch('');
+  }, [selectedAirportId]);
 
   useEffect(() => {
     if (!filters.showAto) {
@@ -3150,6 +3272,93 @@ export default function FrontlineMap({ airportsData }) {
     const next = logisticsMissions.find((mission) => mission.id === selectedLogisticsMission.id) || null;
     setSelectedLogisticsMission(next);
   }, [logisticsMissions, selectedLogisticsMission?.id]);
+
+  useEffect(() => {
+    if (selectedContainerIds.length === 0) return;
+    const valid = selectedContainerIds.filter((id) => containerById.has(id));
+    if (valid.length !== selectedContainerIds.length) {
+      setSelectedContainerIds(valid);
+    }
+  }, [selectedContainerIds, containerById]);
+
+  const evaluateContainerSelection = useCallback((containerItem) => {
+    const containerId = containerItem?.id;
+    if (!containerId) {
+      return { selected: false, disabled: true, reason: 'Invalid mission' };
+    }
+
+    const selected = selectedContainerIds.includes(containerId);
+    if (selected) {
+      return { selected: true, disabled: false, reason: '' };
+    }
+
+    if (selectedSourceAirportId && containerItem.sourceAirportId !== selectedSourceAirportId) {
+      return { selected: false, disabled: true, reason: 'Source airport locked by first selection' };
+    }
+
+    const isoUnits = Number(containerItem.units) || 0;
+    const nextIso = selectedContainersIsoTotal + isoUnits;
+    if (nextIso > 2.5 + 1e-6) {
+      return { selected: false, disabled: true, reason: 'ISO total would exceed 2.5' };
+    }
+
+    const nextLargeCount = selectedLargeContainerCount + (isoUnits >= 1 ? 1 : 0);
+    if (nextLargeCount > 2) {
+      return { selected: false, disabled: true, reason: 'Cannot exceed 2 large containers' };
+    }
+
+    return { selected: false, disabled: false, reason: '' };
+  }, [selectedContainerIds, selectedContainersIsoTotal, selectedLargeContainerCount, selectedSourceAirportId]);
+
+  const handleToggleContainerMission = useCallback((containerItem) => {
+    const containerId = containerItem?.id;
+    if (!containerId) return;
+
+    setSelectedContainerIds((current) => {
+      if (current.includes(containerId)) {
+        return current.filter((id) => id !== containerId);
+      }
+
+      const state = evaluateContainerSelection(containerItem);
+      if (state.disabled) return current;
+      return [...current, containerId];
+    });
+  }, [evaluateContainerSelection]);
+
+  const handleComposeLogisticsMission = useCallback(async () => {
+    if (!selectedAirportId || selectedContainerIds.length === 0) return;
+    if (!canComposeSelectedMission) return;
+
+    if (!user) {
+      window.location.href = '/api/auth/discord';
+      return;
+    }
+
+    setComposingMission(true);
+    try {
+      const composePayload = selectedContainers.map((container) => ({
+        missionId: container.missionId,
+        orderIndex: container.orderIndex,
+        units: container.units,
+      }));
+      const payload = await composeAirportLogisticsMission(selectedAirportId, composePayload);
+      const latest = await getMissions();
+      if (Array.isArray(latest)) {
+        setLogisticsMissions(latest);
+        if (payload?.missionId) {
+          const composedMission = latest.find((mission) => mission.id === payload.missionId) || null;
+          setSelectedLogisticsMission(composedMission);
+        }
+      }
+      setSelectedContainerIds([]);
+      setShowLogisticsComposeWindow(false);
+    } catch (error) {
+      console.error('Failed to compose logistics mission:', error);
+      alert(`Failed to compose logistics mission: ${error.message}`);
+    } finally {
+      setComposingMission(false);
+    }
+  }, [canComposeSelectedMission, selectedAirportId, selectedContainerIds, selectedContainers, user]);
 
   const handleAcceptLogisticsMission = async (mission) => {
     if (!mission || mission.status !== 'pending') return;
@@ -3714,75 +3923,255 @@ export default function FrontlineMap({ airportsData }) {
                       No logistics tasks for this airport.
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      {airportLogistics.map((mission) => {
-                        const sourceAirport = airportsById.get(mission.source_airport_id);
-                        const orders = getMissionOrders(mission);
-                        return (
-                          <div key={mission.id} className="rounded-lg border border-yt-border bg-yt-bg-tertiary/60 p-2">
-                            <div className="mb-1 text-xs font-semibold text-yt-text-primary">
-                              From: {sourceAirport?.displayName || sourceAirport?.name || mission.source_airport_id}
-                            </div>
-                            <div className="mb-2 flex items-center justify-between gap-2">
-                              <div className="text-[11px] text-yt-text-secondary">
-                                Mission {mission.id}
-                              </div>
-                              <span className={`rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${
-                                mission.status === 'accepted'
-                                  ? 'bg-blue-500/20 text-blue-300'
-                                  : 'bg-yellow-500/20 text-yellow-300'
-                              }`}>
-                                {mission.status}
-                              </span>
-                            </div>
-                            {mission.status === 'accepted' && mission.accepted_by && (
-                              <div className="mb-2 text-[10px] text-blue-200">
-                                Accepted by {mission.accepted_by}
-                              </div>
-                            )}
-                            {mission.status === 'pending' && (
-                              <div className="mb-2 text-[10px] text-yellow-200">
-                                Available for assignment
-                              </div>
-                            )}
-                            <div className="space-y-1.5">
-                              {orders.map((order, index) => {
-                                const containerCount = getOrderContainers(order);
-                                const totalWeight = Number(order.total_weight_lbs || 0);
-                                const weightPerContainer = containerCount > 0 ? (totalWeight / containerCount) : totalWeight;
-                                const priority = getPriorityText(order.priority || mission.priority);
-                                return (
-                                  <div key={`${mission.id}-${order.weapon_id || index}`} className="rounded border border-yt-border/70 bg-[#0c1320] px-2 py-1.5">
-                                    <div className="text-[11px] font-semibold text-yt-text-primary">
-                                      {containerCount} container{containerCount > 1 ? 's' : ''} - {getWeaponDisplayName(order.weapon_id || 'cargo')}
-                                    </div>
-                                    <div className="text-[10px] text-yt-text-secondary">
-                                      Content: Qty {Number(order.quantity_needed || 0)}
-                                    </div>
-                                    <div className="text-[10px] text-yt-text-secondary">
-                                      Weight/container: {weightPerContainer > 0 ? `${weightPerContainer.toFixed(1)} lbs` : '-'}
-                                    </div>
-                                    <div className="text-[10px] text-yt-text-secondary">
-                                      Priority: {priority}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                            <div className="mt-2 border-t border-yt-border/70 pt-1.5">
-                              <button
-                                type="button"
-                                onClick={() => setSelectedLogisticsMission(mission)}
-                                className="inline-flex items-center gap-2 text-xs font-semibold text-[#4ca3ff] transition-colors hover:text-[#7cbcff]"
-                              >
-                                View Details
-                              </button>
-                            </div>
+                    <div className="space-y-3">
+                      <div className="rounded-lg border border-yt-border bg-[#0c1320] p-2.5">
+                        <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">
+                          Requested Containers
+                        </div>
+                        <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px]">
+                          <span className="rounded border border-yt-border/80 bg-[#121c2d] px-2 py-0.5 text-yt-text-secondary">
+                            Selected: <span className="font-semibold text-yt-text-primary">{selectedContainerIds.length}</span>
+                          </span>
+                          <span className="rounded border border-yt-border/80 bg-[#121c2d] px-2 py-0.5 text-yt-text-secondary">
+                            ISO: <span className="font-semibold text-yt-text-primary">{formatIsoUnits(selectedContainersIsoTotal)}</span>/2.5
+                          </span>
+                          <span className="rounded border border-yt-border/80 bg-[#121c2d] px-2 py-0.5 text-yt-text-secondary">
+                            Large: <span className="font-semibold text-yt-text-primary">{selectedLargeContainerCount}</span>/2
+                          </span>
+                        </div>
+
+                        <div className="rounded border border-yt-border/70 bg-[#101b2c] px-2 py-2 text-[11px] text-yt-text-secondary">
+                          Pending containers: <span className="font-semibold text-yt-text-primary">{airportContainerItems.length}</span>
+                        </div>
+
+                        <div className="mt-2 flex items-center gap-2 border-t border-yt-border/70 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowLogisticsComposeWindow(true)}
+                            disabled={airportContainerItems.length === 0}
+                            className="rounded border border-yt-border px-2.5 py-1.5 text-xs font-semibold text-yt-text-primary hover:bg-yt-bg-tertiary/50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            Open Container Window
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleComposeLogisticsMission}
+                            disabled={!canComposeSelectedMission || composingMission}
+                            className="rounded border border-green-500/50 bg-green-500/15 px-2.5 py-1.5 text-xs font-semibold text-green-300 hover:bg-green-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {composingMission ? 'Creating...' : 'Create Mission'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {airportAssignedLogistics.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">
+                            Assigned Missions
                           </div>
-                        );
-                      })}
+                          {airportAssignedLogistics.map((mission) => {
+                            const sourceAirport = airportsById.get(mission.source_airport_id);
+                            const orders = getMissionOrders(mission);
+                            return (
+                              <div key={mission.id} className="rounded-lg border border-yt-border bg-yt-bg-tertiary/60 p-2">
+                                <div className="mb-1 text-xs font-semibold text-yt-text-primary">
+                                  From: {sourceAirport?.displayName || sourceAirport?.name || mission.source_airport_id}
+                                </div>
+                                <div className="mb-2 flex items-center justify-between gap-2">
+                                  <div className="text-[11px] text-yt-text-secondary">
+                                    Mission {mission.id}
+                                  </div>
+                                  <span className="rounded bg-blue-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-blue-300">
+                                    {mission.status}
+                                  </span>
+                                </div>
+                                {mission.accepted_by && (
+                                  <div className="mb-2 text-[10px] text-blue-200">
+                                    Accepted by {mission.accepted_by}
+                                  </div>
+                                )}
+                                <div className="space-y-1.5">
+                                  {orders.map((order, index) => {
+                                    const containerCount = getOrderContainers(order);
+                                    const totalWeight = Number(order.total_weight_lbs || 0);
+                                    const weightPerContainer = containerCount > 0 ? (totalWeight / containerCount) : totalWeight;
+                                    const priority = getPriorityText(order.priority || mission.priority);
+                                    return (
+                                      <div key={`${mission.id}-${order.weapon_id || index}`} className="rounded border border-yt-border/70 bg-[#0c1320] px-2 py-1.5">
+                                        <div className="text-[11px] font-semibold text-yt-text-primary">
+                                          {containerCount} container{containerCount > 1 ? 's' : ''} - {getWeaponDisplayName(order.weapon_id || 'cargo')}
+                                        </div>
+                                        <div className="text-[10px] text-yt-text-secondary">
+                                          Content: Qty {Number(order.quantity_needed || 0)}
+                                        </div>
+                                        <div className="text-[10px] text-yt-text-secondary">
+                                          Weight/container: {weightPerContainer > 0 ? `${weightPerContainer.toFixed(1)} lbs` : '-'}
+                                        </div>
+                                        <div className="text-[10px] text-yt-text-secondary">
+                                          Priority: {priority}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                <div className="mt-2 border-t border-yt-border/70 pt-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedLogisticsMission(mission)}
+                                    className="inline-flex items-center gap-2 text-xs font-semibold text-[#4ca3ff] transition-colors hover:text-[#7cbcff]"
+                                  >
+                                    View Details
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
+                </div>
+              )}
+
+              {filters.showLogistics && selectedAirport && showLogisticsComposeWindow && (
+                <div className="fixed inset-0 z-[1200] flex items-center justify-center">
+                  <button
+                    type="button"
+                    className="absolute inset-0 bg-black/70"
+                    onClick={() => setShowLogisticsComposeWindow(false)}
+                    aria-label="Close logistics compose window"
+                  />
+                  <div className="relative w-[min(980px,94vw)] max-h-[86vh] overflow-y-auto rounded-2xl border border-yt-border bg-[#0f1727] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-yt-text-primary">
+                          Container Selection
+                        </div>
+                        <div className="text-xs text-yt-text-secondary">
+                          {selectedAirport.displayName || selectedAirport.name}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleComposeLogisticsMission}
+                          disabled={!canComposeSelectedMission || composingMission}
+                          className="rounded border border-green-500/50 bg-green-500/15 px-2.5 py-1.5 text-xs font-semibold text-green-300 hover:bg-green-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {composingMission ? 'Creating...' : 'Create Mission'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowLogisticsComposeWindow(false)}
+                          className="rounded border border-yt-border px-2 py-1 text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px]">
+                      <span className="rounded border border-yt-border/80 bg-[#121c2d] px-2 py-0.5 text-yt-text-secondary">
+                        Selected: <span className="font-semibold text-yt-text-primary">{selectedContainerIds.length}</span>
+                      </span>
+                      <span className="rounded border border-yt-border/80 bg-[#121c2d] px-2 py-0.5 text-yt-text-secondary">
+                        ISO: <span className="font-semibold text-yt-text-primary">{formatIsoUnits(selectedContainersIsoTotal)}</span>/2.5
+                      </span>
+                      <span className="rounded border border-yt-border/80 bg-[#121c2d] px-2 py-0.5 text-yt-text-secondary">
+                        Large: <span className="font-semibold text-yt-text-primary">{selectedLargeContainerCount}</span>/2
+                      </span>
+                      {selectedSourceAirportId && (
+                        <span className="rounded border border-yt-border/80 bg-[#121c2d] px-2 py-0.5 text-yt-text-secondary">
+                          Source lock: <span className="font-semibold text-yt-text-primary">{airportsById.get(selectedSourceAirportId)?.displayName || selectedSourceAirportId}</span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="mb-3">
+                      <input
+                        type="text"
+                        value={logisticsWeaponSearch}
+                        onChange={(event) => setLogisticsWeaponSearch(event.target.value)}
+                        placeholder="Search weapon..."
+                        className="w-full rounded border border-yt-border bg-[#0c1320] px-2.5 py-1.5 text-xs text-yt-text-primary outline-none placeholder:text-yt-text-secondary focus:border-yt-accent/60"
+                      />
+                    </div>
+
+                    {filteredAirportContainerItems.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-yt-border px-3 py-3 text-xs text-yt-text-secondary">
+                        {airportContainerItems.length === 0 ? 'No pending containers for this airport.' : 'No containers match this weapon search.'}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {filteredAirportContainerItems.map((containerItem) => {
+                          const isoUnits = Number(containerItem.units) || 0;
+                          const typeLabel = getIsoContainerTypeLabel(isoUnits);
+                          const selectionState = evaluateContainerSelection(containerItem);
+                          const dimmed = selectionState.disabled && !selectionState.selected;
+
+                          return (
+                            <div
+                              key={`pending-container-${containerItem.id}`}
+                              className={`rounded-lg border p-2 transition ${
+                                selectionState.selected
+                                  ? 'border-sky-400 bg-sky-500/12'
+                                  : dimmed
+                                    ? 'border-yt-border/40 bg-yt-bg-tertiary/25 opacity-45'
+                                    : 'border-yt-border bg-yt-bg-tertiary/60'
+                              }`}
+                            >
+                              <div className="mb-2 flex items-start justify-between gap-2">
+                                <div>
+                                  <div className="text-xs font-semibold text-yt-text-primary">
+                                    {typeLabel} - {formatIsoUnits(isoUnits)} ISO
+                                  </div>
+                                  <div className="text-[11px] text-yt-text-secondary">
+                                    From: {containerItem.sourceAirportName}
+                                  </div>
+                                  <div className="text-[10px] text-yt-text-secondary">
+                                    Mission: {containerItem.missionId}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleContainerMission(containerItem)}
+                                  disabled={selectionState.disabled && !selectionState.selected}
+                                  title={selectionState.reason || ''}
+                                  className={`rounded border px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                                    selectionState.selected
+                                      ? 'border-sky-400 bg-sky-500/20 text-sky-200'
+                                      : 'border-yt-border bg-[#101b2c] text-yt-text-secondary hover:text-yt-text-primary disabled:cursor-not-allowed disabled:opacity-60'
+                                  }`}
+                                >
+                                  {selectionState.selected ? 'Selected' : 'Select'}
+                                </button>
+                              </div>
+
+                              {selectionState.reason && !selectionState.selected && (
+                                <div className="mb-2 text-[10px] text-amber-300">
+                                  {selectionState.reason}
+                                </div>
+                              )}
+
+                              <div className="rounded border border-yt-border/70 bg-[#0c1320] px-2 py-1.5">
+                                <div className="text-[11px] font-semibold text-yt-text-primary">
+                                  1 container - {getWeaponDisplayName(containerItem.weaponId || 'cargo')}
+                                </div>
+                                <div className="text-[10px] text-yt-text-secondary">
+                                  Content: Qty {Number(containerItem.quantityNeeded || 0)}
+                                </div>
+                                <div className="text-[10px] text-yt-text-secondary">
+                                  Weight/container: {containerItem.totalWeightLbs > 0 ? `${containerItem.totalWeightLbs.toFixed(1)} lbs` : '-'}
+                                </div>
+                                <div className="text-[10px] text-yt-text-secondary">
+                                  Priority: {containerItem.priority}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
