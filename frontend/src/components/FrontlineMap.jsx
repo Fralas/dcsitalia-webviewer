@@ -957,12 +957,9 @@ function FlatMapView({
                 weight: mission.status === 'accepted' ? 3 : 2,
                 opacity: 0.85,
                 dashArray: mission.status === 'pending' ? '8,6' : undefined,
+                interactive: false,
               }}
-            >
-              <Tooltip direction="center" opacity={0.9}>
-                {(sourceAirport.displayName || sourceAirport.name)} {' -> '} {(destinationAirport.displayName || destinationAirport.name)}
-              </Tooltip>
-            </Polyline>
+            />
           );
         })}
 
@@ -1200,7 +1197,7 @@ function MapLibreFlatMapView({
   basemapMode,
   focusTargetKey,
 }) {
-  const MIN_PITCH = 28;
+  const MIN_PITCH = 0;
   const MAX_PITCH = 85;
   const ZONE_DOME_RADIUS_METERS = 3000;
   const LOGISTICS_ROUTE_RADIUS_METERS = 120;
@@ -1742,7 +1739,7 @@ function MapLibreFlatMapView({
       zoom: initialCamera ? initialCamera.zoom : 7,
       minZoom: MIN_SAFE_ZOOM,
       maxZoom: MAX_SAFE_ZOOM,
-      pitch: initialCamera ? initialCamera.pitch : 66,
+      pitch: initialCamera ? initialCamera.pitch : 0,
       bearing: initialCamera ? initialCamera.bearing : 0,
       minPitch: MIN_PITCH,
       maxPitch: MAX_PITCH,
@@ -2065,22 +2062,12 @@ function MapLibreFlatMapView({
         hideHoverPopup();
       });
 
-      map.on('mousemove', 'logistics-hit-pending', (event) => {
-        const feature = event?.features?.[0];
-        const src = feature?.properties?.source_name || '-';
-        const dst = feature?.properties?.destination_name || '-';
-        const status = feature?.properties?.status || 'pending';
-        showHoverPopup(event.lngLat, `<div style="font-size:11px;"><div style="font-weight:600;">${src} -> ${dst}</div><div>Status: ${status}</div></div>`);
+      map.on('mousemove', 'logistics-hit-pending', () => {
+        map.getCanvas().style.cursor = '';
       });
-      map.on('mousemove', 'logistics-hit-accepted', (event) => {
-        const feature = event?.features?.[0];
-        const src = feature?.properties?.source_name || '-';
-        const dst = feature?.properties?.destination_name || '-';
-        const status = feature?.properties?.status || 'accepted';
-        showHoverPopup(event.lngLat, `<div style="font-size:11px;"><div style="font-weight:600;">${src} -> ${dst}</div><div>Status: ${status}</div></div>`);
+      map.on('mousemove', 'logistics-hit-accepted', () => {
+        map.getCanvas().style.cursor = '';
       });
-      map.on('mouseleave', 'logistics-hit-pending', hideHoverPopup);
-      map.on('mouseleave', 'logistics-hit-accepted', hideHoverPopup);
 
       map.on('mousemove', 'convoy-points-layer', (event) => {
         const feature = event?.features?.[0];
