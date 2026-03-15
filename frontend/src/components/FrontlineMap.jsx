@@ -422,87 +422,81 @@ function createDcsarIcon(color = '#f8fafc') {
   });
 }
 
-function createDcsarMapLibreIconDataUrl(color = '#f8fafc') {
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
-      <g fill="none" stroke="${color}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="14" cy="5.5" r="2.2" />
-        <path d="M14 8.8v7.2" />
-        <path d="M9.8 13.5l4.2-2.1 4.2 2.1" />
-        <path d="M11.3 26l2.1-7.3" />
-        <path d="M16.7 26l-2.1-7.3" />
-      </g>
-    </svg>
-  `.trim();
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-}
-
-function ensureDcsarMarkerStyles() {
+function ensureDcsarDomPulseStyles() {
   if (typeof document === 'undefined') return;
-  if (document.getElementById('dcsar-marker-anim-style')) return;
-  const style = document.createElement('style');
-  style.id = 'dcsar-marker-anim-style';
+  let style = document.getElementById('dcsar-dom-pulse-style');
+  if (!style) {
+    style = document.createElement('style');
+    style.id = 'dcsar-dom-pulse-style';
+    document.head.appendChild(style);
+  }
   style.textContent = `
-    @keyframes dcsarPulseA {
-      0% { transform: scale(0.45); opacity: 0.78; }
-      75% { transform: scale(1.75); opacity: 0.10; }
-      100% { transform: scale(2.05); opacity: 0; }
-    }
-    @keyframes dcsarPulseB {
-      0% { transform: scale(0.55); opacity: 0.58; }
-      75% { transform: scale(1.5); opacity: 0.08; }
-      100% { transform: scale(1.85); opacity: 0; }
+    @keyframes dcsarRingPulse {
+      0% { transform: translate(-50%, -50%) scale(0.12); opacity: 0.9; }
+      15% { transform: translate(-50%, -50%) scale(0.45); opacity: 0.82; }
+      60% { transform: translate(-50%, -50%) scale(2.6); opacity: 0.34; }
+      82% { transform: translate(-50%, -50%) scale(3.05); opacity: 0.12; }
+      100% { transform: translate(-50%, -50%) scale(3.35); opacity: 0; }
     }
   `;
-  document.head.appendChild(style);
 }
 
-function createMapLibreDcsarMarkerElement(isAccepted) {
+function createMapLibreDcsarDomMarker(isAccepted) {
   const color = isAccepted ? '#22c55e' : '#f8fafc';
-  const wrapper = document.createElement('div');
-  wrapper.style.position = 'relative';
-  wrapper.style.width = '52px';
-  wrapper.style.height = '52px';
-  wrapper.style.cursor = 'pointer';
-  wrapper.style.display = 'flex';
-  wrapper.style.alignItems = 'center';
-  wrapper.style.justifyContent = 'center';
 
-  const pulseA = document.createElement('span');
-  pulseA.style.position = 'absolute';
-  pulseA.style.inset = '0';
-  pulseA.style.borderRadius = '9999px';
-  pulseA.style.border = `2px solid ${color}`;
-  pulseA.style.background = `${color}2e`;
-  pulseA.style.transformOrigin = 'center center';
-  pulseA.style.animation = 'dcsarPulseA 2.4s ease-out infinite';
-  pulseA.style.pointerEvents = 'none';
-  wrapper.appendChild(pulseA);
+  const root = document.createElement('div');
+  root.style.position = 'relative';
+  root.style.width = '110px';
+  root.style.height = '110px';
+  root.style.pointerEvents = 'auto';
+  root.style.cursor = 'pointer';
 
-  const pulseB = document.createElement('span');
-  pulseB.style.position = 'absolute';
-  pulseB.style.inset = '4px';
-  pulseB.style.borderRadius = '9999px';
-  pulseB.style.border = `1.6px solid ${color}`;
-  pulseB.style.background = `${color}1f`;
-  pulseB.style.transformOrigin = 'center center';
-  pulseB.style.animation = 'dcsarPulseB 2.4s ease-out infinite';
-  pulseB.style.animationDelay = '1.2s';
-  pulseB.style.pointerEvents = 'none';
-  wrapper.appendChild(pulseB);
+  const ring = document.createElement('div');
+  ring.style.position = 'absolute';
+  ring.style.left = '50%';
+  ring.style.top = '50%';
+  ring.style.width = '78px';
+  ring.style.height = '78px';
+  ring.style.borderRadius = '9999px';
+  ring.style.border = `3px solid ${color}`;
+  ring.style.boxShadow = `0 0 10px ${color}66`;
+  ring.style.transform = 'translate(-50%, -50%)';
+  ring.style.transformOrigin = 'center center';
+  ring.style.willChange = 'transform, opacity';
+  if (typeof ring.animate === 'function') {
+    ring.animate(
+      [
+        { transform: 'translate(-50%, -50%) scale(0.15)', opacity: 0.95 },
+        { transform: 'translate(-50%, -50%) scale(0.55)', opacity: 0.86, offset: 0.15 },
+        { transform: 'translate(-50%, -50%) scale(2.8)', opacity: 0.32, offset: 0.65 },
+        { transform: 'translate(-50%, -50%) scale(3.25)', opacity: 0.1, offset: 0.85 },
+        { transform: 'translate(-50%, -50%) scale(3.5)', opacity: 0 },
+      ],
+      {
+        duration: 7000,
+        iterations: Infinity,
+        easing: 'ease-out',
+      }
+    );
+  } else {
+    ring.style.animation = 'dcsarRingPulse 7s ease-out infinite';
+  }
+  ring.style.pointerEvents = 'none';
+  root.appendChild(ring);
 
-  const icon = document.createElement('div');
-  icon.style.position = 'relative';
-  icon.style.zIndex = '2';
-  icon.style.width = '24px';
-  icon.style.height = '24px';
-  icon.style.borderRadius = '9999px';
-  icon.style.background = '#0f1727cc';
-  icon.style.display = 'flex';
-  icon.style.alignItems = 'center';
-  icon.style.justifyContent = 'center';
-  icon.style.boxShadow = '0 0 10px rgba(0,0,0,0.55)';
-  icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 28 28">
+  const iconWrap = document.createElement('div');
+  iconWrap.style.position = 'absolute';
+  iconWrap.style.left = '50%';
+  iconWrap.style.top = '50%';
+  iconWrap.style.transform = 'translate(-50%, -50%)';
+  iconWrap.style.width = '28px';
+  iconWrap.style.height = '28px';
+  iconWrap.style.display = 'flex';
+  iconWrap.style.alignItems = 'center';
+  iconWrap.style.justifyContent = 'center';
+  iconWrap.style.filter = 'drop-shadow(0 0 4px rgba(0,0,0,0.75))';
+  iconWrap.style.pointerEvents = 'none';
+  iconWrap.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 28 28">
     <g fill="none" stroke="${color}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="14" cy="5.5" r="2.2" />
       <path d="M14 8.8v7.2" />
@@ -511,9 +505,9 @@ function createMapLibreDcsarMarkerElement(isAccepted) {
       <path d="M16.7 26l-2.1-7.3" />
     </g>
   </svg>`;
-  wrapper.appendChild(icon);
+  root.appendChild(iconWrap);
 
-  return wrapper;
+  return root;
 }
 
 function getItemQuantity(item) {
@@ -1233,14 +1227,6 @@ function MapLibreFlatMapView({
       features: !showDcsar ? [] : (dcsarPoints || []).flatMap((point) => {
         if (!Number.isFinite(point?.lat) || !Number.isFinite(point?.lon)) return [];
         const accepted = point.accepted ? 1 : 0;
-        const pulseCycleMs = 1450;
-        const offset = hashString(point.id || 'dcsar') % pulseCycleMs;
-        const phase = ((animationTick + offset) % pulseCycleMs) / pulseCycleMs;
-        const phase2 = (phase + 0.5) % 1;
-        const pulseRadius = 10 + phase * 24;
-        const pulseOpacity = (1 - phase) * (accepted ? 0.7 : 0.85);
-        const pulseRadius2 = 10 + phase2 * 20;
-        const pulseOpacity2 = (1 - phase2) * (accepted ? 0.55 : 0.7);
 
         dcsarByIdRef.current.set(String(point.id || ''), point);
 
@@ -1253,15 +1239,11 @@ function MapLibreFlatMapView({
           properties: {
             id: point.id || '',
             accepted,
-            pulse_radius: pulseRadius,
-            pulse_opacity: pulseOpacity,
-            pulse_radius_2: pulseRadius2,
-            pulse_opacity_2: pulseOpacity2,
           },
         }];
       }),
     };
-  }, [dcsarPoints, showDcsar, animationTick]);
+  }, [dcsarPoints, showDcsar]);
 
   const fcZones = useMemo(() => ({
     type: 'FeatureCollection',
@@ -1342,7 +1324,7 @@ function MapLibreFlatMapView({
     });
 
     map.on('load', () => {
-      ensureDcsarMarkerStyles();
+      ensureDcsarDomPulseStyles();
       popupRef.current = new maplibregl.Popup({
         closeButton: false,
         closeOnClick: false,
@@ -1454,6 +1436,7 @@ function MapLibreFlatMapView({
           'line-dasharray': [2, 2],
         },
       });
+
 
 
       map.addLayer({
@@ -1573,6 +1556,7 @@ function MapLibreFlatMapView({
       });
       map.on('mouseleave', 'convoy-points-layer', hideHoverPopup);
 
+
       map.on('zoomend', () => {
         if (onZoomChange) onZoomChange(map.getZoom());
       });
@@ -1635,7 +1619,7 @@ function MapLibreFlatMapView({
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
 
       const isAccepted = point.status === 'accepted' || point.accepted === true;
-      const element = createMapLibreDcsarMarkerElement(isAccepted);
+      const element = createMapLibreDcsarDomMarker(isAccepted);
       const marker = new maplibregl.Marker({ element, anchor: 'center' })
         .setLngLat([lon, lat])
         .addTo(map);
