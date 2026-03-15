@@ -10,6 +10,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import c130ModelUrl from '../assets/3D/yc-130prototype_of_c-130.glb';
+import ch47ModelUrl from '../assets/3D/ch47.glb';
 import { ChevronLeft, ChevronRight, Clock3, MapPin, PersonStanding } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
@@ -1204,6 +1205,9 @@ function MapLibreFlatMapView({
   const ZONE_DOME_RADIUS_METERS = 3000;
   const LOGISTICS_ROUTE_RADIUS_METERS = 120;
   const LOGISTICS_C130_MODEL_SIZE_METERS = 110;
+  const LOGISTICS_CH47_MODEL_SIZE_METERS = 92;
+  const LOGISTICS_CH47_DISTANCE_THRESHOLD_METERS = 70000;
+  const LOGISTICS_CH47_YAW_OFFSET_RAD = THREE.MathUtils.degToRad(70) + Math.PI;
   const MIN_SAFE_ZOOM = 5;
   const MAX_SAFE_ZOOM = 11.8;
   const containerRef = useRef(null);
@@ -1218,7 +1222,8 @@ function MapLibreFlatMapView({
     geometry: null,
     domes: [],
     routes: [],
-    planeTemplate: null,
+    c130Template: null,
+    ch47Template: null,
     planeLoaderPromise: null,
   });
   const popupRef = useRef(null);
@@ -1597,7 +1602,10 @@ function MapLibreFlatMapView({
         }
 
         const distMeters = haversineNm(srcLat, srcLon, dstLat, dstLon) * 1852;
-        const arcPeakMeters = Math.max(1600, Math.min(9000, distMeters * 0.24));
+        const routeUsesCh47 = sourceAirport?.isCarrier === true || distMeters < LOGISTICS_CH47_DISTANCE_THRESHOLD_METERS;
+        const arcPeakMeters = routeUsesCh47
+          ? Math.max(220, Math.min(1800, distMeters * 0.07))
+          : Math.max(1600, Math.min(9000, distMeters * 0.24));
         const segments = 24;
         const points = [];
 
@@ -1635,18 +1643,24 @@ function MapLibreFlatMapView({
         routeMesh.renderOrder = 9;
         group.add(routeMesh);
 
-        if (domes3dRef.current.planeTemplate) {
-          const planeRoot = domes3dRef.current.planeTemplate.clone(true);
+        const useCh47 = routeUsesCh47;
+        const selectedTemplate = useCh47
+          ? (domes3dRef.current.ch47Template || domes3dRef.current.c130Template)
+          : (domes3dRef.current.c130Template || domes3dRef.current.ch47Template);
+
+        if (selectedTemplate) {
+          const planeRoot = selectedTemplate.clone(true);
           const seed = hashString(String(`${mission.source_airport_id}-${mission.airport_id}`));
           const t = 0.2 + ((seed % 61) / 100); // 0.20..0.80
           const pos = curve.getPointAt(t);
           const routeBearingDeg = computeBearingDeg([srcLat, srcLon], [dstLat, dstLon]);
-          const headingYaw = THREE.MathUtils.degToRad(routeBearingDeg) + Math.PI;
+          const headingYaw = THREE.MathUtils.degToRad(routeBearingDeg) + Math.PI + (useCh47 ? LOGISTICS_CH47_YAW_OFFSET_RAD : 0);
           const midMerc = maplibregl.MercatorCoordinate.fromLngLat(
             [(srcLon + dstLon) / 2, (srcLat + dstLat) / 2],
             0
           );
-          const modelScale = midMerc.meterInMercatorCoordinateUnits() * LOGISTICS_C130_MODEL_SIZE_METERS;
+          const modelSizeMeters = useCh47 ? LOGISTICS_CH47_MODEL_SIZE_METERS : LOGISTICS_C130_MODEL_SIZE_METERS;
+          const modelScale = midMerc.meterInMercatorCoordinateUnits() * modelSizeMeters;
           const routeOpacity = 0.78;
           const routeColorThree = new THREE.Color(routeColor);
 
@@ -1828,23 +1842,41 @@ function MapLibreFlatMapView({
 
           if (!domes3dRef.current.planeLoaderPromise) {
             const loader = new GLTFLoader();
-            domes3dRef.current.planeLoaderPromise = loader.loadAsync(c130ModelUrl)
-              .then((gltf) => {
-                const template = gltf?.scene;
-                if (!template) return;
-                template.traverse((child) => {
-                  if (child?.isMesh) {
-                    child.frustumCulled = false;
-                  }
-                });
-                domes3dRef.current.planeTemplate = template;
+            const prepareTemplate = (gltfScene) => {
+              const template = gltfScene?.scene;
+              if (!template) return null;
+              template.traverse((child) => {
+                if (child?.isMesh) {
+                  child.frustumCulled = false;
+                }
+              });
+              return template;
+            };
+
+            domes3dRef.current.planeLoaderPromise = Promise.allSettled([
+              loader.loadAsync(c130ModelUrl),
+              loader.loadAsync(ch47ModelUrl),
+            ])
+              .then((results) => {
+                const c130Result = results[0];
+                const ch47Result = results[1];
+                if (c130Result.status === 'fulfilled') {
+                  domes3dRef.current.c130Template = prepareTemplate(c130Result.value);
+                } else {
+                  console.error('Failed to load C130 model:', c130Result.reason);
+                }
+                if (ch47Result.status === 'fulfilled') {
+                  domes3dRef.current.ch47Template = prepareTemplate(ch47Result.value);
+                } else {
+                  console.error('Failed to load CH47 model:', ch47Result.reason);
+                }
                 rebuildThreeDomes();
                 map.triggerRepaint();
               })
               .catch((error) => {
-                console.error('Failed to load C130 model:', error);
+                console.error('Failed to load aircraft models:', error);
               });
-          } else if (domes3dRef.current.planeTemplate) {
+          } else if (domes3dRef.current.c130Template || domes3dRef.current.ch47Template) {
             rebuildThreeDomes();
             map.triggerRepaint();
           }
