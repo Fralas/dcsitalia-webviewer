@@ -2260,7 +2260,14 @@ function MapLibreFlatMapView({
       }
 
       const element = createMapLibreDcsarDomMarker(isAccepted);
-      const marker = new maplibregl.Marker({ element, anchor: 'bottom' })
+      const marker = new maplibregl.Marker({
+        element,
+        anchor: 'bottom',
+        pitchAlignment: 'map',
+        rotationAlignment: 'map',
+        opacity: '1',
+        opacityWhenCovered: '1',
+      })
         .setLngLat([lon, lat])
         .addTo(map);
 
