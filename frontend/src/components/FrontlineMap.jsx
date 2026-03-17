@@ -1264,6 +1264,9 @@ function MapLibreFlatMapView({
   const LOGISTICS_C130_MODEL_SIZE_METERS = 110;
   const LOGISTICS_CH47_MODEL_SIZE_METERS = 92;
   const LOGISTICS_CONVOY_MODEL_SIZE_METERS = 120;
+  const AIRLIFT_C130_MODEL_SIZE_METERS = 92;
+  const AIRLIFT_CH47_MODEL_SIZE_METERS = 78;
+  const AIRLIFT_MIN_CLEARANCE_METERS = 30;
   const LOGISTICS_CH47_DISTANCE_THRESHOLD_METERS = 70000;
   const LOGISTICS_CH47_YAW_OFFSET_RAD = THREE.MathUtils.degToRad(70) + Math.PI;
   const LOGISTICS_CONVOY_YAW_OFFSET_RAD = 0;
@@ -1569,6 +1572,21 @@ function MapLibreFlatMapView({
     airports: fcAirports.features.length,
   }), [fcZones.features.length, fcLogistics.features.length, fcConvoyPoints.features.length, fcAirliftPlayers.features.length, fcDcsarPoints.features.length, fcAirports.features.length]);
 
+  const disposeThreeNode = useCallback((node) => {
+    if (!node) return;
+    node.traverse?.((entry) => {
+      if (!entry?.isMesh) return;
+      if (entry.userData?.disposeGeometry && entry.geometry?.dispose) {
+        entry.geometry.dispose();
+      }
+      if (Array.isArray(entry.material)) {
+        entry.material.forEach((material) => material?.dispose && material.dispose());
+      } else if (entry.material?.dispose) {
+        entry.material.dispose();
+      }
+    });
+  }, []);
+
   const rebuildThreeDomes = useCallback(() => {
     const map = mapRef.current;
     const group = domes3dRef.current.group;
@@ -1576,17 +1594,12 @@ function MapLibreFlatMapView({
 
     while (group.children.length > 0) {
       const child = group.children.pop();
-      if (child?.geometry?.dispose && child?.userData?.disposeGeometry) {
-        child.geometry.dispose();
-      }
-      if (child?.material?.dispose) {
-        child.material.dispose();
-      }
+      disposeThreeNode(child);
     }
     domes3dRef.current.domes = [];
     domes3dRef.current.routes = [];
 
-    if (!showAto && !showLogistics && !showConvoys) {
+    if (!showAto && !showLogistics && !showConvoys && !showAirliftPlayers) {
       map.triggerRepaint();
       return;
     }
@@ -1871,8 +1884,86 @@ function MapLibreFlatMapView({
       });
     }
 
+    if (showAirliftPlayers && (domes3dRef.current.c130Template || domes3dRef.current.ch47Template)) {
+      (airliftPlayers || []).forEach((player) => {
+        const lat = Number(player?.lat);
+        const lon = Number(player?.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+        const airframe = String(player?.airframe || player?.type_name || '').toUpperCase();
+        const useCh47Template = airframe.includes('CH-47') || airframe.includes('CH47') || airframe.includes('MI-8') || airframe.includes('MI8') || airframe.includes('UH-1') || airframe.includes('UH1');
+        const template = useCh47Template
+          ? (domes3dRef.current.ch47Template || domes3dRef.current.c130Template)
+          : (domes3dRef.current.c130Template || domes3dRef.current.ch47Template);
+        if (!template) return;
+
+        const terrain = map.queryTerrainElevation([lon, lat]);
+        const terrainAltitude = Number.isFinite(terrain) ? terrain : 0;
+        const reportedAltitude = Number(player?.alt_m);
+        const altitudeMeters = Number.isFinite(reportedAltitude)
+          ? Math.max(reportedAltitude, terrainAltitude + AIRLIFT_MIN_CLEARANCE_METERS)
+          : terrainAltitude + 260;
+        const merc = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], altitudeMeters);
+        const modelRoot = template.clone(true);
+        const modelSizeMeters = useCh47Template ? AIRLIFT_CH47_MODEL_SIZE_METERS : AIRLIFT_C130_MODEL_SIZE_METERS;
+        const modelScale = merc.meterInMercatorCoordinateUnits() * modelSizeMeters;
+        const headingDeg = Number.isFinite(Number(player?.heading_deg)) ? Number(player.heading_deg) : 0;
+        const headingYaw = THREE.MathUtils.degToRad(headingDeg) + Math.PI + (useCh47Template ? LOGISTICS_CH47_YAW_OFFSET_RAD : 0);
+        const airliftColor = new THREE.Color('#22c55e');
+        const airliftOpacity = 0.52;
+
+        modelRoot.position.set(merc.x, merc.y, merc.z);
+        modelRoot.scale.set(modelScale, modelScale, modelScale);
+        const headingQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), headingYaw);
+        const baseQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0, 'XYZ'));
+        modelRoot.quaternion.copy(headingQuat).multiply(baseQuat);
+        modelRoot.renderOrder = 13;
+
+        modelRoot.traverse((child) => {
+          if (!child?.isMesh) return;
+          child.frustumCulled = false;
+          if (Array.isArray(child.material)) {
+            child.material = child.material.map((material) => {
+              if (!material) return material;
+              const nextMaterial = typeof material.clone === 'function' ? material.clone() : material;
+              nextMaterial.depthTest = true;
+              nextMaterial.depthWrite = true;
+              if (nextMaterial.color) {
+                nextMaterial.color = airliftColor.clone();
+              }
+              if (nextMaterial.emissive) {
+                nextMaterial.emissive = airliftColor.clone();
+                nextMaterial.emissiveIntensity = 0.16;
+              }
+              nextMaterial.transparent = true;
+              nextMaterial.opacity = airliftOpacity;
+              nextMaterial.needsUpdate = true;
+              return nextMaterial;
+            });
+          } else if (child.material && typeof child.material.clone === 'function') {
+            const nextMaterial = child.material.clone();
+            nextMaterial.depthTest = true;
+            nextMaterial.depthWrite = true;
+            if (nextMaterial.color) {
+              nextMaterial.color = airliftColor.clone();
+            }
+            if (nextMaterial.emissive) {
+              nextMaterial.emissive = airliftColor.clone();
+              nextMaterial.emissiveIntensity = 0.16;
+            }
+            nextMaterial.transparent = true;
+            nextMaterial.opacity = airliftOpacity;
+            nextMaterial.needsUpdate = true;
+            child.material = nextMaterial;
+          }
+        });
+
+        group.add(modelRoot);
+      });
+    }
+
     map.triggerRepaint();
-  }, [zones, showAto, selectedZoneId, showLogistics, logisticsMissions, airportsById, showConvoys, convoys]);
+  }, [zones, showAto, selectedZoneId, showLogistics, logisticsMissions, airportsById, showConvoys, convoys, showAirliftPlayers, airliftPlayers, disposeThreeNode]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -2122,18 +2213,6 @@ function MapLibreFlatMapView({
         },
       });
       map.addLayer({
-        id: 'airlift-players-layer',
-        type: 'circle',
-        source: 'airlift-players-src',
-        paint: {
-          'circle-radius': 5,
-          'circle-color': '#f59e0b',
-          'circle-stroke-color': '#f8fafc',
-          'circle-stroke-width': 1.3,
-          'circle-opacity': 0.95,
-        },
-      });
-      map.addLayer({
         id: 'airlift-players-hit-layer',
         type: 'circle',
         source: 'airlift-players-src',
@@ -2364,7 +2443,7 @@ function MapLibreFlatMapView({
       if (domes3dRef.current.group) {
         while (domes3dRef.current.group.children.length > 0) {
           const child = domes3dRef.current.group.children.pop();
-          if (child?.material?.dispose) child.material.dispose();
+          disposeThreeNode(child);
         }
       }
       if (domes3dRef.current.geometry) {
@@ -2377,7 +2456,7 @@ function MapLibreFlatMapView({
       map.remove();
       mapRef.current = null;
     };
-  }, [style, logMapDebug]);
+  }, [style, logMapDebug, disposeThreeNode]);
 
   useEffect(() => {
     const map = mapRef.current;
