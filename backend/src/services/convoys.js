@@ -139,6 +139,7 @@ export function replaceConvoys(convoys = []) {
     units_total: Number.isFinite(convoy.units_total) ? Number(convoy.units_total) : null,
     units_alive: Number.isFinite(convoy.units_alive) ? Number(convoy.units_alive) : null,
     last_position: sanitizePosition(convoy.last_position),
+    position_at: Number.isFinite(Number(convoy.position_at)) ? Number(convoy.position_at) : null,
     path: Array.isArray(convoy.path) ? convoy.path.map((p) => sanitizePosition(p)).filter(Boolean) : [],
     history: Array.isArray(convoy.history) ? convoy.history : [],
     last_event: sanitizeString(convoy.last_event),

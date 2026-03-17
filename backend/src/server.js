@@ -58,7 +58,7 @@ const CONVOY_API_TOKEN = process.env.CONVOY_API_TOKEN || '';
 const LAUNCH_TARGET_UTC_MS = Date.UTC(2026, 2, 13, 16, 0, 0);
 const CONVOY_SYNC_FILE = process.env.CONVOY_SYNC_FILE
   ? path.resolve(process.env.CONVOY_SYNC_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DMAP\\Export_Ground_Convoys.json';
+  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DRED_GROUND\\Export_Ground_Convoys.json';
 const DCSAR_SYNC_FILE = process.env.DCSAR_SYNC_FILE
   ? path.resolve(process.env.DCSAR_SYNC_FILE)
   : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DMAP\\Export_DCSAR_Positions.json';
@@ -268,10 +268,45 @@ function buildMissionSummary(mission) {
 }
 
 function normalizeConvoyEntry(entry) {
+  const normalizeEpochMs = (value) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return null;
+    return n < 1e12 ? Math.round(n * 1000) : Math.round(n);
+  };
+
+  const toPosition = (latValue, lonValue) => {
+    const lat = Number(latValue);
+    const lon = Number(lonValue);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    return { lat, lon };
+  };
+  const parsePosition = (rawPos, latField, lonField) => {
+    const objPos = (rawPos && typeof rawPos === 'object')
+      ? toPosition(rawPos.lat, rawPos.lon)
+      : null;
+    if (objPos) return objPos;
+    return toPosition(latField, lonField);
+  };
+
   const lastEvent = String(entry?.last_event || '').trim().toLowerCase();
   let status = String(entry?.status || 'active').trim().toLowerCase();
   if (lastEvent === 'arrived') status = 'arrived';
   if (lastEvent === 'destroyed') status = 'destroyed';
+
+  const eventAt = normalizeEpochMs(entry?.event_at) ?? Date.now();
+  const positionAt = normalizeEpochMs(entry?.position_at);
+  const lastPosition = toPosition(entry?.position_lat, entry?.position_lon);
+  const originPosition = parsePosition(
+    entry?.origin_position,
+    entry?.origin_position_lat ?? entry?.origin_lat,
+    entry?.origin_position_lon ?? entry?.origin_lon
+  );
+  const destinationPosition = parsePosition(
+    entry?.destination_position,
+    entry?.destination_position_lat ?? entry?.destination_lat,
+    entry?.destination_position_lon ?? entry?.destination_lon
+  );
+  const lastUpdate = positionAt ?? eventAt;
 
   return {
     convoy_id: String(entry?.convoy_id || '').trim(),
@@ -279,9 +314,13 @@ function normalizeConvoyEntry(entry) {
     destination_zone: String(entry?.destination_zone || '').trim() || null,
     status,
     last_event: lastEvent,
-    event_at: Number.isFinite(Number(entry?.event_at)) ? Number(entry.event_at) : Date.now(),
+    event_at: eventAt,
     feed_message: String(entry?.feed_message || '').trim(),
-    last_update: Number.isFinite(Number(entry?.event_at)) ? Number(entry.event_at) : Date.now(),
+    origin_position: originPosition,
+    destination_position: destinationPosition,
+    last_position: lastPosition,
+    position_at: positionAt,
+    last_update: lastUpdate,
   };
 }
 

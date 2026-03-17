@@ -6,13 +6,9 @@
       "lat": 34.896686,
       "lon": 35.901641
     },
-    "status": "RED",
-    "isActive": true,
-    "tasks": [
-      "SEAD",
-      "DEAD",
-      "CAS"
-    ]
+    "status": "BLUE",
+    "isActive": false,
+    "tasks": []
   },
   {
     "id": "zone_01",
@@ -21,13 +17,9 @@
       "lat": 34.894043,
       "lon": 36.130745
     },
-    "status": "RED",
-    "isActive": true,
-    "tasks": [
-      "SEAD",
-      "DEAD",
-      "CAS"
-    ]
+    "status": "BLUE",
+    "isActive": false,
+    "tasks": []
   },
   {
     "id": "zone_02",
@@ -36,13 +28,9 @@
       "lat": 34.936889,
       "lon": 36.459928
     },
-    "status": "RED",
-    "isActive": true,
-    "tasks": [
-      "SEAD",
-      "DEAD",
-      "CAS"
-    ]
+    "status": "BLUE",
+    "isActive": false,
+    "tasks": []
   },
   {
     "id": "zone_03",
@@ -51,13 +39,9 @@
       "lat": 35.122655,
       "lon": 36.722176
     },
-    "status": "RED",
-    "isActive": true,
-    "tasks": [
-      "SEAD",
-      "DEAD",
-      "CAS"
-    ]
+    "status": "BLUE",
+    "isActive": false,
+    "tasks": []
   },
   {
     "id": "zone_04",
@@ -66,13 +50,9 @@
       "lat": 34.94038,
       "lon": 37.107138
     },
-    "status": "RED",
-    "isActive": true,
-    "tasks": [
-      "SEAD",
-      "DEAD",
-      "CAS"
-    ]
+    "status": "BLUE",
+    "isActive": false,
+    "tasks": []
   },
   {
     "id": "zone_05",
@@ -81,13 +61,9 @@
       "lat": 35.028352,
       "lon": 37.444683
     },
-    "status": "RED",
-    "isActive": true,
-    "tasks": [
-      "SEAD",
-      "DEAD",
-      "CAS"
-    ]
+    "status": "BLUE",
+    "isActive": false,
+    "tasks": []
   },
   {
     "id": "zone_06",
@@ -96,9 +72,13 @@
       "lat": 35.125372,
       "lon": 38.050561
     },
-    "status": "BLUE",
-    "isActive": false,
-    "tasks": []
+    "status": "RED",
+    "isActive": true,
+    "tasks": [
+      "SEAD",
+      "DEAD",
+      "CAS"
+    ]
   },
   {
     "id": "zone_07",
@@ -152,9 +132,13 @@
       "lat": 34.58933,
       "lon": 36.022315
     },
-    "status": "RED",
-    "isActive": false,
-    "tasks": []
+    "status": "UNDER_ATTACK",
+    "isActive": true,
+    "tasks": [
+      "SEAD",
+      "DEAD",
+      "CAS"
+    ]
   },
   {
     "id": "zone_11",
@@ -163,7 +147,7 @@
       "lat": 34.66963,
       "lon": 36.300883
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -171,10 +155,10 @@
     "id": "zone_12",
     "name": "Zone 12",
     "coordinates": {
-      "lat": 34.568682,
-      "lon": 36.563393
+      "lat": 34.568658,
+      "lon": 36.564104
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -185,7 +169,7 @@
       "lat": 34.724905,
       "lon": 36.714429
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -197,8 +181,10 @@
       "lon": 37.184016
     },
     "status": "RED",
-    "isActive": false,
-    "tasks": []
+    "isActive": true,
+    "tasks": [
+      "CAS"
+    ]
   },
   {
     "id": "zone_15",
@@ -208,8 +194,12 @@
       "lon": 37.633076
     },
     "status": "RED",
-    "isActive": false,
-    "tasks": []
+    "isActive": true,
+    "tasks": [
+      "SEAD",
+      "DEAD",
+      "CAS"
+    ]
   },
   {
     "id": "zone_16",
@@ -219,12 +209,8 @@
       "lon": 37.898989
     },
     "status": "RED",
-    "isActive": true,
-    "tasks": [
-      "SEAD",
-      "DEAD",
-      "CAS"
-    ]
+    "isActive": false,
+    "tasks": []
   },
   {
     "id": "zone_17",
@@ -278,8 +264,12 @@
       "lon": 36.384987
     },
     "status": "RED",
-    "isActive": false,
-    "tasks": []
+    "isActive": true,
+    "tasks": [
+      "SEAD",
+      "DEAD",
+      "CAS"
+    ]
   },
   {
     "id": "zone_22",
@@ -289,8 +279,12 @@
       "lon": 36.504514
     },
     "status": "RED",
-    "isActive": false,
-    "tasks": []
+    "isActive": true,
+    "tasks": [
+      "SEAD",
+      "DEAD",
+      "CAS"
+    ]
   },
   {
     "id": "zone_23",
@@ -300,8 +294,12 @@
       "lon": 36.914471
     },
     "status": "RED",
-    "isActive": false,
-    "tasks": []
+    "isActive": true,
+    "tasks": [
+      "SEAD",
+      "DEAD",
+      "CAS"
+    ]
   },
   {
     "id": "zone_24",
@@ -659,8 +657,8 @@
     "id": "zone_56",
     "name": "Zone 56",
     "coordinates": {
-      "lat": 33.465747,
-      "lon": 36.503406
+      "lat": 33.458231,
+      "lon": 36.495074
     },
     "status": "RED",
     "isActive": false,
@@ -802,8 +800,8 @@
     "id": "zone_69",
     "name": "Zone 69",
     "coordinates": {
-      "lat": 32.504427,
-      "lon": 37.202971
+      "lat": 32.410976,
+      "lon": 37.625113
     },
     "status": "RED",
     "isActive": false,

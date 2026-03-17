@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import createGlobe from 'cobe';
 import * as mgrs from 'mgrs';
-import { MapContainer, TileLayer, CircleMarker, Marker, Polyline, Tooltip, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Marker, Polyline, Popup, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import { divIcon } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import maplibregl from 'maplibre-gl';
@@ -966,8 +966,13 @@ function FlatMapView({
 
         {showConvoys && convoys.map((convoy) => {
           const style = getConvoyStyle(convoy.status);
+          const markerPosition = convoy.movingPosition || convoy.lastPosition || null;
+          const hasRoute = Array.isArray(convoy.routeLine) && convoy.routeLine.length >= 2;
+          if (!markerPosition && !hasRoute) return null;
+          const lastUpdateText = convoy.lastUpdateTs ? formatRelativeTime(convoy.lastUpdateTs) : 'unknown';
+
           const layers = [];
-          if (Array.isArray(convoy.routeLine) && convoy.routeLine.length >= 2) {
+          if (hasRoute) {
             layers.push(
               <Polyline
                 key={`convoy-route-${convoy.convoy_id}`}
@@ -983,18 +988,24 @@ function FlatMapView({
             );
           }
 
-          const markerPosition = convoy.movingPosition || convoy.lastPosition || null;
           if (markerPosition) {
             layers.push(
               <Marker
                 key={`convoy-marker-${convoy.convoy_id}`}
                 position={markerPosition}
                 icon={createConvoyMovingIcon(convoy.bearing || 0)}
-                interactive={false}
+                interactive
               >
                 <Tooltip direction="top" offset={[0, -3]} opacity={0.95}>
                   Convoy {convoy.convoy_id} ({convoy.status})
                 </Tooltip>
+                <Popup>
+                  <div className="text-xs">
+                    <div className="font-semibold">Convoy {convoy.convoy_id}</div>
+                    <div>Status: {convoy.status}</div>
+                    <div>Ultimo aggiornamento: {lastUpdateText}</div>
+                  </div>
+                </Popup>
               </Marker>
             );
           }
@@ -1383,6 +1394,7 @@ function MapLibreFlatMapView({
         properties: {
           id: convoy.convoy_id || '',
           status: convoy.status || 'active',
+          last_update: Number.isFinite(Number(convoy.lastUpdateTs)) ? Number(convoy.lastUpdateTs) : null,
         },
       }];
     }),
@@ -2026,6 +2038,16 @@ function MapLibreFlatMapView({
           'line-opacity': 0.8,
         },
       });
+      map.addLayer({
+        id: 'convoy-points-hit-layer',
+        type: 'circle',
+        source: 'convoy-points-src',
+        paint: {
+          'circle-radius': 18,
+          'circle-color': '#000000',
+          'circle-opacity': 0.001,
+        },
+      });
 
       map.addLayer({
         id: 'dcsar-links-accepted-layer',
@@ -2120,6 +2142,27 @@ function MapLibreFlatMapView({
         showHoverPopup(event.lngLat, `<div style="font-size:11px;font-weight:600;">${airportName}</div>`);
       });
       map.on('mouseleave', 'airports-core-layer', () => {
+        map.getCanvas().style.cursor = '';
+        hideHoverPopup();
+      });
+
+      map.on('click', 'convoy-points-hit-layer', (event) => {
+        const feature = event?.features?.[0];
+        const convoyId = String(feature?.properties?.id || '').trim() || 'unknown';
+        const status = String(feature?.properties?.status || 'active');
+        const lastUpdateRaw = Number(feature?.properties?.last_update);
+        const lastUpdateText = Number.isFinite(lastUpdateRaw)
+          ? formatRelativeTime(lastUpdateRaw)
+          : 'unknown';
+        showHoverPopup(
+          event.lngLat,
+          `<div style="font-size:11px;font-weight:600;">Convoy ${convoyId}</div><div style="font-size:10px;opacity:0.9;">Status: ${status}</div><div style="font-size:10px;opacity:0.9;">Ultimo aggiornamento: ${lastUpdateText}</div>`
+        );
+      });
+      map.on('mousemove', 'convoy-points-hit-layer', () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+      map.on('mouseleave', 'convoy-points-hit-layer', () => {
         map.getCanvas().style.cursor = '';
         hideHoverPopup();
       });
@@ -2906,8 +2949,6 @@ export default function FrontlineMap({ airportsData }) {
     return map;
   }, [validZones]);
 
-  const mapAnimationTick = animationTick;
-
   const convoyRenderData = useMemo(() => {
     return convoys
       .filter((convoy) => (convoy?.status || 'active') === 'active')
@@ -2917,26 +2958,15 @@ export default function FrontlineMap({ airportsData }) {
       const originPoint = toLatLngPoint(originPosition);
       const destinationPoint = toLatLngPoint(destinationPosition);
       const routeLine = originPoint && destinationPoint ? [originPoint, destinationPoint] : [];
-      const bearing = routeLine.length >= 2 ? computeBearingDeg(routeLine[0], routeLine[1]) : 0;
-      const lastPosition = toLatLngPoint(convoy.last_position) || destinationPoint || originPoint || null;
-
-      let movingPosition = null;
-      if ((convoy.status || 'active') === 'active' && routeLine.length >= 2) {
-        const cycleMs = 90000;
-        const offset = hashString(convoy.convoy_id || 'convoy') % cycleMs;
-        const progress = ((mapAnimationTick + offset) % cycleMs) / cycleMs;
-        const interpolated = interpolateLatLon(routeLine[0], routeLine[1], progress);
-        movingPosition = applyLateralOffset(routeLine[0], routeLine[1], interpolated, 0.5);
-      } else if (convoy.status === 'arrived' && destinationPoint) {
-        movingPosition = routeLine.length >= 2
-          ? applyLateralOffset(routeLine[0], routeLine[1], destinationPoint, 0.5)
-          : destinationPoint;
-      } else if (convoy.status === 'destroyed') {
-        const destroyedPos = toLatLngPoint(convoy.last_position) || originPoint;
-        movingPosition = routeLine.length >= 2
-          ? applyLateralOffset(routeLine[0], routeLine[1], destroyedPos, 0.5)
-          : destroyedPos;
-      }
+      const realPoint = toLatLngPoint(convoy.last_position);
+      const lastPosition = realPoint || destinationPoint || originPoint || null;
+      const movingPosition = lastPosition;
+      const bearing = (movingPosition && destinationPoint)
+        ? computeBearingDeg(movingPosition, destinationPoint)
+        : ((originPoint && destinationPoint) ? computeBearingDeg(originPoint, destinationPoint) : 0);
+      const lastUpdateTs = Number.isFinite(Number(convoy?.position_at))
+        ? Number(convoy.position_at)
+        : (Number.isFinite(Number(convoy?.last_update)) ? Number(convoy.last_update) : null);
 
       return {
         convoy_id: convoy.convoy_id,
@@ -2945,9 +2975,10 @@ export default function FrontlineMap({ airportsData }) {
         bearing,
         movingPosition,
         lastPosition,
+        lastUpdateTs,
       };
     }).filter((convoy) => convoy.routeLine.length >= 2 || convoy.movingPosition || convoy.lastPosition);
-  }, [convoys, zoneCoordinatesById, mapAnimationTick]);
+  }, [convoys, zoneCoordinatesById]);
 
   useEffect(() => {
     if (validZones.length === 0) return;
