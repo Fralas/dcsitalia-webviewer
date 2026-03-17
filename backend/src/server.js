@@ -54,9 +54,17 @@ const io = new Server(httpServer, {
 
 const PORT = process.env.PORT || 3001;
 const CONVOY_API_TOKEN = process.env.CONVOY_API_TOKEN || '';
+// March 13, 2026 17:00 Europe/Rome (CET => 16:00 UTC)
+const LAUNCH_TARGET_UTC_MS = Date.UTC(2026, 2, 13, 16, 0, 0);
 const CONVOY_SYNC_FILE = process.env.CONVOY_SYNC_FILE
   ? path.resolve(process.env.CONVOY_SYNC_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DMAP\\Export_Ground_Convoys.json';
+  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DRED_GROUND\\Export_Ground_Convoys.json';
+const DCSAR_SYNC_FILE = process.env.DCSAR_SYNC_FILE
+  ? path.resolve(process.env.DCSAR_SYNC_FILE)
+  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DMAP\\Export_DCSAR_Positions.json';
+const AIRLIFT_PLAYERS_SYNC_FILE = process.env.AIRLIFT_PLAYERS_SYNC_FILE
+  ? path.resolve(process.env.AIRLIFT_PLAYERS_SYNC_FILE)
+  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DRED_AIR\\Export_AirliftPlayers.json';
 
 // CSV Directory - configurable via environment variable
 const CSV_DIR = process.env.CSV_DIR
@@ -88,7 +96,7 @@ app.use(cors({
 // Rate limiting
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 500, // limit each IP to 500 requests per windowMs
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -139,6 +147,100 @@ const FRONTLINE_ZONES_FILE = process.env.DYZONE_OUTPUT_JSON
 let lastZoneStatusById = new Map();
 let convoySyncSignature = '';
 let convoyEventById = new Map();
+let dcsarSyncSignature = '';
+let dcsarPoints = [];
+let airliftPlayersSyncSignature = '';
+let airliftPlayers = [];
+let zoneOperationsById = new Map();
+const ZONE_OPERATION_TTL_MS = 45 * 60 * 1000;
+const ZONE_OPERATION_MAX_PER_USER = 2;
+
+function loadFrontlineZonesFromFile() {
+  if (!fs.existsSync(FRONTLINE_ZONES_FILE)) {
+    return [];
+  }
+
+  try {
+    const data = fs.readFileSync(FRONTLINE_ZONES_FILE, 'utf8');
+    const zones = JSON.parse(data);
+    return Array.isArray(zones) ? zones : [];
+  } catch (error) {
+    console.error('Error loading frontline zones from file:', error.message);
+    return [];
+  }
+}
+
+function cleanupExpiredZoneOperations(now = Date.now()) {
+  let changed = false;
+  for (const [zoneId, operation] of zoneOperationsById.entries()) {
+    if (!operation) {
+      zoneOperationsById.delete(zoneId);
+      changed = true;
+      continue;
+    }
+
+    if (!Number.isFinite(operation.expires_at) || operation.expires_at <= now) {
+      zoneOperationsById.delete(zoneId);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+function pruneZoneOperationsForMissingZones(zones) {
+  const validZoneIds = new Set((Array.isArray(zones) ? zones : []).map((zone) => zone?.id).filter(Boolean));
+  let changed = false;
+  for (const zoneId of zoneOperationsById.keys()) {
+    if (!validZoneIds.has(zoneId)) {
+      zoneOperationsById.delete(zoneId);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+function getActiveOperationsForUser(userId, now = Date.now()) {
+  if (!userId) return [];
+  const normalizedUser = String(userId).trim();
+  if (!normalizedUser) return [];
+
+  const result = [];
+  for (const operation of zoneOperationsById.values()) {
+    if (!operation) continue;
+    if (operation.user_id !== normalizedUser) continue;
+    if (!Number.isFinite(operation.expires_at) || operation.expires_at <= now) continue;
+    result.push(operation);
+  }
+  return result;
+}
+
+function buildFrontlineZonesPayload(zones, now = Date.now()) {
+  cleanupExpiredZoneOperations(now);
+  pruneZoneOperationsForMissingZones(zones);
+
+  return (Array.isArray(zones) ? zones : []).map((zone) => {
+    const operation = zoneOperationsById.get(zone.id);
+    const activeOperation = operation && Number.isFinite(operation.expires_at) && operation.expires_at > now
+      ? operation
+      : null;
+
+    return {
+      ...zone,
+      operation_assigned: Boolean(activeOperation),
+      operation_assigned_to: activeOperation?.user_id || null,
+      operation_accepted_at: activeOperation?.accepted_at || null,
+      operation_expires_at: activeOperation?.expires_at || null,
+      operation_remaining_ms: activeOperation ? Math.max(0, activeOperation.expires_at - now) : 0,
+    };
+  });
+}
+
+function emitFrontlineUpdate(zonesFromSource = null) {
+  const sourceZones = Array.isArray(zonesFromSource) ? zonesFromSource : loadFrontlineZonesFromFile();
+  const zones = buildFrontlineZonesPayload(sourceZones);
+  io.emit('frontline:updated', { zones });
+  return zones;
+}
 
 function pushFeedEvent(event) {
   const created = feedService.appendFeedEvent(event);
@@ -171,10 +273,45 @@ function buildMissionSummary(mission) {
 }
 
 function normalizeConvoyEntry(entry) {
+  const normalizeEpochMs = (value) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return null;
+    return n < 1e12 ? Math.round(n * 1000) : Math.round(n);
+  };
+
+  const toPosition = (latValue, lonValue) => {
+    const lat = Number(latValue);
+    const lon = Number(lonValue);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    return { lat, lon };
+  };
+  const parsePosition = (rawPos, latField, lonField) => {
+    const objPos = (rawPos && typeof rawPos === 'object')
+      ? toPosition(rawPos.lat, rawPos.lon)
+      : null;
+    if (objPos) return objPos;
+    return toPosition(latField, lonField);
+  };
+
   const lastEvent = String(entry?.last_event || '').trim().toLowerCase();
   let status = String(entry?.status || 'active').trim().toLowerCase();
   if (lastEvent === 'arrived') status = 'arrived';
   if (lastEvent === 'destroyed') status = 'destroyed';
+
+  const eventAt = normalizeEpochMs(entry?.event_at) ?? Date.now();
+  const positionAt = normalizeEpochMs(entry?.position_at);
+  const lastPosition = toPosition(entry?.position_lat, entry?.position_lon);
+  const originPosition = parsePosition(
+    entry?.origin_position,
+    entry?.origin_position_lat ?? entry?.origin_lat,
+    entry?.origin_position_lon ?? entry?.origin_lon
+  );
+  const destinationPosition = parsePosition(
+    entry?.destination_position,
+    entry?.destination_position_lat ?? entry?.destination_lat,
+    entry?.destination_position_lon ?? entry?.destination_lon
+  );
+  const lastUpdate = positionAt ?? eventAt;
 
   return {
     convoy_id: String(entry?.convoy_id || '').trim(),
@@ -182,9 +319,13 @@ function normalizeConvoyEntry(entry) {
     destination_zone: String(entry?.destination_zone || '').trim() || null,
     status,
     last_event: lastEvent,
-    event_at: Number.isFinite(Number(entry?.event_at)) ? Number(entry.event_at) : Date.now(),
+    event_at: eventAt,
     feed_message: String(entry?.feed_message || '').trim(),
-    last_update: Number.isFinite(Number(entry?.event_at)) ? Number(entry.event_at) : Date.now(),
+    origin_position: originPosition,
+    destination_position: destinationPosition,
+    last_position: lastPosition,
+    position_at: positionAt,
+    last_update: lastUpdate,
   };
 }
 
@@ -248,6 +389,153 @@ function syncConvoysFromFile() {
   }
 }
 
+function parseDcsarLine(line, index) {
+  const cleaned = String(line || '').trim();
+  if (!cleaned || cleaned.startsWith('#') || cleaned.startsWith('//')) return null;
+
+  const nums = cleaned.match(/-?\d+(?:\.\d+)?/g);
+  if (!nums || nums.length < 2) return null;
+  const lat = Number(nums[0]);
+  const lon = Number(nums[1]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+  const acceptedByMatch = cleaned.match(/accepted_by\s*=\s*([^\s|,;]+)/i);
+  const statusMatch = cleaned.match(/status\s*=\s*([^\s|,;]+)/i);
+  const idMatch = cleaned.match(/id\s*=\s*([^\s|,;]+)/i);
+  const acceptedBy = acceptedByMatch ? String(acceptedByMatch[1] || '').trim() : '';
+  const status = statusMatch ? String(statusMatch[1] || '').trim().toLowerCase() : '';
+  const accepted = status === 'accepted' || acceptedBy !== '';
+
+  return {
+    id: idMatch ? String(idMatch[1] || '').trim() : `dcsar_${index + 1}`,
+    lat,
+    lon,
+    status: status || (accepted ? 'accepted' : 'pending'),
+    accepted_by: acceptedBy || null,
+    accepted,
+    raw: cleaned,
+  };
+}
+
+function syncDcsarFromFile() {
+  try {
+    if (!fs.existsSync(DCSAR_SYNC_FILE)) return;
+
+    const raw = fs.readFileSync(DCSAR_SYNC_FILE, 'utf8');
+    if (raw === dcsarSyncSignature) return;
+    dcsarSyncSignature = raw;
+
+    const lines = String(raw || '').split(/\r?\n/);
+    const parsed = [];
+    lines.forEach((line, idx) => {
+      const point = parseDcsarLine(line, idx);
+      if (point) parsed.push(point);
+    });
+    const previousById = new Map(
+      (Array.isArray(dcsarPoints) ? dcsarPoints : [])
+        .filter((point) => point && point.id)
+        .map((point) => [String(point.id), point])
+    );
+
+    dcsarPoints = parsed.map((incomingPoint) => {
+      const pointId = String(incomingPoint?.id || '');
+      const previousPoint = pointId ? previousById.get(pointId) : null;
+      const previousAccepted = String(previousPoint?.status || '').toLowerCase() === 'accepted' || Boolean(previousPoint?.accepted);
+      const incomingAccepted = String(incomingPoint?.status || '').toLowerCase() === 'accepted' || Boolean(incomingPoint?.accepted);
+
+      // Keep accepted assignment sticky to avoid accidental de-assignment when
+      // external file updates omit metadata or downgrade status.
+      if (previousAccepted && !incomingAccepted) {
+        return {
+          ...incomingPoint,
+          status: 'accepted',
+          accepted: true,
+          accepted_by: previousPoint?.accepted_by || incomingPoint?.accepted_by || null,
+        };
+      }
+
+      return incomingPoint;
+    });
+
+    io.emit('dcsar:updated', {
+      points: dcsarPoints,
+    });
+  } catch (error) {
+    console.error('Failed DCSAR sync from file:', error.message);
+  }
+}
+
+function normalizeAirliftPlayerEntry(entry) {
+  const toNum = (value) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
+  const lat = toNum(entry?.lat);
+  const lon = toNum(entry?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+  return {
+    id: String(entry?.id || '').trim() || null,
+    name: String(entry?.name || '').trim() || 'Unknown',
+    unit_name: String(entry?.unit_name || '').trim() || null,
+    group_name: String(entry?.group_name || '').trim() || null,
+    coalition: String(entry?.coalition || '').trim().toLowerCase() || null,
+    type_name: String(entry?.type_name || '').trim() || null,
+    airframe: String(entry?.airframe || '').trim() || null,
+    lat,
+    lon,
+    alt_m: toNum(entry?.alt_m),
+    heading_deg: toNum(entry?.heading_deg),
+  };
+}
+
+function syncAirliftPlayersFromFile() {
+  try {
+    if (!fs.existsSync(AIRLIFT_PLAYERS_SYNC_FILE)) return;
+
+    const raw = fs.readFileSync(AIRLIFT_PLAYERS_SYNC_FILE, 'utf8');
+    if (!raw || raw.trim() === '') return;
+    if (raw === airliftPlayersSyncSignature) return;
+    airliftPlayersSyncSignature = raw;
+
+    const parsed = JSON.parse(raw);
+    const incoming = Array.isArray(parsed?.players) ? parsed.players : [];
+    const normalized = incoming
+      .map(normalizeAirliftPlayerEntry)
+      .filter(Boolean);
+
+    airliftPlayers = normalized;
+
+    io.emit('airlift-players:updated', {
+      players: airliftPlayers,
+    });
+  } catch (error) {
+    console.error('Failed airlift players sync from file:', error.message);
+  }
+}
+
+function persistDcsarToFile(points) {
+  const lines = (Array.isArray(points) ? points : [])
+    .map((point, index) => {
+      const lat = Number(point?.lat);
+      const lon = Number(point?.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+      const id = String(point?.id || `dcsar_${index + 1}`).trim();
+      const status = String(point?.status || 'pending').trim().toLowerCase() === 'accepted' ? 'accepted' : 'pending';
+      const acceptedBy = point?.accepted_by ? String(point.accepted_by).trim() : '';
+      const meta = [
+        `id=${id}`,
+        `status=${status}`,
+        acceptedBy ? `accepted_by=${acceptedBy.replace(/\s+/g, '_')}` : null,
+      ].filter(Boolean).join(' ');
+      return `${lat.toFixed(6)},${lon.toFixed(6)} ${meta}`.trim();
+    })
+    .filter(Boolean);
+
+  fs.writeFileSync(DCSAR_SYNC_FILE, `${lines.join('\n')}${lines.length > 0 ? '\n' : ''}`, 'utf8');
+  dcsarSyncSignature = fs.readFileSync(DCSAR_SYNC_FILE, 'utf8');
+}
+
 /**
  * Load airbase status from airbase_status.lua file
  */
@@ -281,6 +569,13 @@ function processData(data) {
 
   // Add isActive field to each airport based on airbase status
   Object.entries(airportDataMap).forEach(([airportId, airportData]) => {
+    // Keep static airport metadata (including coordinates) aligned with config,
+    // even when data is loaded from an old buffer snapshot.
+    const airportConfig = getAirportById(airportId);
+    if (airportConfig?.coordinates) {
+      airportData.coordinates = airportConfig.coordinates;
+    }
+
     // Add isActive field (carriers are always active)
     airportData.isActive = airportData.isMainBase ||
                            airportData.isCarrier ||
@@ -540,6 +835,22 @@ app.put('/api/profile', (req, res) => {
 });
 
 // ==================== DATA ROUTES ====================
+
+/**
+ * GET /api/time - Server authoritative time and launch state
+ */
+app.get('/api/time', (req, res) => {
+  const serverNowMs = Date.now();
+  const launchRemainingMs = Math.max(0, LAUNCH_TARGET_UTC_MS - serverNowMs);
+  res.json({
+    serverNowMs,
+    serverNowIso: new Date(serverNowMs).toISOString(),
+    launchTargetUtcMs: LAUNCH_TARGET_UTC_MS,
+    launchTargetIso: new Date(LAUNCH_TARGET_UTC_MS).toISOString(),
+    preLaunchActive: launchRemainingMs > 0,
+    launchRemainingMs,
+  });
+});
 
 /**
  * GET /api/airports - Get all airports with current data
@@ -909,17 +1220,96 @@ app.get('/api/combat-missions/pilot/:pilotName', (req, res) => {
  */
 app.get('/api/frontline-zones', (req, res) => {
   try {
-    if (!fs.existsSync(FRONTLINE_ZONES_FILE)) {
-      return res.json({ zones: [] });
-    }
-
-    const data = fs.readFileSync(FRONTLINE_ZONES_FILE, 'utf8');
-    const zones = JSON.parse(data);
+    const zonesFromFile = loadFrontlineZonesFromFile();
+    const zones = buildFrontlineZonesPayload(zonesFromFile);
     res.json({ zones });
   } catch (error) {
     console.error('Error loading frontline zones:', error.message);
     res.status(500).json({ error: 'Failed to load frontline zones' });
   }
+
+  // Enforce policy: carriers can never be logistics destinations
+  const expiredCarrierMissions = historicalData.expireCarrierDestinationMissions();
+  if (expiredCarrierMissions > 0) {
+    console.log(`🚫 Expired ${expiredCarrierMissions} missions targeting carrier destinations`);
+  }
+});
+
+/**
+ * POST /api/frontline-zones/:id/accept - Accept a frontline zone operation
+ */
+app.post('/api/frontline-zones/:id/accept', (req, res) => {
+  const zoneId = String(req.params.id || '').trim();
+  const userId = String(req.body?.userId || '').trim();
+
+  if (!zoneId) {
+    return res.status(400).json({ error: 'zone id is required' });
+  }
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  const zonesFromFile = loadFrontlineZonesFromFile();
+  const zone = zonesFromFile.find((entry) => String(entry?.id || '') === zoneId);
+  if (!zone) {
+    return res.status(404).json({ error: 'Zone not found' });
+  }
+
+  const zoneTasks = Array.isArray(zone.tasks) ? zone.tasks.filter(Boolean) : [];
+  if (zoneTasks.length === 0) {
+    return res.status(400).json({ error: 'Zone must have at least one task to be accepted' });
+  }
+
+  const now = Date.now();
+  cleanupExpiredZoneOperations(now);
+  pruneZoneOperationsForMissingZones(zonesFromFile);
+
+  const current = zoneOperationsById.get(zoneId);
+  if (current && current.user_id === userId && Number.isFinite(current.expires_at) && current.expires_at > now) {
+    return res.status(409).json({ error: 'Zone already accepted by you' });
+  }
+  if (current && current.user_id !== userId && Number.isFinite(current.expires_at) && current.expires_at > now) {
+    return res.status(409).json({ error: `Zone already accepted by ${current.user_id}` });
+  }
+
+  const userOperations = getActiveOperationsForUser(userId, now)
+    .filter((operation) => operation.zone_id !== zoneId);
+  if (userOperations.length >= ZONE_OPERATION_MAX_PER_USER) {
+    return res.status(400).json({ error: `A user can accept at most ${ZONE_OPERATION_MAX_PER_USER} zones` });
+  }
+
+  const acceptedAt = now;
+  const expiresAt = now + ZONE_OPERATION_TTL_MS;
+  zoneOperationsById.set(zoneId, {
+    zone_id: zoneId,
+    user_id: userId,
+    accepted_at: acceptedAt,
+    expires_at: expiresAt,
+  });
+
+  const zones = emitFrontlineUpdate(zonesFromFile);
+  const updatedZone = zones.find((entry) => entry.id === zoneId) || null;
+
+  pushFeedEvent({
+    type: 'zone.operation.accepted',
+    title: 'Zone operation accepted',
+    message: `${userId} is operating on ${zone.name || zone.id}`,
+    actor: userId,
+    zone_id: zone.id || zoneId,
+    metadata: {
+      zone_id: zone.id || zoneId,
+      accepted_by: userId,
+      expires_at: expiresAt,
+      ttl_minutes: Math.round(ZONE_OPERATION_TTL_MS / 60000),
+      tasks: zoneTasks,
+    },
+  });
+
+  res.json({
+    success: true,
+    zone: updatedZone,
+    zones,
+  });
 });
 
 /**
@@ -929,6 +1319,146 @@ app.get('/api/feed', (req, res) => {
   const limit = Number.parseInt(req.query.limit, 10) || 200;
   const events = feedService.getFeedEvents(limit);
   res.json({ events });
+});
+
+/**
+ * GET /api/dcsar - Get current DCSAR positions exported from mission script
+ */
+app.get('/api/dcsar', (req, res) => {
+  res.json({ points: dcsarPoints });
+});
+
+/**
+ * GET /api/airlift-players - Get tracked player positions for transport airframes
+ */
+app.get('/api/airlift-players', (req, res) => {
+  res.json({ players: airliftPlayers });
+});
+
+/**
+ * POST /api/dcsar/:id/accept - Accept a DCSAR rescue task
+ */
+app.post('/api/dcsar/:id/accept', (req, res) => {
+  const dcsarId = String(req.params.id || '').trim();
+  const userId = String(req.body?.userId || '').trim();
+
+  if (!dcsarId) {
+    return res.status(400).json({ error: 'DCSAR id is required' });
+  }
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  const index = dcsarPoints.findIndex((point) => String(point?.id || '') === dcsarId);
+  if (index < 0) {
+    return res.status(404).json({ error: 'DCSAR task not found' });
+  }
+
+  const current = dcsarPoints[index];
+  const alreadyAccepted = String(current?.status || '').toLowerCase() === 'accepted' || Boolean(current?.accepted);
+  if (alreadyAccepted && current?.accepted_by && current.accepted_by !== userId) {
+    return res.status(409).json({ error: `Task already accepted by ${current.accepted_by}` });
+  }
+
+  const updated = {
+    ...current,
+    status: 'accepted',
+    accepted: true,
+    accepted_by: userId,
+  };
+
+  dcsarPoints = [
+    ...dcsarPoints.slice(0, index),
+    updated,
+    ...dcsarPoints.slice(index + 1),
+  ];
+
+  try {
+    persistDcsarToFile(dcsarPoints);
+  } catch (error) {
+    console.error('Failed to persist DCSAR task:', error.message);
+    return res.status(500).json({ error: 'Failed to persist DCSAR task' });
+  }
+
+  io.emit('dcsar:updated', {
+    points: dcsarPoints,
+  });
+
+  pushFeedEvent({
+    type: 'dcsar.accepted',
+    title: 'CSAR task accepted',
+    message: `${userId} accepted CSAR task ${dcsarId}`,
+    metadata: {
+      dcsar_id: dcsarId,
+      accepted_by: userId,
+    },
+  });
+
+  res.json({ success: true, task: updated });
+});
+
+/**
+ * POST /api/dcsar/:id/complete - Complete a DCSAR rescue task
+ */
+app.post('/api/dcsar/:id/complete', (req, res) => {
+  const dcsarId = String(req.params.id || '').trim();
+  const userId = String(req.body?.userId || '').trim();
+
+  if (!dcsarId) {
+    return res.status(400).json({ error: 'DCSAR id is required' });
+  }
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  const index = dcsarPoints.findIndex((point) => String(point?.id || '') === dcsarId);
+  if (index < 0) {
+    return res.status(404).json({ error: 'DCSAR task not found' });
+  }
+
+  const current = dcsarPoints[index];
+  if (String(current?.status || '').toLowerCase() !== 'accepted') {
+    return res.status(400).json({ error: 'Task must be accepted before completion' });
+  }
+  if (current?.accepted_by && current.accepted_by !== userId) {
+    return res.status(403).json({ error: 'Only the assigned user can complete this task' });
+  }
+
+  const removed = current;
+  dcsarPoints = dcsarPoints.filter((point) => String(point?.id || '') !== dcsarId);
+
+  try {
+    persistDcsarToFile(dcsarPoints);
+  } catch (error) {
+    console.error('Failed to persist DCSAR completion:', error.message);
+    return res.status(500).json({ error: 'Failed to persist DCSAR completion' });
+  }
+
+  io.emit('dcsar:updated', {
+    points: dcsarPoints,
+  });
+
+  pushFeedEvent({
+    type: 'dcsar.completed',
+    title: 'CSAR task completed',
+    message: `${userId} completed CSAR task ${dcsarId}`,
+    metadata: {
+      dcsar_id: dcsarId,
+      completed_by: userId,
+      previous: removed,
+    },
+  });
+
+  res.json({ success: true });
+});
+
+/**
+ * POST /api/dcsar/:id/cancel - Cancel a DCSAR rescue task
+ */
+app.post('/api/dcsar/:id/cancel', (req, res) => {
+  res.status(403).json({
+    error: 'CSAR task cancellation is disabled. Complete the task instead.'
+  });
 });
 
 /**
@@ -1157,6 +1687,9 @@ app.post('/api/test/generate-mission', (req, res) => {
   if (!airport) {
     return res.status(404).json({ error: 'Airport not found or not active' });
   }
+  if (airport.isCarrier) {
+    return res.status(400).json({ error: 'Cannot create missions to carrier destinations' });
+  }
 
   if (sourceAirportId) {
     const sourceAirport = airbaseStatusManager.getActiveAirportById(sourceAirportId);
@@ -1220,13 +1753,21 @@ app.post('/api/test/generate-random-missions', (req, res) => {
 
   let targetAirport = airportId;
   if (!targetAirport) {
-    // Pick random non-main-base airport from active airports only
+    // Pick random airport eligible as logistics recipient (exclude main base and carriers)
     const activeAirports = airbaseStatusManager.getActiveAirports();
-    const nonMainBases = activeAirports.filter(a => !a.isMainBase);
-    if (nonMainBases.length === 0) {
-      return res.status(400).json({ error: 'No non-main-base airports available' });
+    const eligibleRecipients = activeAirports.filter(a => !a.isMainBase && !a.isCarrier);
+    if (eligibleRecipients.length === 0) {
+      return res.status(400).json({ error: 'No eligible recipient airports available' });
     }
-    targetAirport = nonMainBases[Math.floor(Math.random() * nonMainBases.length)].id;
+    targetAirport = eligibleRecipients[Math.floor(Math.random() * eligibleRecipients.length)].id;
+  } else {
+    const targetAirportConfig = airbaseStatusManager.getActiveAirportById(targetAirport);
+    if (!targetAirportConfig) {
+      return res.status(404).json({ error: 'Target airport not found or not active' });
+    }
+    if (targetAirportConfig.isCarrier) {
+      return res.status(400).json({ error: 'Cannot create missions to carrier destinations' });
+    }
   }
 
   const generatedMissions = [];
@@ -1299,6 +1840,9 @@ app.post('/api/airports/:id/create-order', (req, res) => {
   if (!airport) {
     return res.status(404).json({ error: 'Airport not found or not active' });
   }
+  if (airport.isCarrier) {
+    return res.status(400).json({ error: 'Cannot create orders for carrier destinations' });
+  }
 
   // Check if it's the main base
   if (airport.isMainBase) {
@@ -1324,6 +1868,12 @@ app.post('/api/airports/:id/create-order', (req, res) => {
     quantity = getOrderQuantityForWeapon(weaponId);
     console.log(`?Y"S Auto-calculated quantity for ${weaponId}: ${quantity} (current: ${currentQuantity})`);
   }
+
+  // Auto pick ISO container size from desired quantity.
+  // <= 50% of default request => ISO small (0.5), otherwise ISO large (1.0).
+  const defaultOrderQuantity = Math.max(1, Number(getOrderQuantityForWeapon(weaponId)) || 1);
+  const requestedQuantity = Math.max(1, Number(quantity) || defaultOrderQuantity);
+  const autoIsoUnits = requestedQuantity <= (defaultOrderQuantity / 2) ? 0.5 : 1.0;
 
   // Find best source airport using donor selection algorithm
   const thresholds = getWeaponThresholds(weaponId);
@@ -1357,7 +1907,7 @@ app.post('/api/airports/:id/create-order', (req, res) => {
       weapon_id: weaponId,
       quantity_needed: quantity,
       current_quantity: currentQuantity,
-      iso_units: getIsoFillForWeapon(weaponId),
+      iso_units: autoIsoUnits,
       priority,
     }],
     priority,
@@ -1377,12 +1927,223 @@ app.post('/api/airports/:id/create-order', (req, res) => {
     success: true,
     orderId,
     message: 'Order created successfully',
+    container: {
+      type: autoIsoUnits >= 1 ? 'large' : 'small',
+      iso_units: autoIsoUnits,
+    },
     route: {
       from: bestSource.airportName,
       to: airport.displayName,
       distance: bestSource.distance,
       isDonor: bestSource.isDonor
     }
+  });
+});
+
+/**
+ * POST /api/airports/:id/compose-mission - Compose a new logistics mission from pending container missions
+ * Body: { containers: [{ missionId, orderIndex, units }] }
+ */
+app.post('/api/airports/:id/compose-mission', (req, res) => {
+  const airportId = req.params.id;
+  const containers = Array.isArray(req.body?.containers) ? req.body.containers : [];
+  if (containers.length === 0) {
+    return res.status(400).json({ error: 'containers is required' });
+  }
+
+  const activeMissions = historicalData.getActiveMissions();
+  const activeById = new Map(activeMissions.map((mission) => [mission.id, mission]));
+  const selectedContainers = [];
+
+  const normalizeUnits = (value) => {
+    const units = Math.round((Number(value) || 0) * 2) / 2;
+    return units;
+  };
+
+  for (const container of containers) {
+    const missionId = String(container?.missionId || '').trim();
+    const orderIndex = Number.parseInt(container?.orderIndex, 10);
+    const units = normalizeUnits(container?.units);
+    if (!missionId || !Number.isInteger(orderIndex) || orderIndex < 0 || !(units === 1 || units === 0.5)) {
+      return res.status(400).json({ error: 'Invalid container payload' });
+    }
+
+    const mission = activeById.get(missionId);
+    if (!mission) return res.status(404).json({ error: `Mission not found: ${missionId}` });
+    if (mission.status !== 'pending') return res.status(400).json({ error: `Mission is not pending: ${missionId}` });
+    if (mission.airport_id !== airportId) return res.status(400).json({ error: `Mission does not belong to airport ${airportId}: ${missionId}` });
+    if (!Array.isArray(mission.orders) || !mission.orders[orderIndex]) {
+      return res.status(400).json({ error: `Order not found in mission ${missionId}` });
+    }
+
+    const order = mission.orders[orderIndex];
+    const orderIso = Math.round((Number(order?.iso_units || 0) || 0) * 2) / 2;
+    if (orderIso <= 0) return res.status(400).json({ error: `Invalid order iso_units in mission ${missionId}` });
+
+    selectedContainers.push({
+      mission,
+      missionId,
+      orderIndex,
+      units,
+      order,
+    });
+  }
+
+  const consumeByOrderKey = new Map();
+  selectedContainers.forEach((entry) => {
+    const key = `${entry.missionId}:${entry.orderIndex}`;
+    consumeByOrderKey.set(key, (consumeByOrderKey.get(key) || 0) + entry.units);
+  });
+  for (const [key, consumedUnits] of consumeByOrderKey.entries()) {
+    const [missionId, orderIndexRaw] = key.split(':');
+    const orderIndex = Number.parseInt(orderIndexRaw, 10);
+    const mission = activeById.get(missionId);
+    const orderIso = Math.round((Number(mission?.orders?.[orderIndex]?.iso_units || 0) || 0) * 2) / 2;
+    if (consumedUnits > orderIso + 1e-6) {
+      return res.status(400).json({ error: `Selected containers exceed available units for ${missionId}#${orderIndex}` });
+    }
+  }
+
+  const sourceAirportId = selectedContainers[0]?.mission?.source_airport_id || null;
+  if (!sourceAirportId) {
+    return res.status(400).json({ error: 'Selected containers do not have a valid source airport' });
+  }
+
+  const mixedSource = selectedContainers.some((entry) => entry.mission.source_airport_id !== sourceAirportId);
+  if (mixedSource) {
+    return res.status(400).json({ error: 'All selected missions must have the same source airport' });
+  }
+
+  const totalIsoUnits = selectedContainers.reduce((sum, entry) => sum + entry.units, 0);
+  const totalLargeContainers = selectedContainers.reduce((sum, entry) => sum + (entry.units >= 1 ? 1 : 0), 0);
+
+  if (totalIsoUnits > 2.5 + 1e-6) {
+    return res.status(400).json({ error: 'Invalid selection: total ISO units cannot exceed 2.5' });
+  }
+  if (totalLargeContainers > 2) {
+    return res.status(400).json({ error: 'Invalid selection: cannot exceed 2 large containers' });
+  }
+
+  const allOrders = selectedContainers.map((entry) => {
+    const orderIso = Math.round((Number(entry.order?.iso_units || 0) || 0) * 2) / 2;
+    const ratio = orderIso > 0 ? entry.units / orderIso : 0;
+    const qty = Math.floor((Number(entry.order?.quantity_needed || 0) || 0) * ratio);
+    const totalWeight = (Number(entry.order?.total_weight_lbs || 0) || 0) * ratio;
+    return {
+      weapon_id: entry.order?.weapon_id,
+      quantity_needed: qty,
+      current_quantity: Number(entry.order?.current_quantity || 0) || 0,
+      iso_units: entry.units,
+      total_weight_lbs: totalWeight,
+      priority: entry.order?.priority || entry.mission?.priority || 'medium',
+    };
+  });
+  if (allOrders.length === 0) {
+    return res.status(400).json({ error: 'Selected missions do not contain valid orders' });
+  }
+
+  const priorityRank = { critical: 0, high: 1, medium: 2, ok: 3 };
+  const rankOf = (priority) => priorityRank[String(priority || '').toLowerCase()] ?? priorityRank.ok;
+  const bestPriority = allOrders.reduce((best, order) => {
+    const candidate = String(order?.priority || '').toLowerCase() || 'ok';
+    return rankOf(candidate) < rankOf(best) ? candidate : best;
+  }, 'ok');
+
+  const totalWeightLbs = allOrders.reduce((sum, order) => sum + (Number(order.total_weight_lbs) || 0), 0);
+
+  const missionIdsTouched = [...new Set(selectedContainers.map((entry) => entry.missionId))];
+  const remainderByMission = new Map();
+  missionIdsTouched.forEach((id) => {
+    const mission = activeById.get(id);
+    if (mission) {
+      remainderByMission.set(id, mission.orders.map((order) => ({ ...order })));
+    }
+  });
+
+  selectedContainers.forEach((entry) => {
+    const orders = remainderByMission.get(entry.missionId);
+    if (!orders || !orders[entry.orderIndex]) return;
+    const sourceOrder = orders[entry.orderIndex];
+    const orderIso = Math.round((Number(sourceOrder?.iso_units || 0) || 0) * 2) / 2;
+    const remainingIso = Math.round((orderIso - entry.units) * 2) / 2;
+    if (remainingIso <= 0) {
+      orders[entry.orderIndex] = null;
+      return;
+    }
+    const ratio = orderIso > 0 ? remainingIso / orderIso : 0;
+    orders[entry.orderIndex] = {
+      ...sourceOrder,
+      iso_units: remainingIso,
+      quantity_needed: Math.floor((Number(sourceOrder.quantity_needed || 0) || 0) * ratio),
+      total_weight_lbs: (Number(sourceOrder.total_weight_lbs || 0) || 0) * ratio,
+    };
+  });
+
+  const missionMetaById = new Map(missionIdsTouched.map((id) => [id, activeById.get(id)]));
+  missionIdsTouched.forEach((id) => historicalData.cancelMission(id));
+  remainderByMission.forEach((ordersRaw, id) => {
+    const baseMission = missionMetaById.get(id);
+    if (!baseMission) return;
+    const orders = ordersRaw.filter(Boolean).filter((order) => (Number(order?.iso_units || 0) || 0) > 0);
+    if (orders.length === 0) return;
+    const remainderIso = orders.reduce((sum, order) => sum + (Number(order.iso_units) || 0), 0);
+    const remainderWeight = orders.reduce((sum, order) => sum + (Number(order.total_weight_lbs) || 0), 0);
+    historicalData.createMission({
+      airportId: baseMission.airport_id,
+      sourceAirportId: baseMission.source_airport_id,
+      distance: baseMission.distance_nm,
+      recommendedAircraft: baseMission.recommended_aircraft || 'airplane',
+      orders,
+      totalWeightLbs: remainderWeight,
+      totalIsoUnits: remainderIso,
+      priority: baseMission.priority || 'medium',
+      expiryHours: 24,
+    });
+  });
+
+  const firstMission = selectedContainers[0]?.mission;
+  const distanceNm = Number(firstMission?.distance_nm) || null;
+  const recommendedAircraft = firstMission?.recommended_aircraft || 'airplane';
+
+  const missionId = historicalData.createMission({
+    airportId,
+    sourceAirportId,
+    distance: distanceNm,
+    recommendedAircraft,
+    orders: allOrders,
+    totalWeightLbs,
+    totalIsoUnits,
+    priority: bestPriority,
+    expiryHours: 24,
+  });
+
+  io.emit('missions:updated', {
+    missions: historicalData.getActiveMissions(),
+  });
+
+  const destinationName = getAirportDisplayName(airportId);
+  const sourceName = getAirportDisplayName(sourceAirportId);
+  pushFeedEvent({
+    type: 'logistics.composed',
+    title: 'Logistics mission composed',
+    message: `Composed route ${sourceName} -> ${destinationName} (${totalIsoUnits.toFixed(1)} ISO)`,
+    actor: '',
+    mission_id: missionId,
+    metadata: {
+      source_airport_id: sourceAirportId,
+      airport_id: airportId,
+      composed_from: missionIdsTouched,
+      total_iso_units: totalIsoUnits,
+      order_count: allOrders.length,
+    },
+  });
+
+  return res.json({
+    success: true,
+    missionId,
+    composedFrom: missionIdsTouched,
+    totalIsoUnits,
+    orderCount: allOrders.length,
   });
 });
 
@@ -1399,12 +2160,12 @@ app.post('/api/debug/generate-orders', authenticateToken, requireAdmin, (req, re
 
   // Loop through all active airports
   activeAirports.forEach(airport => {
-    if (airport.isMainBase) {
+    if (airport.isMainBase || airport.isCarrier) {
       results.push({
         airportId: airport.id,
         airportName: airport.displayName,
         skipped: true,
-        reason: 'Main base - no orders generated'
+        reason: airport.isMainBase ? 'Main base - no orders generated' : 'Carrier destination - no orders generated'
       });
       return;
     }
@@ -1492,6 +2253,15 @@ io.on('connection', (socket) => {
   });
   socket.emit('convoys:updated', {
     convoys: convoysService.getConvoys(),
+  });
+  socket.emit('dcsar:updated', {
+    points: dcsarPoints,
+  });
+  socket.emit('airlift-players:updated', {
+    players: airliftPlayers,
+  });
+  socket.emit('frontline:updated', {
+    zones: buildFrontlineZonesPayload(loadFrontlineZonesFromFile()),
   });
 
   socket.on('disconnect', () => {
@@ -1581,9 +2351,7 @@ const luaZoneWatcher = luaZoneSync.initialize((result) => {
       missions: combatMissionDispatch.getAllCombatMissions()
     });
 
-    io.emit('frontline:updated', {
-      zones: result.zones
-    });
+    emitFrontlineUpdate(result.zones);
 
     console.log(`✅ Regenerated ${missions.length} combat missions`);
   }
@@ -1605,6 +2373,37 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
+// Keep policy enforced even if old data is loaded from storage
+setInterval(() => {
+  const expiredCarrierMissions = historicalData.expireCarrierDestinationMissions();
+  if (expiredCarrierMissions > 0) {
+    io.emit('missions:updated', {
+      missions: historicalData.getActiveMissions()
+    });
+  }
+}, 60 * 1000);
+
+// Regenerate unaccepted logistics missions every 10 minutes
+setInterval(() => {
+  const expiredPending = historicalData.expirePendingMissionsOlderThan(10 * 60 * 1000);
+  if (expiredPending > 0) {
+    console.log(`🔁 Expired ${expiredPending} stale pending missions (10-minute policy)`);
+    io.emit('missions:updated', {
+      missions: historicalData.getActiveMissions()
+    });
+  }
+
+  scheduleRefresh('pending-regeneration-10m');
+}, 10 * 60 * 1000);
+
+// Expire accepted zone operations after TTL and broadcast updates
+setInterval(() => {
+  const changed = cleanupExpiredZoneOperations();
+  if (changed) {
+    emitFrontlineUpdate();
+  }
+}, 10 * 1000);
+
 // Check for new orders every 5 minutes (automatic polling)
 setInterval(() => {
   console.log('⏰ 5-minute check: Scanning for critical weapons...');
@@ -1614,6 +2413,16 @@ setInterval(() => {
 // Poll local DCS convoy export (file-based integration, no external API calls from mission)
 setInterval(() => {
   syncConvoysFromFile();
+}, 2000);
+
+// Poll DCSAR exported positions (line-based file of coordinates)
+setInterval(() => {
+  syncDcsarFromFile();
+}, 2000);
+
+// Poll tracked airlift players exported by mission script
+setInterval(() => {
+  syncAirliftPlayersFromFile();
 }, 2000);
 
 // ==================== START SERVER ====================
@@ -1632,6 +2441,8 @@ io.emit('convoys:updated', {
 
 // Initial convoy sync from local JSON exported by DCS scripts
 syncConvoysFromFile();
+syncDcsarFromFile();
+syncAirliftPlayersFromFile();
 
 httpServer.listen(PORT, () => {
   const activeAirports = airbaseStatusManager.getActiveAirports();

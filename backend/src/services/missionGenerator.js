@@ -23,19 +23,6 @@ function getPriorityRank(priority) {
   return PRIORITY_RANK[priority] ?? PRIORITY_RANK.ok;
 }
 
-function getMissionPriorityFromOrders(orders) {
-  let best = 'ok';
-  let bestRank = PRIORITY_RANK.ok;
-  orders.forEach(order => {
-    const rank = getPriorityRank(order.priority);
-    if (rank < bestRank) {
-      bestRank = rank;
-      best = order.priority;
-    }
-  });
-  return best;
-}
-
 /**
  * Check weapons and generate missions with smart donor selection
  * @param {string} recipientAirportId - Airport ID that needs supplies
@@ -46,8 +33,8 @@ function getMissionPriorityFromOrders(orders) {
 export function checkAndGenerateMissions(recipientAirportId, recipientWeapons, allAirportsData = {}) {
   const recipientAirport = getAirportById(recipientAirportId);
 
-  // Don't generate missions for the main base
-  if (!recipientAirport || recipientAirport.isMainBase) {
+  // Never generate logistics missions to main base or carrier destinations
+  if (!recipientAirport || recipientAirport.isMainBase || recipientAirport.isCarrier) {
     return [];
   }
 
@@ -154,11 +141,6 @@ export function checkAndGenerateMissions(recipientAirportId, recipientWeapons, a
       return (b.iso_units || 0) - (a.iso_units || 0);
     });
 
-    const groupMissions = [];
-
-    let currentOrders = [];
-    let currentUnits = 0;
-
     const createOrderChunk = (order, units) => {
       const baseUnits = Number(order.iso_units || 0);
       const ratio = baseUnits > 0 ? units / baseUnits : 0;
@@ -175,133 +157,37 @@ export function checkAndGenerateMissions(recipientAirportId, recipientWeapons, a
       };
     };
 
-    const flushMission = () => {
-      if (currentOrders.length === 0) return;
-
-      const missionPriority = getMissionPriorityFromOrders(currentOrders);
-      const totalWeight = currentOrders.reduce((sum, o) => sum + (o.total_weight_lbs || 0), 0);
-      const totalIsoUnits = currentOrders.reduce((sum, o) => sum + (o.iso_units || 0), 0);
-
-      groupMissions.push({
-        airportId: recipientAirportId,
-        sourceAirportId: group.source_airport_id,
-        distance: group.distance_nm,
-        recommendedAircraft: group.recommended_aircraft,
-        orders: currentOrders.map(o => ({
-          weapon_id: o.weapon_id,
-          quantity_needed: o.quantity_needed,
-          current_quantity: o.current_quantity,
-          iso_units: o.iso_units,
-          total_weight_lbs: o.total_weight_lbs,
-          priority: o.priority,
-        })),
-        totalWeightLbs: totalWeight,
-        totalIsoUnits: totalIsoUnits,
-        priority: missionPriority,
-        expiryHours: missionRules.mission.missionExpiry,
-      });
-      currentOrders = [];
-      currentUnits = 0;
-    };
-
     sortedOrders.forEach(order => {
       let remainingUnits = Number(order.iso_units || 0);
       if (remainingUnits <= 0) return;
 
       while (remainingUnits > 0) {
-        const remainingCapacity = maxLoadUnits - currentUnits;
-        if (remainingCapacity <= 0 && currentOrders.length > 0) {
-          flushMission();
-          continue;
-        }
-
-        const unitsToAdd = Math.min(remainingUnits, maxLoadUnits - currentUnits);
+        const unitsToAdd = Math.min(remainingUnits, maxLoadUnits);
         if (unitsToAdd <= 0) {
-          flushMission();
-          continue;
+          break;
         }
 
-        currentOrders.push(createOrderChunk(order, unitsToAdd));
-        currentUnits += unitsToAdd;
+        const chunkOrder = createOrderChunk(order, unitsToAdd);
+        const mission = {
+          airportId: recipientAirportId,
+          sourceAirportId: group.source_airport_id,
+          distance: group.distance_nm,
+          recommendedAircraft: group.recommended_aircraft,
+          orders: [chunkOrder],
+          totalWeightLbs: Number(chunkOrder.total_weight_lbs) || 0,
+          totalIsoUnits: Number(chunkOrder.iso_units) || 0,
+          priority: chunkOrder.priority || order.priority || 'medium',
+          expiryHours: missionRules.mission.missionExpiry,
+        };
+        const missionId = historicalData.createMission(mission);
+        console.log(`Generated ${String(mission.priority || 'MEDIUM').toUpperCase()} mission ${missionId}`);
+        console.log(`   Route: ${group.source_airport_name} -> ${recipientAirport.displayName} (${group.distance_nm}nm)`);
+        console.log(`   Orders: 1 (load ${(mission.totalIsoUnits || 0).toFixed(2)}/${maxLoadUnits})`);
+        console.log(`   Recommended: ${group.recommended_aircraft.toUpperCase()}`);
+        generatedMissions.push(missionId);
+
         remainingUnits -= unitsToAdd;
-
-        if (currentUnits >= maxLoadUnits - 1e-6) {
-          flushMission();
-        }
       }
-    });
-
-    flushMission();
-
-    const almostEqual = (value, target) => Math.abs(value - target) < 1e-6;
-
-    const applySimpleSmallShare = () => {
-      const donors = groupMissions.filter(mission => almostEqual(mission.totalIsoUnits, 1.0));
-      const receivers = groupMissions.filter(mission => almostEqual(mission.totalIsoUnits, 2.0));
-
-      if (donors.length === 0 || receivers.length < 2) {
-        return;
-      }
-
-      const donor = donors[0];
-      const receiverA = receivers[0];
-      const receiverB = receivers[1];
-
-      const donorPool = donor.orders.map(order => ({
-        order,
-        remaining_units: Number(order.iso_units || 0),
-      }));
-
-      const takeFromPool = (targetUnits) => {
-        const chunkOrders = [];
-        let remaining = targetUnits;
-
-        for (const entry of donorPool) {
-          if (remaining <= 0) break;
-          if (entry.remaining_units <= 0) continue;
-
-          const takeUnits = Math.min(entry.remaining_units, remaining);
-          if (takeUnits <= 0) continue;
-
-          chunkOrders.push(createOrderChunk(entry.order, takeUnits));
-          entry.remaining_units -= takeUnits;
-          remaining -= takeUnits;
-        }
-
-        return { chunkOrders, usedUnits: targetUnits - remaining };
-      };
-
-      const chunkA = takeFromPool(0.5);
-      const chunkB = takeFromPool(0.5);
-
-      if (!almostEqual(chunkA.usedUnits + chunkB.usedUnits, 1.0)) {
-        return;
-      }
-
-      receiverA.orders = receiverA.orders.concat(chunkA.chunkOrders);
-      receiverB.orders = receiverB.orders.concat(chunkB.chunkOrders);
-
-      [receiverA, receiverB].forEach(receiver => {
-        receiver.totalIsoUnits = receiver.orders.reduce((sum, o) => sum + (o.iso_units || 0), 0);
-        receiver.totalWeightLbs = receiver.orders.reduce((sum, o) => sum + (o.total_weight_lbs || 0), 0);
-        receiver.priority = getMissionPriorityFromOrders(receiver.orders);
-      });
-
-      const donorIndex = groupMissions.indexOf(donor);
-      if (donorIndex >= 0) {
-        groupMissions.splice(donorIndex, 1);
-      }
-    };
-
-    applySimpleSmallShare();
-
-    groupMissions.forEach(mission => {
-      const missionId = historicalData.createMission(mission);
-      console.log(`?o^???  Generated ${mission.priority.toUpperCase()} mission ${missionId}`);
-      console.log(`   Route: ${group.source_airport_name} -> ${recipientAirport.displayName} (${group.distance_nm}nm)`);
-      console.log(`   Orders: ${mission.orders.length} (load ${mission.totalIsoUnits.toFixed(2)}/${maxLoadUnits})`);
-      console.log(`   Recommended: ${group.recommended_aircraft.toUpperCase()}`);
-      generatedMissions.push(missionId);
     });
   });
 

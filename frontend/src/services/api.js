@@ -34,6 +34,13 @@ export async function getAirports() {
 }
 
 /**
+ * Get authoritative server time and launch status
+ */
+export async function getServerTime() {
+  return fetchAPI('/time');
+}
+
+/**
  * Get specific airport data
  */
 export async function getAirport(airportId) {
@@ -94,6 +101,16 @@ export async function completeMission(missionId) {
 export async function cancelMission(missionId) {
   return fetchAPI(`/missions/${missionId}/cancel`, {
     method: 'POST',
+  });
+}
+
+/**
+ * Compose a logistics mission from selected pending container missions.
+ */
+export async function composeAirportLogisticsMission(airportId, containers = []) {
+  return fetchAPI(`/airports/${encodeURIComponent(airportId)}/compose-mission`, {
+    method: 'POST',
+    body: JSON.stringify({ containers }),
   });
 }
 
@@ -208,6 +225,16 @@ export async function getFrontlineZones() {
 }
 
 /**
+ * Accept a frontline zone operation
+ */
+export async function acceptFrontlineZone(zoneId, userId) {
+  return fetchAPI(`/frontline-zones/${encodeURIComponent(zoneId)}/accept`, {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  });
+}
+
+/**
  * Get shared activity feed
  */
 export async function getFeed(limit = 200) {
@@ -220,6 +247,50 @@ export async function getFeed(limit = 200) {
 export async function getConvoys(status = null) {
   const query = status ? `?status=${encodeURIComponent(status)}` : '';
   return fetchAPI(`/convoys${query}`);
+}
+
+/**
+ * Get DCSAR exported points
+ */
+export async function getDcsar() {
+  return fetchAPI('/dcsar');
+}
+
+/**
+ * Get tracked airlift players (C-130 / CH-47 / Mi-8 / UH-1)
+ */
+export async function getAirliftPlayers() {
+  return fetchAPI('/airlift-players');
+}
+
+/**
+ * Accept a DCSAR rescue task
+ */
+export async function acceptDcsarTask(taskId, userId) {
+  return fetchAPI(`/dcsar/${encodeURIComponent(taskId)}/accept`, {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  });
+}
+
+/**
+ * Complete a DCSAR rescue task
+ */
+export async function completeDcsarTask(taskId, userId) {
+  return fetchAPI(`/dcsar/${encodeURIComponent(taskId)}/complete`, {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  });
+}
+
+/**
+ * Cancel a DCSAR rescue task
+ */
+export async function cancelDcsarTask(taskId, userId) {
+  return fetchAPI(`/dcsar/${encodeURIComponent(taskId)}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  });
 }
 
 /**
@@ -279,6 +350,7 @@ export async function saveUserProfile(profile) {
 }
 
 export default {
+  getServerTime,
   getAirports,
   getAirport,
   getAirportHistory,
@@ -301,8 +373,14 @@ export default {
   clearCombatMissions,
   getPilotCombatMissions,
   getFrontlineZones,
+  acceptFrontlineZone,
   getFeed,
   getConvoys,
+  getDcsar,
+  getAirliftPlayers,
+  acceptDcsarTask,
+  completeDcsarTask,
+  cancelDcsarTask,
   postConvoyEvent,
   getUserProfile,
   saveUserProfile,

@@ -432,6 +432,38 @@ export function cleanupExpiredMissions() {
 }
 
 /**
+ * Expire pending missions older than maxAgeMs.
+ * Useful to keep the queue fresh by forcing periodic regeneration.
+ */
+export function expirePendingMissionsOlderThan(maxAgeMs) {
+  if (!Number.isFinite(maxAgeMs) || maxAgeMs <= 0) {
+    return 0;
+  }
+
+  const now = Date.now();
+  let expiredCount = 0;
+
+  missionsCache.forEach((mission) => {
+    if (mission.status !== 'pending') return;
+
+    const createdAt = Number(mission.created_at);
+    if (!Number.isFinite(createdAt)) return;
+
+    if ((now - createdAt) >= maxAgeMs) {
+      mission.status = 'expired';
+      removeActiveIndex(mission);
+      expiredCount++;
+    }
+  });
+
+  if (expiredCount > 0) {
+    scheduleMissionsWrite();
+  }
+
+  return expiredCount;
+}
+
+/**
  * Clear all missions (DEBUG ONLY)
  */
 export function clearAllMissions() {
@@ -440,6 +472,29 @@ export function clearAllMissions() {
   activeMissionIndex = new Map();
   scheduleMissionsWrite();
   return true;
+}
+
+/**
+ * Expire active logistics missions that target carrier destinations.
+ */
+export function expireCarrierDestinationMissions() {
+  let expiredCount = 0;
+
+  missionsCache.forEach((mission) => {
+    if (mission.status !== 'pending' && mission.status !== 'accepted') return;
+    const destination = getAirportById(mission.airport_id);
+    if (!destination?.isCarrier) return;
+
+    mission.status = 'expired';
+    removeActiveIndex(mission);
+    expiredCount++;
+  });
+
+  if (expiredCount > 0) {
+    scheduleMissionsWrite();
+  }
+
+  return expiredCount;
 }
 
 export default {
@@ -455,5 +510,7 @@ export default {
   cancelMission,
   missionExistsForWeapon,
   cleanupExpiredMissions,
+  expirePendingMissionsOlderThan,
+  expireCarrierDestinationMissions,
   clearAllMissions,
 };
