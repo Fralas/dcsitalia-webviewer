@@ -257,6 +257,13 @@ export async function getDcsar() {
 }
 
 /**
+ * Get tracked airlift players (C-130 / CH-47 / Mi-8 / UH-1)
+ */
+export async function getAirliftPlayers() {
+  return fetchAPI('/airlift-players');
+}
+
+/**
  * Accept a DCSAR rescue task
  */
 export async function acceptDcsarTask(taskId, userId) {
@@ -370,6 +377,7 @@ export default {
   getFeed,
   getConvoys,
   getDcsar,
+  getAirliftPlayers,
   acceptDcsarTask,
   completeDcsarTask,
   cancelDcsarTask,

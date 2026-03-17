@@ -18,13 +18,21 @@ import airports from '../config/airports';
 import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
 import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
-import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, createOrder, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getMissions, getServerTime } from '../services/api';
+import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, createOrder, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getMissions, getServerTime } from '../services/api';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
 const MAP_ENGINE = String(import.meta.env.VITE_MAP_ENGINE || 'leaflet').trim().toLowerCase();
 const BASEMAP_MODE_DARK = 'dark';
 const BASEMAP_MODE_SATELLITE = 'satellite';
+
+function isDesktopGlobeDevice() {
+  if (typeof window === 'undefined') return true;
+  const ua = String(window.navigator?.userAgent || '');
+  const isTabletOrPhoneUa = /(Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Tablet)/i.test(ua);
+  if (isTabletOrPhoneUa) return false;
+  return window.matchMedia('(min-width: 1025px)').matches;
+}
 
 const BASEMAP_CONFIG = {
   [BASEMAP_MODE_DARK]: {
@@ -266,6 +274,15 @@ function getConvoyStyle(status) {
     markerRadius: 5,
     markerOpacity: 0.95,
   };
+}
+
+function getAirliftPlayerColor(airframe) {
+  const id = String(airframe || '').toUpperCase();
+  if (id.includes('C-130')) return '#f59e0b';
+  if (id.includes('CH-47')) return '#8b5cf6';
+  if (id.includes('MI-8')) return '#22c55e';
+  if (id.includes('UH-1')) return '#38bdf8';
+  return '#f8fafc';
 }
 
 function getWeaponDisplayName(weaponId = '') {
@@ -884,6 +901,7 @@ function FlatMapView({
   logisticsMissions,
   gridConnections,
   convoys,
+  airliftPlayers,
   dcsarPoints,
   selectedZoneId,
   onZoneSelect,
@@ -895,6 +913,7 @@ function FlatMapView({
   showAirports,
   showLogistics,
   showConvoys,
+  showAirliftPlayers,
   showDcsar,
   onDcsarHover,
   onDcsarSelect,
@@ -1011,6 +1030,33 @@ function FlatMapView({
           }
 
           return layers;
+        })}
+
+        {showAirliftPlayers && airliftPlayers.map((player) => {
+          const lat = Number(player?.lat);
+          const lon = Number(player?.lon);
+          if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+          const color = getAirliftPlayerColor(player.airframe);
+          const name = String(player.name || 'Unknown');
+          const airframe = String(player.airframe || player.type_name || 'Airlift');
+
+          return (
+            <CircleMarker
+              key={`airlift-player-${player.id || `${name}-${airframe}`}`}
+              center={[lat, lon]}
+              radius={5}
+              pathOptions={{
+                color: '#f8fafc',
+                fillColor: color,
+                fillOpacity: 0.92,
+                weight: 1.6,
+              }}
+            >
+              <Tooltip direction="top" offset={[0, -4]} opacity={0.95}>
+                {`${name} (${airframe})`}
+              </Tooltip>
+            </CircleMarker>
+          );
         })}
 
         {showDcsar && dcsarPoints.flatMap((point) => {
@@ -1191,6 +1237,7 @@ function MapLibreFlatMapView({
   logisticsMissions,
   gridConnections,
   convoys,
+  airliftPlayers,
   dcsarPoints,
   selectedZoneId,
   onZoneSelect,
@@ -1202,6 +1249,7 @@ function MapLibreFlatMapView({
   showAirports,
   showLogistics,
   showConvoys,
+  showAirliftPlayers,
   showDcsar,
   onDcsarHover,
   onDcsarSelect,
@@ -1400,6 +1448,29 @@ function MapLibreFlatMapView({
     }),
   }), [convoys, showConvoys]);
 
+  const fcAirliftPlayers = useMemo(() => ({
+    type: 'FeatureCollection',
+    features: !showAirliftPlayers ? [] : (airliftPlayers || []).flatMap((player) => {
+      const lat = Number(player?.lat);
+      const lon = Number(player?.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return [];
+      return [{
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [lon, lat],
+        },
+        properties: {
+          id: String(player?.id || '').trim() || `${player?.name || 'player'}-${player?.airframe || player?.type_name || ''}`,
+          name: String(player?.name || 'Unknown'),
+          airframe: String(player?.airframe || player?.type_name || 'Airlift'),
+          coalition: String(player?.coalition || ''),
+          alt_m: Number.isFinite(Number(player?.alt_m)) ? Number(player.alt_m) : null,
+        },
+      }];
+    }),
+  }), [airliftPlayers, showAirliftPlayers]);
+
   const fcDcsarLinks = useMemo(() => ({
     type: 'FeatureCollection',
     features: !showDcsar ? [] : (dcsarPoints || []).flatMap((point) => {
@@ -1493,9 +1564,10 @@ function MapLibreFlatMapView({
     zones: fcZones.features.length,
     logistics: fcLogistics.features.length,
     convoys: fcConvoyPoints.features.length,
+    airliftPlayers: fcAirliftPlayers.features.length,
     dcsar: fcDcsarPoints.features.length,
     airports: fcAirports.features.length,
-  }), [fcZones.features.length, fcLogistics.features.length, fcConvoyPoints.features.length, fcDcsarPoints.features.length, fcAirports.features.length]);
+  }), [fcZones.features.length, fcLogistics.features.length, fcConvoyPoints.features.length, fcAirliftPlayers.features.length, fcDcsarPoints.features.length, fcAirports.features.length]);
 
   const rebuildThreeDomes = useCallback(() => {
     const map = mapRef.current;
@@ -1880,6 +1952,7 @@ function MapLibreFlatMapView({
       addGeoSource('logistics-src', fcLogistics);
       addGeoSource('convoy-lines-src', fcConvoyLines);
       addGeoSource('convoy-points-src', fcConvoyPoints);
+      addGeoSource('airlift-players-src', fcAirliftPlayers);
       addGeoSource('dcsar-links-src', fcDcsarLinks);
       addGeoSource('dcsar-points-src', fcDcsarPoints);
       addGeoSource('zones-src', fcZones);
@@ -2048,6 +2121,28 @@ function MapLibreFlatMapView({
           'circle-opacity': 0.001,
         },
       });
+      map.addLayer({
+        id: 'airlift-players-layer',
+        type: 'circle',
+        source: 'airlift-players-src',
+        paint: {
+          'circle-radius': 5,
+          'circle-color': '#f59e0b',
+          'circle-stroke-color': '#f8fafc',
+          'circle-stroke-width': 1.3,
+          'circle-opacity': 0.95,
+        },
+      });
+      map.addLayer({
+        id: 'airlift-players-hit-layer',
+        type: 'circle',
+        source: 'airlift-players-src',
+        paint: {
+          'circle-radius': 14,
+          'circle-color': '#000000',
+          'circle-opacity': 0.001,
+        },
+      });
 
       map.addLayer({
         id: 'dcsar-links-accepted-layer',
@@ -2163,6 +2258,23 @@ function MapLibreFlatMapView({
         map.getCanvas().style.cursor = 'pointer';
       });
       map.on('mouseleave', 'convoy-points-hit-layer', () => {
+        map.getCanvas().style.cursor = '';
+        hideHoverPopup();
+      });
+
+      map.on('mousemove', 'airlift-players-hit-layer', (event) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const feature = event?.features?.[0];
+        const name = String(feature?.properties?.name || 'Unknown');
+        const airframe = String(feature?.properties?.airframe || 'Airlift');
+        const alt = Number(feature?.properties?.alt_m);
+        const altText = Number.isFinite(alt) ? `${Math.round(alt)} m` : 'n/a';
+        showHoverPopup(
+          event.lngLat,
+          `<div style="font-size:11px;font-weight:600;">${name}</div><div style="font-size:10px;opacity:0.9;">${airframe}</div><div style="font-size:10px;opacity:0.9;">Alt: ${altText}</div>`
+        );
+      });
+      map.on('mouseleave', 'airlift-players-hit-layer', () => {
         map.getCanvas().style.cursor = '';
         hideHoverPopup();
       });
@@ -2385,6 +2497,13 @@ function MapLibreFlatMapView({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
+    const source = map.getSource('airlift-players-src');
+    if (source?.setData) source.setData(fcAirliftPlayers);
+  }, [fcAirliftPlayers]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
     const source = map.getSource('dcsar-links-src');
     if (source?.setData) source.setData(fcDcsarLinks);
   }, [fcDcsarLinks]);
@@ -2520,7 +2639,7 @@ function MapLibreFlatMapView({
       <div ref={containerRef} className="h-full w-full" />
       <div className="pointer-events-none absolute left-2 top-2 rounded border border-yt-border bg-[#101827dd] px-2 py-1 text-[10px] text-yt-text-secondary">
         <div>MapLibre</div>
-        <div>Z:{layerCounts.zones} L:{layerCounts.logistics} C:{layerCounts.convoys} D:{layerCounts.dcsar} A:{layerCounts.airports}</div>
+        <div>Z:{layerCounts.zones} L:{layerCounts.logistics} C:{layerCounts.convoys} P:{layerCounts.airliftPlayers} D:{layerCounts.dcsar} A:{layerCounts.airports}</div>
       </div>
     </div>
   );
@@ -2529,6 +2648,7 @@ function MapLibreFlatMapView({
 export default function FrontlineMap({ airportsData }) {
   const { user } = useUser();
   const isMapLibreEngine = MAP_ENGINE === 'maplibre';
+  const [isDesktopDevice, setIsDesktopDevice] = useState(() => isDesktopGlobeDevice());
   const [selectedZoneId, setSelectedZoneId] = useState(null);
   const [selectedZoneDetailsId, setSelectedZoneDetailsId] = useState(null);
   const [hoveredZoneId, setHoveredZoneId] = useState(null);
@@ -2557,6 +2677,7 @@ export default function FrontlineMap({ airportsData }) {
   const [combatMissions, setCombatMissions] = useState([]);
   const [logisticsMissions, setLogisticsMissions] = useState([]);
   const [convoys, setConvoys] = useState([]);
+  const [airliftPlayers, setAirliftPlayers] = useState([]);
   const [dcsarPoints, setDcsarPoints] = useState([]);
   const [feedEvents, setFeedEvents] = useState([]);
   const [overlayCollapsed, setOverlayCollapsed] = useState(false);
@@ -2580,20 +2701,31 @@ export default function FrontlineMap({ airportsData }) {
     showLogistics: true,
     showAirports: true,
     showConvoys: true,
+    showAirliftPlayers: true,
     showDcsar: true,
   });
   const mapModeRef = useRef(false);
 
   useEffect(() => {
+    const updateDeviceMode = () => {
+      setIsDesktopDevice(isDesktopGlobeDevice());
+    };
+    updateDeviceMode();
+    window.addEventListener('resize', updateDeviceMode);
+    return () => {
+      window.removeEventListener('resize', updateDeviceMode);
+    };
+  }, []);
+
+  useEffect(() => {
     if (isMapLibreEngine) {
-      mapModeRef.current = true;
-      setMapMode(true);
       setFilters((current) => ({
         ...current,
         showAto: true,
         showLogistics: true,
         showAirports: true,
         showConvoys: true,
+        showAirliftPlayers: true,
         showDcsar: true,
       }));
     }
@@ -2601,8 +2733,8 @@ export default function FrontlineMap({ airportsData }) {
 
   useEffect(() => {
     let isMounted = true;
-    Promise.allSettled([getFrontlineZones(), getCombatMissions(), getMissions(), getFeed(200), getConvoys(), getDcsar()])
-      .then(([zonesResult, combatResult, logisticsResult, feedResult, convoysResult, dcsarResult]) => {
+    Promise.allSettled([getFrontlineZones(), getCombatMissions(), getMissions(), getFeed(200), getConvoys(), getAirliftPlayers(), getDcsar()])
+      .then(([zonesResult, combatResult, logisticsResult, feedResult, convoysResult, airliftPlayersResult, dcsarResult]) => {
         if (!isMounted) return;
 
         if (zonesResult.status === 'fulfilled') {
@@ -2646,6 +2778,15 @@ export default function FrontlineMap({ airportsData }) {
           }
         } else {
           console.error('Failed to load convoys:', convoysResult.reason);
+        }
+
+        if (airliftPlayersResult.status === 'fulfilled') {
+          const nextPlayers = airliftPlayersResult.value?.players || airliftPlayersResult.value;
+          if (Array.isArray(nextPlayers)) {
+            setAirliftPlayers(nextPlayers);
+          }
+        } else {
+          console.error('Failed to load airlift players:', airliftPlayersResult.reason);
         }
 
         if (dcsarResult.status === 'fulfilled') {
@@ -2697,6 +2838,13 @@ export default function FrontlineMap({ airportsData }) {
       }
     });
 
+    const unsubscribeAirliftPlayers = socketService.on('airlift-players:updated', (data) => {
+      const nextPlayers = data?.players || data;
+      if (Array.isArray(nextPlayers)) {
+        setAirliftPlayers(nextPlayers);
+      }
+    });
+
     const unsubscribeDcsar = socketService.on('dcsar:updated', (data) => {
       const nextPoints = data?.points || data;
       if (Array.isArray(nextPoints)) {
@@ -2710,6 +2858,7 @@ export default function FrontlineMap({ airportsData }) {
       unsubscribeLogistics && unsubscribeLogistics();
       unsubscribeFeed && unsubscribeFeed();
       unsubscribeConvoys && unsubscribeConvoys();
+      unsubscribeAirliftPlayers && unsubscribeAirliftPlayers();
       unsubscribeDcsar && unsubscribeDcsar();
     };
   }, []);
@@ -2757,6 +2906,22 @@ export default function FrontlineMap({ airportsData }) {
         console.error('Failed to refresh convoys:', error);
       }
     }, 20000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const latestPlayers = await getAirliftPlayers();
+        const nextPlayers = latestPlayers?.players || latestPlayers;
+        if (Array.isArray(nextPlayers)) {
+          setAirliftPlayers(nextPlayers);
+        }
+      } catch (error) {
+        console.error('Failed to refresh airlift players:', error);
+      }
+    }, 3000);
 
     return () => clearInterval(interval);
   }, []);
@@ -2859,13 +3024,12 @@ export default function FrontlineMap({ airportsData }) {
   }, [isCountdownEncrypted, countdownParts, countdownTick, scrambleTick]);
 
   useEffect(() => {
-    if (isMapLibreEngine) return;
     if (!isPreLaunchCountdownActive) return;
     if (mapModeRef.current || mapMode) {
       mapModeRef.current = false;
       setMapMode(false);
     }
-  }, [isMapLibreEngine, isPreLaunchCountdownActive, mapMode]);
+  }, [isPreLaunchCountdownActive, mapMode]);
 
   const validZones = useMemo(
     () => zones.filter((zone) => zone.coordinates && Number.isFinite(zone.coordinates.lat) && Number.isFinite(zone.coordinates.lon)),
@@ -2979,6 +3143,29 @@ export default function FrontlineMap({ airportsData }) {
       };
     }).filter((convoy) => convoy.routeLine.length >= 2 || convoy.movingPosition || convoy.lastPosition);
   }, [convoys, zoneCoordinatesById]);
+
+  const airliftPlayerRenderData = useMemo(() => {
+    return (airliftPlayers || [])
+      .map((player, index) => {
+        const lat = Number(player?.lat);
+        const lon = Number(player?.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+        return {
+          id: String(player?.id || `airlift_${index}`),
+          name: String(player?.name || 'Unknown'),
+          unit_name: String(player?.unit_name || ''),
+          group_name: String(player?.group_name || ''),
+          coalition: String(player?.coalition || '').toLowerCase(),
+          airframe: String(player?.airframe || player?.type_name || 'Airlift'),
+          type_name: String(player?.type_name || ''),
+          alt_m: Number.isFinite(Number(player?.alt_m)) ? Number(player.alt_m) : null,
+          heading_deg: Number.isFinite(Number(player?.heading_deg)) ? Number(player.heading_deg) : 0,
+          lat,
+          lon,
+        };
+      })
+      .filter(Boolean);
+  }, [airliftPlayers]);
 
   useEffect(() => {
     if (validZones.length === 0) return;
@@ -3144,7 +3331,7 @@ export default function FrontlineMap({ airportsData }) {
   const tacticalFocusTargetKey = selectedDcsarId || selectedZoneId || null;
 
   const handleScaleChange = (scale) => {
-    if (isMapLibreEngine) return;
+    if (!isDesktopDevice) return;
     if (scale >= 2.1 && !mapModeRef.current) {
       mapModeRef.current = true;
       setMapMode(true);
@@ -3158,7 +3345,7 @@ export default function FrontlineMap({ airportsData }) {
   };
 
   const handleFlatMapZoomChange = (zoom) => {
-    if (isMapLibreEngine) return;
+    if (!isDesktopDevice) return;
     if (zoom <= 5 && mapModeRef.current) {
       mapModeRef.current = false;
       setMapMode(false);
@@ -3728,7 +3915,7 @@ export default function FrontlineMap({ airportsData }) {
                 isPreLaunchCountdownActive ? 'pointer-events-none select-none blur-[8px]' : ''
               }`}
             >
-              {!isMapLibreEngine && (
+              {isDesktopDevice && !mapMode && (
                 <div className={`${mapMode ? 'pointer-events-none absolute inset-0 opacity-0' : 'relative h-full w-full opacity-100'} transition-opacity duration-300`}>
                   <GlobeCanvas
                     points={globePoints}
@@ -3740,7 +3927,7 @@ export default function FrontlineMap({ airportsData }) {
                   />
                 </div>
               )}
-              {(isMapLibreEngine || mapMode) && (
+              {(mapMode || !isDesktopDevice) && (
                 <div className="absolute inset-0">
                   {isMapLibreEngine ? (
                     <MapLibreFlatMapView
@@ -3749,6 +3936,7 @@ export default function FrontlineMap({ airportsData }) {
                       logisticsMissions={filteredLogisticsMissions}
                       gridConnections={gridConnections}
                       convoys={convoyRenderData}
+                      airliftPlayers={airliftPlayerRenderData}
                       dcsarPoints={dcsarPointsWithNearest}
                       selectedZoneId={selectedZoneId}
                       onZoneSelect={setSelectedZoneId}
@@ -3762,6 +3950,7 @@ export default function FrontlineMap({ airportsData }) {
                       showAirports={filters.showAirports}
                       showLogistics={filters.showLogistics}
                       showConvoys={filters.showConvoys}
+                      showAirliftPlayers={filters.showAirliftPlayers}
                       showDcsar={filters.showDcsar}
                       animationTick={animationTick}
                       basemapMode={basemapMode}
@@ -3774,6 +3963,7 @@ export default function FrontlineMap({ airportsData }) {
                       logisticsMissions={filteredLogisticsMissions}
                       gridConnections={gridConnections}
                       convoys={convoyRenderData}
+                      airliftPlayers={airliftPlayerRenderData}
                       dcsarPoints={dcsarPointsWithNearest}
                       selectedZoneId={selectedZoneId}
                       onZoneSelect={setSelectedZoneId}
@@ -3787,6 +3977,7 @@ export default function FrontlineMap({ airportsData }) {
                       showAirports={filters.showAirports}
                       showLogistics={filters.showLogistics}
                       showConvoys={filters.showConvoys}
+                      showAirliftPlayers={filters.showAirliftPlayers}
                       showDcsar={filters.showDcsar}
                       animationTick={animationTick}
                       basemapMode={basemapMode}
@@ -3795,7 +3986,7 @@ export default function FrontlineMap({ airportsData }) {
                   )}
                 </div>
               )}
-              {!isMapLibreEngine && mapMode && (
+              {isDesktopDevice && mapMode && (
                 <div className="pointer-events-none absolute inset-x-0 top-3 mx-auto w-fit rounded-full border border-yt-border/80 bg-yt-bg-secondary/90 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-yt-text-secondary">
                   Tactical 2D Map (zoom threshold reached)
                 </div>
@@ -3845,7 +4036,7 @@ export default function FrontlineMap({ airportsData }) {
 
                 {!overlayCollapsed && (
                   <>
-                    <div className="mb-3 grid grid-cols-4 gap-3">
+                    <div className="mb-3 grid grid-cols-5 gap-3">
                       <button
                         type="button"
                         onClick={() => setFilters((current) => ({ ...current, showAto: !current.showAto }))}
@@ -3889,6 +4080,17 @@ export default function FrontlineMap({ airportsData }) {
                         }`}
                       >
                         DCSAR
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFilters((current) => ({ ...current, showAirliftPlayers: !current.showAirliftPlayers }))}
+                        className={`rounded border px-2 py-1 text-[11px] font-semibold ${
+                          filters.showAirliftPlayers
+                            ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
+                            : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
+                        }`}
+                      >
+                        Airlift
                       </button>
                     </div>
 

@@ -62,6 +62,9 @@ const CONVOY_SYNC_FILE = process.env.CONVOY_SYNC_FILE
 const DCSAR_SYNC_FILE = process.env.DCSAR_SYNC_FILE
   ? path.resolve(process.env.DCSAR_SYNC_FILE)
   : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DMAP\\Export_DCSAR_Positions.json';
+const AIRLIFT_PLAYERS_SYNC_FILE = process.env.AIRLIFT_PLAYERS_SYNC_FILE
+  ? path.resolve(process.env.AIRLIFT_PLAYERS_SYNC_FILE)
+  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DRED_AIR\\Export_AirliftPlayers.json';
 
 // CSV Directory - configurable via environment variable
 const CSV_DIR = process.env.CSV_DIR
@@ -146,6 +149,8 @@ let convoySyncSignature = '';
 let convoyEventById = new Map();
 let dcsarSyncSignature = '';
 let dcsarPoints = [];
+let airliftPlayersSyncSignature = '';
+let airliftPlayers = [];
 let zoneOperationsById = new Map();
 const ZONE_OPERATION_TTL_MS = 45 * 60 * 1000;
 const ZONE_OPERATION_MAX_PER_USER = 2;
@@ -457,6 +462,55 @@ function syncDcsarFromFile() {
     });
   } catch (error) {
     console.error('Failed DCSAR sync from file:', error.message);
+  }
+}
+
+function normalizeAirliftPlayerEntry(entry) {
+  const toNum = (value) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
+  const lat = toNum(entry?.lat);
+  const lon = toNum(entry?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+  return {
+    id: String(entry?.id || '').trim() || null,
+    name: String(entry?.name || '').trim() || 'Unknown',
+    unit_name: String(entry?.unit_name || '').trim() || null,
+    group_name: String(entry?.group_name || '').trim() || null,
+    coalition: String(entry?.coalition || '').trim().toLowerCase() || null,
+    type_name: String(entry?.type_name || '').trim() || null,
+    airframe: String(entry?.airframe || '').trim() || null,
+    lat,
+    lon,
+    alt_m: toNum(entry?.alt_m),
+    heading_deg: toNum(entry?.heading_deg),
+  };
+}
+
+function syncAirliftPlayersFromFile() {
+  try {
+    if (!fs.existsSync(AIRLIFT_PLAYERS_SYNC_FILE)) return;
+
+    const raw = fs.readFileSync(AIRLIFT_PLAYERS_SYNC_FILE, 'utf8');
+    if (!raw || raw.trim() === '') return;
+    if (raw === airliftPlayersSyncSignature) return;
+    airliftPlayersSyncSignature = raw;
+
+    const parsed = JSON.parse(raw);
+    const incoming = Array.isArray(parsed?.players) ? parsed.players : [];
+    const normalized = incoming
+      .map(normalizeAirliftPlayerEntry)
+      .filter(Boolean);
+
+    airliftPlayers = normalized;
+
+    io.emit('airlift-players:updated', {
+      players: airliftPlayers,
+    });
+  } catch (error) {
+    console.error('Failed airlift players sync from file:', error.message);
   }
 }
 
@@ -1272,6 +1326,13 @@ app.get('/api/feed', (req, res) => {
  */
 app.get('/api/dcsar', (req, res) => {
   res.json({ points: dcsarPoints });
+});
+
+/**
+ * GET /api/airlift-players - Get tracked player positions for transport airframes
+ */
+app.get('/api/airlift-players', (req, res) => {
+  res.json({ players: airliftPlayers });
 });
 
 /**
@@ -2196,6 +2257,9 @@ io.on('connection', (socket) => {
   socket.emit('dcsar:updated', {
     points: dcsarPoints,
   });
+  socket.emit('airlift-players:updated', {
+    players: airliftPlayers,
+  });
   socket.emit('frontline:updated', {
     zones: buildFrontlineZonesPayload(loadFrontlineZonesFromFile()),
   });
@@ -2356,6 +2420,11 @@ setInterval(() => {
   syncDcsarFromFile();
 }, 2000);
 
+// Poll tracked airlift players exported by mission script
+setInterval(() => {
+  syncAirliftPlayersFromFile();
+}, 2000);
+
 // ==================== START SERVER ====================
 
 // Load airbase status first
@@ -2373,6 +2442,7 @@ io.emit('convoys:updated', {
 // Initial convoy sync from local JSON exported by DCS scripts
 syncConvoysFromFile();
 syncDcsarFromFile();
+syncAirliftPlayersFromFile();
 
 httpServer.listen(PORT, () => {
   const activeAirports = airbaseStatusManager.getActiveAirports();
