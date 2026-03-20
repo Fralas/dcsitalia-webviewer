@@ -25,6 +25,9 @@ import { useUser } from '../contexts/UserContext';
 const MAP_ENGINE = String(import.meta.env.VITE_MAP_ENGINE || 'leaflet').trim().toLowerCase();
 const BASEMAP_MODE_DARK = 'dark';
 const BASEMAP_MODE_SATELLITE = 'satellite';
+const SHOW_AIRLIFT_FILTER_BUTTON = false;
+const MAPLIBRE_NAV_CONTROL_POSITION = 'bottom-right';
+const MAPLIBRE_FOCUS_Y_OFFSET_PX = 132;
 
 function isDesktopGlobeDevice() {
   if (typeof window === 'undefined') return true;
@@ -1274,7 +1277,6 @@ function MapLibreFlatMapView({
   const MAX_SAFE_ZOOM = 11.8;
   const containerRef = useRef(null);
   const mapRef = useRef(null);
-  const dcsarMarkersRef = useRef(new Map());
   const dcsarByIdRef = useRef(new Map());
   const domes3dRef = useRef({
     scene: null,
@@ -1983,7 +1985,7 @@ function MapLibreFlatMapView({
       maxPitch: MAX_PITCH,
     });
     mapRef.current = map;
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), MAPLIBRE_NAV_CONTROL_POSITION);
     // Reduce zoom aggressiveness from fast wheel input to avoid unstable camera states.
     map.scrollZoom.setWheelZoomRate(1 / 1500);
     map.scrollZoom.setZoomRate(1 / 220);
@@ -2136,8 +2138,13 @@ function MapLibreFlatMapView({
             : (args?.modelViewProjectionMatrix || args?.projectionMatrix || matrix);
           camera.projectionMatrix = new THREE.Matrix4().fromArray(projectionMatrix);
 
-          // Partial line-of-sight fade: domes outside the current view bearing fade out.
-          const center = map.getCenter();
+          // Keep fade reference aligned with the visual focus point used by autofocus.
+          const canvas = map.getCanvas();
+          const referenceX = (canvas?.clientWidth || 0) / 2;
+          const referenceY = ((canvas?.clientHeight || 0) / 2) + MAPLIBRE_FOCUS_Y_OFFSET_PX;
+          const center = (referenceX > 0 && referenceY > 0)
+            ? map.unproject([referenceX, referenceY])
+            : map.getCenter();
           const centerPoint = [center.lat, center.lng];
           const viewBearing = (map.getBearing() + 360) % 360;
           domes.forEach((dome) => {
@@ -2496,11 +2503,13 @@ function MapLibreFlatMapView({
       const element = createMapLibreDcsarDomMarker(isAccepted);
       const marker = new maplibregl.Marker({
         element,
+        // Keep the marker "feet" on ground and lift slightly to avoid terrain clipping.
         anchor: 'bottom',
-        pitchAlignment: 'map',
-        rotationAlignment: 'map',
+        offset: [0, -MAPLIBRE_DCSAR_MARKER_LIFT_PX],
+        pitchAlignment: 'viewport',
+        rotationAlignment: 'viewport',
         opacity: '1',
-        opacityWhenCovered: '1',
+        opacityWhenCovered: '0',
       })
         .setLngLat([lon, lat])
         .addTo(map);
@@ -2662,6 +2671,7 @@ function MapLibreFlatMapView({
 
     map.easeTo({
       center: [nextLon, nextLat],
+      offset: [0, MAPLIBRE_FOCUS_Y_OFFSET_PX],
       zoom: Math.min(MAX_SAFE_ZOOM, map.getZoom() + 0.35),
       duration: 950,
       easing: (t) => t * (2 - t),
@@ -4115,7 +4125,7 @@ export default function FrontlineMap({ airportsData }) {
 
                 {!overlayCollapsed && (
                   <>
-                    <div className="mb-3 grid grid-cols-5 gap-3">
+                    <div className={`mb-3 grid ${SHOW_AIRLIFT_FILTER_BUTTON ? 'grid-cols-5' : 'grid-cols-4'} gap-3`}>
                       <button
                         type="button"
                         onClick={() => setFilters((current) => ({ ...current, showAto: !current.showAto }))}
@@ -4160,17 +4170,19 @@ export default function FrontlineMap({ airportsData }) {
                       >
                         DCSAR
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setFilters((current) => ({ ...current, showAirliftPlayers: !current.showAirliftPlayers }))}
-                        className={`rounded border px-2 py-1 text-[11px] font-semibold ${
-                          filters.showAirliftPlayers
-                            ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
-                            : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
-                        }`}
-                      >
-                        Airlift
-                      </button>
+                      {SHOW_AIRLIFT_FILTER_BUTTON && (
+                        <button
+                          type="button"
+                          onClick={() => setFilters((current) => ({ ...current, showAirliftPlayers: !current.showAirliftPlayers }))}
+                          className={`rounded border px-2 py-1 text-[11px] font-semibold ${
+                            filters.showAirliftPlayers
+                              ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
+                              : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
+                          }`}
+                        >
+                          Airlift
+                        </button>
+                      )}
                     </div>
 
                     <div className="mb-2 flex flex-wrap gap-1.5">
