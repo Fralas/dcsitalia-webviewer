@@ -2254,6 +2254,43 @@ function MapLibreFlatMapView({
         },
       });
 
+      map.addLayer({
+        id: 'dcsar-points-pending-layer',
+        type: 'circle',
+        source: 'dcsar-points-src',
+        filter: ['!=', ['get', 'accepted'], 1],
+        paint: {
+          'circle-radius': 6.5,
+          'circle-color': '#f8fafc',
+          'circle-stroke-color': '#0f172a',
+          'circle-stroke-width': 1.8,
+          'circle-opacity': 0.95,
+        },
+      });
+      map.addLayer({
+        id: 'dcsar-points-accepted-layer',
+        type: 'circle',
+        source: 'dcsar-points-src',
+        filter: ['==', ['get', 'accepted'], 1],
+        paint: {
+          'circle-radius': 6.5,
+          'circle-color': '#22c55e',
+          'circle-stroke-color': '#052e16',
+          'circle-stroke-width': 1.8,
+          'circle-opacity': 0.95,
+        },
+      });
+      map.addLayer({
+        id: 'dcsar-points-hit-layer',
+        type: 'circle',
+        source: 'dcsar-points-src',
+        paint: {
+          'circle-radius': 14,
+          'circle-color': '#000000',
+          'circle-opacity': 0.001,
+        },
+      });
+
 
 
       map.addLayer({
@@ -2365,6 +2402,32 @@ function MapLibreFlatMapView({
         hideHoverPopup();
       });
 
+      map.on('click', 'dcsar-points-hit-layer', (event) => {
+        const feature = event?.features?.[0];
+        const dcsarId = String(feature?.properties?.id || '').trim();
+        if (!dcsarId || !onDcsarSelect) return;
+        const point = dcsarByIdRef.current.get(dcsarId);
+        if (point) onDcsarSelect(point);
+      });
+      map.on('mousemove', 'dcsar-points-hit-layer', (event) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const feature = event?.features?.[0];
+        const dcsarId = String(feature?.properties?.id || '').trim();
+        const accepted = Number(feature?.properties?.accepted) === 1;
+        if (onDcsarHover) onDcsarHover(dcsarId || null);
+        const label = dcsarId ? `CSAR ${dcsarId}` : 'CSAR';
+        const status = accepted ? 'Accepted' : 'Pending';
+        showHoverPopup(
+          event.lngLat,
+          `<div style="font-size:11px;font-weight:600;">${label}</div><div style="font-size:10px;opacity:0.9;">${status}</div>`
+        );
+      });
+      map.on('mouseleave', 'dcsar-points-hit-layer', () => {
+        map.getCanvas().style.cursor = '';
+        if (onDcsarHover) onDcsarHover(null);
+        hideHoverPopup();
+      });
+
       map.on('mousemove', 'logistics-hit-pending', () => {
         map.getCanvas().style.cursor = '';
       });
@@ -2442,11 +2505,6 @@ function MapLibreFlatMapView({
 
     return () => {
       logMapDebug('map-unmount');
-      dcsarMarkersRef.current.forEach(({ marker, cleanup }) => {
-        if (typeof cleanup === 'function') cleanup();
-        marker.remove();
-      });
-      dcsarMarkersRef.current.clear();
       if (domes3dRef.current.group) {
         while (domes3dRef.current.group.children.length > 0) {
           const child = domes3dRef.current.group.children.pop();
@@ -2464,95 +2522,6 @@ function MapLibreFlatMapView({
       mapRef.current = null;
     };
   }, [style, logMapDebug, disposeThreeNode]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    if (!showDcsar) {
-      dcsarMarkersRef.current.forEach(({ marker, cleanup }) => {
-        if (typeof cleanup === 'function') cleanup();
-        marker.remove();
-      });
-      dcsarMarkersRef.current.clear();
-      return;
-    }
-
-    const nextIds = new Set();
-    (dcsarPoints || []).forEach((point) => {
-      const id = String(point?.id || '').trim();
-      const lat = Number(point?.lat);
-      const lon = Number(point?.lon);
-      if (!id || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
-      nextIds.add(id);
-
-      const isAccepted = point.status === 'accepted' || point.accepted === true;
-      const existing = dcsarMarkersRef.current.get(id);
-
-      if (existing) {
-        existing.marker.setLngLat([lon, lat]);
-        if (existing.accepted !== isAccepted) {
-          if (typeof existing.cleanup === 'function') existing.cleanup();
-          existing.marker.remove();
-          dcsarMarkersRef.current.delete(id);
-        } else {
-          existing.point = point;
-          return;
-        }
-      }
-
-      const element = createMapLibreDcsarDomMarker(isAccepted);
-      const marker = new maplibregl.Marker({
-        element,
-        // Keep the marker "feet" on ground and lift slightly to avoid terrain clipping.
-        anchor: 'bottom',
-        offset: [0, -MAPLIBRE_DCSAR_MARKER_LIFT_PX],
-        pitchAlignment: 'viewport',
-        rotationAlignment: 'viewport',
-        opacity: '1',
-        opacityWhenCovered: '0',
-      })
-        .setLngLat([lon, lat])
-        .addTo(map);
-
-      const entry = { marker, accepted: isAccepted, point, cleanup: null };
-
-      const onMouseEnter = () => {
-        map.getCanvas().style.cursor = 'pointer';
-        if (onDcsarHover) onDcsarHover(id);
-        if (popupRef.current) {
-          popupRef.current
-            .setLngLat([lon, lat])
-            .setHTML(`<div style="font-size:11px;font-weight:600;">CSAR ${id}</div>`)
-            .addTo(map);
-        }
-      };
-      const onMouseLeave = () => {
-        map.getCanvas().style.cursor = '';
-        if (onDcsarHover) onDcsarHover(null);
-        if (popupRef.current) popupRef.current.remove();
-      };
-      const onClick = () => {
-        if (onDcsarSelect) onDcsarSelect(entry.point);
-      };
-
-      element.addEventListener('mouseenter', onMouseEnter);
-      element.addEventListener('mouseleave', onMouseLeave);
-      element.addEventListener('click', onClick);
-      entry.cleanup = () => {
-        element.removeEventListener('mouseenter', onMouseEnter);
-        element.removeEventListener('mouseleave', onMouseLeave);
-        element.removeEventListener('click', onClick);
-      };
-      dcsarMarkersRef.current.set(id, entry);
-    });
-
-    dcsarMarkersRef.current.forEach((entry, id) => {
-      if (nextIds.has(id)) return;
-      if (typeof entry.cleanup === 'function') entry.cleanup();
-      entry.marker.remove();
-      dcsarMarkersRef.current.delete(id);
-    });
-  }, [dcsarPoints, showDcsar, onDcsarHover, onDcsarSelect]);
 
   useEffect(() => {
     const map = mapRef.current;
