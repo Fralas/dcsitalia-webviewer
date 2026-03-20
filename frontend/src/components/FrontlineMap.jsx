@@ -28,6 +28,9 @@ const BASEMAP_MODE_SATELLITE = 'satellite';
 const SHOW_AIRLIFT_FILTER_BUTTON = false;
 const MAPLIBRE_NAV_CONTROL_POSITION = 'bottom-right';
 const MAPLIBRE_FOCUS_Y_OFFSET_PX = 132;
+const MAPLIBRE_DCSAR_ICON_PENDING_IMAGE_ID = 'dcsar-person-icon-pending';
+const MAPLIBRE_DCSAR_ICON_ACCEPTED_IMAGE_ID = 'dcsar-person-icon-accepted';
+const MAPLIBRE_DCSAR_ICON_SIZE = ['interpolate', ['linear'], ['zoom'], 5, 1.15, 8, 1.55, 10, 1.9];
 
 function isDesktopGlobeDevice() {
   if (typeof window === 'undefined') return true;
@@ -566,81 +569,8 @@ function createDcsarIcon(color = '#f8fafc') {
   });
 }
 
-function ensureDcsarDomPulseStyles() {
-  if (typeof document === 'undefined') return;
-  let style = document.getElementById('dcsar-dom-pulse-style');
-  if (!style) {
-    style = document.createElement('style');
-    style.id = 'dcsar-dom-pulse-style';
-    document.head.appendChild(style);
-  }
-  style.textContent = `
-    @keyframes dcsarRingPulse {
-      0% { transform: translate(-50%, -50%) scale(0.12); opacity: 0.9; }
-      15% { transform: translate(-50%, -50%) scale(0.45); opacity: 0.82; }
-      60% { transform: translate(-50%, -50%) scale(2.6); opacity: 0.34; }
-      82% { transform: translate(-50%, -50%) scale(3.05); opacity: 0.12; }
-      100% { transform: translate(-50%, -50%) scale(3.35); opacity: 0; }
-    }
-  `;
-}
-
-function createMapLibreDcsarDomMarker(isAccepted) {
-  const color = isAccepted ? '#22c55e' : '#f8fafc';
-
-  const root = document.createElement('div');
-  root.style.position = 'relative';
-  root.style.width = '60px';
-  root.style.height = '60px';
-  root.style.pointerEvents = 'auto';
-  root.style.cursor = 'pointer';
-
-  const ring = document.createElement('div');
-  ring.style.position = 'absolute';
-  ring.style.left = '50%';
-  ring.style.top = '50%';
-  ring.style.width = '30px';
-  ring.style.height = '30px';
-  ring.style.borderRadius = '9999px';
-  ring.style.border = `3px solid ${color}`;
-  ring.style.boxShadow = `0 0 10px ${color}66`;
-  ring.style.transform = 'translate(-50%, -50%)';
-  ring.style.transformOrigin = 'center center';
-  ring.style.willChange = 'transform, opacity';
-  if (typeof ring.animate === 'function') {
-    ring.animate(
-      [
-        { transform: 'translate(-50%, -50%) scale(0.65)', opacity: 0.92 },
-        { transform: 'translate(-50%, -50%) scale(0.95)', opacity: 0.86, offset: 0.18 },
-        { transform: 'translate(-50%, -50%) scale(1.35)', opacity: 0.32, offset: 0.65 },
-        { transform: 'translate(-50%, -50%) scale(1.55)', opacity: 0.1, offset: 0.85 },
-        { transform: 'translate(-50%, -50%) scale(1.7)', opacity: 0 },
-      ],
-      {
-        duration: 3375,
-        iterations: Infinity,
-        easing: 'ease-out',
-      }
-    );
-  } else {
-    ring.style.animation = 'dcsarRingPulse 3.375s ease-out infinite';
-  }
-  ring.style.pointerEvents = 'none';
-  root.appendChild(ring);
-
-  const iconWrap = document.createElement('div');
-  iconWrap.style.position = 'absolute';
-  iconWrap.style.left = '50%';
-  iconWrap.style.top = '50%';
-  iconWrap.style.transform = 'translate(-50%, -50%)';
-  iconWrap.style.width = '28px';
-  iconWrap.style.height = '28px';
-  iconWrap.style.display = 'flex';
-  iconWrap.style.alignItems = 'center';
-  iconWrap.style.justifyContent = 'center';
-  iconWrap.style.filter = 'drop-shadow(0 0 4px rgba(0,0,0,0.75))';
-  iconWrap.style.pointerEvents = 'none';
-  iconWrap.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 28 28">
+function buildDcsarPersonSvgMarkup(color = '#f8fafc') {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
     <g fill="none" stroke="${color}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="14" cy="5.5" r="2.2" />
       <path d="M14 8.8v7.2" />
@@ -649,9 +579,29 @@ function createMapLibreDcsarDomMarker(isAccepted) {
       <path d="M16.7 26l-2.1-7.3" />
     </g>
   </svg>`;
-  root.appendChild(iconWrap);
+}
 
-  return root;
+function loadSvgAsImage(svgMarkup) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Failed to load SVG icon image'));
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`;
+  });
+}
+
+async function ensureMapLibreDcsarIconImages(map) {
+  const defs = [
+    { id: MAPLIBRE_DCSAR_ICON_PENDING_IMAGE_ID, color: '#f8fafc' },
+    { id: MAPLIBRE_DCSAR_ICON_ACCEPTED_IMAGE_ID, color: '#22c55e' },
+  ];
+
+  for (const def of defs) {
+    if (map.hasImage(def.id)) continue;
+    const svg = buildDcsarPersonSvgMarkup(def.color);
+    const image = await loadSvgAsImage(svg);
+    map.addImage(def.id, image, { pixelRatio: 2 });
+  }
 }
 
 function getItemQuantity(item) {
@@ -1256,7 +1206,6 @@ function MapLibreFlatMapView({
   showDcsar,
   onDcsarHover,
   onDcsarSelect,
-  animationTick,
   basemapMode,
   focusTargetKey,
 }) {
@@ -1504,18 +1453,21 @@ function MapLibreFlatMapView({
       type: 'FeatureCollection',
       features: !showDcsar ? [] : (dcsarPoints || []).flatMap((point) => {
         if (!Number.isFinite(point?.lat) || !Number.isFinite(point?.lon)) return [];
+        const id = String(point.id || '').trim();
+        if (!id) return [];
         const accepted = point.accepted ? 1 : 0;
 
-        dcsarByIdRef.current.set(String(point.id || ''), point);
+        dcsarByIdRef.current.set(id, point);
 
         return [{
+          id,
           type: 'Feature',
           geometry: {
             type: 'Point',
             coordinates: [point.lon, point.lat],
           },
           properties: {
-            id: point.id || '',
+            id,
             accepted,
           },
         }];
@@ -2011,8 +1963,7 @@ function MapLibreFlatMapView({
       if (event?.originalEvent) markUserCameraInteraction();
     });
 
-    map.on('load', () => {
-      ensureDcsarDomPulseStyles();
+    map.on('load', async () => {
       popupRef.current = new maplibregl.Popup({
         closeButton: false,
         closeOnClick: false,
@@ -2040,6 +1991,12 @@ function MapLibreFlatMapView({
       const addGeoSource = (id, data) => {
         map.addSource(id, { type: 'geojson', data });
       };
+
+      try {
+        await ensureMapLibreDcsarIconImages(map);
+      } catch (error) {
+        console.error('Failed to initialize DCSAR icon images:', error);
+      }
 
       addGeoSource('grid-src', fcGrid);
       addGeoSource('logistics-src', fcLogistics);
@@ -2255,29 +2212,31 @@ function MapLibreFlatMapView({
       });
 
       map.addLayer({
-        id: 'dcsar-points-pending-layer',
-        type: 'circle',
+        id: 'dcsar-icons-pending-layer',
+        type: 'symbol',
         source: 'dcsar-points-src',
         filter: ['!=', ['get', 'accepted'], 1],
-        paint: {
-          'circle-radius': 6.5,
-          'circle-color': '#f8fafc',
-          'circle-stroke-color': '#0f172a',
-          'circle-stroke-width': 1.8,
-          'circle-opacity': 0.95,
+        layout: {
+          'icon-image': MAPLIBRE_DCSAR_ICON_PENDING_IMAGE_ID,
+          'icon-size': MAPLIBRE_DCSAR_ICON_SIZE,
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'map',
+          'icon-rotation-alignment': 'map',
         },
       });
       map.addLayer({
-        id: 'dcsar-points-accepted-layer',
-        type: 'circle',
+        id: 'dcsar-icons-accepted-layer',
+        type: 'symbol',
         source: 'dcsar-points-src',
         filter: ['==', ['get', 'accepted'], 1],
-        paint: {
-          'circle-radius': 6.5,
-          'circle-color': '#22c55e',
-          'circle-stroke-color': '#052e16',
-          'circle-stroke-width': 1.8,
-          'circle-opacity': 0.95,
+        layout: {
+          'icon-image': MAPLIBRE_DCSAR_ICON_ACCEPTED_IMAGE_ID,
+          'icon-size': MAPLIBRE_DCSAR_ICON_SIZE,
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'map',
+          'icon-rotation-alignment': 'map',
         },
       });
       map.addLayer({
@@ -3001,12 +2960,13 @@ export default function FrontlineMap({ airportsData }) {
   }, []);
 
   useEffect(() => {
+    if (isMapLibreEngine) return undefined;
     const interval = setInterval(() => {
       setAnimationTick(Date.now());
     }, 280);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isMapLibreEngine]);
 
   useEffect(() => {
     let isMounted = true;
@@ -4010,7 +3970,6 @@ export default function FrontlineMap({ airportsData }) {
                       showConvoys={filters.showConvoys}
                       showAirliftPlayers={filters.showAirliftPlayers}
                       showDcsar={filters.showDcsar}
-                      animationTick={animationTick}
                       basemapMode={basemapMode}
                       focusTargetKey={tacticalFocusTargetKey}
                     />
