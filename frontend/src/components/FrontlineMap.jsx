@@ -4117,12 +4117,6 @@ export default function FrontlineMap({ airportsData }) {
                   )}
                 </div>
               )}
-              {isDesktopDevice && mapMode && (
-                <div className="pointer-events-none absolute inset-x-0 top-3 mx-auto w-fit rounded-full border border-yt-border/80 bg-yt-bg-secondary/90 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-yt-text-secondary">
-                  Tactical 2D Map (zoom threshold reached)
-                </div>
-              )}
-
               <div
                 className={`absolute left-3 top-3 z-[1000] rounded-xl border border-yt-border bg-[#151925f2] shadow-2xl backdrop-blur transition-all duration-200 ${
                   overlayCollapsed ? 'w-[46px] p-1.5' : 'w-[320px] p-3'
