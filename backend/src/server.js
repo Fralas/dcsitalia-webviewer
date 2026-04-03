@@ -58,6 +58,9 @@ const DISCORD_GUILD_ID = String(process.env.DISCORD_GUILD_ID || '').trim();
 const DISCORD_BOT_TOKEN = String(process.env.DISCORD_BOT_TOKEN || '').trim();
 const DISCORD_LOGISTICS_ROUTE_ROLE_ID = String(process.env.DISCORD_LOGISTICS_ROUTE_ROLE_ID || '1447684923518484500').trim();
 const DISCORD_ROLE_CACHE_TTL_MS = 10 * 60 * 1000;
+const MAX_CARRIER_SOURCE_DISTANCE_KM = 50;
+const KM_PER_NM = 1.852;
+const MAX_CARRIER_SOURCE_DISTANCE_NM = MAX_CARRIER_SOURCE_DISTANCE_KM / KM_PER_NM;
 // March 13, 2026 17:00 Europe/Rome (CET => 16:00 UTC)
 const LAUNCH_TARGET_UTC_MS = Date.UTC(2026, 2, 13, 16, 0, 0);
 const CONVOY_SYNC_FILE = process.env.CONVOY_SYNC_FILE
@@ -1885,6 +1888,9 @@ app.post('/api/test/generate-mission', (req, res) => {
     priority: getWeaponPriority(weaponId, currentQuantity),
     expiryHours: 24,
   });
+  if (!missionId) {
+    return res.status(400).json({ error: 'Carrier source routes are limited to 50 km' });
+  }
 
   console.log(`🧪 TEST: Generated mission ${missionId} for ${weaponId} at ${airportId}`);
 
@@ -1969,6 +1975,9 @@ app.post('/api/test/generate-random-missions', (req, res) => {
       priority: getWeaponPriority(randomWeapon, randomQuantity),
       expiryHours: 24,
     });
+    if (!missionId) {
+      continue;
+    }
 
     generatedMissions.push({
       missionId,
@@ -2082,6 +2091,9 @@ app.post('/api/airports/:id/create-order', (req, res) => {
     priority,
     expiryHours: 24,
   });
+  if (!orderId) {
+    return res.status(400).json({ error: 'Carrier source routes are limited to 50 km' });
+  }
 
   console.log(`📦 Manual order created: ${orderId} for ${weaponId} at ${airport.displayName} (qty: ${quantity})`);
   console.log(`   Route: ${bestSource.airportName} → ${airport.displayName} (${bestSource.distance}nm)`);
@@ -2248,6 +2260,14 @@ app.post('/api/airports/:id/compose-mission', (req, res) => {
     };
   });
 
+  const firstMission = selectedContainers[0]?.mission;
+  const distanceNm = Number(firstMission?.distance_nm) || null;
+  const recommendedAircraft = firstMission?.recommended_aircraft || 'airplane';
+  const sourceAirport = getAirportById(sourceAirportId);
+  if (sourceAirport?.isCarrier && Number.isFinite(distanceNm) && distanceNm > MAX_CARRIER_SOURCE_DISTANCE_NM) {
+    return res.status(400).json({ error: 'Carrier source routes are limited to 50 km' });
+  }
+
   const missionMetaById = new Map(missionIdsTouched.map((id) => [id, activeById.get(id)]));
   missionIdsTouched.forEach((id) => historicalData.cancelMission(id));
   remainderByMission.forEach((ordersRaw, id) => {
@@ -2270,10 +2290,6 @@ app.post('/api/airports/:id/compose-mission', (req, res) => {
     });
   });
 
-  const firstMission = selectedContainers[0]?.mission;
-  const distanceNm = Number(firstMission?.distance_nm) || null;
-  const recommendedAircraft = firstMission?.recommended_aircraft || 'airplane';
-
   const missionId = historicalData.createMission({
     airportId,
     sourceAirportId,
@@ -2285,6 +2301,9 @@ app.post('/api/airports/:id/compose-mission', (req, res) => {
     priority: bestPriority,
     expiryHours: 24,
   });
+  if (!missionId) {
+    return res.status(400).json({ error: 'Carrier source routes are limited to 50 km' });
+  }
 
   io.emit('missions:updated', {
     missions: historicalData.getActiveMissions(),
@@ -2553,6 +2572,13 @@ setInterval(() => {
       missions: historicalData.getActiveMissions()
     });
   }
+
+  const expiredCarrierSourceDistanceMissions = historicalData.expireCarrierSourceMissionsBeyondDistance();
+  if (expiredCarrierSourceDistanceMissions > 0) {
+    io.emit('missions:updated', {
+      missions: historicalData.getActiveMissions()
+    });
+  }
 }, 60 * 1000);
 
 // Regenerate unaccepted logistics missions every 10 minutes
@@ -2605,6 +2631,15 @@ loadHiddenLogisticsRouteAirportIds();
 
 // Load initial data
 await loadFromBuffer();
+
+// Enforce logistics mission policies on startup
+const expiredCarrierDestinationAtBoot = historicalData.expireCarrierDestinationMissions();
+const expiredCarrierSourceDistanceAtBoot = historicalData.expireCarrierSourceMissionsBeyondDistance();
+if (expiredCarrierDestinationAtBoot > 0 || expiredCarrierSourceDistanceAtBoot > 0) {
+  io.emit('missions:updated', {
+    missions: historicalData.getActiveMissions()
+  });
+}
 
 // Reset convoy state at each backend restart
 convoysService.clearAllConvoys();
