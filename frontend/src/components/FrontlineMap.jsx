@@ -1519,15 +1519,6 @@ function MapLibreFlatMapView({
     }),
   }), [airportsData, showAirports]);
 
-  const layerCounts = useMemo(() => ({
-    zones: fcZones.features.length,
-    logistics: fcLogistics.features.length,
-    convoys: fcConvoyPoints.features.length,
-    airliftPlayers: fcAirliftPlayers.features.length,
-    dcsar: fcDcsarPoints.features.length,
-    airports: fcAirports.features.length,
-  }), [fcZones.features.length, fcLogistics.features.length, fcConvoyPoints.features.length, fcAirliftPlayers.features.length, fcDcsarPoints.features.length, fcAirports.features.length]);
-
   const disposeThreeNode = useCallback((node) => {
     if (!node) return;
     node.traverse?.((entry) => {
@@ -2643,10 +2634,6 @@ function MapLibreFlatMapView({
   return (
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
-      <div className="pointer-events-none absolute left-2 top-2 rounded border border-yt-border bg-[#101827dd] px-2 py-1 text-[10px] text-yt-text-secondary">
-        <div>MapLibre</div>
-        <div>Z:{layerCounts.zones} L:{layerCounts.logistics} C:{layerCounts.convoys} P:{layerCounts.airliftPlayers} D:{layerCounts.dcsar} A:{layerCounts.airports}</div>
-      </div>
     </div>
   );
 }
