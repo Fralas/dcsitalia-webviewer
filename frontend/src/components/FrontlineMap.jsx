@@ -18,11 +18,12 @@ import airports from '../config/airports';
 import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
 import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
-import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, createOrder, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getMissions, getServerTime } from '../services/api';
+import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, createOrder, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getLogisticsRouteVisibility, getMissions, getServerTime, setAirportLogisticsRoutePriority } from '../services/api';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
 const MAP_ENGINE = String(import.meta.env.VITE_MAP_ENGINE || 'leaflet').trim().toLowerCase();
+const LOGISTICS_ROUTE_TOGGLE_ROLE_ID = '1447684923518484500';
 const BASEMAP_MODE_DARK = 'dark';
 const BASEMAP_MODE_SATELLITE = 'satellite';
 const SHOW_AIRLIFT_FILTER_BUTTON = false;
@@ -1188,6 +1189,7 @@ function MapLibreFlatMapView({
   zones,
   airportsData,
   logisticsMissions,
+  logisticsFrontlineAirportIds,
   gridConnections,
   convoys,
   airliftPlayers,
@@ -1631,6 +1633,7 @@ function MapLibreFlatMapView({
         const srcId = String(mission?.source_airport_id || '');
         const dstId = String(mission?.airport_id || '');
         if (!srcId || !dstId) return;
+        if (!(logisticsFrontlineAirportIds instanceof Set) || !logisticsFrontlineAirportIds.has(dstId)) return;
         const routeKey = `${srcId}->${dstId}`;
         const current = routesByKey.get(routeKey);
         if (!current) {
@@ -1917,7 +1920,7 @@ function MapLibreFlatMapView({
     }
 
     map.triggerRepaint();
-  }, [zones, showAto, selectedZoneId, showLogistics, logisticsMissions, airportsById, showConvoys, convoys, showAirliftPlayers, airliftPlayers, disposeThreeNode]);
+  }, [zones, showAto, selectedZoneId, showLogistics, logisticsMissions, logisticsFrontlineAirportIds, airportsById, showConvoys, convoys, showAirliftPlayers, airliftPlayers, disposeThreeNode]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -2664,6 +2667,7 @@ function MapLibreFlatMapView({
 
 export default function FrontlineMap({ airportsData }) {
   const { user } = useUser();
+  const canManageLogisticsRouteVisibility = user?.canManageLogisticsRouteVisibility === true;
   const isMapLibreEngine = MAP_ENGINE === 'maplibre';
   const [isDesktopDevice, setIsDesktopDevice] = useState(() => isDesktopGlobeDevice());
   const [selectedZoneId, setSelectedZoneId] = useState(null);
@@ -2684,6 +2688,8 @@ export default function FrontlineMap({ airportsData }) {
   const [requestWeaponId, setRequestWeaponId] = useState('');
   const [requestQuantity, setRequestQuantity] = useState(0);
   const [requestingOrder, setRequestingOrder] = useState(false);
+  const [hiddenLogisticsRouteAirportIds, setHiddenLogisticsRouteAirportIds] = useState(new Set());
+  const [updatingRoutePriorityAirportId, setUpdatingRoutePriorityAirportId] = useState(null);
   const [acceptingZoneOperationId, setAcceptingZoneOperationId] = useState(null);
   const [acceptingMissionId, setAcceptingMissionId] = useState(null);
   const [acceptingDcsarId, setAcceptingDcsarId] = useState(null);
@@ -2722,6 +2728,25 @@ export default function FrontlineMap({ airportsData }) {
     showDcsar: true,
   });
   const mapModeRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadRouteVisibility = async () => {
+      try {
+        const payload = await getLogisticsRouteVisibility();
+        if (cancelled) return;
+        const ids = Array.isArray(payload?.hiddenAirportIds) ? payload.hiddenAirportIds : [];
+        setHiddenLogisticsRouteAirportIds(new Set(ids.map((entry) => String(entry))));
+      } catch (error) {
+        console.error('Failed to load logistics route visibility settings:', error);
+      }
+    };
+
+    loadRouteVisibility();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const updateDeviceMode = () => {
@@ -2869,6 +2894,11 @@ export default function FrontlineMap({ airportsData }) {
       }
     });
 
+    const unsubscribeRouteVisibility = socketService.on('logistics-route-visibility:updated', (data) => {
+      const ids = Array.isArray(data?.hiddenAirportIds) ? data.hiddenAirportIds : [];
+      setHiddenLogisticsRouteAirportIds(new Set(ids.map((entry) => String(entry))));
+    });
+
     return () => {
       unsubscribe && unsubscribe();
       unsubscribeMissions && unsubscribeMissions();
@@ -2877,6 +2907,7 @@ export default function FrontlineMap({ airportsData }) {
       unsubscribeConvoys && unsubscribeConvoys();
       unsubscribeAirliftPlayers && unsubscribeAirliftPlayers();
       unsubscribeDcsar && unsubscribeDcsar();
+      unsubscribeRouteVisibility && unsubscribeRouteVisibility();
     };
   }, []);
 
@@ -3079,6 +3110,80 @@ export default function FrontlineMap({ airportsData }) {
     return map;
   }, [validZones]);
 
+  const logisticsFrontlineAirportIds = useMemo(() => {
+    const zoneByIndex = new Map();
+    validZones.forEach((zone) => {
+      const index = getZoneGridIndex(zone);
+      if (index === null) return;
+      zoneByIndex.set(index, zone);
+    });
+
+    const getNeighborIndexes = (index) => {
+      const row = Math.floor(index / 10);
+      const col = index % 10;
+      const result = [];
+      if (row > 0) result.push(index - 10);
+      if (row < 9) result.push(index + 10);
+      if (col > 0) result.push(index - 1);
+      if (col < 9) result.push(index + 1);
+      return result;
+    };
+
+    const firstLineBlueZoneIndexes = new Set();
+    zoneByIndex.forEach((zone, index) => {
+      if (zone?.status !== 'BLUE') return;
+      const hasRedNeighbor = getNeighborIndexes(index).some((neighborIndex) => zoneByIndex.get(neighborIndex)?.status === 'RED');
+      if (hasRedNeighbor) {
+        firstLineBlueZoneIndexes.add(index);
+      }
+    });
+
+    const secondLineBlueZoneIndexes = new Set();
+    zoneByIndex.forEach((zone, index) => {
+      if (zone?.status !== 'BLUE') return;
+      if (firstLineBlueZoneIndexes.has(index)) return;
+      const linkedToFirstLine = getNeighborIndexes(index).some((neighborIndex) => firstLineBlueZoneIndexes.has(neighborIndex));
+      if (linkedToFirstLine) {
+        secondLineBlueZoneIndexes.add(index);
+      }
+    });
+
+    const eligibleBlueZoneIndexes = new Set([
+      ...Array.from(firstLineBlueZoneIndexes),
+      ...Array.from(secondLineBlueZoneIndexes),
+    ]);
+
+    const indexedZones = Array.from(zoneByIndex.entries()).filter(([, zone]) => (
+      Number.isFinite(Number(zone?.coordinates?.lat)) && Number.isFinite(Number(zone?.coordinates?.lon))
+    ));
+    const eligibleAirportIds = new Set();
+
+    validAirports.forEach((airport) => {
+      const airportLat = Number(airport?.coordinates?.lat);
+      const airportLon = Number(airport?.coordinates?.lon);
+      if (!Number.isFinite(airportLat) || !Number.isFinite(airportLon)) return;
+
+      let nearestZoneIndex = null;
+      let nearestDistanceNm = Number.POSITIVE_INFINITY;
+
+      indexedZones.forEach(([zoneIndex, zone]) => {
+        const zoneLat = Number(zone.coordinates.lat);
+        const zoneLon = Number(zone.coordinates.lon);
+        const distanceNm = haversineNm(airportLat, airportLon, zoneLat, zoneLon);
+        if (distanceNm < nearestDistanceNm) {
+          nearestDistanceNm = distanceNm;
+          nearestZoneIndex = zoneIndex;
+        }
+      });
+
+      if (nearestZoneIndex !== null && eligibleBlueZoneIndexes.has(nearestZoneIndex)) {
+        eligibleAirportIds.add(String(airport.id));
+      }
+    });
+
+    return eligibleAirportIds;
+  }, [validZones, validAirports]);
+
   const gridConnections = useMemo(() => {
     const zoneByIndex = new Map();
 
@@ -3238,6 +3343,13 @@ export default function FrontlineMap({ airportsData }) {
       return true;
     });
   }, [logisticsMissions, filters.logisticsStatus]);
+
+  const routeVisibleLogisticsMissions = useMemo(() => {
+    if (hiddenLogisticsRouteAirportIds.size === 0) {
+      return filteredLogisticsMissions;
+    }
+    return filteredLogisticsMissions.filter((mission) => !hiddenLogisticsRouteAirportIds.has(String(mission.airport_id)));
+  }, [filteredLogisticsMissions, hiddenLogisticsRouteAirportIds]);
 
   const focusedZone = useMemo(
     () => (selectedZoneId ? filteredZones.find((zone) => zone.id === selectedZoneId) || validZones.find((zone) => zone.id === selectedZoneId) || null : null),
@@ -3493,6 +3605,7 @@ export default function FrontlineMap({ airportsData }) {
     && selectedLargeContainerCount <= 2;
 
   const selectedAirport = selectedAirportId ? airportsById.get(selectedAirportId) : null;
+  const selectedAirportRoutesHidden = selectedAirportId ? hiddenLogisticsRouteAirportIds.has(String(selectedAirportId)) : false;
   const selectedAirportRequestedWeaponIds = useMemo(() => {
     const set = new Set();
     airportLogistics.forEach((mission) => {
@@ -3923,6 +4036,33 @@ export default function FrontlineMap({ airportsData }) {
     }
   };
 
+  const handleAirportClick = useCallback((airportId) => {
+    if (!airportId) return;
+    const normalizedAirportId = String(airportId);
+    setSelectedAirportId(normalizedAirportId);
+  }, []);
+
+  const handleToggleAirportRoutePriority = useCallback(async (airportId) => {
+    const normalizedAirportId = String(airportId || '').trim();
+    if (!normalizedAirportId) return;
+    if (!canManageLogisticsRouteVisibility) return;
+
+    const isCurrentlyHidden = hiddenLogisticsRouteAirportIds.has(normalizedAirportId);
+    const nextIsPriority = isCurrentlyHidden;
+
+    setUpdatingRoutePriorityAirportId(normalizedAirportId);
+    try {
+      const payload = await setAirportLogisticsRoutePriority(normalizedAirportId, nextIsPriority);
+      const ids = Array.isArray(payload?.hiddenAirportIds) ? payload.hiddenAirportIds : [];
+      setHiddenLogisticsRouteAirportIds(new Set(ids.map((entry) => String(entry))));
+    } catch (error) {
+      console.error('Failed to update airport route priority:', error);
+      alert(`Failed to update airport priority: ${error.message}`);
+    } finally {
+      setUpdatingRoutePriorityAirportId(null);
+    }
+  }, [canManageLogisticsRouteVisibility, hiddenLogisticsRouteAirportIds]);
+
   return (
     <div className="h-full overflow-hidden bg-yt-bg-primary p-3">
       <div className="h-full">
@@ -3951,7 +4091,8 @@ export default function FrontlineMap({ airportsData }) {
                     <MapLibreFlatMapView
                       zones={filteredZones}
                       airportsData={validAirports}
-                      logisticsMissions={filteredLogisticsMissions}
+                      logisticsMissions={routeVisibleLogisticsMissions}
+                      logisticsFrontlineAirportIds={logisticsFrontlineAirportIds}
                       gridConnections={gridConnections}
                       convoys={convoyRenderData}
                       airliftPlayers={airliftPlayerRenderData}
@@ -3963,7 +4104,7 @@ export default function FrontlineMap({ airportsData }) {
                       onZoneHover={setHoveredZoneId}
                       onDcsarHover={setHoveredDcsarId}
                       onDcsarSelect={handleSelectDcsarTask}
-                      onAirportClick={setSelectedAirportId}
+                      onAirportClick={handleAirportClick}
                       showAto={filters.showAto}
                       showAirports={filters.showAirports}
                       showLogistics={filters.showLogistics}
@@ -3977,7 +4118,7 @@ export default function FrontlineMap({ airportsData }) {
                     <FlatMapView
                       zones={filteredZones}
                       airportsData={validAirports}
-                      logisticsMissions={filteredLogisticsMissions}
+                      logisticsMissions={routeVisibleLogisticsMissions}
                       gridConnections={gridConnections}
                       convoys={convoyRenderData}
                       airliftPlayers={airliftPlayerRenderData}
@@ -3989,7 +4130,7 @@ export default function FrontlineMap({ airportsData }) {
                       onZoneHover={setHoveredZoneId}
                       onDcsarHover={setHoveredDcsarId}
                       onDcsarSelect={handleSelectDcsarTask}
-                      onAirportClick={setSelectedAirportId}
+                      onAirportClick={handleAirportClick}
                       showAto={filters.showAto}
                       showAirports={filters.showAirports}
                       showLogistics={filters.showLogistics}
@@ -4350,6 +4491,24 @@ export default function FrontlineMap({ airportsData }) {
                       Close
                     </button>
                   </div>
+                  {canManageLogisticsRouteVisibility && (
+                    <div className="mb-2 flex items-center justify-between rounded border border-yt-border/70 bg-[#0c1320] px-2.5 py-1.5 text-[11px] text-yt-text-secondary">
+                      <div>
+                        Airport priority: <span className={`font-semibold ${selectedAirportRoutesHidden ? 'text-amber-300' : 'text-green-300'}`}>{selectedAirportRoutesHidden ? 'Not priority' : 'Priority'}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAirportRoutePriority(selectedAirport.id)}
+                        disabled={updatingRoutePriorityAirportId === String(selectedAirport.id)}
+                        className="rounded border border-yt-border px-2 py-0.5 font-semibold text-yt-text-primary hover:bg-yt-bg-tertiary/50"
+                        title={`Discord role ${LOGISTICS_ROUTE_TOGGLE_ROLE_ID}`}
+                      >
+                        {updatingRoutePriorityAirportId === String(selectedAirport.id)
+                          ? 'Saving...'
+                          : (selectedAirportRoutesHidden ? 'Set Priority' : 'Set Not Priority')}
+                      </button>
+                    </div>
+                  )}
 
                   {airportLogistics.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-yt-border px-3 py-3 text-xs text-yt-text-secondary">

@@ -54,6 +54,10 @@ const io = new Server(httpServer, {
 
 const PORT = process.env.PORT || 3001;
 const CONVOY_API_TOKEN = process.env.CONVOY_API_TOKEN || '';
+const DISCORD_GUILD_ID = String(process.env.DISCORD_GUILD_ID || '').trim();
+const DISCORD_BOT_TOKEN = String(process.env.DISCORD_BOT_TOKEN || '').trim();
+const DISCORD_LOGISTICS_ROUTE_ROLE_ID = String(process.env.DISCORD_LOGISTICS_ROUTE_ROLE_ID || '1447684923518484500').trim();
+const DISCORD_ROLE_CACHE_TTL_MS = 10 * 60 * 1000;
 // March 13, 2026 17:00 Europe/Rome (CET => 16:00 UTC)
 const LAUNCH_TARGET_UTC_MS = Date.UTC(2026, 2, 13, 16, 0, 0);
 const CONVOY_SYNC_FILE = process.env.CONVOY_SYNC_FILE
@@ -132,6 +136,10 @@ const BUFFER_FILE_PATH = process.env.BUFFER_FILE_PATH
   ? path.resolve(process.env.BUFFER_FILE_PATH)
   : path.resolve(process.cwd(), 'data-buffer.json');
 
+const LOGISTICS_ROUTE_VISIBILITY_FILE_PATH = process.env.LOGISTICS_ROUTE_VISIBILITY_FILE
+  ? path.resolve(process.env.LOGISTICS_ROUTE_VISIBILITY_FILE)
+  : path.resolve(process.cwd(), 'logistics-route-visibility.json');
+
 // Lua zone buffer location and refresh interval
 const LUA_ZONE_BUFFER_PATH = process.env.LUA_ZONE_BUFFER_PATH
   ? path.resolve(process.env.LUA_ZONE_BUFFER_PATH)
@@ -152,8 +160,52 @@ let dcsarPoints = [];
 let airliftPlayersSyncSignature = '';
 let airliftPlayers = [];
 let zoneOperationsById = new Map();
+let hiddenLogisticsRouteAirportIds = new Set();
 const ZONE_OPERATION_TTL_MS = 45 * 60 * 1000;
 const ZONE_OPERATION_MAX_PER_USER = 2;
+
+async function resolveDiscordLogisticsRoutePermission(userId) {
+  if (!userId || !DISCORD_GUILD_ID || !DISCORD_BOT_TOKEN || !DISCORD_LOGISTICS_ROUTE_ROLE_ID) {
+    return { roleIds: [], canManageLogisticsRouteVisibility: false };
+  }
+
+  try {
+    const member = await discordAuth.getGuildMember(DISCORD_GUILD_ID, userId, DISCORD_BOT_TOKEN);
+    const roleIds = Array.isArray(member?.roles) ? member.roles.map((roleId) => String(roleId)) : [];
+    return {
+      roleIds,
+      canManageLogisticsRouteVisibility: roleIds.includes(DISCORD_LOGISTICS_ROUTE_ROLE_ID),
+    };
+  } catch (error) {
+    console.warn(`Failed to resolve Discord roles for user ${userId}:`, error.message);
+    return { roleIds: [], canManageLogisticsRouteVisibility: false };
+  }
+}
+
+async function ensureSessionUserPermissions(req, options = {}) {
+  const forceRefresh = options.forceRefresh === true;
+  const sessionUser = req?.session?.user;
+  if (!sessionUser?.id) return null;
+
+  const lastResolvedAt = Number(req.session.userPermissionsResolvedAt || 0);
+  const cacheValid = !forceRefresh
+    && Number.isFinite(lastResolvedAt)
+    && (Date.now() - lastResolvedAt) < DISCORD_ROLE_CACHE_TTL_MS
+    && typeof sessionUser.canManageLogisticsRouteVisibility === 'boolean';
+
+  if (cacheValid) {
+    return sessionUser;
+  }
+
+  const permissions = await resolveDiscordLogisticsRoutePermission(sessionUser.id);
+  req.session.user = {
+    ...sessionUser,
+    discordRoleIds: permissions.roleIds,
+    canManageLogisticsRouteVisibility: permissions.canManageLogisticsRouteVisibility,
+  };
+  req.session.userPermissionsResolvedAt = Date.now();
+  return req.session.user;
+}
 
 function loadFrontlineZonesFromFile() {
   if (!fs.existsSync(FRONTLINE_ZONES_FILE)) {
@@ -168,6 +220,52 @@ function loadFrontlineZonesFromFile() {
     console.error('Error loading frontline zones from file:', error.message);
     return [];
   }
+}
+
+function getKnownAirportIds() {
+  return new Set((Array.isArray(airports) ? airports : []).map((airport) => String(airport?.id || '').trim()).filter(Boolean));
+}
+
+function normalizeHiddenLogisticsRouteAirportIds(rawValue) {
+  const knownAirportIds = getKnownAirportIds();
+  if (!Array.isArray(rawValue)) return [];
+  return rawValue
+    .map((value) => String(value || '').trim())
+    .filter((airportId) => airportId !== '' && knownAirportIds.has(airportId));
+}
+
+function persistHiddenLogisticsRouteAirportIds() {
+  const payload = {
+    hiddenAirportIds: Array.from(hiddenLogisticsRouteAirportIds).sort(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  const tempPath = `${LOGISTICS_ROUTE_VISIBILITY_FILE_PATH}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), 'utf8');
+  fs.renameSync(tempPath, LOGISTICS_ROUTE_VISIBILITY_FILE_PATH);
+}
+
+function loadHiddenLogisticsRouteAirportIds() {
+  if (!fs.existsSync(LOGISTICS_ROUTE_VISIBILITY_FILE_PATH)) {
+    hiddenLogisticsRouteAirportIds = new Set();
+    persistHiddenLogisticsRouteAirportIds();
+    return;
+  }
+
+  try {
+    const raw = fs.readFileSync(LOGISTICS_ROUTE_VISIBILITY_FILE_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+    hiddenLogisticsRouteAirportIds = new Set(normalizeHiddenLogisticsRouteAirportIds(parsed?.hiddenAirportIds));
+    persistHiddenLogisticsRouteAirportIds();
+  } catch (error) {
+    console.error('Error loading logistics route visibility file:', error.message);
+    hiddenLogisticsRouteAirportIds = new Set();
+    persistHiddenLogisticsRouteAirportIds();
+  }
+}
+
+function getHiddenLogisticsRouteAirportIdsPayload() {
+  return Array.from(hiddenLogisticsRouteAirportIds).sort();
 }
 
 function cleanupExpiredZoneOperations(now = Date.now()) {
@@ -731,8 +829,12 @@ app.get('/api/auth/discord/callback', async (req, res) => {
       username: discordUser.username,
       discriminator: discordUser.discriminator,
       avatar: discordUser.avatar,
-      globalName: discordUser.global_name || discordUser.username
+      globalName: discordUser.global_name || discordUser.username,
+      discordRoleIds: [],
+      canManageLogisticsRouteVisibility: false,
     };
+
+    await ensureSessionUserPermissions(req, { forceRefresh: true });
 
     // Register user as active
     activeUsers.addActiveUser(discordUser);
@@ -767,12 +869,13 @@ app.get('/api/auth/discord/callback', async (req, res) => {
 /**
  * GET /api/auth/user - Get current authenticated user
  */
-app.get('/api/auth/user', (req, res) => {
+app.get('/api/auth/user', async (req, res) => {
   if (!req.session.user) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
-  res.json(req.session.user);
+  const user = await ensureSessionUserPermissions(req);
+  res.json(user || req.session.user);
 });
 
 /**
@@ -832,6 +935,72 @@ app.put('/api/profile', (req, res) => {
 
   const savedProfile = userProfiles.saveProfile(req.session.user.id, req.body);
   res.json(savedProfile);
+});
+
+/**
+ * GET /api/logistics-route-visibility - Get airports with hidden logistics 3D routes
+ */
+app.get('/api/logistics-route-visibility', (req, res) => {
+  res.json({
+    hiddenAirportIds: getHiddenLogisticsRouteAirportIdsPayload(),
+  });
+});
+
+/**
+ * POST /api/logistics-route-visibility/:airportId - Set airport logistics route priority
+ * Body: { isPriority: boolean }
+ */
+app.post('/api/logistics-route-visibility/:airportId', async (req, res) => {
+  if (!req.session.user) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const user = await ensureSessionUserPermissions(req);
+  if (!user?.canManageLogisticsRouteVisibility) {
+    return res.status(403).json({
+      error: `Access denied. Discord role ${DISCORD_LOGISTICS_ROUTE_ROLE_ID} required.`,
+    });
+  }
+
+  const airportId = String(req.params.airportId || '').trim();
+  if (!airportId) {
+    return res.status(400).json({ error: 'airportId is required' });
+  }
+
+  const knownAirportIds = getKnownAirportIds();
+  if (!knownAirportIds.has(airportId)) {
+    return res.status(404).json({ error: 'Airport not found' });
+  }
+
+  const isPriority = req.body?.isPriority;
+  if (typeof isPriority !== 'boolean') {
+    return res.status(400).json({ error: 'isPriority must be a boolean' });
+  }
+
+  if (isPriority) {
+    hiddenLogisticsRouteAirportIds.delete(airportId);
+  } else {
+    hiddenLogisticsRouteAirportIds.add(airportId);
+  }
+
+  try {
+    persistHiddenLogisticsRouteAirportIds();
+  } catch (error) {
+    console.error('Failed to persist logistics route visibility:', error.message);
+    return res.status(500).json({ error: 'Failed to persist logistics route visibility' });
+  }
+
+  const hiddenAirportIds = getHiddenLogisticsRouteAirportIdsPayload();
+  io.emit('logistics-route-visibility:updated', {
+    hiddenAirportIds,
+  });
+
+  res.json({
+    success: true,
+    airportId,
+    isPriority,
+    hiddenAirportIds,
+  });
 });
 
 // ==================== DATA ROUTES ====================
@@ -2263,6 +2432,9 @@ io.on('connection', (socket) => {
   socket.emit('frontline:updated', {
     zones: buildFrontlineZonesPayload(loadFrontlineZonesFromFile()),
   });
+  socket.emit('logistics-route-visibility:updated', {
+    hiddenAirportIds: getHiddenLogisticsRouteAirportIdsPayload(),
+  });
 
   socket.on('disconnect', () => {
     console.log('🔌 Client disconnected:', socket.id);
@@ -2429,6 +2601,7 @@ setInterval(() => {
 
 // Load airbase status first
 loadAirbaseStatus();
+loadHiddenLogisticsRouteAirportIds();
 
 // Load initial data
 await loadFromBuffer();

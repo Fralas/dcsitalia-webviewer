@@ -125,6 +125,26 @@ export async function createOrder(airportId, weaponId, quantity) {
 }
 
 /**
+ * Get global logistics 3D route visibility settings.
+ */
+export async function getLogisticsRouteVisibility() {
+  return fetchAPI('/logistics-route-visibility', {
+    credentials: 'include',
+  });
+}
+
+/**
+ * Set airport logistics route priority.
+ */
+export async function setAirportLogisticsRoutePriority(airportId, isPriority) {
+  return fetchAPI(`/logistics-route-visibility/${encodeURIComponent(airportId)}`, {
+    method: 'POST',
+    body: JSON.stringify({ isPriority }),
+    credentials: 'include',
+  });
+}
+
+/**
  * Get overall statistics
  */
 export async function getStats() {
@@ -361,6 +381,8 @@ export default {
   completeMission,
   cancelMission,
   createOrder,
+  getLogisticsRouteVisibility,
+  setAirportLogisticsRoutePriority,
   getStats,
   debugGenerateOrders,
   debugClearOrders,
