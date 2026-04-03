@@ -2098,23 +2098,9 @@ function MapLibreFlatMapView({
             : (args?.modelViewProjectionMatrix || args?.projectionMatrix || matrix);
           camera.projectionMatrix = new THREE.Matrix4().fromArray(projectionMatrix);
 
-          // Keep fade reference aligned with the visual focus point used by autofocus.
-          const canvas = map.getCanvas();
-          const referenceX = (canvas?.clientWidth || 0) / 2;
-          const referenceY = ((canvas?.clientHeight || 0) / 2) + MAPLIBRE_FOCUS_Y_OFFSET_PX;
-          const center = (referenceX > 0 && referenceY > 0)
-            ? map.unproject([referenceX, referenceY])
-            : map.getCenter();
-          const centerPoint = [center.lat, center.lng];
-          const viewBearing = (map.getBearing() + 360) % 360;
           domes.forEach((dome) => {
-            const bearingToDome = computeBearingDeg(centerPoint, [dome.lat, dome.lon]);
-            const delta = Math.abs((((bearingToDome - viewBearing) % 360) + 540) % 360 - 180);
-            let visibilityFactor = 1;
-            if (delta > 125) visibilityFactor = 0.1;
-            else if (delta > 100) visibilityFactor = 0.3;
-            dome.main.material.opacity = dome.mainBaseOpacity * visibilityFactor;
-            dome.glow.material.opacity = dome.glowBaseOpacity * visibilityFactor;
+            dome.main.material.opacity = dome.mainBaseOpacity;
+            dome.glow.material.opacity = dome.glowBaseOpacity;
           });
 
           renderer.resetState();
