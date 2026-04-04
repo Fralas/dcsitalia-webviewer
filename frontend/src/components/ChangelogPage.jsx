@@ -191,6 +191,7 @@ export default function ChangelogPage() {
   const [publishing, setPublishing] = useState(false);
   const [editingPostId, setEditingPostId] = useState('');
   const [editorOpen, setEditorOpen] = useState(false);
+  const [fullscreenMedia, setFullscreenMedia] = useState(null);
   const [error, setError] = useState('');
   const lastSavedSerializedRef = useRef('');
 
@@ -214,6 +215,16 @@ export default function ChangelogPage() {
 
   useEffect(() => {
     loadPosts();
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setFullscreenMedia(null);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
   useEffect(() => {
@@ -429,6 +440,15 @@ export default function ChangelogPage() {
     }
   };
 
+  const openFullscreenMedia = (attachment) => {
+    if (!attachment?.url || !attachment?.type) return;
+    setFullscreenMedia({
+      url: attachment.url,
+      type: attachment.type,
+      fileName: attachment.fileName || attachment.id || 'media',
+    });
+  };
+
   return (
     <div className="max-w-6xl mx-auto w-full space-y-4">
       <div className="bg-yt-bg-secondary/85 rounded-2xl border border-yt-border/70 p-4 shadow-[0_14px_30px_rgba(0,0,0,0.35)] backdrop-blur-sm">
@@ -562,9 +582,19 @@ export default function ChangelogPage() {
                     {draft.attachments.map((attachment) => (
                       <div key={attachment.id} className="rounded border border-yt-border/70 bg-[#0d1520] p-2">
                         {attachment.type === 'image' ? (
-                          <img src={attachment.url} alt={attachment.fileName || attachment.id} className="w-full max-h-52 object-contain rounded" />
+                          <img
+                            src={attachment.url}
+                            alt={attachment.fileName || attachment.id}
+                            className="w-full max-h-52 object-contain rounded cursor-zoom-in"
+                            onClick={() => openFullscreenMedia(attachment)}
+                          />
                         ) : (
-                          <video src={attachment.url} controls className="w-full max-h-52 rounded" />
+                          <video
+                            src={attachment.url}
+                            controls
+                            className="w-full max-h-52 rounded cursor-zoom-in"
+                            onClick={() => openFullscreenMedia(attachment)}
+                          />
                         )}
                         <div className="mt-2 flex items-center justify-between gap-2">
                           <span className="text-xs text-yt-text-secondary truncate">
@@ -701,9 +731,19 @@ export default function ChangelogPage() {
                 {post.attachments.map((attachment) => (
                   <div key={attachment.id} className="rounded border border-yt-border/70 bg-[#0d1520] p-2">
                     {attachment.type === 'video' ? (
-                      <video src={attachment.url} controls className="w-full max-h-64 rounded" />
+                      <video
+                        src={attachment.url}
+                        controls
+                        className="w-full max-h-64 rounded cursor-zoom-in"
+                        onClick={() => openFullscreenMedia(attachment)}
+                      />
                     ) : (
-                      <img src={attachment.url} alt={attachment.fileName || attachment.id} className="w-full max-h-64 object-contain rounded" />
+                      <img
+                        src={attachment.url}
+                        alt={attachment.fileName || attachment.id}
+                        className="w-full max-h-64 object-contain rounded cursor-zoom-in"
+                        onClick={() => openFullscreenMedia(attachment)}
+                      />
                     )}
                   </div>
                 ))}
@@ -718,6 +758,26 @@ export default function ChangelogPage() {
           </article>
         ))}
       </div>
+
+      {fullscreenMedia && (
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/90 p-4" onClick={() => setFullscreenMedia(null)}>
+          <button
+            type="button"
+            onClick={() => setFullscreenMedia(null)}
+            className="absolute right-4 top-4 inline-flex items-center gap-1 rounded border border-white/30 bg-black/40 px-3 py-2 text-sm text-white"
+          >
+            <X className="h-4 w-4" />
+            Chiudi
+          </button>
+          <div className="max-h-[95vh] max-w-[95vw]" onClick={(event) => event.stopPropagation()}>
+            {fullscreenMedia.type === 'video' ? (
+              <video src={fullscreenMedia.url} controls autoPlay className="max-h-[95vh] max-w-[95vw] rounded" />
+            ) : (
+              <img src={fullscreenMedia.url} alt={fullscreenMedia.fileName} className="max-h-[95vh] max-w-[95vw] object-contain rounded" />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

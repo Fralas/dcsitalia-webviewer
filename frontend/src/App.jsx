@@ -199,9 +199,9 @@ function App() {
                     : 'border-yt-border/80 bg-[#151b25] text-yt-text-primary hover:border-yt-accent hover:text-white'
                 }`}
                 title="Apri changelog"
+                aria-label="Apri changelog"
               >
                 <CalendarSync className="w-4 h-4" />
-                Changelog
               </button>
               <UserMenu />
             </div>
