@@ -1071,6 +1071,49 @@ app.post('/api/changelogs', (req, res) => {
 });
 
 /**
+ * PUT /api/changelogs/:postId - Update changelog post (author only)
+ */
+app.put('/api/changelogs/:postId', (req, res) => {
+  const userId = req.session?.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+    return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
+  }
+
+  try {
+    const post = changelogsService.updatePost({
+      postId: req.params.postId,
+      draft: req.body || {},
+    });
+    return res.json({ post });
+  } catch (error) {
+    const status = String(error?.message || '').toLowerCase().includes('not found') ? 404 : 400;
+    return res.status(status).json({ error: error.message || 'Failed to update changelog' });
+  }
+});
+
+/**
+ * DELETE /api/changelogs/:postId - Delete changelog post (author only)
+ */
+app.delete('/api/changelogs/:postId', (req, res) => {
+  const userId = req.session?.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+    return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
+  }
+
+  const removed = changelogsService.removePost(req.params.postId);
+  if (!removed) {
+    return res.status(404).json({ error: 'Changelog not found' });
+  }
+  return res.json({ success: true });
+});
+
+/**
  * GET /api/changelogs/media/:fileName - Serve uploaded changelog media
  */
 app.get('/api/changelogs/media/:fileName', (req, res) => {

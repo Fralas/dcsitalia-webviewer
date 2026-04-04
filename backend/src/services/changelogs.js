@@ -212,6 +212,54 @@ export function publishPost({ userId, authorName, draft }) {
   return post;
 }
 
+export function updatePost({ postId, draft }) {
+  const targetId = sanitizeText(postId || '', 80);
+  if (!targetId) {
+    throw new Error('postId is required');
+  }
+
+  const normalizedDraft = normalizeDraft(draft, '');
+  if (!normalizedDraft.title) {
+    throw new Error('Title is required');
+  }
+  if (!normalizedDraft.rows.length) {
+    throw new Error('At least one changelog row is required');
+  }
+
+  const posts = readPosts();
+  const index = posts.findIndex((post) => post.id === targetId);
+  if (index < 0) {
+    throw new Error('Changelog not found');
+  }
+
+  const current = posts[index];
+  const updated = normalizePost({
+    ...current,
+    title: normalizedDraft.title,
+    rows: normalizedDraft.rows,
+    attachments: normalizedDraft.attachments,
+    contributorIds: normalizedDraft.contributorIds,
+    updatedAt: Date.now(),
+  });
+
+  posts[index] = updated;
+  writePosts(posts);
+  return updated;
+}
+
+export function removePost(postId) {
+  const targetId = sanitizeText(postId || '', 80);
+  if (!targetId) return false;
+
+  const posts = readPosts();
+  const next = posts.filter((post) => post.id !== targetId);
+  if (next.length === posts.length) {
+    return false;
+  }
+  writePosts(next);
+  return true;
+}
+
 function sanitizeFileName(fileName) {
   const base = String(fileName || 'upload').trim().toLowerCase();
   return base.replace(/[^a-z0-9._-]/g, '_').slice(0, 90) || 'upload';
@@ -263,4 +311,3 @@ export function getMediaAbsolutePath(fileName) {
   if (!fs.existsSync(absolutePath)) return null;
   return absolutePath;
 }
-

@@ -144,9 +144,9 @@ function App() {
             <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
-                onClick={() => goToView(user ? 'profile' : 'frontline')}
+                onClick={() => goToView('frontline')}
                 className="flex items-center gap-2 text-left transition-opacity hover:opacity-90"
-                title={user ? 'Apri profilo' : 'Frontline'}
+                title="Frontline"
               >
                 <img
                   src={bannerImg}

@@ -428,6 +428,27 @@ export async function publishChangelog(draft) {
   });
 }
 
+/**
+ * Update a changelog post
+ */
+export async function updateChangelog(postId, draft) {
+  return fetchAPI(`/changelogs/${encodeURIComponent(postId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(draft),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Delete a changelog post
+ */
+export async function deleteChangelog(postId) {
+  return fetchAPI(`/changelogs/${encodeURIComponent(postId)}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+}
+
 export default {
   getServerTime,
   getAirports,
@@ -471,4 +492,6 @@ export default {
   deleteChangelogDraft,
   uploadChangelogMedia,
   publishChangelog,
+  updateChangelog,
+  deleteChangelog,
 };

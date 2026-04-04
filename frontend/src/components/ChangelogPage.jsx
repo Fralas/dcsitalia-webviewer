@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarSync, ImagePlus, Loader2, Plus, Save, Trash2, Upload, Video } from 'lucide-react';
+import { CalendarSync, GitPullRequestCreateArrow, ImagePlus, Loader2, Pencil, Plus, Save, Trash2, Upload, Video, X } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import * as api from '../services/api';
 
@@ -189,6 +189,8 @@ export default function ChangelogPage() {
   const [saveStatus, setSaveStatus] = useState('');
   const [busyUpload, setBusyUpload] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [editingPostId, setEditingPostId] = useState('');
+  const [editorOpen, setEditorOpen] = useState(false);
   const [error, setError] = useState('');
   const lastSavedSerializedRef = useRef('');
 
@@ -346,6 +348,7 @@ export default function ChangelogPage() {
       await api.deleteChangelogDraft();
       const next = { ...EMPTY_DRAFT, rows: [{ id: `row_${Date.now()}`, tag: 'UPD', text: '' }] };
       setDraft(next);
+      setEditingPostId('');
       lastSavedSerializedRef.current = JSON.stringify(next);
       if (user?.id) {
         localStorage.removeItem(getLocalDraftKey(user.id));
@@ -361,24 +364,68 @@ export default function ChangelogPage() {
     try {
       setPublishing(true);
       setError('');
-      const response = await api.publishChangelog(draft);
+      const response = editingPostId
+        ? await api.updateChangelog(editingPostId, draft)
+        : await api.publishChangelog(draft);
       const post = response?.post;
       if (post) {
-        setPosts((prev) => [post, ...prev]);
+        setPosts((prev) => (
+          editingPostId
+            ? prev.map((item) => (item.id === post.id ? post : item))
+            : [post, ...prev]
+        ));
       } else {
         await loadPosts();
       }
       const next = { ...EMPTY_DRAFT, rows: [{ id: `row_${Date.now()}`, tag: 'UPD', text: '' }] };
       setDraft(next);
+      setEditingPostId('');
       lastSavedSerializedRef.current = JSON.stringify(next);
       if (user?.id) {
         localStorage.removeItem(getLocalDraftKey(user.id));
       }
-      setSaveStatus('Pubblicato');
+      setSaveStatus(editingPostId ? 'Changelog aggiornato' : 'Pubblicato');
     } catch (err) {
-      setError(err.message || 'Pubblicazione fallita');
+      setError(err.message || (editingPostId ? 'Aggiornamento fallito' : 'Pubblicazione fallita'));
     } finally {
       setPublishing(false);
+    }
+  };
+
+  const startEditingPost = (post) => {
+    if (!canEdit || !post?.id) return;
+    const normalized = normalizeDraft({
+      title: post.title,
+      rows: post.rows,
+      attachments: post.attachments,
+      contributorIds: post.contributorIds,
+    });
+    setDraft(normalized);
+    setEditingPostId(post.id);
+    setEditorOpen(true);
+    setSaveStatus('Modalita modifica');
+    setError('');
+  };
+
+  const cancelEditing = () => {
+    const next = { ...EMPTY_DRAFT, rows: [{ id: `row_${Date.now()}`, tag: 'UPD', text: '' }] };
+    setDraft(next);
+    setEditingPostId('');
+    setSaveStatus('Modifica annullata');
+  };
+
+  const deletePost = async (postId) => {
+    if (!canEdit || !postId) return;
+    if (!window.confirm('Confermi eliminazione di questo changelog?')) return;
+    try {
+      await api.deleteChangelog(postId);
+      setPosts((prev) => prev.filter((post) => post.id !== postId));
+      if (editingPostId === postId) {
+        cancelEditing();
+      }
+      setSaveStatus('Changelog eliminato');
+    } catch (err) {
+      setError(err.message || 'Eliminazione fallita');
     }
   };
 
@@ -392,7 +439,6 @@ export default function ChangelogPage() {
             </div>
             <div>
               <h2 className="text-xl font-extrabold tracking-[0.05em] text-yt-text-primary">Changelogs</h2>
-              <p className="text-xs text-yt-text-secondary">Storico aggiornamenti con tag, markdown e media allegati</p>
             </div>
           </div>
           {canEdit && (
@@ -407,147 +453,174 @@ export default function ChangelogPage() {
       </div>
 
       {canEdit && (
-        <div className="bg-yt-bg-secondary/85 rounded-2xl border border-yt-border/70 p-4 shadow-[0_10px_26px_rgba(0,0,0,0.3)] space-y-3">
-          <div className="text-xs uppercase tracking-[0.1em] text-yt-text-secondary">Nuovo post changelog</div>
-
-          <input
-            type="text"
-            value={draft.title}
-            onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
-            placeholder="Titolo changelog"
-            className="w-full rounded-lg border border-yt-border bg-[#121b27] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
-          />
-
-          <div className="rounded-xl border border-yt-border/80 bg-[#111926] p-2">
-            <div className="space-y-2">
-              {draft.rows.map((row) => {
-                const style = TAGS[row.tag] || TAGS.UPD;
-                return (
-                  <div key={row.id} className="flex items-start gap-2 border-b border-yt-border/40 pb-2 last:border-b-0 last:pb-0">
-                    <div className="flex w-[92px] shrink-0 flex-col gap-1">
-                      <select
-                        value={row.tag}
-                        onChange={(event) => updateRow(row.id, { tag: event.target.value })}
-                        className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] ${style.editorClass}`}
-                      >
-                        {Object.entries(TAGS).map(([value, tag]) => (
-                          <option key={value} value={value}>{tag.label}</option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => removeRow(row.id)}
-                        className="inline-flex items-center justify-center gap-1 rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-300"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        Rimuovi
-                      </button>
-                    </div>
-                    <textarea
-                      rows={3}
-                      value={row.text}
-                      onChange={(event) => updateRow(row.id, { text: event.target.value })}
-                      placeholder="Testo riga (supporto markdown)"
-                      className="w-full rounded border border-yt-border/80 bg-[#0e1520] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
-                    />
-                  </div>
-                );
-              })}
+        <div className="bg-yt-bg-secondary/85 rounded-2xl border border-yt-border/70 p-4 shadow-[0_10px_26px_rgba(0,0,0,0.3)]">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs uppercase tracking-[0.1em] text-yt-text-secondary">
+              {editingPostId ? 'Modifica changelog' : 'Nuovo post changelog'}
             </div>
             <button
               type="button"
-              onClick={addRow}
-              className="mt-2 inline-flex items-center gap-1 rounded border border-yt-border px-2 py-1 text-xs text-yt-text-primary hover:border-yt-accent"
+              onClick={() => setEditorOpen((prev) => !prev)}
+              className="inline-flex items-center gap-1 rounded border border-yt-border px-2 py-1 text-xs text-yt-text-primary hover:border-yt-accent"
+              title={editorOpen ? 'Chiudi editor changelog' : 'Apri editor changelog'}
+              aria-label={editorOpen ? 'Chiudi editor changelog' : 'Apri editor changelog'}
             >
-              <Plus className="w-3.5 h-3.5" />
-              Aggiungi Riga
+              <GitPullRequestCreateArrow className={`h-4 w-4 transition-transform ${editorOpen ? 'rotate-180' : ''}`} />
             </button>
           </div>
 
-          <div className="space-y-2">
-            <div className="text-xs uppercase tracking-[0.08em] text-yt-text-secondary">Tag contributor</div>
-            <div className="flex flex-wrap gap-2">
-              {CONTRIBUTORS.map((entry) => (
-                <label key={entry.id} className="inline-flex items-center gap-2 rounded border border-yt-border bg-[#121b27] px-2 py-1 text-xs text-yt-text-primary">
-                  <input
-                    type="checkbox"
-                    checked={draft.contributorIds.includes(entry.id)}
-                    onChange={() => toggleContributor(entry.id)}
-                  />
-                  {entry.label}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.08em] text-yt-text-secondary">
-              <Upload className="w-3.5 h-3.5" />
-              Allegati immagini/video
-            </div>
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded border border-yt-border px-3 py-2 text-xs text-yt-text-primary hover:border-yt-accent">
-              {busyUpload ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
-              Carica Media
+          {editorOpen && (
+            <div className="mt-3 space-y-3">
               <input
-                type="file"
-                className="hidden"
-                accept="image/*,video/*"
-                multiple
-                onChange={(event) => uploadFiles(Array.from(event.target.files || []))}
+                type="text"
+                value={draft.title}
+                onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
+                placeholder="Titolo changelog"
+                className="w-full rounded-lg border border-yt-border bg-[#121b27] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
               />
-            </label>
-            {draft.attachments.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {draft.attachments.map((attachment) => (
-                  <div key={attachment.id} className="rounded border border-yt-border/70 bg-[#0d1520] p-2">
-                    {attachment.type === 'image' ? (
-                      <img src={attachment.url} alt={attachment.fileName || attachment.id} className="w-full max-h-52 object-contain rounded" />
-                    ) : (
-                      <video src={attachment.url} controls className="w-full max-h-52 rounded" />
-                    )}
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <span className="text-xs text-yt-text-secondary truncate">
-                        {attachment.type === 'video' ? <Video className="inline w-3.5 h-3.5 mr-1" /> : null}
-                        {attachment.fileName || attachment.id}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDraft((prev) => ({
-                            ...prev,
-                            attachments: prev.attachments.filter((item) => item.id !== attachment.id),
-                          }));
-                        }}
-                        className="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-300"
-                      >
-                        Rimuovi
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
 
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <button
-              type="button"
-              onClick={publishPost}
-              disabled={publishing}
-              className="inline-flex items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/15 px-3 py-2 text-sm text-emerald-300 disabled:opacity-60"
-            >
-              {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarSync className="w-4 h-4" />}
-              Pubblica Changelog
-            </button>
-            <button
-              type="button"
-              onClick={clearDraft}
-              className="inline-flex items-center gap-1 rounded border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300"
-            >
-              <Trash2 className="w-4 h-4" />
-              Elimina Bozza
-            </button>
-          </div>
+              <div className="rounded-xl border border-yt-border/80 bg-[#111926] p-2">
+                <div className="space-y-2">
+                  {draft.rows.map((row) => {
+                    const style = TAGS[row.tag] || TAGS.UPD;
+                    return (
+                      <div key={row.id} className="flex items-start gap-2 border-b border-yt-border/40 pb-2 last:border-b-0 last:pb-0">
+                        <div className="flex w-[92px] shrink-0 flex-col gap-1">
+                          <select
+                            value={row.tag}
+                            onChange={(event) => updateRow(row.id, { tag: event.target.value })}
+                            className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] ${style.editorClass}`}
+                          >
+                            {Object.entries(TAGS).map(([value, tag]) => (
+                              <option key={value} value={value}>{tag.label}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => removeRow(row.id)}
+                            className="inline-flex items-center justify-center gap-1 rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-300"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Rimuovi
+                          </button>
+                        </div>
+                        <textarea
+                          rows={3}
+                          value={row.text}
+                          onChange={(event) => updateRow(row.id, { text: event.target.value })}
+                          placeholder="Testo riga (supporto markdown)"
+                          className="w-full rounded border border-yt-border/80 bg-[#0e1520] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  onClick={addRow}
+                  className="mt-2 inline-flex items-center gap-1 rounded border border-yt-border px-2 py-1 text-xs text-yt-text-primary hover:border-yt-accent"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Aggiungi Riga
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-xs uppercase tracking-[0.08em] text-yt-text-secondary">Tag contributor</div>
+                <div className="flex flex-wrap gap-2">
+                  {CONTRIBUTORS.map((entry) => (
+                    <label key={entry.id} className="inline-flex items-center gap-2 rounded border border-yt-border bg-[#121b27] px-2 py-1 text-xs text-yt-text-primary">
+                      <input
+                        type="checkbox"
+                        checked={draft.contributorIds.includes(entry.id)}
+                        onChange={() => toggleContributor(entry.id)}
+                      />
+                      {entry.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs uppercase tracking-[0.08em] text-yt-text-secondary">
+                  <Upload className="w-3.5 h-3.5" />
+                  Allegati immagini/video
+                </div>
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded border border-yt-border px-3 py-2 text-xs text-yt-text-primary hover:border-yt-accent">
+                  {busyUpload ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+                  Carica Media
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*,video/*"
+                    multiple
+                    onChange={(event) => uploadFiles(Array.from(event.target.files || []))}
+                  />
+                </label>
+                {draft.attachments.length > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {draft.attachments.map((attachment) => (
+                      <div key={attachment.id} className="rounded border border-yt-border/70 bg-[#0d1520] p-2">
+                        {attachment.type === 'image' ? (
+                          <img src={attachment.url} alt={attachment.fileName || attachment.id} className="w-full max-h-52 object-contain rounded" />
+                        ) : (
+                          <video src={attachment.url} controls className="w-full max-h-52 rounded" />
+                        )}
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <span className="text-xs text-yt-text-secondary truncate">
+                            {attachment.type === 'video' ? <Video className="inline w-3.5 h-3.5 mr-1" /> : null}
+                            {attachment.fileName || attachment.id}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDraft((prev) => ({
+                                ...prev,
+                                attachments: prev.attachments.filter((item) => item.id !== attachment.id),
+                              }));
+                            }}
+                            className="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-300"
+                          >
+                            Rimuovi
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={publishPost}
+                  disabled={publishing}
+                  className="inline-flex items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/15 px-3 py-2 text-sm text-emerald-300 disabled:opacity-60"
+                >
+                  {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarSync className="w-4 h-4" />}
+                  {editingPostId ? 'Aggiorna Changelog' : 'Pubblica Changelog'}
+                </button>
+                {editingPostId && (
+                  <button
+                    type="button"
+                    onClick={cancelEditing}
+                    className="inline-flex items-center gap-1 rounded border border-yt-border px-3 py-2 text-sm text-yt-text-primary"
+                  >
+                    <X className="w-4 h-4" />
+                    Annulla Modifica
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={clearDraft}
+                  className="inline-flex items-center gap-1 rounded border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Elimina Bozza
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -578,7 +651,29 @@ export default function ChangelogPage() {
           <article key={post.id} className="rounded-2xl border border-yt-border/70 bg-yt-bg-secondary/85 p-4 shadow-[0_10px_26px_rgba(0,0,0,0.3)]">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-lg font-bold text-yt-text-primary">{post.title}</h3>
-              <div className="text-xs text-yt-text-secondary">{formatDate(post.createdAt)}</div>
+              <div className="flex items-center gap-2">
+                <div className="text-xs text-yt-text-secondary">{formatDate(post.createdAt)}</div>
+                {canEdit && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => startEditingPost(post)}
+                      className="inline-flex items-center gap-1 rounded border border-yt-border px-2 py-1 text-xs text-yt-text-primary hover:border-yt-accent"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      Modifica
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deletePost(post.id)}
+                      className="inline-flex items-center gap-1 rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-300"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Elimina
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
             <div className="text-xs text-yt-text-secondary mt-1">
               by {post.author?.name || post.author?.id || 'Unknown'}
