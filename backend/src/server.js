@@ -32,6 +32,7 @@ import * as activeUsers from './services/activeUsers.js';
 import * as userProfiles from './services/userProfiles.js';
 import * as feedService from './services/feed.js';
 import * as convoysService from './services/convoys.js';
+import * as changelogsService from './services/changelogs.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,11 +43,36 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 const app = express();
 const httpServer = createServer(app);
 
-// CORS configuration based on environment
+// CORS configuration
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const FRONTEND_ORIGINS = Array.from(new Set([
+  FRONTEND_URL,
+  ...(String(process.env.FRONTEND_ORIGINS || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)),
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+]));
+
+function isAllowedCorsOrigin(origin) {
+  if (!origin) return true;
+  return FRONTEND_ORIGINS.includes(origin);
+}
+
+const corsOriginHandler = (origin, callback) => {
+  if (isAllowedCorsOrigin(origin)) {
+    callback(null, true);
+    return;
+  }
+  callback(new Error(`CORS blocked for origin: ${origin}`));
+};
+
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.NODE_ENV === 'production' ? FRONTEND_URL : '*',
+    origin: corsOriginHandler,
     methods: ['GET', 'POST'],
     credentials: true
   }
@@ -58,6 +84,11 @@ const DISCORD_GUILD_ID = String(process.env.DISCORD_GUILD_ID || '').trim();
 const DISCORD_BOT_TOKEN = String(process.env.DISCORD_BOT_TOKEN || '').trim();
 const DISCORD_LOGISTICS_ROUTE_ROLE_ID = String(process.env.DISCORD_LOGISTICS_ROUTE_ROLE_ID || '1447684923518484500').trim();
 const DISCORD_ROLE_CACHE_TTL_MS = 10 * 60 * 1000;
+const CHANGELOG_AUTHOR_IDS = new Set([
+  '714087060343881778',
+  '675706661570347041',
+  '153370631772045313',
+]);
 const MAX_CARRIER_SOURCE_DISTANCE_KM = 50;
 const KM_PER_NM = 1.852;
 const MAX_CARRIER_SOURCE_DISTANCE_NM = MAX_CARRIER_SOURCE_DISTANCE_KM / KM_PER_NM;
@@ -96,7 +127,7 @@ app.use(helmet({
 
 // CORS
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ? FRONTEND_URL : '*',
+  origin: corsOriginHandler,
   credentials: true
 }));
 
@@ -110,7 +141,7 @@ const limiter = rateLimit({
 });
 
 app.use(limiter);
-app.use(express.json());
+app.use(express.json({ limit: '80mb' }));
 app.use(cookieParser());
 
 // Session configuration
@@ -938,6 +969,116 @@ app.put('/api/profile', (req, res) => {
 
   const savedProfile = userProfiles.saveProfile(req.session.user.id, req.body);
   res.json(savedProfile);
+});
+
+/**
+ * GET /api/changelogs - Public list of changelog posts
+ */
+app.get('/api/changelogs', (req, res) => {
+  const posts = changelogsService.getPosts();
+  res.json({ posts });
+});
+
+/**
+ * GET /api/changelogs/draft - Get current user's draft (author only)
+ */
+app.get('/api/changelogs/draft', (req, res) => {
+  const userId = req.session?.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+    return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
+  }
+  const draft = changelogsService.getDraft(userId);
+  res.json({ draft });
+});
+
+/**
+ * PUT /api/changelogs/draft - Save current user's draft (author only)
+ */
+app.put('/api/changelogs/draft', (req, res) => {
+  const userId = req.session?.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+    return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
+  }
+  const draft = changelogsService.saveDraft(userId, req.body || {});
+  res.json({ draft });
+});
+
+/**
+ * DELETE /api/changelogs/draft - Delete current user's draft (author only)
+ */
+app.delete('/api/changelogs/draft', (req, res) => {
+  const userId = req.session?.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+    return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
+  }
+  changelogsService.deleteDraft(userId);
+  res.json({ success: true });
+});
+
+/**
+ * POST /api/changelogs/media - Upload image/video to changelog storage (author only)
+ */
+app.post('/api/changelogs/media', (req, res) => {
+  const userId = req.session?.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+    return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
+  }
+
+  try {
+    const { fileName, mimeType, base64Data } = req.body || {};
+    const media = changelogsService.saveMedia({ fileName, mimeType, base64Data });
+    return res.json({ media });
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'Media upload failed' });
+  }
+});
+
+/**
+ * POST /api/changelogs - Publish changelog post (author only)
+ */
+app.post('/api/changelogs', (req, res) => {
+  const sessionUser = req.session?.user;
+  const userId = sessionUser?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+    return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
+  }
+
+  try {
+    const post = changelogsService.publishPost({
+      userId,
+      authorName: sessionUser.globalName || sessionUser.username || String(userId),
+      draft: req.body || {},
+    });
+    return res.json({ post });
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'Failed to publish changelog' });
+  }
+});
+
+/**
+ * GET /api/changelogs/media/:fileName - Serve uploaded changelog media
+ */
+app.get('/api/changelogs/media/:fileName', (req, res) => {
+  const absolutePath = changelogsService.getMediaAbsolutePath(req.params.fileName);
+  if (!absolutePath) {
+    return res.status(404).json({ error: 'Media not found' });
+  }
+  return res.sendFile(absolutePath);
 });
 
 /**

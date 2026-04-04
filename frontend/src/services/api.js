@@ -369,6 +369,65 @@ export async function saveUserProfile(profile) {
   });
 }
 
+/**
+ * Get changelog posts
+ */
+export async function getChangelogs() {
+  return fetchAPI('/changelogs');
+}
+
+/**
+ * Get current user's changelog draft
+ */
+export async function getChangelogDraft() {
+  return fetchAPI('/changelogs/draft', {
+    credentials: 'include',
+  });
+}
+
+/**
+ * Save current user's changelog draft
+ */
+export async function saveChangelogDraft(draft) {
+  return fetchAPI('/changelogs/draft', {
+    method: 'PUT',
+    body: JSON.stringify(draft),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Delete current user's changelog draft
+ */
+export async function deleteChangelogDraft() {
+  return fetchAPI('/changelogs/draft', {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+}
+
+/**
+ * Upload changelog media
+ */
+export async function uploadChangelogMedia(payload) {
+  return fetchAPI('/changelogs/media', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Publish a changelog post
+ */
+export async function publishChangelog(draft) {
+  return fetchAPI('/changelogs', {
+    method: 'POST',
+    body: JSON.stringify(draft),
+    credentials: 'include',
+  });
+}
+
 export default {
   getServerTime,
   getAirports,
@@ -406,4 +465,10 @@ export default {
   postConvoyEvent,
   getUserProfile,
   saveUserProfile,
+  getChangelogs,
+  getChangelogDraft,
+  saveChangelogDraft,
+  deleteChangelogDraft,
+  uploadChangelogMedia,
+  publishChangelog,
 };

@@ -14,3 +14,5 @@ lua-zones-buffer.json
 ago --name-status --pretty=format-h -ad -an -s --date=short
 CHANGELOG.md
 /csvexample
+/data/changelogs/media
+data/changelogs/drafts.json

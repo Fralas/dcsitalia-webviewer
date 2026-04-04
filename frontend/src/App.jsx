@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Activity, AlertCircle } from 'lucide-react';
+import { Activity, AlertCircle, CalendarSync } from 'lucide-react';
 import FrontlineMap from './components/FrontlineMap';
 import UserMenu from './components/UserMenu';
 import UserProfile from './components/UserProfile';
+import ChangelogPage from './components/ChangelogPage';
 import * as api from './services/api';
 import socketService from './services/socket';
 import { t } from './utils/locale';
@@ -41,7 +42,7 @@ function App() {
     UNDER_ATTACK: 0,
   });
   const { user } = useUser();
-  const allowedViews = useMemo(() => new Set(['frontline', 'profile']), []);
+  const allowedViews = useMemo(() => new Set(['frontline', 'profile', 'changelogs']), []);
 
   const goToView = (view) => {
     setCurrentView(allowedViews.has(view) ? view : 'frontline');
@@ -189,7 +190,20 @@ function App() {
             </div>
 
             <div className="flex items-center gap-2">
-              <UserMenu onProfileOpen={() => setCurrentView('profile')} />
+              <button
+                type="button"
+                onClick={() => goToView('changelogs')}
+                className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] transition-colors ${
+                  currentView === 'changelogs'
+                    ? 'border-yt-accent bg-yt-accent/20 text-yt-accent'
+                    : 'border-yt-border/80 bg-[#151b25] text-yt-text-primary hover:border-yt-accent hover:text-white'
+                }`}
+                title="Apri changelog"
+              >
+                <CalendarSync className="w-4 h-4" />
+                Changelog
+              </button>
+              <UserMenu />
             </div>
           </div>
         </div>
@@ -201,6 +215,9 @@ function App() {
         )}
         {currentView === 'profile' && (
           <UserProfile />
+        )}
+        {currentView === 'changelogs' && (
+          <ChangelogPage />
         )}
       </main>
 
