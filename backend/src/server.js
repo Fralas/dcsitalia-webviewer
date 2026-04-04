@@ -33,6 +33,7 @@ import * as userProfiles from './services/userProfiles.js';
 import * as feedService from './services/feed.js';
 import * as convoysService from './services/convoys.js';
 import * as changelogsService from './services/changelogs.js';
+import * as changelogTranslator from './services/changelogTranslator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1067,6 +1068,34 @@ app.post('/api/changelogs', (req, res) => {
     return res.json({ post });
   } catch (error) {
     return res.status(400).json({ error: error.message || 'Failed to publish changelog' });
+  }
+});
+
+/**
+ * POST /api/changelogs/translate - Auto translate draft (author only)
+ */
+app.post('/api/changelogs/translate', async (req, res) => {
+  const userId = req.session?.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+    return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
+  }
+
+  try {
+    const draft = req.body?.draft || {};
+    const sourceLang = req.body?.sourceLang || 'it';
+    const targetLang = req.body?.targetLang || 'en';
+    const overwrite = req.body?.overwrite === true;
+    const translatedDraft = await changelogTranslator.translateDraft(draft, {
+      sourceLang,
+      targetLang,
+      overwrite,
+    });
+    return res.json({ draft: translatedDraft });
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'Translation failed' });
   }
 });
 

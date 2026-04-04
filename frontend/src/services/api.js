@@ -429,6 +429,17 @@ export async function publishChangelog(draft) {
 }
 
 /**
+ * Auto translate changelog draft
+ */
+export async function translateChangelogDraft(draft, sourceLang = 'it', targetLang = 'en', overwrite = false) {
+  return fetchAPI('/changelogs/translate', {
+    method: 'POST',
+    body: JSON.stringify({ draft, sourceLang, targetLang, overwrite }),
+    credentials: 'include',
+  });
+}
+
+/**
  * Update a changelog post
  */
 export async function updateChangelog(postId, draft) {
@@ -492,6 +503,7 @@ export default {
   deleteChangelogDraft,
   uploadChangelogMedia,
   publishChangelog,
+  translateChangelogDraft,
   updateChangelog,
   deleteChangelog,
 };

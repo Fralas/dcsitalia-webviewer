@@ -2,26 +2,31 @@
   {
     "id": "changelog_1775344261120_939f2728",
     "title": "V2.0",
+    "titleEn": "",
     "rows": [
       {
         "id": "row_1775344179230",
         "tag": "FIX",
-        "text": "Djogo è tornato gay"
+        "text": "Djogo è tornato gay",
+        "textEn": ""
       },
       {
         "id": "row_1775344202049_a2bfb",
         "tag": "NEW",
-        "text": "Fralas ha una palla in più"
+        "text": "Fralas ha una palla in più",
+        "textEn": ""
       },
       {
         "id": "row_1775344209984_8572e",
         "tag": "UPD",
-        "text": "Kira ha migliorato l'entrata di indiana jones"
+        "text": "Kira ha migliorato l'entrata di indiana jones",
+        "textEn": ""
       },
       {
         "id": "row_1775344220987_a1c24",
         "tag": "WIP",
-        "text": "DJ (non sta facendo i video)"
+        "text": "DJ (non sta facendo i video)",
+        "textEn": ""
       }
     ],
     "attachments": [
@@ -48,11 +53,13 @@
   {
     "id": "changelog_1775344758042_e47d53ec",
     "title": "Titolo",
+    "titleEn": "",
     "rows": [
       {
         "id": "row_1775344655320",
         "tag": "UPD",
-        "text": "Test"
+        "text": "Test",
+        "textEn": ""
       }
     ],
     "attachments": [],
@@ -71,21 +78,25 @@
   {
     "id": "changelog_1775344873608_15abf491",
     "title": "TITOLO NORMALMENTE LUNGO SECONDO CAZZO",
+    "titleEn": "",
     "rows": [
       {
         "id": "row_1775344685638",
         "tag": "UPD",
-        "text": "TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO"
+        "text": "TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO",
+        "textEn": "OMGTHETEXTISVERYBIG"
       },
       {
         "id": "row_1775344857153_fb74e",
         "tag": "NEW",
-        "text": "TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO"
+        "text": "TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO TESTOVERAMENTE LUNGO",
+        "textEn": ""
       },
       {
         "id": "row_1775344860738_86ba2",
         "tag": "UPD",
-        "text": "TESTOVERAMENTE LUNGO"
+        "text": "TESTOVERAMENTE LUNGO",
+        "textEn": ""
       }
     ],
     "attachments": [],
@@ -95,6 +106,6 @@
       "name": "Fralas"
     },
     "createdAt": 1775344873608,
-    "updatedAt": 1775344873608
+    "updatedAt": 1775345916518
   }
 ]

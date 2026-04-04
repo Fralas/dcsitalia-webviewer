@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarSync, GitPullRequestCreateArrow, ImagePlus, Loader2, Pencil, Plus, Save, Trash2, Upload, Video, X } from 'lucide-react';
+import { CalendarSync, GitPullRequestCreateArrow, ImagePlus, Languages, Loader2, Pencil, Plus, Save, Trash2, Upload, Video, X } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import * as api from '../services/api';
 
@@ -36,7 +36,8 @@ const TAGS = {
 
 const EMPTY_DRAFT = {
   title: '',
-  rows: [{ id: `row_${Date.now()}`, tag: 'UPD', text: '' }],
+  titleEn: '',
+  rows: [{ id: `row_${Date.now()}`, tag: 'UPD', text: '', textEn: '' }],
   attachments: [],
   contributorIds: [],
 };
@@ -168,11 +169,13 @@ function normalizeDraft(rawDraft) {
       id: String(row?.id || `row_${index + 1}`),
       tag: TAGS[row?.tag] ? row.tag : 'UPD',
       text: String(row?.text || ''),
+      textEn: String(row?.textEn || ''),
     }))
-    : [{ id: `row_${Date.now()}`, tag: 'UPD', text: '' }];
+    : [{ id: `row_${Date.now()}`, tag: 'UPD', text: '', textEn: '' }];
 
   return {
     title: String(rawDraft.title || ''),
+    titleEn: String(rawDraft.titleEn || ''),
     rows,
     attachments: Array.isArray(rawDraft.attachments) ? rawDraft.attachments : [],
     contributorIds: Array.isArray(rawDraft.contributorIds) ? rawDraft.contributorIds : [],
@@ -188,9 +191,11 @@ export default function ChangelogPage() {
   const [draftReady, setDraftReady] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
   const [busyUpload, setBusyUpload] = useState(false);
+  const [translating, setTranslating] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [editingPostId, setEditingPostId] = useState('');
   const [editorOpen, setEditorOpen] = useState(false);
+  const [viewLanguage, setViewLanguage] = useState('it');
   const [fullscreenMedia, setFullscreenMedia] = useState(null);
   const [error, setError] = useState('');
   const lastSavedSerializedRef = useRef('');
@@ -297,7 +302,7 @@ export default function ChangelogPage() {
   const addRow = () => {
     setDraft((prev) => ({
       ...prev,
-      rows: [...prev.rows, { id: `row_${Date.now()}_${Math.random().toString(16).slice(2, 7)}`, tag: 'UPD', text: '' }],
+      rows: [...prev.rows, { id: `row_${Date.now()}_${Math.random().toString(16).slice(2, 7)}`, tag: 'UPD', text: '', textEn: '' }],
     }));
   };
 
@@ -306,7 +311,7 @@ export default function ChangelogPage() {
       const nextRows = prev.rows.filter((row) => row.id !== rowId);
       return {
         ...prev,
-        rows: nextRows.length ? nextRows : [{ id: `row_${Date.now()}`, tag: 'UPD', text: '' }],
+        rows: nextRows.length ? nextRows : [{ id: `row_${Date.now()}`, tag: 'UPD', text: '', textEn: '' }],
       };
     });
   };
@@ -357,7 +362,7 @@ export default function ChangelogPage() {
     if (!canEdit) return;
     try {
       await api.deleteChangelogDraft();
-      const next = { ...EMPTY_DRAFT, rows: [{ id: `row_${Date.now()}`, tag: 'UPD', text: '' }] };
+      const next = { ...EMPTY_DRAFT, rows: [{ id: `row_${Date.now()}`, tag: 'UPD', text: '', textEn: '' }] };
       setDraft(next);
       setEditingPostId('');
       lastSavedSerializedRef.current = JSON.stringify(next);
@@ -375,9 +380,20 @@ export default function ChangelogPage() {
     try {
       setPublishing(true);
       setError('');
+      let draftToSend = draft;
+      const missingTitleEn = String(draft.title || '').trim() && !String(draft.titleEn || '').trim();
+      const missingRowsEn = (Array.isArray(draft.rows) ? draft.rows : [])
+        .some((row) => String(row?.text || '').trim() && !String(row?.textEn || '').trim());
+      if (missingTitleEn || missingRowsEn) {
+        setTranslating(true);
+        const translatedResponse = await api.translateChangelogDraft(draft, 'it', 'en', false);
+        draftToSend = normalizeDraft(translatedResponse?.draft || draft);
+        setDraft(draftToSend);
+        setSaveStatus('Traduzione EN automatica completata');
+      }
       const response = editingPostId
-        ? await api.updateChangelog(editingPostId, draft)
-        : await api.publishChangelog(draft);
+        ? await api.updateChangelog(editingPostId, draftToSend)
+        : await api.publishChangelog(draftToSend);
       const post = response?.post;
       if (post) {
         setPosts((prev) => (
@@ -388,7 +404,7 @@ export default function ChangelogPage() {
       } else {
         await loadPosts();
       }
-      const next = { ...EMPTY_DRAFT, rows: [{ id: `row_${Date.now()}`, tag: 'UPD', text: '' }] };
+      const next = { ...EMPTY_DRAFT, rows: [{ id: `row_${Date.now()}`, tag: 'UPD', text: '', textEn: '' }] };
       setDraft(next);
       setEditingPostId('');
       lastSavedSerializedRef.current = JSON.stringify(next);
@@ -399,6 +415,7 @@ export default function ChangelogPage() {
     } catch (err) {
       setError(err.message || (editingPostId ? 'Aggiornamento fallito' : 'Pubblicazione fallita'));
     } finally {
+      setTranslating(false);
       setPublishing(false);
     }
   };
@@ -407,6 +424,7 @@ export default function ChangelogPage() {
     if (!canEdit || !post?.id) return;
     const normalized = normalizeDraft({
       title: post.title,
+      titleEn: post.titleEn,
       rows: post.rows,
       attachments: post.attachments,
       contributorIds: post.contributorIds,
@@ -419,7 +437,7 @@ export default function ChangelogPage() {
   };
 
   const cancelEditing = () => {
-    const next = { ...EMPTY_DRAFT, rows: [{ id: `row_${Date.now()}`, tag: 'UPD', text: '' }] };
+    const next = { ...EMPTY_DRAFT, rows: [{ id: `row_${Date.now()}`, tag: 'UPD', text: '', textEn: '' }] };
     setDraft(next);
     setEditingPostId('');
     setSaveStatus('Modifica annullata');
@@ -461,6 +479,15 @@ export default function ChangelogPage() {
               <h2 className="text-xl font-extrabold tracking-[0.05em] text-yt-text-primary">Changelogs</h2>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => setViewLanguage((prev) => (prev === 'it' ? 'en' : 'it'))}
+            className="inline-flex items-center gap-1 rounded border border-yt-border px-2 py-1 text-xs text-yt-text-primary hover:border-yt-accent"
+            title={viewLanguage === 'it' ? 'Switch to English' : 'Passa a Italiano'}
+          >
+            <Languages className="h-3.5 w-3.5" />
+            {viewLanguage === 'it' ? 'IT' : 'EN'}
+          </button>
           {canEdit && (
             <div className="text-[11px] text-yt-text-secondary">
               <span className="inline-flex items-center gap-1 rounded border border-yt-border px-2 py-1">
@@ -498,6 +525,13 @@ export default function ChangelogPage() {
                 placeholder="Titolo changelog"
                 className="w-full rounded-lg border border-yt-border bg-[#121b27] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
               />
+              <input
+                type="text"
+                value={draft.titleEn}
+                onChange={(event) => setDraft((prev) => ({ ...prev, titleEn: event.target.value }))}
+                placeholder="English title (translation)"
+                className="w-full rounded-lg border border-yt-border bg-[#121b27] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+              />
 
               <div className="rounded-xl border border-yt-border/80 bg-[#111926] p-2">
                 <div className="space-y-2">
@@ -528,7 +562,14 @@ export default function ChangelogPage() {
                           rows={3}
                           value={row.text}
                           onChange={(event) => updateRow(row.id, { text: event.target.value })}
-                          placeholder="Testo riga (supporto markdown)"
+                          placeholder="Testo riga IT (supporto markdown)"
+                          className="w-full rounded border border-yt-border/80 bg-[#0e1520] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                        />
+                        <textarea
+                          rows={3}
+                          value={row.textEn || ''}
+                          onChange={(event) => updateRow(row.id, { textEn: event.target.value })}
+                          placeholder="English row translation (markdown supported)"
                           className="w-full rounded border border-yt-border/80 bg-[#0e1520] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
                         />
                       </div>
@@ -623,8 +664,29 @@ export default function ChangelogPage() {
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <button
                   type="button"
+                  onClick={async () => {
+                    try {
+                      setTranslating(true);
+                      const response = await api.translateChangelogDraft(draft, 'it', 'en', false);
+                      const translated = normalizeDraft(response?.draft || draft);
+                      setDraft(translated);
+                      setSaveStatus('Traduzione EN completata');
+                    } catch (err) {
+                      setError(err.message || 'Traduzione automatica fallita');
+                    } finally {
+                      setTranslating(false);
+                    }
+                  }}
+                  disabled={translating}
+                  className="inline-flex items-center gap-1 rounded border border-blue-500/35 bg-blue-500/10 px-3 py-2 text-sm text-blue-300 disabled:opacity-60"
+                >
+                  {translating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Languages className="w-4 h-4" />}
+                  Traduci EN
+                </button>
+                <button
+                  type="button"
                   onClick={publishPost}
-                  disabled={publishing}
+                  disabled={publishing || translating}
                   className="inline-flex items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/15 px-3 py-2 text-sm text-emerald-300 disabled:opacity-60"
                 >
                   {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarSync className="w-4 h-4" />}
@@ -680,7 +742,9 @@ export default function ChangelogPage() {
         {posts.map((post) => (
           <article key={post.id} className="rounded-2xl border border-yt-border/70 bg-yt-bg-secondary/85 p-4 shadow-[0_10px_26px_rgba(0,0,0,0.3)]">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-lg font-bold text-yt-text-primary">{post.title}</h3>
+              <h3 className="text-lg font-bold text-yt-text-primary">
+                {viewLanguage === 'en' ? (post.titleEn || post.title) : post.title}
+              </h3>
               <div className="flex items-center gap-2">
                 <div className="text-xs text-yt-text-secondary">{formatDate(post.createdAt)}</div>
                 {canEdit && (
@@ -719,7 +783,7 @@ export default function ChangelogPage() {
                     </div>
                     <div
                       className="text-sm text-yt-text-primary prose prose-invert prose-sm max-w-none"
-                      dangerouslySetInnerHTML={{ __html: renderMarkdownBlock(row.text) }}
+                      dangerouslySetInnerHTML={{ __html: renderMarkdownBlock(viewLanguage === 'en' ? (row.textEn || row.text) : row.text) }}
                     />
                   </div>
                 );

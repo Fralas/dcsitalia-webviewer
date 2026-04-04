@@ -65,10 +65,12 @@ function normalizeRows(rows) {
     .map((row, index) => {
       const text = sanitizeText(row?.text || '', 4000);
       if (!text) return null;
+      const textEn = sanitizeText(row?.textEn || '', 4000);
       return {
         id: sanitizeText(row?.id || '', 60) || `line_${index + 1}`,
         tag: normalizeTag(row?.tag),
         text,
+        textEn,
       };
     })
     .filter(Boolean)
@@ -103,6 +105,7 @@ function normalizeAttachments(attachments) {
 function normalizeDraft(draft, userId = '') {
   return {
     title: sanitizeText(draft?.title || '', 200),
+    titleEn: sanitizeText(draft?.titleEn || '', 200),
     rows: normalizeRows(draft?.rows),
     attachments: normalizeAttachments(draft?.attachments),
     contributorIds: normalizeContributorIds(draft?.contributorIds),
@@ -116,6 +119,7 @@ function normalizePost(post) {
   return {
     id: sanitizeText(post?.id || '', 80) || `changelog_${createdAt}_${crypto.randomBytes(4).toString('hex')}`,
     title: sanitizeText(post?.title || '', 200),
+    titleEn: sanitizeText(post?.titleEn || '', 200),
     rows: normalizeRows(post?.rows),
     attachments: normalizeAttachments(post?.attachments),
     contributorIds: normalizeContributorIds(post?.contributorIds),
@@ -195,6 +199,7 @@ export function publishPost({ userId, authorName, draft }) {
   const post = normalizePost({
     id: `changelog_${createdAt}_${crypto.randomBytes(4).toString('hex')}`,
     title: normalizedDraft.title,
+    titleEn: normalizedDraft.titleEn,
     rows: normalizedDraft.rows,
     attachments: normalizedDraft.attachments,
     contributorIds: normalizedDraft.contributorIds,
@@ -236,6 +241,7 @@ export function updatePost({ postId, draft }) {
   const updated = normalizePost({
     ...current,
     title: normalizedDraft.title,
+    titleEn: normalizedDraft.titleEn,
     rows: normalizedDraft.rows,
     attachments: normalizedDraft.attachments,
     contributorIds: normalizedDraft.contributorIds,
