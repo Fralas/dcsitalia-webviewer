@@ -172,6 +172,63 @@ function getZoneGridIndex(zone) {
   return value;
 }
 
+function isCyprusZone(zone) {
+  const source = String(zone?.id || zone?.name || '').toUpperCase();
+  return /(^|_)C\d{2}(?!\d)/.test(source);
+}
+
+function buildZoneGridKey(prefix, index) {
+  return `${prefix}${String(index).padStart(2, '0')}`;
+}
+
+function getZoneGridKey(zone) {
+  const index = getZoneGridIndex(zone);
+  if (index === null) return null;
+  const prefix = isCyprusZone(zone) ? 'C' : 'N';
+  return buildZoneGridKey(prefix, index);
+}
+
+function parseZoneGridKey(key) {
+  const match = String(key || '').match(/^([A-Z])(\d{2})$/);
+  if (!match) return null;
+  const index = Number.parseInt(match[2], 10);
+  if (!Number.isFinite(index) || index < 0 || index > 99) return null;
+  return { prefix: match[1], index };
+}
+
+function getNeighborZoneGridKeys(key) {
+  const parsed = parseZoneGridKey(key);
+  if (!parsed) return [];
+
+  const { prefix, index } = parsed;
+  const row = Math.floor(index / 10);
+  const col = index % 10;
+  const result = [];
+  if (row > 0) result.push(buildZoneGridKey(prefix, index - 10));
+  if (row < 9) result.push(buildZoneGridKey(prefix, index + 10));
+  if (col > 0) result.push(buildZoneGridKey(prefix, index - 1));
+  if (col < 9) result.push(buildZoneGridKey(prefix, index + 1));
+  return result;
+}
+
+function getRightZoneGridKey(key) {
+  const parsed = parseZoneGridKey(key);
+  if (!parsed) return null;
+  const { prefix, index } = parsed;
+  const col = index % 10;
+  if (col >= 9) return null;
+  return buildZoneGridKey(prefix, index + 1);
+}
+
+function getDownZoneGridKey(key) {
+  const parsed = parseZoneGridKey(key);
+  if (!parsed) return null;
+  const { prefix, index } = parsed;
+  const row = Math.floor(index / 10);
+  if (row >= 9) return null;
+  return buildZoneGridKey(prefix, index + 10);
+}
+
 function formatDms(value, positiveLabel, negativeLabel) {
   if (!Number.isFinite(value)) return '-';
   const abs = Math.abs(value);
@@ -3073,60 +3130,49 @@ export default function FrontlineMap({ airportsData }) {
     return map;
   }, [combatMissions]);
 
-  const zoneByGridIndex = useMemo(() => {
+  const zoneByGridKey = useMemo(() => {
     const map = new Map();
     validZones.forEach((zone) => {
-      const index = getZoneGridIndex(zone);
-      if (index === null) return;
-      map.set(index, zone);
+      const key = getZoneGridKey(zone);
+      if (!key) return;
+      map.set(key, zone);
     });
     return map;
   }, [validZones]);
 
   const logisticsFrontlineAirportIds = useMemo(() => {
-    const zoneByIndex = new Map();
+    const zoneByKey = new Map();
     validZones.forEach((zone) => {
-      const index = getZoneGridIndex(zone);
-      if (index === null) return;
-      zoneByIndex.set(index, zone);
+      const key = getZoneGridKey(zone);
+      if (!key) return;
+      zoneByKey.set(key, zone);
     });
 
-    const getNeighborIndexes = (index) => {
-      const row = Math.floor(index / 10);
-      const col = index % 10;
-      const result = [];
-      if (row > 0) result.push(index - 10);
-      if (row < 9) result.push(index + 10);
-      if (col > 0) result.push(index - 1);
-      if (col < 9) result.push(index + 1);
-      return result;
-    };
-
-    const firstLineBlueZoneIndexes = new Set();
-    zoneByIndex.forEach((zone, index) => {
+    const firstLineBlueZoneKeys = new Set();
+    zoneByKey.forEach((zone, key) => {
       if (zone?.status !== 'BLUE') return;
-      const hasRedNeighbor = getNeighborIndexes(index).some((neighborIndex) => zoneByIndex.get(neighborIndex)?.status === 'RED');
+      const hasRedNeighbor = getNeighborZoneGridKeys(key).some((neighborKey) => zoneByKey.get(neighborKey)?.status === 'RED');
       if (hasRedNeighbor) {
-        firstLineBlueZoneIndexes.add(index);
+        firstLineBlueZoneKeys.add(key);
       }
     });
 
-    const secondLineBlueZoneIndexes = new Set();
-    zoneByIndex.forEach((zone, index) => {
+    const secondLineBlueZoneKeys = new Set();
+    zoneByKey.forEach((zone, key) => {
       if (zone?.status !== 'BLUE') return;
-      if (firstLineBlueZoneIndexes.has(index)) return;
-      const linkedToFirstLine = getNeighborIndexes(index).some((neighborIndex) => firstLineBlueZoneIndexes.has(neighborIndex));
+      if (firstLineBlueZoneKeys.has(key)) return;
+      const linkedToFirstLine = getNeighborZoneGridKeys(key).some((neighborKey) => firstLineBlueZoneKeys.has(neighborKey));
       if (linkedToFirstLine) {
-        secondLineBlueZoneIndexes.add(index);
+        secondLineBlueZoneKeys.add(key);
       }
     });
 
-    const eligibleBlueZoneIndexes = new Set([
-      ...Array.from(firstLineBlueZoneIndexes),
-      ...Array.from(secondLineBlueZoneIndexes),
+    const eligibleBlueZoneKeys = new Set([
+      ...Array.from(firstLineBlueZoneKeys),
+      ...Array.from(secondLineBlueZoneKeys),
     ]);
 
-    const indexedZones = Array.from(zoneByIndex.entries()).filter(([, zone]) => (
+    const keyedZones = Array.from(zoneByKey.entries()).filter(([, zone]) => (
       Number.isFinite(Number(zone?.coordinates?.lat)) && Number.isFinite(Number(zone?.coordinates?.lon))
     ));
     const eligibleAirportIds = new Set();
@@ -3136,20 +3182,20 @@ export default function FrontlineMap({ airportsData }) {
       const airportLon = Number(airport?.coordinates?.lon);
       if (!Number.isFinite(airportLat) || !Number.isFinite(airportLon)) return;
 
-      let nearestZoneIndex = null;
+      let nearestZoneKey = null;
       let nearestDistanceNm = Number.POSITIVE_INFINITY;
 
-      indexedZones.forEach(([zoneIndex, zone]) => {
+      keyedZones.forEach(([zoneKey, zone]) => {
         const zoneLat = Number(zone.coordinates.lat);
         const zoneLon = Number(zone.coordinates.lon);
         const distanceNm = haversineNm(airportLat, airportLon, zoneLat, zoneLon);
         if (distanceNm < nearestDistanceNm) {
           nearestDistanceNm = distanceNm;
-          nearestZoneIndex = zoneIndex;
+          nearestZoneKey = zoneKey;
         }
       });
 
-      if (nearestZoneIndex !== null && eligibleBlueZoneIndexes.has(nearestZoneIndex)) {
+      if (nearestZoneKey !== null && eligibleBlueZoneKeys.has(nearestZoneKey)) {
         eligibleAirportIds.add(String(airport.id));
       }
     });
@@ -3158,25 +3204,23 @@ export default function FrontlineMap({ airportsData }) {
   }, [validZones, validAirports]);
 
   const gridConnections = useMemo(() => {
-    const zoneByIndex = new Map();
+    const zoneByKey = new Map();
 
     validZones.forEach((zone) => {
-      const index = getZoneGridIndex(zone);
-      if (index === null || !zone?.coordinates) return;
-      zoneByIndex.set(index, zone);
+      const key = getZoneGridKey(zone);
+      if (!key || !zone?.coordinates) return;
+      zoneByKey.set(key, zone);
     });
 
     const links = [];
-    zoneByIndex.forEach((zone, index) => {
-      const row = Math.floor(index / 10);
-      const col = index % 10;
-      const rightIndex = col < 9 ? index + 1 : null;
-      const downIndex = row < 9 ? index + 10 : null;
+    zoneByKey.forEach((zone, key) => {
+      const rightKey = getRightZoneGridKey(key);
+      const downKey = getDownZoneGridKey(key);
 
-      if (rightIndex !== null && zoneByIndex.has(rightIndex)) {
-        const target = zoneByIndex.get(rightIndex);
+      if (rightKey !== null && zoneByKey.has(rightKey)) {
+        const target = zoneByKey.get(rightKey);
         links.push({
-          id: `grid-${index}-${rightIndex}`,
+          id: `grid-${key}-${rightKey}`,
           positions: [
             [zone.coordinates.lat, zone.coordinates.lon],
             [target.coordinates.lat, target.coordinates.lon],
@@ -3184,10 +3228,10 @@ export default function FrontlineMap({ airportsData }) {
         });
       }
 
-      if (downIndex !== null && zoneByIndex.has(downIndex)) {
-        const target = zoneByIndex.get(downIndex);
+      if (downKey !== null && zoneByKey.has(downKey)) {
+        const target = zoneByKey.get(downKey);
         links.push({
-          id: `grid-${index}-${downIndex}`,
+          id: `grid-${key}-${downKey}`,
           positions: [
             [zone.coordinates.lat, zone.coordinates.lon],
             [target.coordinates.lat, target.coordinates.lon],
@@ -3503,21 +3547,13 @@ export default function FrontlineMap({ airportsData }) {
     : [];
   const selectedZoneDetailsRedNeighbors = useMemo(() => {
     if (!selectedZoneDetails) return [];
-    const gridIndex = getZoneGridIndex(selectedZoneDetails);
-    if (gridIndex === null) return [];
+    const gridKey = getZoneGridKey(selectedZoneDetails);
+    if (!gridKey) return [];
 
-    const row = Math.floor(gridIndex / 10);
-    const col = gridIndex % 10;
-    const neighborIndexes = [];
-    if (row > 0) neighborIndexes.push(gridIndex - 10);
-    if (row < 9) neighborIndexes.push(gridIndex + 10);
-    if (col > 0) neighborIndexes.push(gridIndex - 1);
-    if (col < 9) neighborIndexes.push(gridIndex + 1);
-
-    return neighborIndexes
-      .map((index) => zoneByGridIndex.get(index))
+    return getNeighborZoneGridKeys(gridKey)
+      .map((key) => zoneByGridKey.get(key))
       .filter((zone) => zone && zone.status === 'RED');
-  }, [selectedZoneDetails, zoneByGridIndex]);
+  }, [selectedZoneDetails, zoneByGridKey]);
   const selectedZoneDetailsHasTasks = Array.isArray(selectedZoneDetails?.tasks) && selectedZoneDetails.tasks.length > 0;
   const selectedZoneDetailsAcceptedByOther = Boolean(
     selectedZoneDetails?.operation_assigned &&
