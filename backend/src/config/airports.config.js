@@ -699,7 +699,7 @@ export const airports = [
     isCarrier: true,
     herculesBase: false,
     csvPrefix: 'CARRIER',
-    coordinates: { lat: 35.435000, lon: 35.596667 },
+    coordinates: { lat: 35.986389, lon: 33.511389 },
   },
   {
     id: 'kharab-ishk',
