@@ -12,7 +12,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import c130ModelUrl from '../assets/3D/yc-130prototype_of_c-130.glb';
 import ch47ModelUrl from '../assets/3D/ch47.glb';
 import t72ModelUrl from '../assets/3D/t90.glb';
-import { Blend, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3, Forklift, MapPin, PersonStanding, Satellite, TowerControl } from 'lucide-react';
+import { Ambulance, Anchor, Blend, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3, Forklift, MapPin, PersonStanding, Satellite, TowerControl } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
@@ -31,7 +31,9 @@ const MAPLIBRE_FOCUS_Y_OFFSET_PX = 132;
 const MAPLIBRE_DCSAR_ICON_PENDING_IMAGE_ID = 'dcsar-person-icon-pending';
 const MAPLIBRE_DCSAR_ICON_ACCEPTED_IMAGE_ID = 'dcsar-person-icon-accepted';
 const MAPLIBRE_DCSAR_ICON_SIZE = ['interpolate', ['linear'], ['zoom'], 5, 1.15, 8, 1.55, 10, 1.9];
-const MAPLIBRE_AIRPORT_ICON_IMAGE_ID = 'airport-tower-icon';
+const MAPLIBRE_AIRPORT_ICON_TOWER_BLUE_IMAGE_ID = 'airport-tower-icon-blue';
+const MAPLIBRE_AIRPORT_ICON_TOWER_GREEN_IMAGE_ID = 'airport-tower-icon-green';
+const MAPLIBRE_AIRPORT_ICON_ANCHOR_IMAGE_ID = 'airport-anchor-icon';
 const MAPLIBRE_AIRPORT_ICON_SIZE = ['interpolate', ['linear'], ['zoom'], 5, 0.78, 8, 0.95, 10, 1.12];
 
 function isDesktopGlobeDevice() {
@@ -628,9 +630,11 @@ function createDcsarIcon(color = '#f8fafc') {
   });
 }
 
-function createAirportTowerIcon(isMainBase = false) {
+function createAirportMarkerIcon(isMainBase = false, isCarrier = false) {
   const frameSize = isMainBase ? 30 : 27;
   const iconSize = isMainBase ? 19 : 17;
+  const color = isMainBase ? '#22c55e' : '#3b82f6';
+  const IconComponent = isCarrier ? Anchor : TowerControl;
   const html = renderToStaticMarkup(
     <div
       style={{
@@ -643,16 +647,16 @@ function createAirportTowerIcon(isMainBase = false) {
         borderRadius: '999px',
         background: 'rgba(15, 23, 42, 0.78)',
         border: '1px solid rgba(148, 163, 184, 0.7)',
-        boxShadow: '0 0 0 1px rgba(30, 41, 59, 0.9), 0 0 8px rgba(59, 130, 246, 0.35)',
+        boxShadow: `0 0 0 1px rgba(30, 41, 59, 0.9), 0 0 8px ${isMainBase ? 'rgba(34, 197, 94, 0.4)' : 'rgba(59, 130, 246, 0.35)'}`,
       }}
     >
-      <TowerControl size={iconSize} color="#3b82f6" strokeWidth={2.25} />
+      <IconComponent size={iconSize} color={color} strokeWidth={2.25} />
     </div>
   );
 
   return divIcon({
     html,
-    className: 'airport-tower-icon',
+    className: 'airport-marker-icon',
     iconSize: [frameSize, frameSize],
     iconAnchor: [frameSize / 2, frameSize / 2],
   });
@@ -693,9 +697,10 @@ async function ensureMapLibreDcsarIconImages(map) {
   }
 }
 
-function buildAirportTowerSvgMarkup(color = '#3b82f6') {
+function buildAirportSvgMarkup(icon = 'tower', color = '#3b82f6') {
+  const IconComponent = icon === 'anchor' ? Anchor : TowerControl;
   return renderToStaticMarkup(
-    <TowerControl
+    <IconComponent
       size={30}
       color={color}
       strokeWidth={2.3}
@@ -706,11 +711,19 @@ function buildAirportTowerSvgMarkup(color = '#3b82f6') {
   );
 }
 
-async function ensureMapLibreAirportIconImage(map) {
-  if (map.hasImage(MAPLIBRE_AIRPORT_ICON_IMAGE_ID)) return;
-  const svg = buildAirportTowerSvgMarkup();
-  const image = await loadSvgAsImage(svg);
-  map.addImage(MAPLIBRE_AIRPORT_ICON_IMAGE_ID, image, { pixelRatio: 2 });
+async function ensureMapLibreAirportIconImages(map) {
+  const defs = [
+    { id: MAPLIBRE_AIRPORT_ICON_TOWER_BLUE_IMAGE_ID, icon: 'tower', color: '#3b82f6' },
+    { id: MAPLIBRE_AIRPORT_ICON_TOWER_GREEN_IMAGE_ID, icon: 'tower', color: '#22c55e' },
+    { id: MAPLIBRE_AIRPORT_ICON_ANCHOR_IMAGE_ID, icon: 'anchor', color: '#3b82f6' },
+  ];
+
+  for (const def of defs) {
+    if (map.hasImage(def.id)) continue;
+    const svg = buildAirportSvgMarkup(def.icon, def.color);
+    const image = await loadSvgAsImage(svg);
+    map.addImage(def.id, image, { pixelRatio: 2 });
+  }
 }
 
 function getItemQuantity(item) {
@@ -1252,7 +1265,7 @@ function FlatMapView({
           <Marker
             key={`airport-marker-${airport.id}`}
             position={[airport.coordinates.lat, airport.coordinates.lon]}
-            icon={createAirportTowerIcon(Boolean(airport.isMainBase))}
+            icon={createAirportMarkerIcon(Boolean(airport.isMainBase), Boolean(airport.isCarrier))}
             eventHandlers={{
               click: () => onAirportClick && onAirportClick(airport.id),
             }}
@@ -1596,6 +1609,7 @@ function MapLibreFlatMapView({
           id: airport.id || '',
           name: airport.displayName || airport.name || airport.id || '',
           main: airport.isMainBase ? 1 : 0,
+          carrier: airport.isCarrier ? 1 : 0,
         },
       }];
     }),
@@ -2074,7 +2088,7 @@ function MapLibreFlatMapView({
         console.error('Failed to initialize DCSAR icon images:', error);
       }
       try {
-        await ensureMapLibreAirportIconImage(map);
+        await ensureMapLibreAirportIconImages(map);
       } catch (error) {
         console.error('Failed to initialize airport icon image:', error);
       }
@@ -2336,7 +2350,7 @@ function MapLibreFlatMapView({
         source: 'airports-src',
         paint: {
           'circle-radius': ['case', ['==', ['get', 'main'], 1], 11, 9],
-          'circle-color': ['case', ['==', ['get', 'main'], 1], '#38bdf8', '#60a5fa'],
+          'circle-color': ['case', ['==', ['get', 'main'], 1], '#22c55e', '#60a5fa'],
           'circle-opacity': 0.16,
         },
       });
@@ -2346,7 +2360,12 @@ function MapLibreFlatMapView({
         type: 'symbol',
         source: 'airports-src',
         layout: {
-          'icon-image': MAPLIBRE_AIRPORT_ICON_IMAGE_ID,
+          'icon-image': [
+            'case',
+            ['==', ['get', 'carrier'], 1], MAPLIBRE_AIRPORT_ICON_ANCHOR_IMAGE_ID,
+            ['==', ['get', 'main'], 1], MAPLIBRE_AIRPORT_ICON_TOWER_GREEN_IMAGE_ID,
+            MAPLIBRE_AIRPORT_ICON_TOWER_BLUE_IMAGE_ID,
+          ],
           'icon-size': MAPLIBRE_AIRPORT_ICON_SIZE,
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,
@@ -2786,7 +2805,7 @@ export default function FrontlineMap({ airportsData }) {
     showAirports: true,
     showConvoys: false,
     showAirliftPlayers: false,
-    showDcsar: false,
+    showDcsar: true,
   });
   const mapModeRef = useRef(false);
 
@@ -2829,7 +2848,7 @@ export default function FrontlineMap({ airportsData }) {
         showAirports: true,
         showConvoys: false,
         showAirliftPlayers: false,
-        showDcsar: false,
+        showDcsar: true,
       }));
     }
   }, [isMapLibreEngine]);
@@ -4153,7 +4172,7 @@ export default function FrontlineMap({ airportsData }) {
                     className={`flex flex-col gap-2 overflow-hidden transition-[max-height,opacity,transform,margin-bottom] duration-[360ms] ease-in-out ${
                       overlayCollapsed
                         ? 'mb-0 max-h-0 -translate-y-1 opacity-0 pointer-events-none'
-                        : 'mb-2 max-h-40 translate-y-0 opacity-100'
+                        : 'mb-2 max-h-56 translate-y-0 opacity-100'
                     }`}
                     aria-hidden={overlayCollapsed}
                   >
@@ -4182,6 +4201,19 @@ export default function FrontlineMap({ airportsData }) {
                       }`}
                     >
                       <Forklift className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Toggle CSAR overlays"
+                      title="CSAR"
+                      onClick={() => setFilters((current) => ({ ...current, showDcsar: !current.showDcsar }))}
+                      className={`rounded-md border p-2 transition-colors ${
+                        filters.showDcsar
+                          ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
+                          : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
+                      }`}
+                    >
+                      <Ambulance className="h-4 w-4" />
                     </button>
                     <button
                       type="button"
