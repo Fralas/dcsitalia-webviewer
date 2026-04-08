@@ -12,7 +12,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import c130ModelUrl from '../assets/3D/yc-130prototype_of_c-130.glb';
 import ch47ModelUrl from '../assets/3D/ch47.glb';
 import t72ModelUrl from '../assets/3D/t90.glb';
-import { ChevronLeft, ChevronRight, Clock3, MapPin, PersonStanding } from 'lucide-react';
+import { Blend, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3, Forklift, MapPin, PersonStanding, Satellite, TowerControl } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
@@ -26,12 +26,13 @@ const MAP_ENGINE = String(import.meta.env.VITE_MAP_ENGINE || 'leaflet').trim().t
 const LOGISTICS_ROUTE_TOGGLE_ROLE_ID = '1447684923518484500';
 const BASEMAP_MODE_DARK = 'dark';
 const BASEMAP_MODE_SATELLITE = 'satellite';
-const SHOW_AIRLIFT_FILTER_BUTTON = false;
 const MAPLIBRE_NAV_CONTROL_POSITION = 'bottom-right';
 const MAPLIBRE_FOCUS_Y_OFFSET_PX = 132;
 const MAPLIBRE_DCSAR_ICON_PENDING_IMAGE_ID = 'dcsar-person-icon-pending';
 const MAPLIBRE_DCSAR_ICON_ACCEPTED_IMAGE_ID = 'dcsar-person-icon-accepted';
 const MAPLIBRE_DCSAR_ICON_SIZE = ['interpolate', ['linear'], ['zoom'], 5, 1.15, 8, 1.55, 10, 1.9];
+const MAPLIBRE_AIRPORT_ICON_IMAGE_ID = 'airport-tower-icon';
+const MAPLIBRE_AIRPORT_ICON_SIZE = ['interpolate', ['linear'], ['zoom'], 5, 0.78, 8, 0.95, 10, 1.12];
 
 function isDesktopGlobeDevice() {
   if (typeof window === 'undefined') return true;
@@ -627,6 +628,36 @@ function createDcsarIcon(color = '#f8fafc') {
   });
 }
 
+function createAirportTowerIcon(isMainBase = false) {
+  const frameSize = isMainBase ? 30 : 27;
+  const iconSize = isMainBase ? 19 : 17;
+  const html = renderToStaticMarkup(
+    <div
+      style={{
+        width: `${frameSize}px`,
+        height: `${frameSize}px`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        pointerEvents: 'none',
+        borderRadius: '999px',
+        background: 'rgba(15, 23, 42, 0.78)',
+        border: '1px solid rgba(148, 163, 184, 0.7)',
+        boxShadow: '0 0 0 1px rgba(30, 41, 59, 0.9), 0 0 8px rgba(59, 130, 246, 0.35)',
+      }}
+    >
+      <TowerControl size={iconSize} color="#3b82f6" strokeWidth={2.25} />
+    </div>
+  );
+
+  return divIcon({
+    html,
+    className: 'airport-tower-icon',
+    iconSize: [frameSize, frameSize],
+    iconAnchor: [frameSize / 2, frameSize / 2],
+  });
+}
+
 function buildDcsarPersonSvgMarkup(color = '#f8fafc') {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
     <g fill="none" stroke="${color}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
@@ -660,6 +691,26 @@ async function ensureMapLibreDcsarIconImages(map) {
     const image = await loadSvgAsImage(svg);
     map.addImage(def.id, image, { pixelRatio: 2 });
   }
+}
+
+function buildAirportTowerSvgMarkup(color = '#3b82f6') {
+  return renderToStaticMarkup(
+    <TowerControl
+      size={30}
+      color={color}
+      strokeWidth={2.3}
+      style={{
+        filter: 'drop-shadow(0 0 2px rgba(15,23,42,0.9))',
+      }}
+    />
+  );
+}
+
+async function ensureMapLibreAirportIconImage(map) {
+  if (map.hasImage(MAPLIBRE_AIRPORT_ICON_IMAGE_ID)) return;
+  const svg = buildAirportTowerSvgMarkup();
+  const image = await loadSvgAsImage(svg);
+  map.addImage(MAPLIBRE_AIRPORT_ICON_IMAGE_ID, image, { pixelRatio: 2 });
 }
 
 function getItemQuantity(item) {
@@ -1197,46 +1248,20 @@ function FlatMapView({
           return layers;
         })}
 
-        {showAirports && airportsData.flatMap((airport) => {
-          const center = [airport.coordinates.lat, airport.coordinates.lon];
-          const isMain = Boolean(airport.isMainBase);
-          const coreColor = isMain ? '#4ec5ff' : '#93c5fd';
-          const ringColor = isMain ? '#38bdf8' : '#60a5fa';
-
-          return [
-            <CircleMarker
-              key={`airport-glow-${airport.id}`}
-              center={center}
-              radius={isMain ? 11 : 9}
-              pathOptions={{
-                color: ringColor,
-                fillColor: ringColor,
-                fillOpacity: 0.16,
-                opacity: 0.55,
-                weight: 1.8,
-              }}
-              interactive={false}
-            />,
-            <CircleMarker
-              key={`airport-core-${airport.id}`}
-              center={center}
-              radius={isMain ? 7 : 5.5}
-              pathOptions={{
-                color: '#f8fafc',
-                fillColor: coreColor,
-                fillOpacity: 0.98,
-                weight: 2.3,
-              }}
-              eventHandlers={{
-                click: () => onAirportClick && onAirportClick(airport.id),
-              }}
-            >
-              <Tooltip direction="top" offset={[0, -4]} opacity={0.95}>
-                {airport.displayName}
-              </Tooltip>
-            </CircleMarker>,
-          ];
-        })}
+        {showAirports && airportsData.map((airport) => (
+          <Marker
+            key={`airport-marker-${airport.id}`}
+            position={[airport.coordinates.lat, airport.coordinates.lon]}
+            icon={createAirportTowerIcon(Boolean(airport.isMainBase))}
+            eventHandlers={{
+              click: () => onAirportClick && onAirportClick(airport.id),
+            }}
+          >
+            <Tooltip direction="top" offset={[0, -4]} opacity={0.95}>
+              {airport.displayName || airport.name || airport.id}
+            </Tooltip>
+          </Marker>
+        ))}
       </MapContainer>
     </div>
   );
@@ -2048,6 +2073,11 @@ function MapLibreFlatMapView({
       } catch (error) {
         console.error('Failed to initialize DCSAR icon images:', error);
       }
+      try {
+        await ensureMapLibreAirportIconImage(map);
+      } catch (error) {
+        console.error('Failed to initialize airport icon image:', error);
+      }
 
       addGeoSource('grid-src', fcGrid);
       addGeoSource('logistics-src', fcLogistics);
@@ -2313,14 +2343,15 @@ function MapLibreFlatMapView({
 
       map.addLayer({
         id: 'airports-core-layer',
-        type: 'circle',
+        type: 'symbol',
         source: 'airports-src',
-        paint: {
-          'circle-radius': ['case', ['==', ['get', 'main'], 1], 7, 5.5],
-          'circle-color': ['case', ['==', ['get', 'main'], 1], '#4ec5ff', '#93c5fd'],
-          'circle-stroke-color': '#f8fafc',
-          'circle-stroke-width': 2,
-          'circle-opacity': 0.98,
+        layout: {
+          'icon-image': MAPLIBRE_AIRPORT_ICON_IMAGE_ID,
+          'icon-size': MAPLIBRE_AIRPORT_ICON_SIZE,
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'map',
+          'icon-rotation-alignment': 'map',
         },
       });
 
@@ -2753,9 +2784,9 @@ export default function FrontlineMap({ airportsData }) {
     showAto: true,
     showLogistics: true,
     showAirports: true,
-    showConvoys: true,
-    showAirliftPlayers: true,
-    showDcsar: true,
+    showConvoys: false,
+    showAirliftPlayers: false,
+    showDcsar: false,
   });
   const mapModeRef = useRef(false);
 
@@ -2796,9 +2827,9 @@ export default function FrontlineMap({ airportsData }) {
         showAto: true,
         showLogistics: true,
         showAirports: true,
-        showConvoys: true,
-        showAirliftPlayers: true,
-        showDcsar: true,
+        showConvoys: false,
+        showAirliftPlayers: false,
+        showDcsar: false,
       }));
     }
   }, [isMapLibreEngine]);
@@ -3383,47 +3414,6 @@ export default function FrontlineMap({ airportsData }) {
     validAirports.forEach((airport) => map.set(airport.id, airport));
     return map;
   }, [validAirports]);
-
-  const overlayTagOptions = useMemo(
-    () => [
-      { label: 'All', value: 'all' },
-      { label: 'Red', value: 'RED' },
-      { label: 'Blue', value: 'BLUE' },
-      { label: 'Neutral', value: 'NEUTRAL' },
-      { label: 'Under Attack', value: 'UNDER_ATTACK' },
-    ],
-    []
-  );
-
-  const missionStatusOptions = useMemo(
-    () => [
-      { label: 'ATO Any', value: 'all' },
-      { label: 'Available', value: 'available' },
-      { label: 'Assigned', value: 'assigned' },
-    ],
-    []
-  );
-
-  const logisticsStatusOptions = useMemo(
-    () => [
-      { label: 'LOG Any', value: 'all' },
-      { label: 'Pending', value: 'pending' },
-      { label: 'Accepted', value: 'accepted' },
-    ],
-    []
-  );
-
-  const priorityOptions = useMemo(
-    () => [
-      { label: 'Any Priority', value: 'all' },
-      { label: 'P1', value: '1' },
-      { label: 'P2', value: '2' },
-      { label: 'P3', value: '3' },
-      { label: 'P4', value: '4' },
-      { label: 'P5', value: '5' },
-    ],
-    []
-  );
 
   const globePoints = useMemo(() => {
     const zonePoints = filters.showAto ? filteredZones.map((zone) => ({
@@ -4154,182 +4144,71 @@ export default function FrontlineMap({ airportsData }) {
                 </div>
               )}
               <div
-                className={`absolute left-3 top-3 z-[1000] rounded-xl border border-yt-border bg-[#151925f2] shadow-2xl backdrop-blur transition-all duration-200 ${
-                  overlayCollapsed ? 'w-[46px] p-1.5' : 'w-[320px] p-3'
+                className={`absolute left-3 top-3 z-[1000] rounded-xl border border-yt-border bg-[#151925f2] shadow-2xl backdrop-blur transition-all duration-[360ms] ease-in-out ${
+                  overlayCollapsed ? 'w-[46px] p-1.5' : 'w-[52px] p-1.5'
                 }`}
               >
-                <div className={`flex items-center ${overlayCollapsed ? 'justify-center' : 'mb-2 justify-between'}`}>
-                  {!overlayCollapsed && (
-                    <>
-                      <div className="text-[11px] uppercase tracking-[0.18em] text-yt-text-secondary">Overlays</div>
-                      <button
-                        type="button"
-                        className={`rounded px-2 py-1 text-[10px] font-semibold ${filters.showAirports ? 'bg-yt-accent/25 text-yt-text-primary' : 'bg-yt-bg-tertiary text-yt-text-secondary'}`}
-                        onClick={() => setFilters((current) => ({ ...current, showAirports: !current.showAirports }))}
-                      >
-                        Airports
-                      </button>
-                      <button
-                        type="button"
-                        className={`rounded px-2 py-1 text-[10px] font-semibold ${
-                          basemapMode === BASEMAP_MODE_SATELLITE
-                            ? 'bg-yt-accent/25 text-yt-text-primary'
-                            : 'bg-yt-bg-tertiary text-yt-text-secondary'
-                        }`}
-                        onClick={() => setBasemapMode((current) => (
-                          current === BASEMAP_MODE_SATELLITE ? BASEMAP_MODE_DARK : BASEMAP_MODE_SATELLITE
-                        ))}
-                      >
-                        Satellite
-                      </button>
-                    </>
-                  )}
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`flex flex-col gap-2 overflow-hidden transition-[max-height,opacity,transform,margin-bottom] duration-[360ms] ease-in-out ${
+                      overlayCollapsed
+                        ? 'mb-0 max-h-0 -translate-y-1 opacity-0 pointer-events-none'
+                        : 'mb-2 max-h-40 translate-y-0 opacity-100'
+                    }`}
+                    aria-hidden={overlayCollapsed}
+                  >
+                    <button
+                      type="button"
+                      aria-label="Toggle ATO overlays"
+                      title="ATO"
+                      onClick={() => setFilters((current) => ({ ...current, showAto: !current.showAto }))}
+                      className={`rounded-md border p-2 transition-colors ${
+                        filters.showAto
+                          ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
+                          : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
+                      }`}
+                    >
+                      <Blend className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Toggle Logistics overlays"
+                      title="Logistics"
+                      onClick={() => setFilters((current) => ({ ...current, showLogistics: !current.showLogistics }))}
+                      className={`rounded-md border p-2 transition-colors ${
+                        filters.showLogistics
+                          ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
+                          : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
+                      }`}
+                    >
+                      <Forklift className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Toggle satellite basemap"
+                      title="Satellite"
+                      className={`rounded-md border p-2 transition-colors ${
+                        basemapMode === BASEMAP_MODE_SATELLITE
+                          ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
+                          : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
+                      }`}
+                      onClick={() => setBasemapMode((current) => (
+                        current === BASEMAP_MODE_SATELLITE ? BASEMAP_MODE_DARK : BASEMAP_MODE_SATELLITE
+                      ))}
+                    >
+                      <Satellite className="h-4 w-4" />
+                    </button>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setOverlayCollapsed((value) => !value)}
-                    className="rounded border border-yt-border bg-yt-bg-tertiary/60 p-1 text-yt-text-secondary transition-colors hover:text-yt-text-primary"
+                    className="rounded-md border border-yt-border bg-yt-bg-tertiary/60 p-2 text-yt-text-secondary transition-colors hover:text-yt-text-primary"
                     aria-label={overlayCollapsed ? 'Open overlays' : 'Close overlays'}
                     title={overlayCollapsed ? 'Open overlays' : 'Close overlays'}
                   >
-                    {overlayCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                    {overlayCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
                   </button>
                 </div>
-
-                {!overlayCollapsed && (
-                  <>
-                    <div className={`mb-3 grid ${SHOW_AIRLIFT_FILTER_BUTTON ? 'grid-cols-5' : 'grid-cols-4'} gap-3`}>
-                      <button
-                        type="button"
-                        onClick={() => setFilters((current) => ({ ...current, showAto: !current.showAto }))}
-                        className={`rounded border px-2 py-1 text-[11px] font-semibold ${
-                          filters.showAto
-                            ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
-                            : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
-                        }`}
-                      >
-                        ATO
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFilters((current) => ({ ...current, showLogistics: !current.showLogistics }))}
-                        className={`rounded border px-2 py-1 text-[11px] font-semibold ${
-                          filters.showLogistics
-                            ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
-                            : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
-                        }`}
-                      >
-                        Logistics
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFilters((current) => ({ ...current, showConvoys: !current.showConvoys }))}
-                        className={`rounded border px-2 py-1 text-[11px] font-semibold ${
-                          filters.showConvoys
-                            ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
-                            : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
-                        }`}
-                      >
-                        Convoys
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFilters((current) => ({ ...current, showDcsar: !current.showDcsar }))}
-                        className={`rounded border px-2 py-1 text-[11px] font-semibold ${
-                          filters.showDcsar
-                            ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
-                            : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
-                        }`}
-                      >
-                        DCSAR
-                      </button>
-                      {SHOW_AIRLIFT_FILTER_BUTTON && (
-                        <button
-                          type="button"
-                          onClick={() => setFilters((current) => ({ ...current, showAirliftPlayers: !current.showAirliftPlayers }))}
-                          className={`rounded border px-2 py-1 text-[11px] font-semibold ${
-                            filters.showAirliftPlayers
-                              ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
-                              : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
-                          }`}
-                        >
-                          Airlift
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="mb-2 flex flex-wrap gap-1.5">
-                      {overlayTagOptions.map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => setFilters((current) => ({ ...current, control: option.value }))}
-                          className={`rounded border px-2 py-1 text-[11px] ${
-                            filters.control === option.value
-                              ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
-                              : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="mb-2 grid grid-cols-2 gap-2">
-                      <select
-                        value={filters.atoMissionStatus}
-                        onChange={(event) => setFilters((current) => ({ ...current, atoMissionStatus: event.target.value }))}
-                        className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
-                      >
-                        {missionStatusOptions.map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
-                      <select
-                        value={filters.logisticsStatus}
-                        onChange={(event) => setFilters((current) => ({ ...current, logisticsStatus: event.target.value }))}
-                        className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
-                      >
-                        {logisticsStatusOptions.map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="mb-3 grid grid-cols-2 gap-3">
-                      <select
-                        value={filters.priority}
-                        onChange={(event) => setFilters((current) => ({ ...current, priority: event.target.value }))}
-                        className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
-                      >
-                        {priorityOptions.map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
-                      <select
-                        value={filters.task}
-                        onChange={(event) => setFilters((current) => ({ ...current, task: event.target.value }))}
-                        className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
-                      >
-                        <option value="all">Any Task</option>
-                        <option value="LOGISTICS">LOGISTICS</option>
-                        <option value="SEAD">SEAD</option>
-                        <option value="DEAD">DEAD</option>
-                        <option value="CAS">CAS</option>
-                      </select>
-                    </div>
-                    <div className="grid grid-cols-1 gap-3">
-                      <select
-                        value={filters.activity}
-                        onChange={(event) => setFilters((current) => ({ ...current, activity: event.target.value }))}
-                        className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
-                      >
-                        <option value="all">All Activity</option>
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                      </select>
-                    </div>
-                  </>
-                )}
               </div>
 
               <div
