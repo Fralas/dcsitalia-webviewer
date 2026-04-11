@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Activity, AlertCircle, CalendarSync } from 'lucide-react';
 import FrontlineMap from './components/FrontlineMap';
 import UserMenu from './components/UserMenu';
@@ -9,6 +9,75 @@ import socketService from './services/socket';
 import { t } from './utils/locale';
 import bannerImg from '../img/DCS_ITALIA_ICON.png';
 import { useUser } from './contexts/UserContext';
+
+const VIEW_TO_PATH = Object.freeze({
+  frontline: '/',
+  profile: '/profile',
+  changelogs: '/changelogs',
+});
+
+function normalizeView(view) {
+  return Object.prototype.hasOwnProperty.call(VIEW_TO_PATH, view) ? view : 'frontline';
+}
+
+function normalizePath(pathname = '/') {
+  const cleaned = String(pathname || '/').replace(/\/+$/, '');
+  return cleaned || '/';
+}
+
+function viewFromLocation() {
+  if (typeof window === 'undefined') {
+    return 'frontline';
+  }
+
+  const currentPath = normalizePath(window.location.pathname);
+
+  if (currentPath === '/changelogs') {
+    return 'changelogs';
+  }
+  if (currentPath === '/profile') {
+    return 'profile';
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const viewFromQuery = params.get('view');
+  if (viewFromQuery) {
+    return normalizeView(viewFromQuery);
+  }
+
+  const hashView = window.location.hash.replace(/^#\/?/, '').replace(/\/+$/, '');
+  if (hashView) {
+    return normalizeView(hashView);
+  }
+
+  return 'frontline';
+}
+
+function syncUrlWithView(view, { replace = false } = {}) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const targetView = normalizeView(view);
+  const targetPath = VIEW_TO_PATH[targetView];
+  const url = new URL(window.location.href);
+  url.pathname = targetPath;
+  url.searchParams.delete('view');
+
+  const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+  const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+  if (nextUrl === currentUrl) {
+    return;
+  }
+
+  if (replace) {
+    window.history.replaceState({}, '', nextUrl);
+    return;
+  }
+
+  window.history.pushState({}, '', nextUrl);
+}
 
 function buildFrontlineSummary(zones = []) {
   const summary = {
@@ -30,7 +99,7 @@ function buildFrontlineSummary(zones = []) {
 }
 
 function App() {
-  const [currentView, setCurrentView] = useState('frontline');
+  const [currentView, setCurrentView] = useState(() => viewFromLocation());
   const [airports, setAirports] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -42,10 +111,11 @@ function App() {
     UNDER_ATTACK: 0,
   });
   const { user } = useUser();
-  const allowedViews = useMemo(() => new Set(['frontline', 'profile', 'changelogs']), []);
 
   const goToView = (view) => {
-    setCurrentView(allowedViews.has(view) ? view : 'frontline');
+    const normalized = normalizeView(view);
+    setCurrentView(normalized);
+    syncUrlWithView(normalized);
   };
 
   useEffect(() => {
@@ -53,10 +123,20 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!allowedViews.has(currentView)) {
-      setCurrentView('frontline');
-    }
-  }, [currentView, allowedViews]);
+    // Canonicalize URL (supports old ?view=changelogs links and unknown paths).
+    syncUrlWithView(currentView, { replace: true });
+  }, [currentView]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentView(viewFromLocation());
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
 
   useEffect(() => {
     socketService.connect();
