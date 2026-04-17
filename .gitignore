@@ -16,3 +16,6 @@ CHANGELOG.md
 /csvexample
 /data/changelogs/media
 data/changelogs/drafts.json
+data/wiki/pages.json
+data/wiki/drafts.json
+data/wiki/media/

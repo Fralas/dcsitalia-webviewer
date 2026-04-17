@@ -34,6 +34,7 @@ import * as feedService from './services/feed.js';
 import * as convoysService from './services/convoys.js';
 import * as changelogsService from './services/changelogs.js';
 import * as changelogTranslator from './services/changelogTranslator.js';
+import * as wikiService from './services/wiki.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -89,6 +90,9 @@ const CHANGELOG_AUTHOR_IDS = new Set([
   '714087060343881778',
   '675706661570347041',
   '153370631772045313',
+]);
+const WIKI_EDITOR_IDS = new Set([
+  '675706661570347041',
 ]);
 const MAX_CARRIER_SOURCE_DISTANCE_KM = 50;
 const KM_PER_NM = 1.852;
@@ -970,6 +974,133 @@ app.put('/api/profile', (req, res) => {
 
   const savedProfile = userProfiles.saveProfile(req.session.user.id, req.body);
   res.json(savedProfile);
+});
+
+function isWikiEditor(sessionUserId) {
+  return WIKI_EDITOR_IDS.has(String(sessionUserId || '').trim());
+}
+
+/**
+ * GET /api/wiki/pages - Public list of wiki pages
+ */
+app.get('/api/wiki/pages', (req, res) => {
+  const pages = wikiService.getPages();
+  res.json({ pages });
+});
+
+/**
+ * GET /api/wiki/pages/:pageId - Public wiki page by id
+ */
+app.get('/api/wiki/pages/:pageId', (req, res) => {
+  const page = wikiService.getPage(req.params.pageId);
+  if (!page) {
+    return res.status(404).json({ error: 'Wiki page not found' });
+  }
+  return res.json({ page });
+});
+
+/**
+ * GET /api/wiki/drafts/:pageId - Get current user's wiki draft (editor only)
+ */
+app.get('/api/wiki/drafts/:pageId', (req, res) => {
+  const userId = req.session?.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!isWikiEditor(userId)) {
+    return res.status(403).json({ error: 'Only allowed contributors can edit wiki pages' });
+  }
+  const draft = wikiService.getDraft(userId, req.params.pageId);
+  return res.json({ draft });
+});
+
+/**
+ * PUT /api/wiki/drafts/:pageId - Save current user's wiki draft (editor only)
+ */
+app.put('/api/wiki/drafts/:pageId', (req, res) => {
+  const userId = req.session?.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!isWikiEditor(userId)) {
+    return res.status(403).json({ error: 'Only allowed contributors can edit wiki pages' });
+  }
+  const draft = wikiService.saveDraft(userId, req.params.pageId, req.body || {});
+  return res.json({ draft });
+});
+
+/**
+ * DELETE /api/wiki/drafts/:pageId - Delete current user's wiki draft (editor only)
+ */
+app.delete('/api/wiki/drafts/:pageId', (req, res) => {
+  const userId = req.session?.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!isWikiEditor(userId)) {
+    return res.status(403).json({ error: 'Only allowed contributors can edit wiki pages' });
+  }
+  wikiService.deleteDraft(userId, req.params.pageId);
+  return res.json({ success: true });
+});
+
+/**
+ * PUT /api/wiki/pages/:pageId - Publish/update wiki page from editor payload (editor only)
+ */
+app.put('/api/wiki/pages/:pageId', (req, res) => {
+  const sessionUser = req.session?.user;
+  const userId = sessionUser?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!isWikiEditor(userId)) {
+    return res.status(403).json({ error: 'Only allowed contributors can edit wiki pages' });
+  }
+
+  try {
+    const page = wikiService.updatePage({
+      pageId: req.params.pageId,
+      userId,
+      authorName: sessionUser.globalName || sessionUser.username || String(userId),
+      draft: req.body || {},
+    });
+    return res.json({ page });
+  } catch (error) {
+    const status = String(error?.message || '').toLowerCase().includes('not found') ? 404 : 400;
+    return res.status(status).json({ error: error.message || 'Failed to update wiki page' });
+  }
+});
+
+/**
+ * POST /api/wiki/media - Upload image/video to wiki storage (editor only)
+ */
+app.post('/api/wiki/media', (req, res) => {
+  const userId = req.session?.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!isWikiEditor(userId)) {
+    return res.status(403).json({ error: 'Only allowed contributors can edit wiki pages' });
+  }
+
+  try {
+    const { fileName, mimeType, base64Data } = req.body || {};
+    const media = wikiService.saveMedia({ fileName, mimeType, base64Data });
+    return res.json({ media });
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'Media upload failed' });
+  }
+});
+
+/**
+ * GET /api/wiki/media/:fileName - Serve uploaded wiki media
+ */
+app.get('/api/wiki/media/:fileName', (req, res) => {
+  const absolutePath = wikiService.getMediaAbsolutePath(req.params.fileName);
+  if (!absolutePath) {
+    return res.status(404).json({ error: 'Media not found' });
+  }
+  return res.sendFile(absolutePath);
 });
 
 /**

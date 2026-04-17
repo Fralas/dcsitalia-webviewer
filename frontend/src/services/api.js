@@ -460,6 +460,72 @@ export async function deleteChangelog(postId) {
   });
 }
 
+/**
+ * Get all wiki pages
+ */
+export async function getWikiPages() {
+  return fetchAPI('/wiki/pages');
+}
+
+/**
+ * Get a specific wiki page
+ */
+export async function getWikiPage(pageId) {
+  return fetchAPI(`/wiki/pages/${encodeURIComponent(pageId)}`);
+}
+
+/**
+ * Get current user's wiki draft for a page
+ */
+export async function getWikiDraft(pageId) {
+  return fetchAPI(`/wiki/drafts/${encodeURIComponent(pageId)}`, {
+    credentials: 'include',
+  });
+}
+
+/**
+ * Save current user's wiki draft for a page
+ */
+export async function saveWikiDraft(pageId, draft) {
+  return fetchAPI(`/wiki/drafts/${encodeURIComponent(pageId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(draft),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Delete current user's wiki draft for a page
+ */
+export async function deleteWikiDraft(pageId) {
+  return fetchAPI(`/wiki/drafts/${encodeURIComponent(pageId)}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+}
+
+/**
+ * Update/publish wiki page
+ */
+export async function updateWikiPage(pageId, draft) {
+  return fetchAPI(`/wiki/pages/${encodeURIComponent(pageId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(draft),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Upload wiki media
+ */
+export async function uploadWikiMedia(payload) {
+  return fetchAPI('/wiki/media', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    credentials: 'include',
+  });
+}
+
 export default {
   getServerTime,
   getAirports,
@@ -506,4 +572,11 @@ export default {
   translateChangelogDraft,
   updateChangelog,
   deleteChangelog,
+  getWikiPages,
+  getWikiPage,
+  getWikiDraft,
+  saveWikiDraft,
+  deleteWikiDraft,
+  updateWikiPage,
+  uploadWikiMedia,
 };

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Gamepad2, Layers3, Maximize2, Minimize2, Radar, ShieldCheck, Truck } from 'lucide-react';
+import { Eye, Gamepad2, Layers3, Loader2, Maximize2, Minimize2, PenSquare, Radar, Save, ShieldCheck, Truck, Upload, X } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import avengerImg from '../../img/wiki/veh/AVENGER.png';
 import firtinaImg from '../../img/wiki/veh/FIRTINA.png';
 import fmtvImg from '../../img/wiki/veh/FMTV.png';
@@ -15,6 +17,8 @@ import rolandImg from '../../img/wiki/veh/ROLAND.png';
 import scimitarImg from '../../img/wiki/veh/SCIMITAR.png';
 import scorpionImg from '../../img/wiki/veh/SCORPION.png';
 import towImg from '../../img/wiki/veh/TOW.png';
+import { useUser } from '../contexts/UserContext';
+import * as api from '../services/api';
 
 const GAMEPLAY_FEATURES = [
   {
@@ -156,6 +160,20 @@ const SLOT_STEP = 186;
 const WHEEL_THRESHOLD = 40;
 const FULLSCREEN_TRANSITION_MS = 280;
 const SHOWROOM_BLUE_GLOW = 'rgba(78, 197, 255, 0.16)';
+const WIKI_EDITOR_IDS = new Set(['675706661570347041']);
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      const [, base64] = result.split(',');
+      resolve(base64 || '');
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
 
 function wrapIndex(value, length) {
   return ((value % length) + length) % length;
@@ -196,16 +214,31 @@ function getVisualFromPosition(positionPx) {
 }
 
 export default function WikiPage() {
+  const { user } = useUser();
   const [selectedVehicleIndex, setSelectedVehicleIndex] = useState(0);
   const [isShowroomFullscreen, setIsShowroomFullscreen] = useState(false);
   const [isShowroomFullscreenActive, setIsShowroomFullscreenActive] = useState(false);
   const [slotAnimating, setSlotAnimating] = useState(false);
   const [slotTranslate, setSlotTranslate] = useState(0);
+  const [wikiPagesById, setWikiPagesById] = useState({});
+  const [wikiLoading, setWikiLoading] = useState(true);
+  const [wikiError, setWikiError] = useState('');
+  const [selectedGameplayId, setSelectedGameplayId] = useState('');
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [wikiDraft, setWikiDraft] = useState({ title: '', summary: '', content: '' });
+  const [draftStatus, setDraftStatus] = useState('');
+  const [draftLoading, setDraftLoading] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
   const wheelAccumulatorRef = useRef(0);
   const closeTimeoutRef = useRef(null);
   const openRafRef = useRef(null);
   const slotRafRef = useRef(null);
   const slotPendingDirectionRef = useRef(0);
+  const wikiSaveTimerRef = useRef(null);
+  const lastSavedDraftSerializedRef = useRef('');
+  const wikiMediaInputRef = useRef(null);
+
+  const canEditWiki = Boolean(user?.id && WIKI_EDITOR_IDS.has(String(user.id)));
 
   const priorityOffset = useMemo(() => {
     let bestOffset = 0;
@@ -227,6 +260,64 @@ export default function WikiPage() {
     const visualIndex = wrapIndex(selectedVehicleIndex + priorityOffset, VEHICLES.length);
     return VEHICLES[visualIndex];
   }, [selectedVehicleIndex, priorityOffset]);
+
+  const gameplayItems = useMemo(() => (
+    GAMEPLAY_FEATURES.map((feature) => {
+      const page = wikiPagesById[feature.id];
+      return {
+        ...feature,
+        title: page?.title || feature.title,
+        description: page?.summary || feature.description,
+      };
+    })
+  ), [wikiPagesById]);
+
+  const selectedGameplayFeature = useMemo(() => {
+    if (!gameplayItems.length) return null;
+    const fallback = gameplayItems[0];
+    if (!selectedGameplayId) return fallback;
+    return gameplayItems.find((item) => item.id === selectedGameplayId) || fallback;
+  }, [gameplayItems, selectedGameplayId]);
+
+  const selectedGameplayPage = useMemo(() => {
+    if (!selectedGameplayFeature) return null;
+    const page = wikiPagesById[selectedGameplayFeature.id];
+    if (page) return page;
+    return {
+      id: selectedGameplayFeature.id,
+      title: selectedGameplayFeature.title,
+      summary: selectedGameplayFeature.description,
+      content: `## ${selectedGameplayFeature.title}\n\n${selectedGameplayFeature.description}`,
+      updatedAt: null,
+      updatedBy: null,
+    };
+  }, [selectedGameplayFeature, wikiPagesById]);
+
+  const markdownComponents = useMemo(() => ({
+    h1: ({ node, ...props }) => <h1 className="mb-2 mt-4 text-2xl font-black uppercase tracking-[0.04em] text-yt-text-primary" {...props} />,
+    h2: ({ node, ...props }) => <h2 className="mb-2 mt-4 text-xl font-extrabold uppercase tracking-[0.04em] text-yt-text-primary" {...props} />,
+    h3: ({ node, ...props }) => <h3 className="mb-2 mt-3 text-lg font-bold text-yt-text-primary" {...props} />,
+    p: ({ node, ...props }) => <p className="mb-3 leading-relaxed text-yt-text-secondary" {...props} />,
+    ul: ({ node, ...props }) => <ul className="mb-3 list-disc space-y-1 pl-5 text-yt-text-secondary" {...props} />,
+    ol: ({ node, ...props }) => <ol className="mb-3 list-decimal space-y-1 pl-5 text-yt-text-secondary" {...props} />,
+    li: ({ node, ...props }) => <li className="leading-relaxed" {...props} />,
+    table: ({ node, ...props }) => (
+      <div className="mb-4 overflow-x-auto">
+        <table className="w-full border-collapse text-sm text-yt-text-secondary" {...props} />
+      </div>
+    ),
+    thead: ({ node, ...props }) => <thead className="bg-[#0f1a2a]" {...props} />,
+    th: ({ node, ...props }) => <th className="border border-yt-border/80 px-3 py-2 text-left font-bold text-yt-text-primary" {...props} />,
+    td: ({ node, ...props }) => <td className="border border-yt-border/70 px-3 py-2 align-top" {...props} />,
+    blockquote: ({ node, ...props }) => <blockquote className="mb-3 border-l-2 border-yt-accent/60 pl-3 text-yt-text-secondary/95" {...props} />,
+    a: ({ node, ...props }) => <a className="text-yt-accent underline" target="_blank" rel="noreferrer" {...props} />,
+    img: ({ node, ...props }) => <img className="my-3 max-h-[420px] w-auto max-w-full rounded border border-yt-border/80 bg-[#0b121d] p-1" loading="lazy" {...props} />,
+    code: ({ inline, className, children, ...props }) => (
+      inline
+        ? <code className="rounded bg-[#0e1827] px-1.5 py-0.5 text-[0.95em] text-yt-accent" {...props}>{children}</code>
+        : <code className="block overflow-x-auto rounded-xl border border-yt-border/80 bg-[#0b121d] p-3 text-sm text-yt-text-primary" {...props}>{children}</code>
+    ),
+  }), []);
 
   const shiftVehicle = (direction) => {
     if (!direction || slotAnimating) {
@@ -295,7 +386,125 @@ export default function WikiPage() {
     if (slotRafRef.current) {
       cancelAnimationFrame(slotRafRef.current);
     }
+    if (wikiSaveTimerRef.current) {
+      clearTimeout(wikiSaveTimerRef.current);
+    }
   }, []);
+
+  useEffect(() => {
+    const loadWikiPages = async () => {
+      try {
+        setWikiLoading(true);
+        setWikiError('');
+        const response = await api.getWikiPages();
+        const pages = Array.isArray(response?.pages) ? response.pages : [];
+        const byId = {};
+        pages.forEach((page) => {
+          if (page?.id) {
+            byId[page.id] = page;
+          }
+        });
+        setWikiPagesById(byId);
+      } catch (error) {
+        setWikiError(error.message || 'Impossibile caricare le pagine wiki');
+      } finally {
+        setWikiLoading(false);
+      }
+    };
+
+    loadWikiPages();
+  }, []);
+
+  useEffect(() => {
+    if (!gameplayItems.length) return;
+    if (selectedGameplayId) return;
+    setSelectedGameplayId(gameplayItems[0].id);
+  }, [gameplayItems, selectedGameplayId]);
+
+  useEffect(() => {
+    if (!canEditWiki || !editorOpen || !selectedGameplayFeature?.id) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadDraft = async () => {
+      try {
+        setDraftLoading(true);
+        setDraftStatus('Caricamento bozza...');
+        const response = await api.getWikiDraft(selectedGameplayFeature.id);
+        if (cancelled) return;
+        const incomingDraft = response?.draft;
+        const basePage = selectedGameplayPage || {};
+        const nextDraft = incomingDraft
+          ? {
+            title: incomingDraft.title || basePage.title || '',
+            summary: incomingDraft.summary || basePage.summary || '',
+            content: incomingDraft.content || basePage.content || '',
+          }
+          : {
+            title: basePage.title || '',
+            summary: basePage.summary || '',
+            content: basePage.content || '',
+          };
+        setWikiDraft(nextDraft);
+        lastSavedDraftSerializedRef.current = JSON.stringify(nextDraft);
+        setDraftStatus(incomingDraft ? 'Bozza caricata' : 'Nessuna bozza salvata');
+      } catch (error) {
+        if (cancelled) return;
+        const basePage = selectedGameplayPage || {};
+        const fallback = {
+          title: basePage.title || '',
+          summary: basePage.summary || '',
+          content: basePage.content || '',
+        };
+        setWikiDraft(fallback);
+        lastSavedDraftSerializedRef.current = JSON.stringify(fallback);
+        if (String(error?.message || '').includes('404')) {
+          setDraftStatus('Nessuna bozza salvata');
+        } else {
+          setDraftStatus(error.message || 'Errore caricamento bozza');
+        }
+      } finally {
+        if (!cancelled) {
+          setDraftLoading(false);
+        }
+      }
+    };
+
+    loadDraft();
+    return () => {
+      cancelled = true;
+    };
+  }, [canEditWiki, editorOpen, selectedGameplayFeature?.id, selectedGameplayPage]);
+
+  useEffect(() => {
+    if (!canEditWiki || !editorOpen || draftLoading || !selectedGameplayFeature?.id) {
+      return;
+    }
+
+    const serialized = JSON.stringify(wikiDraft);
+    if (serialized === lastSavedDraftSerializedRef.current) {
+      return;
+    }
+
+    if (wikiSaveTimerRef.current) {
+      clearTimeout(wikiSaveTimerRef.current);
+    }
+
+    wikiSaveTimerRef.current = setTimeout(async () => {
+      try {
+        setDraftStatus('Salvataggio bozza...');
+        await api.saveWikiDraft(selectedGameplayFeature.id, wikiDraft);
+        lastSavedDraftSerializedRef.current = serialized;
+        setDraftStatus('Bozza salvata');
+      } catch (error) {
+        setDraftStatus(error.message || 'Errore salvataggio bozza');
+      } finally {
+        wikiSaveTimerRef.current = null;
+      }
+    }, 900);
+  }, [canEditWiki, draftLoading, editorOpen, selectedGameplayFeature?.id, wikiDraft]);
 
   const openShowroomFullscreen = () => {
     if (closeTimeoutRef.current) {
@@ -363,6 +572,67 @@ export default function WikiPage() {
     openShowroomFullscreen();
   };
 
+  const handleSelectGameplayItem = (itemId) => {
+    setSelectedGameplayId(itemId);
+    setEditorOpen(false);
+    setDraftStatus('');
+  };
+
+  const handlePublishGameplayArticle = async () => {
+    if (!canEditWiki || !selectedGameplayFeature?.id) return;
+    try {
+      setDraftStatus('Pubblicazione...');
+      const response = await api.updateWikiPage(selectedGameplayFeature.id, wikiDraft);
+      const updatedPage = response?.page;
+      if (updatedPage?.id) {
+        setWikiPagesById((prev) => ({
+          ...prev,
+          [updatedPage.id]: updatedPage,
+        }));
+      }
+      lastSavedDraftSerializedRef.current = JSON.stringify(wikiDraft);
+      setDraftStatus('Articolo pubblicato');
+      setEditorOpen(false);
+    } catch (error) {
+      setDraftStatus(error.message || 'Errore pubblicazione');
+    }
+  };
+
+  const handleUploadWikiMedia = async (files) => {
+    if (!canEditWiki || !selectedGameplayFeature?.id || !files?.length) return;
+
+    try {
+      setUploadingMedia(true);
+      for (const file of files) {
+        const mimeType = String(file.type || '').toLowerCase();
+        if (!mimeType.startsWith('image/') && !mimeType.startsWith('video/')) continue;
+        const base64Data = await fileToBase64(file);
+        const response = await api.uploadWikiMedia({
+          fileName: file.name,
+          mimeType: file.type,
+          base64Data,
+        });
+        const media = response?.media;
+        if (!media?.url) continue;
+        const snippet = media.type === 'image'
+          ? `\n\n![${media.fileName || media.id}](${media.url})\n`
+          : `\n\n[${media.fileName || media.id}](${media.url})\n`;
+        setWikiDraft((prev) => ({
+          ...prev,
+          content: `${prev.content || ''}${snippet}`,
+        }));
+      }
+      setDraftStatus('Media inserito nel markdown');
+    } catch (error) {
+      setDraftStatus(error.message || 'Errore upload media');
+    } finally {
+      setUploadingMedia(false);
+      if (wikiMediaInputRef.current) {
+        wikiMediaInputRef.current.value = '';
+      }
+    }
+  };
+
   const handleSlotTrackTransitionEnd = (event) => {
     if (event.target !== event.currentTarget || event.propertyName !== 'transform' || !slotAnimating) {
       return;
@@ -424,9 +694,11 @@ export default function WikiPage() {
 
         <div className="relative">
           <div
-            className="pointer-events-none absolute inset-0 opacity-55"
+            className="pointer-events-none absolute -inset-x-40 -top-44 -bottom-12 opacity-42"
             style={{
-              background: `radial-gradient(circle at 50% 62%, ${SHOWROOM_BLUE_GLOW}, transparent 65%)`,
+              background: `radial-gradient(circle at 50% 62%, ${SHOWROOM_BLUE_GLOW}, transparent 78%)`,
+              WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 30%, black 100%)',
+              maskImage: 'linear-gradient(to bottom, transparent 0%, black 30%, black 100%)',
             }}
           />
 
@@ -512,19 +784,155 @@ export default function WikiPage() {
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
-          {GAMEPLAY_FEATURES.map(({ id, title, description, Icon }) => (
-            <article
+          {gameplayItems.map(({ id, title, description, Icon }) => (
+            <button
+              type="button"
               key={id}
-              className="rounded-2xl border border-yt-border/80 bg-[#101926] p-4 shadow-[0_8px_18px_rgba(0,0,0,0.26)]"
+              onClick={() => handleSelectGameplayItem(id)}
+              className={`rounded-2xl border bg-[#101926] p-4 text-left shadow-[0_8px_18px_rgba(0,0,0,0.26)] transition-all ${
+                selectedGameplayFeature?.id === id
+                  ? 'border-yt-accent/60 ring-1 ring-yt-accent/35'
+                  : 'border-yt-border/80 hover:border-yt-accent/45'
+              }`}
             >
               <div className="mb-2 inline-flex items-center gap-2 rounded-lg border border-yt-border/80 bg-[#0b121d] px-2.5 py-1">
                 <Icon className="h-4 w-4 text-yt-accent" />
                 <h3 className="text-xs font-bold uppercase tracking-[0.09em] text-yt-accent">{title}</h3>
               </div>
               <p className="text-sm leading-relaxed text-yt-text-secondary">{description}</p>
-            </article>
+            </button>
           ))}
         </div>
+
+        {wikiLoading && (
+          <div className="mt-4 rounded-xl border border-yt-border/80 bg-[#0e1520] px-3 py-2 text-sm text-yt-text-secondary">
+            Caricamento articoli wiki...
+          </div>
+        )}
+        {wikiError && (
+          <div className="mt-4 rounded-xl border border-red-500/35 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+            {wikiError}
+          </div>
+        )}
+
+        {selectedGameplayPage && (
+          <article className="mt-4 rounded-2xl border border-yt-border/80 bg-[#0f1723] p-4">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-extrabold uppercase tracking-[0.05em] text-yt-text-primary">
+                  {selectedGameplayPage.title}
+                </h3>
+                <p className="mt-1 text-sm text-yt-text-secondary">{selectedGameplayPage.summary}</p>
+                {selectedGameplayPage.updatedAt && (
+                  <p className="mt-1 text-xs text-yt-text-secondary/80">
+                    Ultimo aggiornamento: {new Date(selectedGameplayPage.updatedAt).toLocaleString('it-IT')}
+                  </p>
+                )}
+              </div>
+              {canEditWiki && (
+                <button
+                  type="button"
+                  onClick={() => setEditorOpen((prev) => !prev)}
+                  className="inline-flex items-center gap-2 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary transition-colors hover:border-yt-accent hover:text-yt-accent"
+                >
+                  <PenSquare className="h-3.5 w-3.5" />
+                  {editorOpen ? 'Chiudi Editor' : 'Modifica Articolo'}
+                </button>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-yt-border/75 bg-[#0c1320] px-4 py-3">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                {selectedGameplayPage.content}
+              </ReactMarkdown>
+            </div>
+
+            {canEditWiki && editorOpen && (
+              <div className="mt-4 rounded-xl border border-yt-border/80 bg-[#0b121d] p-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.1em] text-yt-text-secondary">
+                    <Eye className="h-3.5 w-3.5" />
+                    Editor Wiki + Preview
+                  </div>
+                  <div className="text-xs text-yt-text-secondary">{draftStatus}</div>
+                </div>
+
+                {draftLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-yt-text-secondary">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Caricamento bozza...
+                  </div>
+                ) : (
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={wikiDraft.title}
+                        onChange={(event) => setWikiDraft((prev) => ({ ...prev, title: event.target.value }))}
+                        placeholder="Titolo articolo"
+                        className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                      />
+                      <textarea
+                        rows={3}
+                        value={wikiDraft.summary}
+                        onChange={(event) => setWikiDraft((prev) => ({ ...prev, summary: event.target.value }))}
+                        placeholder="Descrizione breve"
+                        className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                      />
+                      <textarea
+                        rows={14}
+                        value={wikiDraft.content}
+                        onChange={(event) => setWikiDraft((prev) => ({ ...prev, content: event.target.value }))}
+                        placeholder="Contenuto markdown..."
+                        className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={handlePublishGameplayArticle}
+                          className="inline-flex items-center gap-1 rounded border border-emerald-500/45 bg-emerald-500/15 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-emerald-300"
+                        >
+                          <Save className="h-3.5 w-3.5" />
+                          Pubblica
+                        </button>
+                        <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary hover:border-yt-accent hover:text-yt-accent">
+                          {uploadingMedia ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                          Media
+                          <input
+                            ref={wikiMediaInputRef}
+                            type="file"
+                            accept="image/*,video/*"
+                            className="hidden"
+                            onChange={(event) => handleUploadWikiMedia(Array.from(event.target.files || []))}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setEditorOpen(false)}
+                          className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          Chiudi
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="rounded border border-yt-border/80 bg-[#111a28] p-3">
+                      <h4 className="mb-2 text-xs font-bold uppercase tracking-[0.1em] text-yt-accent">Preview</h4>
+                      <h3 className="text-lg font-extrabold uppercase tracking-[0.05em] text-yt-text-primary">{wikiDraft.title || 'Titolo'}</h3>
+                      <p className="mb-3 mt-1 text-sm text-yt-text-secondary">{wikiDraft.summary || 'Descrizione breve'}</p>
+                      <div className="max-h-[480px] overflow-auto rounded border border-yt-border/70 bg-[#0c1320] px-3 py-2">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                          {wikiDraft.content || '*Nessun contenuto*'}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </article>
+        )}
       </section>
 
       <section
