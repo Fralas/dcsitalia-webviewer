@@ -246,10 +246,13 @@ export default function WikiPage() {
   };
 
   const handleWheel = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
     if (slotAnimating) {
       return;
     }
-    event.preventDefault();
+
     wheelAccumulatorRef.current += event.deltaY;
 
     if (Math.abs(wheelAccumulatorRef.current) < WHEEL_THRESHOLD) {
@@ -345,7 +348,9 @@ export default function WikiPage() {
             style={{
               WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 11%, black 89%, transparent 100%)',
               maskImage: 'linear-gradient(to bottom, transparent 0%, black 11%, black 89%, transparent 100%)',
+              overscrollBehavior: 'contain',
             }}
+            onWheelCapture={handleWheel}
             onWheel={handleWheel}
             onKeyDown={handleKeyDown}
             tabIndex={0}
