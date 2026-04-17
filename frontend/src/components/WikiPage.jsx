@@ -90,18 +90,38 @@ function wrapIndex(value, length) {
   return ((value % length) + length) % length;
 }
 
-function getOffsetVisual(offset) {
-  const distance = Math.abs(offset);
-  if (distance === 0) {
-    return { opacity: 1, blur: 0 };
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getVisualFromPosition(positionPx) {
+  const normalized = Math.abs(positionPx) / SLOT_STEP;
+
+  let opacity;
+  let blur;
+  let sizePx;
+
+  if (normalized <= 1) {
+    opacity = 1 - (0.5 * normalized);
+    blur = 0.2 * normalized;
+    sizePx = 128 - (48 * normalized);
+  } else if (normalized <= 2) {
+    const local = normalized - 1;
+    opacity = 0.5 - (0.32 * local);
+    blur = 0.2 + (1.6 * local);
+    sizePx = 80 - (8 * local);
+  } else {
+    const local = normalized - 2;
+    opacity = 0.18 - (0.13 * local);
+    blur = 1.8 + (0.8 * local);
+    sizePx = 72 - (10 * local);
   }
-  if (distance === 1) {
-    return { opacity: 0.5, blur: 0.2 };
-  }
-  if (distance === 2) {
-    return { opacity: 0.18, blur: 1.8 };
-  }
-  return { opacity: 0.05, blur: 2.4 };
+
+  return {
+    opacity: clamp(opacity, 0.05, 1),
+    blur: clamp(blur, 0, 2.6),
+    sizePx: clamp(sizePx, 62, 128),
+  };
 }
 
 export default function WikiPage() {
@@ -110,17 +130,32 @@ export default function WikiPage() {
   const [isShowroomFullscreenActive, setIsShowroomFullscreenActive] = useState(false);
   const [slotAnimating, setSlotAnimating] = useState(false);
   const [slotTranslate, setSlotTranslate] = useState(0);
-  const [slotTransitionEnabled, setSlotTransitionEnabled] = useState(true);
   const wheelAccumulatorRef = useRef(0);
   const closeTimeoutRef = useRef(null);
   const openRafRef = useRef(null);
   const slotRafRef = useRef(null);
   const slotPendingDirectionRef = useRef(0);
 
-  const selectedVehicle = useMemo(
-    () => VEHICLES[selectedVehicleIndex],
-    [selectedVehicleIndex],
-  );
+  const priorityOffset = useMemo(() => {
+    let bestOffset = 0;
+    let bestDistance = Number.POSITIVE_INFINITY;
+
+    SLOT_ITEM_OFFSETS.forEach((offset) => {
+      const position = (offset * SLOT_STEP) + slotTranslate;
+      const distance = Math.abs(position);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestOffset = offset;
+      }
+    });
+
+    return bestOffset;
+  }, [slotTranslate]);
+
+  const selectedVehicle = useMemo(() => {
+    const visualIndex = wrapIndex(selectedVehicleIndex + priorityOffset, VEHICLES.length);
+    return VEHICLES[visualIndex];
+  }, [selectedVehicleIndex, priorityOffset]);
 
   const shiftVehicle = (direction) => {
     if (!direction || slotAnimating) {
@@ -130,7 +165,6 @@ export default function WikiPage() {
     const normalizedDirection = direction > 0 ? 1 : -1;
     slotPendingDirectionRef.current = normalizedDirection;
     setSlotAnimating(true);
-    setSlotTransitionEnabled(true);
     setSlotTranslate(0);
 
     if (slotRafRef.current) {
@@ -264,15 +298,10 @@ export default function WikiPage() {
       return;
     }
 
-    setSlotTransitionEnabled(false);
-    setSlotTranslate(0);
     setSelectedVehicleIndex((prev) => wrapIndex(prev + direction, VEHICLES.length));
+    setSlotTranslate(0);
     setSlotAnimating(false);
     slotPendingDirectionRef.current = 0;
-
-    requestAnimationFrame(() => {
-      setSlotTransitionEnabled(true);
-    });
   };
 
   const renderShowroomContent = ({ fullscreen = false } = {}) => (
@@ -302,9 +331,9 @@ export default function WikiPage() {
         </div>
       </div>
 
-      <div className={`relative grid gap-8 ${fullscreen ? 'xl:grid-cols-[430px_minmax(0,1fr)]' : 'lg:grid-cols-[390px_minmax(0,1fr)]'}`}>
+      <div className={`relative grid gap-8 ${fullscreen ? 'lg:grid-cols-[430px_minmax(0,1fr)]' : 'lg:grid-cols-[390px_minmax(0,1fr)]'}`}>
         <div
-          className="pointer-events-none absolute inset-y-0 left-0 w-[50%] opacity-60"
+          className="pointer-events-none absolute inset-y-0 left-0 w-[460px] opacity-60"
           style={{
             background: `radial-gradient(circle at 28% 50%, ${SHOWROOM_BLUE_GLOW}, transparent 64%)`,
           }}
@@ -324,7 +353,7 @@ export default function WikiPage() {
             aria-label="Lista veicoli showroom"
           >
             <div
-              className={`absolute inset-0 ${slotTransitionEnabled ? 'transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]' : ''}`}
+              className={`absolute inset-0 ${slotAnimating ? 'transition-transform duration-[420ms] ease-[cubic-bezier(0.22,0.61,0.36,1)]' : ''}`}
               style={{
                 transform: `translateY(${slotTranslate}px)`,
               }}
@@ -333,8 +362,9 @@ export default function WikiPage() {
               {SLOT_ITEM_OFFSETS.map((offset) => {
                 const itemIndex = wrapIndex(selectedVehicleIndex + offset, VEHICLES.length);
                 const vehicle = VEHICLES[itemIndex];
-                const visual = getOffsetVisual(offset);
-                const isActive = offset === 0;
+                const position = (offset * SLOT_STEP) + slotTranslate;
+                const visual = getVisualFromPosition(position);
+                const isPriority = offset === priorityOffset;
 
                 return (
                   <button
@@ -354,16 +384,18 @@ export default function WikiPage() {
                       filter: `blur(${visual.blur}px)`,
                     }}
                     role="option"
-                    aria-selected={isActive}
+                    aria-selected={isPriority}
                   >
                     <img
                       src={vehicle.image}
                       alt={vehicle.name}
-                      className={`mx-auto object-contain transition-all duration-250 ${
-                        isActive
-                          ? 'h-32 w-32 drop-shadow-[0_0_14px_rgba(78,197,255,0.26)]'
-                          : 'h-20 w-20'
+                      className={`mx-auto object-contain transition-[filter] duration-200 ${
+                        isPriority ? 'drop-shadow-[0_0_14px_rgba(78,197,255,0.26)]' : ''
                       }`}
+                      style={{
+                        width: `${visual.sizePx}px`,
+                        height: `${visual.sizePx}px`,
+                      }}
                     />
                   </button>
                 );
@@ -372,18 +404,19 @@ export default function WikiPage() {
           </div>
         </aside>
 
-        <article className="relative flex items-center justify-center px-2 md:px-6">
-          <div className="max-w-xl space-y-4 text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-yt-accent/40 bg-yt-accent/12 px-3 py-1">
-              <span className="h-2 w-2 rounded-full bg-yt-accent shadow-[0_0_10px_rgba(78,197,255,0.7)]" />
-              <span className="text-xs font-black uppercase tracking-[0.14em] text-yt-accent">
-                Categoria: {selectedVehicle.category}
-              </span>
+        <article className="relative flex items-start justify-center">
+          <div className="w-full max-w-xl space-y-3 pt-1 text-center">
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <h3 className={`font-black uppercase leading-tight tracking-[0.05em] text-yt-text-primary ${fullscreen ? 'text-4xl' : 'text-3xl'}`}>
+                {selectedVehicle.name}
+              </h3>
+              <div className="inline-flex items-center gap-2 rounded-full border border-yt-accent/40 bg-yt-accent/12 px-3 py-1">
+                <span className="h-2 w-2 rounded-full bg-yt-accent shadow-[0_0_10px_rgba(78,197,255,0.7)]" />
+                <span className="text-xs font-black uppercase tracking-[0.14em] text-yt-accent">
+                  Categoria: {selectedVehicle.category}
+                </span>
+              </div>
             </div>
-
-            <h3 className={`font-black uppercase leading-tight tracking-[0.05em] text-yt-text-primary ${fullscreen ? 'text-4xl' : 'text-3xl'}`}>
-              {selectedVehicle.name}
-            </h3>
             <p className={`mx-auto max-w-xl leading-relaxed text-yt-text-secondary ${fullscreen ? 'text-base' : 'text-sm'}`}>
               {selectedVehicle.description}
             </p>
