@@ -331,6 +331,11 @@ const UI_COPY = {
     titlePlaceholder: 'Article title',
     summaryPlaceholder: 'Short description',
     contentPlaceholder: 'Markdown content...',
+    titlePlaceholderIt: 'Article title (Italian translation)',
+    summaryPlaceholderIt: 'Short description (Italian translation)',
+    contentPlaceholderIt: 'Markdown content (Italian translation)...',
+    englishBase: 'English Base (Required)',
+    italianTranslation: 'Italian Translation (Optional)',
     titleFallback: 'Title',
     summaryFallback: 'Short description',
     emptyContentFallback: '*No content*',
@@ -346,10 +351,14 @@ const UI_COPY = {
     topicCreated: 'Article created',
     topicCreateError: 'Topic creation failed',
     fillRequiredFields: 'Fill title, summary, and content.',
+    fillRequiredFieldsEn: 'Fill English title, summary, and content.',
     cancel: 'Cancel',
     topicTitlePlaceholder: 'Topic title',
     topicSummaryPlaceholder: 'Short description',
     topicContentPlaceholder: 'Initial markdown content',
+    topicTitlePlaceholderIt: 'Topic title (Italian translation)',
+    topicSummaryPlaceholderIt: 'Short description (Italian translation)',
+    topicContentPlaceholderIt: 'Initial markdown content (Italian translation)',
     icon: 'Icon',
     customWikiArticle: 'Custom wiki article',
     lastUpdated: 'Last updated',
@@ -392,6 +401,11 @@ const UI_COPY = {
     titlePlaceholder: 'Titolo articolo',
     summaryPlaceholder: 'Descrizione breve',
     contentPlaceholder: 'Contenuto markdown...',
+    titlePlaceholderIt: 'Titolo articolo (traduzione italiana)',
+    summaryPlaceholderIt: 'Descrizione breve (traduzione italiana)',
+    contentPlaceholderIt: 'Contenuto markdown (traduzione italiana)...',
+    englishBase: 'Base Inglese (Obbligatoria)',
+    italianTranslation: 'Traduzione Italiana (Opzionale)',
     titleFallback: 'Titolo',
     summaryFallback: 'Descrizione breve',
     emptyContentFallback: '*Nessun contenuto*',
@@ -407,10 +421,14 @@ const UI_COPY = {
     topicCreated: 'Articolo creato',
     topicCreateError: 'Errore creazione argomento',
     fillRequiredFields: 'Compila titolo, descrizione e contenuto.',
+    fillRequiredFieldsEn: 'Compila titolo, descrizione e contenuto in inglese.',
     cancel: 'Annulla',
     topicTitlePlaceholder: 'Titolo argomento',
     topicSummaryPlaceholder: 'Descrizione breve',
     topicContentPlaceholder: 'Contenuto markdown iniziale',
+    topicTitlePlaceholderIt: 'Titolo argomento (traduzione italiana)',
+    topicSummaryPlaceholderIt: 'Descrizione breve (traduzione italiana)',
+    topicContentPlaceholderIt: 'Contenuto markdown iniziale (traduzione italiana)',
     icon: 'Icona',
     customWikiArticle: 'Articolo wiki personalizzato',
     lastUpdated: 'Ultimo aggiornamento',
@@ -418,17 +436,73 @@ const UI_COPY = {
     articleTitle: 'Nuovo Argomento',
   },
 };
-function buildEmptyNewTopicDraft(language = DEFAULT_LANGUAGE) {
-  const heading = language === 'it' ? 'Nuovo Argomento' : 'New Topic';
-  const description = language === 'it'
-    ? "Scrivi qui il contenuto dell'articolo."
-    : 'Write the article content here.';
+function buildEmptyNewTopicDraft() {
+  const heading = 'New Topic';
+  const description = 'Write the article content here.';
   return {
     iconKey: 'layers3',
-    title: '',
-    summary: '',
-    content: `## ${heading}\n\n${description}`,
+    titleEn: '',
+    summaryEn: '',
+    contentEn: `## ${heading}\n\n${description}`,
+    titleIt: '',
+    summaryIt: '',
+    contentIt: '',
   };
+}
+
+function toLocalizedDraftValue(value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return {
+      en: String(value.en || ''),
+      it: String(value.it || ''),
+    };
+  }
+  return {
+    en: String(value || ''),
+    it: '',
+  };
+}
+
+function createWikiDraftFromSource(source = {}) {
+  const title = toLocalizedDraftValue(source.title);
+  const summary = toLocalizedDraftValue(source.summary);
+  const content = toLocalizedDraftValue(source.content);
+  return {
+    iconKey: normalizeGameplayIconKey(source.iconKey || 'layers3'),
+    titleEn: title.en,
+    summaryEn: summary.en,
+    contentEn: content.en,
+    titleIt: title.it,
+    summaryIt: summary.it,
+    contentIt: content.it,
+  };
+}
+
+function createWikiPayloadFromDraft(draft = {}) {
+  return {
+    iconKey: normalizeGameplayIconKey(draft.iconKey || 'layers3'),
+    title: {
+      en: String(draft.titleEn || '').trim(),
+      it: String(draft.titleIt || '').trim(),
+    },
+    summary: {
+      en: String(draft.summaryEn || '').trim(),
+      it: String(draft.summaryIt || '').trim(),
+    },
+    content: {
+      en: String(draft.contentEn || '').trim(),
+      it: String(draft.contentIt || '').trim(),
+    },
+  };
+}
+
+function getDraftLocalizedField(draft = {}, field = 'title', language = DEFAULT_LANGUAGE) {
+  const en = String(draft?.[`${field}En`] || '');
+  const it = String(draft?.[`${field}It`] || '');
+  if (language === 'it' && it) {
+    return it;
+  }
+  return en || it;
 }
 
 function localizeText(value, language) {
@@ -512,7 +586,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
   const [wikiError, setWikiError] = useState('');
   const [selectedGameplayId, setSelectedGameplayId] = useState('');
   const [newTopicOpen, setNewTopicOpen] = useState(false);
-  const [newTopicDraft, setNewTopicDraft] = useState(() => buildEmptyNewTopicDraft(DEFAULT_LANGUAGE));
+  const [newTopicDraft, setNewTopicDraft] = useState(() => buildEmptyNewTopicDraft());
   const [newTopicStatus, setNewTopicStatus] = useState('');
   const [newTopicIconPickerOpen, setNewTopicIconPickerOpen] = useState(false);
   const [newTopicIconSearch, setNewTopicIconSearch] = useState('');
@@ -522,7 +596,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [wikiDraftIconPickerOpen, setWikiDraftIconPickerOpen] = useState(false);
   const [wikiDraftIconSearch, setWikiDraftIconSearch] = useState('');
-  const [wikiDraft, setWikiDraft] = useState({ iconKey: 'layers3', title: '', summary: '', content: '' });
+  const [wikiDraft, setWikiDraft] = useState(() => createWikiDraftFromSource({ iconKey: 'layers3' }));
   const [draftStatus, setDraftStatus] = useState('');
   const [draftLoading, setDraftLoading] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
@@ -585,8 +659,8 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
         ...feature,
         iconKey: normalizeGameplayIconKey(page?.iconKey || feature.iconKey || ''),
         Icon,
-        title: page?.title || localizeText(feature.title, language),
-        description: page?.summary || localizeText(feature.description, language),
+        title: localizeText(page?.title, language) || localizeText(feature.title, language),
+        description: localizeText(page?.summary, language) || localizeText(feature.description, language),
       };
     });
 
@@ -596,8 +670,8 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
       .map((page) => ({
         id: page.id,
         iconKey: normalizeGameplayIconKey(page.iconKey || 'layers3'),
-        title: page.title || page.id,
-        description: page.summary || ui.customWikiArticle,
+        title: localizeText(page.title, language) || page.id,
+        description: localizeText(page.summary, language) || ui.customWikiArticle,
         Icon: resolveGameplayIcon(page.iconKey, Layers3),
       }));
 
@@ -630,6 +704,19 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
       updatedBy: null,
     };
   }, [selectedGameplayFeature, wikiPagesById]);
+
+  const selectedGameplayPageTitle = useMemo(
+    () => localizeText(selectedGameplayPage?.title, language) || ui.titleFallback,
+    [selectedGameplayPage?.title, language, ui.titleFallback],
+  );
+  const selectedGameplayPageSummary = useMemo(
+    () => localizeText(selectedGameplayPage?.summary, language) || ui.summaryFallback,
+    [selectedGameplayPage?.summary, language, ui.summaryFallback],
+  );
+  const selectedGameplayPageContent = useMemo(
+    () => localizeText(selectedGameplayPage?.content, language) || ui.emptyContentFallback,
+    [selectedGameplayPage?.content, language, ui.emptyContentFallback],
+  );
 
   const NewTopicSelectedIcon = useMemo(
     () => resolveGameplayIcon(newTopicDraft.iconKey, Layers3),
@@ -812,30 +899,30 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
         const incomingDraft = response?.draft;
         const basePage = selectedGameplayPage || {};
         const nextDraft = incomingDraft
-          ? {
-            iconKey: normalizeGameplayIconKey(incomingDraft.iconKey || basePage.iconKey || 'layers3'),
+          ? createWikiDraftFromSource({
+            iconKey: incomingDraft.iconKey || basePage.iconKey || 'layers3',
             title: incomingDraft.title || basePage.title || '',
             summary: incomingDraft.summary || basePage.summary || '',
             content: incomingDraft.content || basePage.content || '',
-          }
-          : {
-            iconKey: normalizeGameplayIconKey(basePage.iconKey || 'layers3'),
+          })
+          : createWikiDraftFromSource({
+            iconKey: basePage.iconKey || 'layers3',
             title: basePage.title || '',
             summary: basePage.summary || '',
             content: basePage.content || '',
-        };
+          });
         setWikiDraft(nextDraft);
         lastSavedDraftSerializedRef.current = JSON.stringify(nextDraft);
         setDraftStatus(incomingDraft ? ui.draftLoaded : ui.noDraftSaved);
       } catch (error) {
         if (cancelled) return;
         const basePage = selectedGameplayPage || {};
-        const fallback = {
-          iconKey: normalizeGameplayIconKey(basePage.iconKey || 'layers3'),
+        const fallback = createWikiDraftFromSource({
+          iconKey: basePage.iconKey || 'layers3',
           title: basePage.title || '',
           summary: basePage.summary || '',
           content: basePage.content || '',
-        };
+        });
         setWikiDraft(fallback);
         lastSavedDraftSerializedRef.current = JSON.stringify(fallback);
         if (String(error?.message || '').includes('404')) {
@@ -873,7 +960,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
     wikiSaveTimerRef.current = setTimeout(async () => {
       try {
         setDraftStatus(ui.savingDraft);
-        await api.saveWikiDraft(selectedGameplayFeature.id, wikiDraft);
+        await api.saveWikiDraft(selectedGameplayFeature.id, createWikiPayloadFromDraft(wikiDraft));
         lastSavedDraftSerializedRef.current = serialized;
         setDraftStatus(ui.draftSaved);
       } catch (error) {
@@ -967,19 +1054,27 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
     if (!canEditWiki) return;
 
     const iconKey = normalizeGameplayIconKey(newTopicDraft.iconKey || 'layers3');
-    const title = String(newTopicDraft.title || '').trim();
-    const summary = String(newTopicDraft.summary || '').trim();
-    const content = String(newTopicDraft.content || '').trim();
+    const titleEn = String(newTopicDraft.titleEn || '').trim();
+    const summaryEn = String(newTopicDraft.summaryEn || '').trim();
+    const contentEn = String(newTopicDraft.contentEn || '').trim();
+    const titleIt = String(newTopicDraft.titleIt || '').trim();
+    const summaryIt = String(newTopicDraft.summaryIt || '').trim();
+    const contentIt = String(newTopicDraft.contentIt || '').trim();
 
-    if (!title || !summary || !content) {
-      setNewTopicStatus(ui.fillRequiredFields);
+    if (!titleEn || !summaryEn || !contentEn) {
+      setNewTopicStatus(ui.fillRequiredFieldsEn);
       return;
     }
 
     try {
       setCreatingTopic(true);
       setNewTopicStatus(ui.creatingTopic);
-      const response = await api.createWikiPage({ iconKey, title, summary, content });
+      const response = await api.createWikiPage({
+        iconKey,
+        title: { en: titleEn, it: titleIt },
+        summary: { en: summaryEn, it: summaryIt },
+        content: { en: contentEn, it: contentIt },
+      });
       const createdPage = response?.page;
       if (!createdPage?.id) {
         throw new Error(ui.topicCreateError);
@@ -992,12 +1087,12 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
       setSelectedGameplayId(createdPage.id);
       setEditorOpen(true);
 
-      const createdDraft = {
-        iconKey: normalizeGameplayIconKey(createdPage.iconKey || iconKey || 'layers3'),
-        title: createdPage.title || title,
-        summary: createdPage.summary || summary,
-        content: createdPage.content || content,
-      };
+      const createdDraft = createWikiDraftFromSource({
+        iconKey: createdPage.iconKey || iconKey || 'layers3',
+        title: createdPage.title || { en: titleEn, it: titleIt },
+        summary: createdPage.summary || { en: summaryEn, it: summaryIt },
+        content: createdPage.content || { en: contentEn, it: contentIt },
+      });
       setWikiDraft(createdDraft);
       lastSavedDraftSerializedRef.current = JSON.stringify(createdDraft);
       setDraftStatus(ui.topicCreated);
@@ -1006,7 +1101,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
       setNewTopicIconPickerOpen(false);
       setNewTopicIconSearch('');
       setNewTopicStatus('');
-      setNewTopicDraft(buildEmptyNewTopicDraft(language));
+      setNewTopicDraft(buildEmptyNewTopicDraft());
       openGameplayArticleFullscreen();
     } catch (error) {
       setNewTopicStatus(error.message || ui.topicCreateError);
@@ -1017,9 +1112,14 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
 
   const handlePublishGameplayArticle = async () => {
     if (!canEditWiki || !selectedGameplayFeature?.id) return;
+    const payload = createWikiPayloadFromDraft(wikiDraft);
+    if (!payload.title.en || !payload.summary.en || !payload.content.en) {
+      setDraftStatus(ui.fillRequiredFieldsEn);
+      return;
+    }
     try {
       setDraftStatus(ui.publishing);
-      const response = await api.updateWikiPage(selectedGameplayFeature.id, wikiDraft);
+      const response = await api.updateWikiPage(selectedGameplayFeature.id, payload);
       const updatedPage = response?.page;
       if (updatedPage?.id) {
         setWikiPagesById((prev) => ({
@@ -1056,7 +1156,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
           : `\n\n[${media.fileName || media.id}](${media.url})\n`;
         setWikiDraft((prev) => ({
           ...prev,
-          content: `${prev.content || ''}${snippet}`,
+          contentEn: `${prev.contentEn || ''}${snippet}`,
         }));
       }
       setDraftStatus(ui.mediaInserted);
@@ -1099,9 +1199,9 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
           <div>
             <h3 className="inline-flex items-center gap-2 text-xl font-extrabold uppercase tracking-[0.05em] text-yt-text-primary">
               <SelectedArticleIcon className="h-5 w-5 text-yt-accent" />
-              {selectedGameplayPage.title}
+              {selectedGameplayPageTitle}
             </h3>
-            <p className="mt-1 text-sm text-yt-text-secondary">{selectedGameplayPage.summary}</p>
+            <p className="mt-1 text-sm text-yt-text-secondary">{selectedGameplayPageSummary}</p>
             {selectedGameplayPage.updatedAt && (
               <p className="mt-1 text-xs text-yt-text-secondary/80">
                 {ui.lastUpdated}: {new Date(selectedGameplayPage.updatedAt).toLocaleString(dateLocale)}
@@ -1133,7 +1233,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
 
         <div className="max-h-[40vh] overflow-auto rounded-xl border border-yt-border/75 bg-[#0c1320] px-4 py-3 sm:max-h-[46vh]">
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-            {selectedGameplayPage.content}
+            {selectedGameplayPageContent}
           </ReactMarkdown>
         </div>
 
@@ -1208,25 +1308,49 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                       </div>
                     )}
                   </div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-yt-accent">{ui.englishBase}</p>
                   <input
                     type="text"
-                    value={wikiDraft.title}
-                    onChange={(event) => setWikiDraft((prev) => ({ ...prev, title: event.target.value }))}
+                    value={wikiDraft.titleEn}
+                    onChange={(event) => setWikiDraft((prev) => ({ ...prev, titleEn: event.target.value }))}
                     placeholder={ui.titlePlaceholder}
                     className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
                   />
                   <textarea
                     rows={3}
-                    value={wikiDraft.summary}
-                    onChange={(event) => setWikiDraft((prev) => ({ ...prev, summary: event.target.value }))}
+                    value={wikiDraft.summaryEn}
+                    onChange={(event) => setWikiDraft((prev) => ({ ...prev, summaryEn: event.target.value }))}
                     placeholder={ui.summaryPlaceholder}
                     className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
                   />
                   <textarea
-                    rows={14}
-                    value={wikiDraft.content}
-                    onChange={(event) => setWikiDraft((prev) => ({ ...prev, content: event.target.value }))}
+                    rows={10}
+                    value={wikiDraft.contentEn}
+                    onChange={(event) => setWikiDraft((prev) => ({ ...prev, contentEn: event.target.value }))}
                     placeholder={ui.contentPlaceholder}
+                    className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                  />
+
+                  <p className="pt-1 text-[11px] font-bold uppercase tracking-[0.09em] text-yt-text-secondary">{ui.italianTranslation}</p>
+                  <input
+                    type="text"
+                    value={wikiDraft.titleIt}
+                    onChange={(event) => setWikiDraft((prev) => ({ ...prev, titleIt: event.target.value }))}
+                    placeholder={ui.titlePlaceholderIt}
+                    className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                  />
+                  <textarea
+                    rows={3}
+                    value={wikiDraft.summaryIt}
+                    onChange={(event) => setWikiDraft((prev) => ({ ...prev, summaryIt: event.target.value }))}
+                    placeholder={ui.summaryPlaceholderIt}
+                    className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                  />
+                  <textarea
+                    rows={8}
+                    value={wikiDraft.contentIt}
+                    onChange={(event) => setWikiDraft((prev) => ({ ...prev, contentIt: event.target.value }))}
+                    placeholder={ui.contentPlaceholderIt}
                     className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
                   />
                   <div className="flex flex-wrap gap-2">
@@ -1264,12 +1388,14 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                   <h4 className="mb-2 text-xs font-bold uppercase tracking-[0.1em] text-yt-accent">{ui.preview}</h4>
                   <h3 className="inline-flex items-center gap-2 text-lg font-extrabold uppercase tracking-[0.05em] text-yt-text-primary">
                     <DraftIcon className="h-4 w-4 text-yt-accent" />
-                    {wikiDraft.title || ui.titleFallback}
+                    {getDraftLocalizedField(wikiDraft, 'title', language) || ui.titleFallback}
                   </h3>
-                  <p className="mb-3 mt-1 text-sm text-yt-text-secondary">{wikiDraft.summary || ui.summaryFallback}</p>
+                  <p className="mb-3 mt-1 text-sm text-yt-text-secondary">
+                    {getDraftLocalizedField(wikiDraft, 'summary', language) || ui.summaryFallback}
+                  </p>
                   <div className="max-h-[420px] overflow-auto rounded border border-yt-border/70 bg-[#0c1320] px-3 py-2">
                     <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                      {wikiDraft.content || ui.emptyContentFallback}
+                      {getDraftLocalizedField(wikiDraft, 'content', language) || ui.emptyContentFallback}
                     </ReactMarkdown>
                   </div>
                 </div>
@@ -1433,7 +1559,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                   setNewTopicStatus('');
                   return;
                 }
-                setNewTopicDraft(buildEmptyNewTopicDraft(language));
+                setNewTopicDraft(buildEmptyNewTopicDraft());
                 setNewTopicIconPickerOpen(false);
                 setNewTopicIconSearch('');
                 setNewTopicStatus('');
@@ -1530,25 +1656,49 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                   </div>
                 )}
               </div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-yt-accent">{ui.englishBase}</p>
               <input
                 type="text"
-                value={newTopicDraft.title}
-                onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, title: event.target.value }))}
+                value={newTopicDraft.titleEn}
+                onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, titleEn: event.target.value }))}
                 placeholder={ui.topicTitlePlaceholder}
                 className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
               />
               <textarea
                 rows={3}
-                value={newTopicDraft.summary}
-                onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, summary: event.target.value }))}
+                value={newTopicDraft.summaryEn}
+                onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, summaryEn: event.target.value }))}
                 placeholder={ui.topicSummaryPlaceholder}
                 className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
               />
               <textarea
-                rows={10}
-                value={newTopicDraft.content}
-                onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, content: event.target.value }))}
+                rows={8}
+                value={newTopicDraft.contentEn}
+                onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, contentEn: event.target.value }))}
                 placeholder={ui.topicContentPlaceholder}
+                className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+              />
+
+              <p className="pt-1 text-[11px] font-bold uppercase tracking-[0.09em] text-yt-text-secondary">{ui.italianTranslation}</p>
+              <input
+                type="text"
+                value={newTopicDraft.titleIt}
+                onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, titleIt: event.target.value }))}
+                placeholder={ui.topicTitlePlaceholderIt}
+                className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+              />
+              <textarea
+                rows={3}
+                value={newTopicDraft.summaryIt}
+                onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, summaryIt: event.target.value }))}
+                placeholder={ui.topicSummaryPlaceholderIt}
+                className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+              />
+              <textarea
+                rows={6}
+                value={newTopicDraft.contentIt}
+                onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, contentIt: event.target.value }))}
+                placeholder={ui.topicContentPlaceholderIt}
                 className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
               />
               <div className="flex flex-wrap gap-2">
@@ -1568,7 +1718,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                     setNewTopicIconPickerOpen(false);
                     setNewTopicIconSearch('');
                     setNewTopicStatus('');
-                    setNewTopicDraft(buildEmptyNewTopicDraft(language));
+                    setNewTopicDraft(buildEmptyNewTopicDraft());
                   }}
                   className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary"
                 >

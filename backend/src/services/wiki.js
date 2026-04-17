@@ -11,9 +11,30 @@ const DEFAULT_PAGES = [
   {
     id: 'territory',
     iconKey: 'radar',
-    title: 'Frontline Dinamico',
-    summary: 'Le zone cambiano stato in tempo reale. Ogni conquista modifica il bilanciamento del fronte.',
-    content: `## Panoramica
+    title: {
+      en: 'Dynamic Frontline',
+      it: 'Frontline Dinamico',
+    },
+    summary: {
+      en: 'Zones change in real time, and every capture shifts the frontline balance.',
+      it: 'Le zone cambiano stato in tempo reale. Ogni conquista modifica il bilanciamento del fronte.',
+    },
+    content: {
+      en: `## Overview
+The **frontline** evolves based on pilot actions and ground operations.
+
+## Zone States
+| State | Description |
+|---|---|
+| RED | Area under hostile control |
+| BLUE | Area under allied control |
+| UNDER_ATTACK | Active engagement |
+
+## Operational Notes
+- Maintain air superiority over contested zones.
+- Coordinate with logistics to sustain the advance.
+`,
+      it: `## Panoramica
 Il **frontline** evolve in base alle azioni dei piloti e alle operazioni a terra.
 
 ## Stato Zone
@@ -27,13 +48,34 @@ Il **frontline** evolve in base alle azioni dei piloti e alle operazioni a terra
 - Mantieni la superiorita aerea sopra le zone contestate.
 - Coordinati con la logistica per sostenere l'avanzata.
 `,
+    },
   },
   {
     id: 'logistics',
     iconKey: 'truck',
-    title: 'Logistica Strategica',
-    summary: 'Gestione di rifornimenti, rotte e priorita missioni per mantenere operative le basi.',
-    content: `## Panoramica
+    title: {
+      en: 'Strategic Logistics',
+      it: 'Logistica Strategica',
+    },
+    summary: {
+      en: 'Manage supplies, routes, and mission priorities to keep airbases operational.',
+      it: 'Gestione di rifornimenti, rotte e priorita missioni per mantenere operative le basi.',
+    },
+    content: {
+      en: `## Overview
+Logistics keeps forward bases alive and enables sustained operations.
+
+## Key Elements
+- Supply convoys
+- Order priorities
+- Source-to-destination airbase chain
+
+## Example
+\`\`\`text
+Source Base -> Frontline Base -> Local distribution
+\`\`\`
+`,
+      it: `## Panoramica
 La logistica mantiene vive le basi avanzate e abilita missioni continuative.
 
 ## Elementi Chiave
@@ -46,13 +88,29 @@ La logistica mantiene vive le basi avanzate e abilita missioni continuative.
 Base Sorgente -> Base Frontline -> Distribuzione locale
 \`\`\`
 `,
+    },
   },
   {
     id: 'combined',
     iconKey: 'layers3',
-    title: 'Operazioni Combined Arms',
-    summary: 'Veicoli e unita di supporto lavorano in sinergia con i piloti per gli obiettivi a terra.',
-    content: `## Panoramica
+    title: {
+      en: 'Combined Arms Operations',
+      it: 'Operazioni Combined Arms',
+    },
+    summary: {
+      en: 'Ground vehicles and support units work in sync with pilots to secure objectives.',
+      it: 'Veicoli e unita di supporto lavorano in sinergia con i piloti per gli obiettivi a terra.',
+    },
+    content: {
+      en: `## Overview
+Combined arms operations merge CAS, SEAD, transport, and tactical vehicles.
+
+## Roles
+- **Strike**: neutralize high-priority targets.
+- **Escort**: protect convoys and critical assets.
+- **Recon**: identify threats and engagement windows.
+`,
+      it: `## Panoramica
 Le operazioni combined arms uniscono CAS, SEAD, trasporto e veicoli tattici.
 
 ## Ruoli
@@ -60,13 +118,29 @@ Le operazioni combined arms uniscono CAS, SEAD, trasporto e veicoli tattici.
 - **Escort**: protegge convogli e asset critici.
 - **Recon**: identifica minacce e finestre di ingaggio.
 `,
+    },
   },
   {
     id: 'defense',
     iconKey: 'shield_check',
-    title: 'Difesa Attiva',
-    summary: 'Assetti antiaerei e colonne mobili proteggono aeroporti, convogli e punti critici.',
-    content: `## Panoramica
+    title: {
+      en: 'Active Defense',
+      it: 'Difesa Attiva',
+    },
+    summary: {
+      en: 'Air-defense assets and mobile columns protect airfields, convoys, and key points.',
+      it: 'Assetti antiaerei e colonne mobili proteggono aeroporti, convogli e punti critici.',
+    },
+    content: {
+      en: `## Overview
+Active defense reduces enemy pressure on airfields and strategic routes.
+
+## Doctrine
+- Layered defenses (short/medium range)
+- Redundancy on critical points
+- Rapid relocation of mobile units
+`,
+      it: `## Panoramica
 La difesa attiva riduce la pressione nemica su aeroporti e rotte strategiche.
 
 ## Dottrina
@@ -74,8 +148,13 @@ La difesa attiva riduce la pressione nemica su aeroporti e rotte strategiche.
 - Ridondanza sui punti critici
 - Rilocazione rapida delle unita mobili
 `,
+    },
   },
 ];
+const DEFAULT_PAGES_BY_ID = DEFAULT_PAGES.reduce((acc, page) => {
+  acc[page.id] = page;
+  return acc;
+}, {});
 
 function ensureStorage() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -121,6 +200,48 @@ function sanitizeMarkdown(value, maxLen = 120000) {
   return value.replace(/\r\n/g, '\n').slice(0, maxLen);
 }
 
+function normalizeLocalizedValue({
+  value,
+  valueEn,
+  valueIt,
+  fallbackEn = '',
+  fallbackIt = '',
+  maxLen = 10000,
+  isMarkdown = false,
+}) {
+  const sanitizer = isMarkdown ? sanitizeMarkdown : sanitizeText;
+  const safeFallbackEn = sanitizer(fallbackEn, maxLen);
+  const safeFallbackIt = sanitizer(fallbackIt, maxLen);
+
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return {
+      en: sanitizer(value.en ?? valueEn ?? safeFallbackEn, maxLen),
+      it: sanitizer(value.it ?? valueIt ?? '', maxLen),
+    };
+  }
+
+  const legacyString = sanitizer(value, maxLen);
+  if (legacyString && safeFallbackEn && safeFallbackIt && legacyString === safeFallbackIt) {
+    return {
+      en: safeFallbackEn,
+      it: safeFallbackIt,
+    };
+  }
+
+  let en = sanitizer(valueEn, maxLen) || legacyString || safeFallbackEn;
+  let it = sanitizer(valueIt, maxLen);
+
+  if (!legacyString && !valueEn && !valueIt && safeFallbackIt) {
+    it = safeFallbackIt;
+  }
+
+  if (!en) {
+    en = safeFallbackEn;
+  }
+
+  return { en, it };
+}
+
 function normalizePageId(pageId) {
   const normalized = String(pageId || '')
     .trim()
@@ -139,14 +260,37 @@ function normalizeIconKey(iconKey) {
 
 function normalizePage(rawPage) {
   const id = normalizePageId(rawPage?.id);
+  const defaults = DEFAULT_PAGES_BY_ID[id] || null;
   const createdAt = Number.isFinite(rawPage?.createdAt) ? rawPage.createdAt : Date.now();
   const updatedAt = Number.isFinite(rawPage?.updatedAt) ? rawPage.updatedAt : createdAt;
   return {
     id,
     iconKey: normalizeIconKey(rawPage?.iconKey || ''),
-    title: sanitizeText(rawPage?.title || '', 200),
-    summary: sanitizeText(rawPage?.summary || '', 500),
-    content: sanitizeMarkdown(rawPage?.content || '', 120000),
+    title: normalizeLocalizedValue({
+      value: rawPage?.title,
+      valueEn: rawPage?.titleEn,
+      valueIt: rawPage?.titleIt,
+      fallbackEn: defaults?.title?.en || '',
+      fallbackIt: defaults?.title?.it || '',
+      maxLen: 200,
+    }),
+    summary: normalizeLocalizedValue({
+      value: rawPage?.summary,
+      valueEn: rawPage?.summaryEn,
+      valueIt: rawPage?.summaryIt,
+      fallbackEn: defaults?.summary?.en || '',
+      fallbackIt: defaults?.summary?.it || '',
+      maxLen: 500,
+    }),
+    content: normalizeLocalizedValue({
+      value: rawPage?.content,
+      valueEn: rawPage?.contentEn,
+      valueIt: rawPage?.contentIt,
+      fallbackEn: defaults?.content?.en || '',
+      fallbackIt: defaults?.content?.it || '',
+      maxLen: 120000,
+      isMarkdown: true,
+    }),
     createdAt,
     updatedAt,
     updatedBy: {
@@ -161,15 +305,34 @@ function normalizeDraft(rawDraft, userId = '', pageId = '') {
     pageId: normalizePageId(rawDraft?.pageId || pageId),
     userId: sanitizeText(String(userId || ''), 80),
     iconKey: normalizeIconKey(rawDraft?.iconKey || ''),
-    title: sanitizeText(rawDraft?.title || '', 200),
-    summary: sanitizeText(rawDraft?.summary || '', 500),
-    content: sanitizeMarkdown(rawDraft?.content || '', 120000),
+    title: normalizeLocalizedValue({
+      value: rawDraft?.title,
+      valueEn: rawDraft?.titleEn,
+      valueIt: rawDraft?.titleIt,
+      maxLen: 200,
+    }),
+    summary: normalizeLocalizedValue({
+      value: rawDraft?.summary,
+      valueEn: rawDraft?.summaryEn,
+      valueIt: rawDraft?.summaryIt,
+      maxLen: 500,
+    }),
+    content: normalizeLocalizedValue({
+      value: rawDraft?.content,
+      valueEn: rawDraft?.contentEn,
+      valueIt: rawDraft?.contentIt,
+      maxLen: 120000,
+      isMarkdown: true,
+    }),
     updatedAt: Number.isFinite(rawDraft?.updatedAt) ? rawDraft.updatedAt : Date.now(),
   };
 }
 
 function pageSlugFromTitle(title) {
-  const slug = String(title || '')
+  const sourceTitle = title && typeof title === 'object'
+    ? (title.en || title.it || '')
+    : title;
+  const slug = String(sourceTitle || '')
     .trim()
     .toLowerCase()
     .replace(/['"]/g, '')
@@ -244,7 +407,11 @@ function draftKey(userId, pageId) {
 ensureStorage();
 
 export function getPages() {
-  return readPages().sort((a, b) => (Number(a.title?.localeCompare?.(b.title || '')) || 0));
+  return readPages().sort((a, b) => {
+    const aTitle = String(a?.title?.en || a?.title?.it || '');
+    const bTitle = String(b?.title?.en || b?.title?.it || '');
+    return Number(aTitle.localeCompare(bTitle)) || 0;
+  });
 }
 
 export function getPage(pageId) {
@@ -295,9 +462,9 @@ export function updatePage({ pageId, userId, authorName, draft }) {
   if (index < 0) throw new Error('Wiki page not found');
 
   const payload = normalizeDraft(draft, userId, normalizedPageId);
-  if (!payload.title) throw new Error('Title is required');
-  if (!payload.summary) throw new Error('Summary is required');
-  if (!payload.content) throw new Error('Content is required');
+  if (!payload.title.en) throw new Error('English title is required');
+  if (!payload.summary.en) throw new Error('English summary is required');
+  if (!payload.content.en) throw new Error('English content is required');
 
   const current = pages[index];
   const updated = normalizePage({
@@ -322,9 +489,9 @@ export function updatePage({ pageId, userId, authorName, draft }) {
 export function createPage({ pageId, userId, authorName, draft }) {
   const pages = readPages();
   const payload = normalizeDraft(draft, userId, pageId);
-  if (!payload.title) throw new Error('Title is required');
-  if (!payload.summary) throw new Error('Summary is required');
-  if (!payload.content) throw new Error('Content is required');
+  if (!payload.title.en) throw new Error('English title is required');
+  if (!payload.summary.en) throw new Error('English summary is required');
+  if (!payload.content.en) throw new Error('English content is required');
 
   const resolvedPageId = resolveNewPageId(pages, pageId, payload.title);
   const now = Date.now();

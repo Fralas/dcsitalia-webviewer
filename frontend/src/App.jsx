@@ -287,20 +287,16 @@ function App() {
               <button
                 type="button"
                 onClick={toggleWikiLanguage}
-                className={`inline-flex items-center rounded border px-3 py-1.5 transition-colors ${
-                  currentView === 'wiki'
-                    ? 'border-yt-accent/70 bg-yt-accent/10'
-                    : 'border-yt-border/80 bg-[#151b25] hover:border-yt-accent/70'
-                }`}
+                className="inline-flex h-[34px] w-[84px] items-center justify-center bg-transparent p-0 transition-opacity hover:opacity-95"
                 role="switch"
                 aria-checked={isItalianWiki}
                 aria-label={isItalianWiki ? 'Switch wiki language to English' : 'Switch wiki language to Italian'}
                 title={isItalianWiki ? 'Switch wiki language to English' : 'Switch wiki language to Italian'}
               >
-                <span className="relative flex h-5 w-14 items-center rounded-full border border-yt-border/80 bg-[#0f1826]">
+                <span className="relative flex h-7 w-[84px] items-center rounded-md border border-yt-border/80 bg-[#101a29]">
                   <span
-                    className={`pointer-events-none absolute top-0.5 h-4 w-6 rounded-full border border-yt-accent/50 bg-yt-accent/22 shadow-[0_0_10px_rgba(78,197,255,0.2)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                      isItalianWiki ? 'translate-x-[30px]' : 'translate-x-0.5'
+                    className={`pointer-events-none absolute top-0.5 h-6 w-[38px] rounded-sm border border-yt-accent/50 bg-yt-accent/20 shadow-[0_0_10px_rgba(78,197,255,0.2)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                      isItalianWiki ? 'translate-x-[43px]' : 'translate-x-0.5'
                     }`}
                   />
                   <span className="relative z-10 inline-flex w-1/2 items-center justify-center" aria-hidden="true">
