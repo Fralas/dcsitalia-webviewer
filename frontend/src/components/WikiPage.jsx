@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Gamepad2, Layers3, Maximize2, Minimize2, Radar, ShieldCheck, Truck } from 'lucide-react';
-import armoredImg from '../assets/vehicles/armored.png';
-import utilityImg from '../assets/vehicles/utility.png';
-import attackHeliImg from '../assets/vehicles/attack-heli.png';
-import airDefenseImg from '../assets/vehicles/air-defense.png';
-import transportHeliImg from '../assets/vehicles/transport-heli.png';
-import fuelTruckImg from '../assets/vehicles/fuel-truck.png';
+import avengerImg from '../../img/wiki/veh/AVENGER.png';
+import firtinaImg from '../../img/wiki/veh/FIRTINA.png';
+import fmtvImg from '../../img/wiki/veh/FMTV.png';
+import gepardImg from '../../img/wiki/veh/GEPARD.png';
+import gmlrsAtacmsImg from '../../img/wiki/veh/GMLRS-ATACMS.png';
+import hemttImg from '../../img/wiki/veh/HEMTT.png';
+import hmmwvImg from '../../img/wiki/veh/HMMWV.png';
+import l118Img from '../../img/wiki/veh/L118.png';
+import lavImg from '../../img/wiki/veh/LAV.png';
+import mbtImg from '../../img/wiki/veh/MBT.png';
+import rolandImg from '../../img/wiki/veh/ROLAND.png';
+import scimitarImg from '../../img/wiki/veh/SCIMITAR.png';
+import scorpionImg from '../../img/wiki/veh/SCORPION.png';
+import towImg from '../../img/wiki/veh/TOW.png';
 
 const GAMEPLAY_FEATURES = [
   {
@@ -37,51 +45,114 @@ const GAMEPLAY_FEATURES = [
 
 const VEHICLES = [
   {
-    id: 't90',
-    category: 'Corazzato',
-    name: 'T-90M',
-    description: 'Carro pesante da sfondamento. Controlla i choke point e tiene la linea sotto fuoco intenso.',
-    image: armoredImg,
-  },
-  {
-    id: 'uaz',
-    category: 'Ricognizione',
-    name: 'UAZ Recon',
-    description: 'Mezzo rapido per scouting avanzato. Individua movimenti nemici e apre finestre di ingaggio.',
-    image: utilityImg,
-  },
-  {
-    id: 'ka50',
-    category: 'Attacco',
-    name: 'Ka-50 Black Shark',
-    description: 'Elicottero anticarro. Neutralizza minacce prioritarie con attacchi rapidi e precisi.',
-    image: attackHeliImg,
-  },
-  {
-    id: 'sa19',
+    id: 'avenger',
     category: 'Difesa Aerea',
-    name: 'SA-19 Tunguska',
-    description: 'Scudo mobile a corto raggio. Protegge i convogli da elicotteri e strike a bassa quota.',
-    image: airDefenseImg,
+    name: 'Avenger',
+    description: 'Sistema SHORAD mobile per contrastare elicotteri e minacce a bassa quota.',
+    image: avengerImg,
   },
   {
-    id: 'ch47',
-    category: 'Trasporto',
-    name: 'CH-47 Chinook',
-    description: 'Trasporto truppe e carichi pesanti. Essenziale per redeploy rapidi e rinforzi sul fronte.',
-    image: transportHeliImg,
+    id: 'firtina',
+    category: 'Artiglieria',
+    name: 'Firtina',
+    description: 'Obice semovente per fuoco indiretto a lunga distanza su obiettivi tattici.',
+    image: firtinaImg,
   },
   {
-    id: 'cisterna',
-    category: 'Supporto',
-    name: 'Fuel Truck M978',
-    description: 'Rifornimento mobile per basi avanzate. Mantiene in vita operazioni aeree e terrestri prolungate.',
-    image: fuelTruckImg,
+    id: 'fmtv',
+    category: 'Logistica',
+    name: 'FMTV',
+    description: 'Camion tattico multiruolo per trasporto rifornimenti, munizioni e supporto operativo.',
+    image: fmtvImg,
+  },
+  {
+    id: 'gepard',
+    category: 'Difesa Aerea',
+    name: 'Gepard',
+    description: 'Piattaforma antiaerea a cannoni per protezione ravvicinata delle unita a terra.',
+    image: gepardImg,
+  },
+  {
+    id: 'gmlrs',
+    category: 'Artiglieria Missilistica',
+    name: 'GMLRS',
+    description: 'Razzi guidati a lungo raggio per ingaggi di precisione su target strategici.',
+    image: gmlrsAtacmsImg,
+  },
+  {
+    id: 'atacms',
+    category: 'Artiglieria Missilistica',
+    name: 'ATACMS',
+    description: 'Missile tattico a lunghissimo raggio per colpire nodi critici in profondita.',
+    image: gmlrsAtacmsImg,
+  },
+  {
+    id: 'hemtt',
+    category: 'Logistica',
+    name: 'HEMTT',
+    description: 'Piattaforma pesante per trasporto carburante, container e materiali di prima linea.',
+    image: hemttImg,
+  },
+  {
+    id: 'hmmwv',
+    category: 'Ricognizione',
+    name: 'HMMWV',
+    description: 'Veicolo leggero rapido per pattugliamento, scouting e supporto mobile.',
+    image: hmmwvImg,
+  },
+  {
+    id: 'l118',
+    category: 'Artiglieria',
+    name: 'L118',
+    description: 'Obice trainato da 105mm per supporto di fuoco rapido e flessibile.',
+    image: l118Img,
+  },
+  {
+    id: 'lav',
+    category: 'Corazzato Leggero',
+    name: 'LAV',
+    description: 'Veicolo blindato veloce per ricognizione armata e protezione convogli.',
+    image: lavImg,
+  },
+  {
+    id: 'mbt',
+    category: 'Corazzato',
+    name: 'MBT',
+    description: 'Main Battle Tank per sfondamento e superiorita sul terreno.',
+    image: mbtImg,
+  },
+  {
+    id: 'roland',
+    category: 'Difesa Aerea',
+    name: 'Roland',
+    description: 'Sistema SAM mobile a corto-medio raggio per copertura antiaerea del fronte.',
+    image: rolandImg,
+  },
+  {
+    id: 'scimitar',
+    category: 'Ricognizione',
+    name: 'Scimitar',
+    description: 'Veicolo cingolato leggero da esplorazione armata e acquisizione bersagli.',
+    image: scimitarImg,
+  },
+  {
+    id: 'scorpion',
+    category: 'Difesa Aerea',
+    name: 'Scorpion',
+    description: 'Piattaforma di difesa ravvicinata per contrasto droni e minacce a corto raggio.',
+    image: scorpionImg,
+  },
+  {
+    id: 'tow',
+    category: 'Controcarro',
+    name: 'TOW',
+    description: 'Sistema missilistico anticarro per neutralizzare veicoli blindati ad alta priorita.',
+    image: towImg,
   },
 ];
 
 const SLOT_ITEM_OFFSETS = [-3, -2, -1, 0, 1, 2, 3];
-const SLOT_STEP = 138;
+const SLOT_STEP = 186;
 const WHEEL_THRESHOLD = 40;
 const FULLSCREEN_TRANSITION_MS = 280;
 const SHOWROOM_BLUE_GLOW = 'rgba(78, 197, 255, 0.16)';
@@ -253,7 +324,8 @@ export default function WikiPage() {
       return;
     }
 
-    wheelAccumulatorRef.current += event.deltaY;
+    const primaryDelta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
+    wheelAccumulatorRef.current += primaryDelta;
 
     if (Math.abs(wheelAccumulatorRef.current) < WHEEL_THRESHOLD) {
       return;
@@ -268,10 +340,10 @@ export default function WikiPage() {
     if (slotAnimating) {
       return;
     }
-    if (event.key === 'ArrowDown') {
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
       event.preventDefault();
       shiftVehicle(1);
-    } else if (event.key === 'ArrowUp') {
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
       event.preventDefault();
       shiftVehicle(-1);
     }
@@ -312,12 +384,8 @@ export default function WikiPage() {
       <div className="relative mb-4 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-black uppercase tracking-[0.08em] text-yt-text-primary">Veicoli</h2>
-          <p className="text-sm text-yt-text-secondary">Showroom virtuale con selezione a scorrimento verticale.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="rounded-full border border-yt-accent/30 bg-yt-accent/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-yt-accent">
-            Slot View
-          </span>
+        <div className="flex items-center">
           <button
             type="button"
             onClick={(event) => {
@@ -334,20 +402,39 @@ export default function WikiPage() {
         </div>
       </div>
 
-      <div className={`relative grid gap-8 ${fullscreen ? 'lg:grid-cols-[430px_minmax(0,1fr)]' : 'lg:grid-cols-[390px_minmax(0,1fr)]'}`}>
-        <div
-          className="pointer-events-none absolute inset-y-0 left-0 w-[460px] opacity-60"
-          style={{
-            background: `radial-gradient(circle at 28% 50%, ${SHOWROOM_BLUE_GLOW}, transparent 64%)`,
-          }}
-        />
+      <div className="space-y-5">
+        <article className="relative flex items-start justify-center">
+          <div className="w-full max-w-3xl space-y-3 pt-1 text-center">
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <h3 className={`font-black uppercase leading-tight tracking-[0.05em] text-yt-text-primary ${fullscreen ? 'text-4xl' : 'text-3xl'}`}>
+                {selectedVehicle.name}
+              </h3>
+              <div className="inline-flex items-center gap-2 rounded-full border border-yt-accent/40 bg-yt-accent/12 px-3 py-1">
+                <span className="h-2 w-2 rounded-full bg-yt-accent shadow-[0_0_10px_rgba(78,197,255,0.7)]" />
+                <span className="text-xs font-black uppercase tracking-[0.14em] text-yt-accent">
+                  Categoria: {selectedVehicle.category}
+                </span>
+              </div>
+            </div>
+            <p className={`mx-auto max-w-2xl leading-relaxed text-yt-text-secondary ${fullscreen ? 'text-base' : 'text-sm'}`}>
+              {selectedVehicle.description}
+            </p>
+          </div>
+        </article>
 
-        <aside className="relative flex flex-col items-center">
+        <div className="relative">
           <div
-            className={`relative w-full overflow-hidden outline-none focus:outline-none ${fullscreen ? 'h-[min(74vh,760px)]' : 'h-[560px]'}`}
+            className="pointer-events-none absolute inset-0 opacity-55"
             style={{
-              WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 11%, black 89%, transparent 100%)',
-              maskImage: 'linear-gradient(to bottom, transparent 0%, black 11%, black 89%, transparent 100%)',
+              background: `radial-gradient(circle at 50% 62%, ${SHOWROOM_BLUE_GLOW}, transparent 65%)`,
+            }}
+          />
+
+          <div
+            className={`relative mx-auto overflow-hidden outline-none focus:outline-none ${fullscreen ? 'h-[360px] max-w-[min(92vw,1280px)]' : 'h-[300px] max-w-[min(92vw,1040px)]'}`}
+            style={{
+              WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%)',
+              maskImage: 'linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%)',
               overscrollBehavior: 'contain',
             }}
             onWheelCapture={handleWheel}
@@ -360,7 +447,7 @@ export default function WikiPage() {
             <div
               className={`absolute inset-0 ${slotAnimating ? 'transition-transform duration-[420ms] ease-[cubic-bezier(0.22,0.61,0.36,1)]' : ''}`}
               style={{
-                transform: `translateY(${slotTranslate}px)`,
+                transform: `translateX(${slotTranslate}px)`,
               }}
               onTransitionEnd={handleSlotTrackTransitionEnd}
             >
@@ -381,10 +468,9 @@ export default function WikiPage() {
                       }
                       shiftVehicle(offset > 0 ? 1 : -1);
                     }}
-                    className="absolute left-1/2 w-[92%] -translate-x-1/2 p-0 transition-all duration-250"
+                    className="absolute top-1/2 left-1/2 p-0 transition-all duration-250"
                     style={{
-                      transform: `translate(-50%, calc(-50% + ${offset * SLOT_STEP}px))`,
-                      top: '50%',
+                      transform: `translate(calc(-50% + ${offset * SLOT_STEP}px), -50%)`,
                       opacity: visual.opacity,
                       filter: `blur(${visual.blur}px)`,
                     }}
@@ -407,26 +493,7 @@ export default function WikiPage() {
               })}
             </div>
           </div>
-        </aside>
-
-        <article className="relative flex items-start justify-center">
-          <div className="w-full max-w-xl space-y-3 pt-1 text-center">
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <h3 className={`font-black uppercase leading-tight tracking-[0.05em] text-yt-text-primary ${fullscreen ? 'text-4xl' : 'text-3xl'}`}>
-                {selectedVehicle.name}
-              </h3>
-              <div className="inline-flex items-center gap-2 rounded-full border border-yt-accent/40 bg-yt-accent/12 px-3 py-1">
-                <span className="h-2 w-2 rounded-full bg-yt-accent shadow-[0_0_10px_rgba(78,197,255,0.7)]" />
-                <span className="text-xs font-black uppercase tracking-[0.14em] text-yt-accent">
-                  Categoria: {selectedVehicle.category}
-                </span>
-              </div>
-            </div>
-            <p className={`mx-auto max-w-xl leading-relaxed text-yt-text-secondary ${fullscreen ? 'text-base' : 'text-sm'}`}>
-              {selectedVehicle.description}
-            </p>
-          </div>
-        </article>
+        </div>
       </div>
     </>
   );
