@@ -182,7 +182,7 @@ function normalizeDraft(rawDraft) {
   };
 }
 
-export default function ChangelogPage() {
+export default function ChangelogPage({ language = 'en' }) {
   const { user } = useUser();
   const canEdit = Boolean(user?.id && ALLOWED_AUTHOR_IDS.has(String(user.id)));
   const [posts, setPosts] = useState([]);
@@ -195,10 +195,10 @@ export default function ChangelogPage() {
   const [publishing, setPublishing] = useState(false);
   const [editingPostId, setEditingPostId] = useState('');
   const [editorOpen, setEditorOpen] = useState(false);
-  const [viewLanguage, setViewLanguage] = useState('it');
   const [fullscreenMedia, setFullscreenMedia] = useState(null);
   const [error, setError] = useState('');
   const lastSavedSerializedRef = useRef('');
+  const viewLanguage = language === 'it' ? 'it' : 'en';
 
   const contributorsById = useMemo(() => {
     const map = new Map();
@@ -479,15 +479,6 @@ export default function ChangelogPage() {
               <h2 className="text-xl font-extrabold tracking-[0.05em] text-yt-text-primary">Changelogs</h2>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setViewLanguage((prev) => (prev === 'it' ? 'en' : 'it'))}
-            className="inline-flex items-center gap-1 rounded border border-yt-border px-2 py-1 text-xs text-yt-text-primary hover:border-yt-accent"
-            title={viewLanguage === 'it' ? 'Switch to English' : 'Passa a Italiano'}
-          >
-            <Languages className="h-3.5 w-3.5" />
-            {viewLanguage === 'it' ? 'IT' : 'EN'}
-          </button>
           {canEdit && (
             <div className="text-[11px] text-yt-text-secondary">
               <span className="inline-flex items-center gap-1 rounded border border-yt-border px-2 py-1">

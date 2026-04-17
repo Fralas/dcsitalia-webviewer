@@ -108,7 +108,7 @@ function buildFrontlineSummary(zones = []) {
 
 function App() {
   const [currentView, setCurrentView] = useState(() => viewFromLocation());
-  const [wikiLanguage, setWikiLanguage] = useState(DEFAULT_WIKI_LANGUAGE);
+  const [appLanguage, setAppLanguage] = useState(DEFAULT_WIKI_LANGUAGE);
   const [airports, setAirports] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -126,10 +126,10 @@ function App() {
     setCurrentView(normalized);
     syncUrlWithView(normalized);
   };
-  const isItalianWiki = wikiLanguage === 'it';
+  const isItalian = appLanguage === 'it';
 
-  const toggleWikiLanguage = () => {
-    setWikiLanguage((prev) => (prev === 'it' ? 'en' : 'it'));
+  const toggleLanguage = () => {
+    setAppLanguage((prev) => (prev === 'it' ? 'en' : 'it'));
   };
 
   useEffect(() => {
@@ -286,17 +286,17 @@ function App() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={toggleWikiLanguage}
+                onClick={toggleLanguage}
                 className="inline-flex h-[34px] w-[84px] items-center justify-center bg-transparent p-0 transition-opacity hover:opacity-95"
                 role="switch"
-                aria-checked={isItalianWiki}
-                aria-label={isItalianWiki ? 'Switch wiki language to English' : 'Switch wiki language to Italian'}
-                title={isItalianWiki ? 'Switch wiki language to English' : 'Switch wiki language to Italian'}
+                aria-checked={isItalian}
+                aria-label={isItalian ? 'Switch language to English' : 'Switch language to Italian'}
+                title={isItalian ? 'Switch language to English' : 'Switch language to Italian'}
               >
                 <span className="relative flex h-7 w-[84px] items-center rounded-md border border-yt-border/80 bg-[#101a29]">
                   <span
                     className={`pointer-events-none absolute top-0.5 h-6 w-[38px] rounded-sm border border-yt-accent/50 bg-yt-accent/20 shadow-[0_0_10px_rgba(78,197,255,0.2)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                      isItalianWiki ? 'translate-x-[43px]' : 'translate-x-0.5'
+                      isItalian ? 'translate-x-[43px]' : 'translate-x-0.5'
                     }`}
                   />
                   <span className="relative z-10 inline-flex w-1/2 items-center justify-center" aria-hidden="true">
@@ -319,7 +319,6 @@ function App() {
                 aria-label="Apri changelog"
               >
                 <CalendarSync className="w-4 h-4" />
-                <span className="hidden sm:inline">Changelog</span>
               </button>
               <button
                 type="button"
@@ -333,7 +332,6 @@ function App() {
                 aria-label="Apri wiki"
               >
                 <BookOpen className="w-4 h-4" />
-                <span className="hidden sm:inline">Wiki</span>
               </button>
               <UserMenu />
             </div>
@@ -349,10 +347,10 @@ function App() {
           <UserProfile />
         )}
         {currentView === 'changelogs' && (
-          <ChangelogPage />
+          <ChangelogPage language={appLanguage} />
         )}
         {currentView === 'wiki' && (
-          <WikiPage language={wikiLanguage} />
+          <WikiPage language={appLanguage} />
         )}
       </main>
 
