@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ChevronUp, Gamepad2, Layers3, Maximize2, Minimize2, Radar, ShieldCheck, Truck } from 'lucide-react';
-import armoredImg from '../assets/vehicles/armored.svg';
-import utilityImg from '../assets/vehicles/utility.svg';
-import attackHeliImg from '../assets/vehicles/attack-heli.svg';
-import airDefenseImg from '../assets/vehicles/air-defense.svg';
-import transportHeliImg from '../assets/vehicles/transport-heli.svg';
-import fuelTruckImg from '../assets/vehicles/fuel-truck.svg';
+import { Gamepad2, Layers3, Maximize2, Minimize2, Radar, ShieldCheck, Truck } from 'lucide-react';
+import armoredImg from '../assets/vehicles/armored.png';
+import utilityImg from '../assets/vehicles/utility.png';
+import attackHeliImg from '../assets/vehicles/attack-heli.png';
+import airDefenseImg from '../assets/vehicles/air-defense.png';
+import transportHeliImg from '../assets/vehicles/transport-heli.png';
+import fuelTruckImg from '../assets/vehicles/fuel-truck.png';
 
 const GAMEPLAY_FEATURES = [
   {
@@ -42,7 +42,6 @@ const VEHICLES = [
     name: 'T-90M',
     description: 'Carro pesante da sfondamento. Controlla i choke point e tiene la linea sotto fuoco intenso.',
     image: armoredImg,
-    glow: 'rgba(255, 123, 61, 0.42)',
   },
   {
     id: 'uaz',
@@ -50,7 +49,6 @@ const VEHICLES = [
     name: 'UAZ Recon',
     description: 'Mezzo rapido per scouting avanzato. Individua movimenti nemici e apre finestre di ingaggio.',
     image: utilityImg,
-    glow: 'rgba(113, 218, 255, 0.42)',
   },
   {
     id: 'ka50',
@@ -58,7 +56,6 @@ const VEHICLES = [
     name: 'Ka-50 Black Shark',
     description: 'Elicottero anticarro. Neutralizza minacce prioritarie con attacchi rapidi e precisi.',
     image: attackHeliImg,
-    glow: 'rgba(255, 92, 133, 0.42)',
   },
   {
     id: 'sa19',
@@ -66,7 +63,6 @@ const VEHICLES = [
     name: 'SA-19 Tunguska',
     description: 'Scudo mobile a corto raggio. Protegge i convogli da elicotteri e strike a bassa quota.',
     image: airDefenseImg,
-    glow: 'rgba(125, 241, 125, 0.38)',
   },
   {
     id: 'ch47',
@@ -74,7 +70,6 @@ const VEHICLES = [
     name: 'CH-47 Chinook',
     description: 'Trasporto truppe e carichi pesanti. Essenziale per redeploy rapidi e rinforzi sul fronte.',
     image: transportHeliImg,
-    glow: 'rgba(255, 219, 120, 0.4)',
   },
   {
     id: 'cisterna',
@@ -82,13 +77,14 @@ const VEHICLES = [
     name: 'Fuel Truck M978',
     description: 'Rifornimento mobile per basi avanzate. Mantiene in vita operazioni aeree e terrestri prolungate.',
     image: fuelTruckImg,
-    glow: 'rgba(155, 150, 255, 0.4)',
   },
 ];
 
 const SLOT_ITEM_OFFSETS = [-2, -1, 0, 1, 2];
-const SLOT_STEP = 94;
-const WHEEL_THRESHOLD = 36;
+const SLOT_STEP = 126;
+const WHEEL_THRESHOLD = 40;
+const FULLSCREEN_TRANSITION_MS = 280;
+const SHOWROOM_BLUE_GLOW = 'rgba(78, 197, 255, 0.30)';
 
 function wrapIndex(value, length) {
   return ((value % length) + length) % length;
@@ -97,12 +93,12 @@ function wrapIndex(value, length) {
 function getOffsetVisual(offset) {
   const distance = Math.abs(offset);
   if (distance === 0) {
-    return { opacity: 1, scale: 1, blur: 0 };
+    return { opacity: 1, scale: 1.12, blur: 0 };
   }
   if (distance === 1) {
-    return { opacity: 0.52, scale: 0.86, blur: 0 };
+    return { opacity: 0.5, scale: 0.86, blur: 0.2 };
   }
-  return { opacity: 0.2, scale: 0.74, blur: 1.5 };
+  return { opacity: 0.18, scale: 0.68, blur: 1.8 };
 }
 
 export default function WikiPage() {
@@ -112,7 +108,6 @@ export default function WikiPage() {
   const wheelAccumulatorRef = useRef(0);
   const closeTimeoutRef = useRef(null);
   const openRafRef = useRef(null);
-  const FULLSCREEN_TRANSITION_MS = 280;
 
   const selectedVehicle = useMemo(
     () => VEHICLES[selectedVehicleIndex],
@@ -123,27 +118,14 @@ export default function WikiPage() {
     setSelectedVehicleIndex((prev) => wrapIndex(prev + direction, VEHICLES.length));
   };
 
-  const handleWheel = (event) => {
-    event.preventDefault();
-    wheelAccumulatorRef.current += event.deltaY;
-
-    if (Math.abs(wheelAccumulatorRef.current) < WHEEL_THRESHOLD) {
-      return;
+  const closeShowroomFullscreen = () => {
+    setIsShowroomFullscreenActive(false);
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
     }
-
-    const direction = wheelAccumulatorRef.current > 0 ? 1 : -1;
-    wheelAccumulatorRef.current = 0;
-    shiftVehicle(direction);
-  };
-
-  const handleKeyDown = (event) => {
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      shiftVehicle(1);
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      shiftVehicle(-1);
-    }
+    closeTimeoutRef.current = setTimeout(() => {
+      setIsShowroomFullscreen(false);
+    }, FULLSCREEN_TRANSITION_MS);
   };
 
   useEffect(() => {
@@ -194,22 +176,35 @@ export default function WikiPage() {
     });
   };
 
-  const closeShowroomFullscreen = () => {
-    setIsShowroomFullscreenActive(false);
-    if (closeTimeoutRef.current) {
-      clearTimeout(closeTimeoutRef.current);
-    }
-    closeTimeoutRef.current = setTimeout(() => {
-      setIsShowroomFullscreen(false);
-    }, FULLSCREEN_TRANSITION_MS);
-  };
-
   const toggleShowroomFullscreen = () => {
     if (isShowroomFullscreen) {
       closeShowroomFullscreen();
       return;
     }
     openShowroomFullscreen();
+  };
+
+  const handleWheel = (event) => {
+    event.preventDefault();
+    wheelAccumulatorRef.current += event.deltaY;
+
+    if (Math.abs(wheelAccumulatorRef.current) < WHEEL_THRESHOLD) {
+      return;
+    }
+
+    const direction = wheelAccumulatorRef.current > 0 ? 1 : -1;
+    wheelAccumulatorRef.current = 0;
+    shiftVehicle(direction);
+  };
+
+  const handleKeyDown = (event) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      shiftVehicle(1);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      shiftVehicle(-1);
+    }
   };
 
   const handleShowroomClick = (event) => {
@@ -253,30 +248,26 @@ export default function WikiPage() {
         </div>
       </div>
 
-      <div className={`relative grid gap-6 ${fullscreen ? 'xl:grid-cols-[260px_minmax(0,1fr)]' : 'lg:grid-cols-[220px_minmax(0,1fr)]'}`}>
-        <aside className="flex flex-col items-center gap-2">
-          <button
-            type="button"
-            onClick={() => shiftVehicle(-1)}
-            className="inline-flex items-center justify-center rounded-lg border border-yt-border/80 bg-[#101827] p-2 text-yt-text-secondary transition-colors hover:border-yt-accent hover:text-yt-accent"
-            aria-label="Veicolo precedente"
-            title="Veicolo precedente"
-          >
-            <ChevronUp className="h-4 w-4" />
-          </button>
+      <div className={`relative grid gap-8 ${fullscreen ? 'xl:grid-cols-[360px_minmax(0,1fr)]' : 'lg:grid-cols-[320px_minmax(0,1fr)]'}`}>
+        <div
+          className="pointer-events-none absolute inset-y-0 left-0 w-[58%] opacity-85"
+          style={{
+            background: `radial-gradient(circle at 30% 50%, ${SHOWROOM_BLUE_GLOW}, transparent 70%)`,
+          }}
+        />
 
+        <aside className="relative flex flex-col items-center">
           <div
-            className={`relative w-full overflow-hidden rounded-2xl border border-yt-border/80 bg-[#0c1320] px-2 ${fullscreen ? '' : 'h-[430px]'}`}
-            style={fullscreen ? { height: 'min(72vh, 760px)' } : undefined}
+            className={`relative w-full overflow-hidden rounded-2xl border border-yt-border/70 bg-[#0c1320] ${fullscreen ? 'h-[min(74vh,760px)]' : 'h-[510px]'}`}
             onWheel={handleWheel}
             onKeyDown={handleKeyDown}
             tabIndex={0}
             role="listbox"
             aria-label="Lista veicoli showroom"
           >
-            <div className="pointer-events-none absolute inset-x-2 top-1/2 h-[108px] -translate-y-1/2 rounded-2xl border border-yt-accent/40 bg-yt-accent/8 shadow-[0_0_36px_rgba(78,197,255,0.28)]" />
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#0c1320] to-transparent" />
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0c1320] to-transparent" />
+            <div className="pointer-events-none absolute inset-x-3 top-1/2 h-[148px] -translate-y-1/2 rounded-2xl border border-yt-accent/45 bg-yt-accent/10 shadow-[0_0_38px_rgba(78,197,255,0.34)]" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-[#0c1320] to-transparent" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#0c1320] to-transparent" />
 
             {SLOT_ITEM_OFFSETS.map((offset) => {
               const itemIndex = wrapIndex(selectedVehicleIndex + offset, VEHICLES.length);
@@ -289,10 +280,8 @@ export default function WikiPage() {
                   key={`${vehicle.id}_${offset}`}
                   type="button"
                   onClick={() => setSelectedVehicleIndex(itemIndex)}
-                  className={`absolute left-1/2 w-[88%] -translate-x-1/2 rounded-xl border px-3 py-2 text-center transition-all duration-250 ${
-                    isActive
-                      ? 'border-yt-accent/45 bg-[#112035] shadow-[0_0_22px_rgba(78,197,255,0.28)]'
-                      : 'border-yt-border/70 bg-[#111926]'
+                  className={`absolute left-1/2 w-[84%] -translate-x-1/2 rounded-2xl bg-[#102033]/80 px-3 py-4 transition-all duration-250 ${
+                    isActive ? 'shadow-[0_0_26px_rgba(78,197,255,0.26)]' : ''
                   }`}
                   style={{
                     transform: `translate(-50%, calc(-50% + ${offset * SLOT_STEP}px)) scale(${visual.scale})`,
@@ -306,62 +295,29 @@ export default function WikiPage() {
                   <img
                     src={vehicle.image}
                     alt={vehicle.name}
-                    className={`mx-auto object-contain ${isActive ? 'h-11 w-11' : 'h-8 w-8'}`}
+                    className={`mx-auto object-contain ${isActive ? 'h-24 w-24' : 'h-16 w-16'}`}
                   />
-                  <div className={`mt-1 text-xs font-bold uppercase tracking-[0.08em] ${isActive ? 'text-yt-accent' : 'text-yt-text-secondary'}`}>
-                    {vehicle.name}
-                  </div>
                 </button>
               );
             })}
           </div>
-
-          <button
-            type="button"
-            onClick={() => shiftVehicle(1)}
-            className="inline-flex items-center justify-center rounded-lg border border-yt-border/80 bg-[#101827] p-2 text-yt-text-secondary transition-colors hover:border-yt-accent hover:text-yt-accent"
-            aria-label="Veicolo successivo"
-            title="Veicolo successivo"
-          >
-            <ChevronDown className="h-4 w-4" />
-          </button>
-          <p className="text-center text-[11px] uppercase tracking-[0.1em] text-yt-text-secondary">
-            Scroll su e giu
-          </p>
         </aside>
 
-        <article className="relative overflow-hidden rounded-3xl border border-yt-border/80 bg-[#111b2a] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
-          <div
-            className="pointer-events-none absolute inset-0 opacity-90"
-            style={{
-              background: `radial-gradient(circle at 88% 18%, ${selectedVehicle.glow}, transparent 42%)`,
-            }}
-          />
-
-          <div className={`relative grid items-center gap-5 ${fullscreen ? 'lg:grid-cols-[280px_minmax(0,1fr)]' : 'md:grid-cols-[220px_minmax(0,1fr)]'}`}>
-            <div className="rounded-2xl border border-yt-border/80 bg-[#0b1320] p-4 shadow-[inset_0_0_30px_rgba(78,197,255,0.1)]">
-              <img
-                src={selectedVehicle.image}
-                alt={selectedVehicle.name}
-                className={`mx-auto object-contain ${fullscreen ? 'h-44 w-44' : 'h-36 w-36'}`}
-              />
+        <article className="relative flex items-center justify-center px-2 md:px-6">
+          <div className="max-w-2xl space-y-4 text-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-yt-accent/40 bg-yt-accent/12 px-3 py-1">
+              <span className="h-2 w-2 rounded-full bg-yt-accent shadow-[0_0_10px_rgba(78,197,255,0.7)]" />
+              <span className="text-xs font-black uppercase tracking-[0.14em] text-yt-accent">
+                Categoria: {selectedVehicle.category}
+              </span>
             </div>
 
-            <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-yt-accent/40 bg-yt-accent/12 px-3 py-1">
-                <span className="h-2 w-2 rounded-full bg-yt-accent shadow-[0_0_10px_rgba(78,197,255,0.7)]" />
-                <span className="text-xs font-black uppercase tracking-[0.14em] text-yt-accent">
-                  Categoria: {selectedVehicle.category}
-                </span>
-              </div>
-
-              <h3 className={`font-black uppercase leading-tight tracking-[0.05em] text-yt-text-primary ${fullscreen ? 'text-4xl' : 'text-3xl'}`}>
-                {selectedVehicle.name}
-              </h3>
-              <p className={`max-w-2xl leading-relaxed text-yt-text-secondary ${fullscreen ? 'text-base' : 'text-sm'}`}>
-                {selectedVehicle.description}
-              </p>
-            </div>
+            <h3 className={`font-black uppercase leading-tight tracking-[0.05em] text-yt-text-primary ${fullscreen ? 'text-5xl' : 'text-4xl'}`}>
+              {selectedVehicle.name}
+            </h3>
+            <p className={`mx-auto max-w-2xl leading-relaxed text-yt-text-secondary ${fullscreen ? 'text-lg' : 'text-base'}`}>
+              {selectedVehicle.description}
+            </p>
           </div>
         </article>
       </div>
@@ -402,13 +358,6 @@ export default function WikiPage() {
         onClick={handleShowroomClick}
         title="Clicca per aprire lo showroom in fullscreen"
       >
-        <div
-          className="pointer-events-none absolute inset-0 opacity-80"
-          style={{
-            background: `radial-gradient(circle at 16% 50%, ${selectedVehicle.glow}, transparent 47%)`,
-          }}
-        />
-
         <div className="relative">
           {renderShowroomContent()}
         </div>
@@ -427,12 +376,6 @@ export default function WikiPage() {
             }`}
             onClick={(event) => event.stopPropagation()}
           >
-            <div
-              className="pointer-events-none absolute inset-0 opacity-80"
-              style={{
-                background: `radial-gradient(circle at 14% 52%, ${selectedVehicle.glow}, transparent 48%)`,
-              }}
-            />
             <div className="relative h-full">
               {renderShowroomContent({ fullscreen: true })}
             </div>
