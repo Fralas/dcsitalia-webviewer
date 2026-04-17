@@ -1045,6 +1045,35 @@ app.delete('/api/wiki/drafts/:pageId', (req, res) => {
 });
 
 /**
+ * POST /api/wiki/pages - Create new wiki page (editor only)
+ */
+app.post('/api/wiki/pages', (req, res) => {
+  const sessionUser = req.session?.user;
+  const userId = sessionUser?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!isWikiEditor(userId)) {
+    return res.status(403).json({ error: 'Only allowed contributors can edit wiki pages' });
+  }
+
+  try {
+    const page = wikiService.createPage({
+      pageId: req.body?.pageId,
+      userId,
+      authorName: sessionUser.globalName || sessionUser.username || String(userId),
+      draft: req.body || {},
+    });
+    return res.status(201).json({ page });
+  } catch (error) {
+    const errorMessage = String(error?.message || '');
+    const lowered = errorMessage.toLowerCase();
+    const status = lowered.includes('already exists') ? 409 : 400;
+    return res.status(status).json({ error: errorMessage || 'Failed to create wiki page' });
+  }
+});
+
+/**
  * PUT /api/wiki/pages/:pageId - Publish/update wiki page from editor payload (editor only)
  */
 app.put('/api/wiki/pages/:pageId', (req, res) => {

@@ -475,6 +475,17 @@ export async function getWikiPage(pageId) {
 }
 
 /**
+ * Create a new wiki page
+ */
+export async function createWikiPage(draft) {
+  return fetchAPI('/wiki/pages', {
+    method: 'POST',
+    body: JSON.stringify(draft),
+    credentials: 'include',
+  });
+}
+
+/**
  * Get current user's wiki draft for a page
  */
 export async function getWikiDraft(pageId) {
@@ -574,6 +585,7 @@ export default {
   deleteChangelog,
   getWikiPages,
   getWikiPage,
+  createWikiPage,
   getWikiDraft,
   saveWikiDraft,
   deleteWikiDraft,

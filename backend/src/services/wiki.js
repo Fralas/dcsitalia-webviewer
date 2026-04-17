@@ -154,6 +154,43 @@ function normalizeDraft(rawDraft, userId = '', pageId = '') {
   };
 }
 
+function pageSlugFromTitle(title) {
+  const slug = String(title || '')
+    .trim()
+    .toLowerCase()
+    .replace(/['"]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return normalizePageId(slug);
+}
+
+function resolveNewPageId(pages, requestedId, title) {
+  const normalizedRequestedId = normalizePageId(requestedId);
+  const baseId = normalizedRequestedId || pageSlugFromTitle(title);
+  if (!baseId) {
+    throw new Error('Invalid page id');
+  }
+
+  if (!pages.some((page) => page.id === baseId)) {
+    return baseId;
+  }
+
+  if (normalizedRequestedId) {
+    throw new Error('Wiki page id already exists');
+  }
+
+  let suffix = 2;
+  while (suffix < 1000) {
+    const candidate = normalizePageId(`${baseId}-${suffix}`);
+    if (candidate && !pages.some((page) => page.id === candidate)) {
+      return candidate;
+    }
+    suffix += 1;
+  }
+
+  throw new Error('Unable to generate unique page id');
+}
+
 function readPages() {
   const pagesRaw = readJson(PAGES_FILE, []);
   const pages = Array.isArray(pagesRaw) ? pagesRaw.map(normalizePage).filter((page) => page.id) : [];
@@ -265,6 +302,33 @@ export function updatePage({ pageId, userId, authorName, draft }) {
   writePages(pages);
   deleteDraft(userId, normalizedPageId);
   return updated;
+}
+
+export function createPage({ pageId, userId, authorName, draft }) {
+  const pages = readPages();
+  const payload = normalizeDraft(draft, userId, pageId);
+  if (!payload.title) throw new Error('Title is required');
+  if (!payload.summary) throw new Error('Summary is required');
+  if (!payload.content) throw new Error('Content is required');
+
+  const resolvedPageId = resolveNewPageId(pages, pageId, payload.title);
+  const now = Date.now();
+  const created = normalizePage({
+    id: resolvedPageId,
+    title: payload.title,
+    summary: payload.summary,
+    content: payload.content,
+    createdAt: now,
+    updatedAt: now,
+    updatedBy: {
+      id: sanitizeText(String(userId || ''), 80),
+      name: sanitizeText(authorName || '', 120),
+    },
+  });
+
+  pages.push(created);
+  writePages(pages);
+  return created;
 }
 
 function sanitizeFileName(fileName) {

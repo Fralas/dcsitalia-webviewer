@@ -1,6 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Eye, Gamepad2, Layers3, Loader2, Maximize2, Minimize2, PenSquare, Radar, Save, ShieldCheck, Truck, Upload, X } from 'lucide-react';
+import {
+  Activity,
+  Anchor,
+  ClipboardList,
+  Eye,
+  Gamepad2,
+  Helicopter,
+  Layers3,
+  Loader2,
+  MapPin,
+  Maximize2,
+  Megaphone,
+  Minimize2,
+  Package,
+  PenSquare,
+  Plane,
+  Plus,
+  Radar,
+  Radio,
+  Save,
+  ShieldCheck,
+  Target,
+  Truck,
+  Upload,
+  X,
+} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import avengerImg from '../../img/wiki/veh/AVENGER.png';
@@ -23,29 +48,56 @@ import * as api from '../services/api';
 const GAMEPLAY_FEATURES = [
   {
     id: 'territory',
+    iconKey: 'radar',
     title: 'Frontline Dinamico',
     description: 'Le zone cambiano stato in tempo reale. Ogni conquista modifica il bilanciamento del fronte.',
     Icon: Radar,
   },
   {
     id: 'logistics',
+    iconKey: 'truck',
     title: 'Logistica Strategica',
     description: 'Gestione di rifornimenti, rotte e priorita missioni per mantenere operative le basi.',
     Icon: Truck,
   },
   {
     id: 'combined',
+    iconKey: 'layers3',
     title: 'Operazioni Combined Arms',
     description: 'Veicoli e unita di supporto lavorano in sinergia con i piloti per gli obiettivi a terra.',
     Icon: Layers3,
   },
   {
     id: 'defense',
+    iconKey: 'shield_check',
     title: 'Difesa Attiva',
     description: 'Assetti antiaerei e colonne mobili proteggono aeroporti, convogli e punti critici.',
     Icon: ShieldCheck,
   },
 ];
+
+const GAMEPLAY_ICON_LIBRARY = [
+  { key: 'radar', label: 'Radar', Icon: Radar },
+  { key: 'truck', label: 'Truck', Icon: Truck },
+  { key: 'shield_check', label: 'Shield', Icon: ShieldCheck },
+  { key: 'layers3', label: 'Layers', Icon: Layers3 },
+  { key: 'target', label: 'Target', Icon: Target },
+  { key: 'activity', label: 'Activity', Icon: Activity },
+  { key: 'radio', label: 'Radio', Icon: Radio },
+  { key: 'package', label: 'Package', Icon: Package },
+  { key: 'megaphone', label: 'Megaphone', Icon: Megaphone },
+  { key: 'map_pin', label: 'Map Pin', Icon: MapPin },
+  { key: 'plane', label: 'Plane', Icon: Plane },
+  { key: 'helicopter', label: 'Helicopter', Icon: Helicopter },
+  { key: 'anchor', label: 'Anchor', Icon: Anchor },
+  { key: 'clipboard_list', label: 'Checklist', Icon: ClipboardList },
+  { key: 'gamepad2', label: 'Gameplay', Icon: Gamepad2 },
+];
+
+const GAMEPLAY_ICON_MAP = GAMEPLAY_ICON_LIBRARY.reduce((acc, iconDef) => {
+  acc[iconDef.key] = iconDef.Icon;
+  return acc;
+}, {});
 
 const VEHICLES = [
   {
@@ -161,6 +213,12 @@ const WHEEL_THRESHOLD = 40;
 const FULLSCREEN_TRANSITION_MS = 280;
 const SHOWROOM_BLUE_GLOW = 'rgba(78, 197, 255, 0.16)';
 const WIKI_EDITOR_IDS = new Set(['675706661570347041']);
+const EMPTY_NEW_TOPIC_DRAFT = {
+  iconKey: 'layers3',
+  title: '',
+  summary: '',
+  content: '## Nuovo Argomento\n\nScrivi qui il contenuto dell\'articolo.',
+};
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -181,6 +239,15 @@ function wrapIndex(value, length) {
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
+}
+
+function normalizeGameplayIconKey(iconKey) {
+  return String(iconKey || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+}
+
+function resolveGameplayIcon(iconKey, fallback = Layers3) {
+  const normalizedKey = normalizeGameplayIconKey(iconKey);
+  return GAMEPLAY_ICON_MAP[normalizedKey] || fallback;
 }
 
 function getVisualFromPosition(positionPx) {
@@ -224,6 +291,12 @@ export default function WikiPage() {
   const [wikiLoading, setWikiLoading] = useState(true);
   const [wikiError, setWikiError] = useState('');
   const [selectedGameplayId, setSelectedGameplayId] = useState('');
+  const [newTopicOpen, setNewTopicOpen] = useState(false);
+  const [newTopicDraft, setNewTopicDraft] = useState(EMPTY_NEW_TOPIC_DRAFT);
+  const [newTopicStatus, setNewTopicStatus] = useState('');
+  const [creatingTopic, setCreatingTopic] = useState(false);
+  const [isGameplayArticleFullscreen, setIsGameplayArticleFullscreen] = useState(false);
+  const [isGameplayArticleFullscreenActive, setIsGameplayArticleFullscreenActive] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [wikiDraft, setWikiDraft] = useState({ title: '', summary: '', content: '' });
   const [draftStatus, setDraftStatus] = useState('');
@@ -232,6 +305,8 @@ export default function WikiPage() {
   const wheelAccumulatorRef = useRef(0);
   const closeTimeoutRef = useRef(null);
   const openRafRef = useRef(null);
+  const gameplayCloseTimeoutRef = useRef(null);
+  const gameplayOpenRafRef = useRef(null);
   const slotRafRef = useRef(null);
   const slotPendingDirectionRef = useRef(0);
   const wikiSaveTimerRef = useRef(null);
@@ -261,16 +336,30 @@ export default function WikiPage() {
     return VEHICLES[visualIndex];
   }, [selectedVehicleIndex, priorityOffset]);
 
-  const gameplayItems = useMemo(() => (
-    GAMEPLAY_FEATURES.map((feature) => {
+  const gameplayItems = useMemo(() => {
+    const featureById = new Map(GAMEPLAY_FEATURES.map((feature) => [feature.id, feature]));
+
+    const baseItems = GAMEPLAY_FEATURES.map((feature) => {
       const page = wikiPagesById[feature.id];
       return {
         ...feature,
         title: page?.title || feature.title,
         description: page?.summary || feature.description,
       };
-    })
-  ), [wikiPagesById]);
+    });
+
+    const customItems = Object.values(wikiPagesById)
+      .filter((page) => page?.id && !featureById.has(page.id))
+      .sort((a, b) => (Number(b?.updatedAt) || 0) - (Number(a?.updatedAt) || 0))
+      .map((page) => ({
+        id: page.id,
+        title: page.title || page.id,
+        description: page.summary || 'Articolo wiki personalizzato',
+        Icon: Layers3,
+      }));
+
+    return [...baseItems, ...customItems];
+  }, [wikiPagesById]);
 
   const selectedGameplayFeature = useMemo(() => {
     if (!gameplayItems.length) return null;
@@ -348,13 +437,39 @@ export default function WikiPage() {
     }, FULLSCREEN_TRANSITION_MS);
   };
 
+  const closeGameplayArticleFullscreen = () => {
+    setIsGameplayArticleFullscreenActive(false);
+    if (gameplayCloseTimeoutRef.current) {
+      clearTimeout(gameplayCloseTimeoutRef.current);
+    }
+    gameplayCloseTimeoutRef.current = setTimeout(() => {
+      setIsGameplayArticleFullscreen(false);
+    }, FULLSCREEN_TRANSITION_MS);
+  };
+
+  const openGameplayArticleFullscreen = () => {
+    if (gameplayCloseTimeoutRef.current) {
+      clearTimeout(gameplayCloseTimeoutRef.current);
+      gameplayCloseTimeoutRef.current = null;
+    }
+    setIsGameplayArticleFullscreen(true);
+    gameplayOpenRafRef.current = requestAnimationFrame(() => {
+      setIsGameplayArticleFullscreenActive(true);
+    });
+  };
+
   useEffect(() => {
-    if (!isShowroomFullscreen) {
+    if (!isShowroomFullscreen && !isGameplayArticleFullscreen) {
       return undefined;
     }
 
     const onKeyDown = (event) => {
-      if (event.key === 'Escape') {
+      if (event.key !== 'Escape') return;
+      if (isGameplayArticleFullscreen) {
+        closeGameplayArticleFullscreen();
+        return;
+      }
+      if (isShowroomFullscreen) {
         closeShowroomFullscreen();
       }
     };
@@ -367,7 +482,7 @@ export default function WikiPage() {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [isShowroomFullscreen]);
+  }, [isShowroomFullscreen, isGameplayArticleFullscreen]);
 
   useEffect(() => {
     document.body.classList.toggle('wiki-showroom-open', isShowroomFullscreen);
@@ -382,6 +497,12 @@ export default function WikiPage() {
     }
     if (openRafRef.current) {
       cancelAnimationFrame(openRafRef.current);
+    }
+    if (gameplayCloseTimeoutRef.current) {
+      clearTimeout(gameplayCloseTimeoutRef.current);
+    }
+    if (gameplayOpenRafRef.current) {
+      cancelAnimationFrame(gameplayOpenRafRef.current);
     }
     if (slotRafRef.current) {
       cancelAnimationFrame(slotRafRef.current);
@@ -576,6 +697,57 @@ export default function WikiPage() {
     setSelectedGameplayId(itemId);
     setEditorOpen(false);
     setDraftStatus('');
+    setNewTopicOpen(false);
+    setNewTopicStatus('');
+    openGameplayArticleFullscreen();
+  };
+
+  const handleCreateGameplayTopic = async () => {
+    if (!canEditWiki) return;
+
+    const title = String(newTopicDraft.title || '').trim();
+    const summary = String(newTopicDraft.summary || '').trim();
+    const content = String(newTopicDraft.content || '').trim();
+
+    if (!title || !summary || !content) {
+      setNewTopicStatus('Compila titolo, descrizione e contenuto.');
+      return;
+    }
+
+    try {
+      setCreatingTopic(true);
+      setNewTopicStatus('Creazione argomento...');
+      const response = await api.createWikiPage({ title, summary, content });
+      const createdPage = response?.page;
+      if (!createdPage?.id) {
+        throw new Error('Creazione pagina non riuscita');
+      }
+
+      setWikiPagesById((prev) => ({
+        ...prev,
+        [createdPage.id]: createdPage,
+      }));
+      setSelectedGameplayId(createdPage.id);
+      setEditorOpen(true);
+
+      const createdDraft = {
+        title: createdPage.title || title,
+        summary: createdPage.summary || summary,
+        content: createdPage.content || content,
+      };
+      setWikiDraft(createdDraft);
+      lastSavedDraftSerializedRef.current = JSON.stringify(createdDraft);
+      setDraftStatus('Articolo creato');
+
+      setNewTopicOpen(false);
+      setNewTopicStatus('');
+      setNewTopicDraft({ ...EMPTY_NEW_TOPIC_DRAFT });
+      openGameplayArticleFullscreen();
+    } catch (error) {
+      setNewTopicStatus(error.message || 'Errore creazione argomento');
+    } finally {
+      setCreatingTopic(false);
+    }
   };
 
   const handlePublishGameplayArticle = async () => {
@@ -647,6 +819,142 @@ export default function WikiPage() {
     setSlotTranslate(0);
     setSlotAnimating(false);
     slotPendingDirectionRef.current = 0;
+  };
+
+  const renderGameplayArticleContent = () => {
+    if (!selectedGameplayPage) {
+      return null;
+    }
+
+    return (
+      <article className="h-full rounded-2xl border border-yt-border/80 bg-[#0f1723] p-4 sm:p-5">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-xl font-extrabold uppercase tracking-[0.05em] text-yt-text-primary">
+              {selectedGameplayPage.title}
+            </h3>
+            <p className="mt-1 text-sm text-yt-text-secondary">{selectedGameplayPage.summary}</p>
+            {selectedGameplayPage.updatedAt && (
+              <p className="mt-1 text-xs text-yt-text-secondary/80">
+                Ultimo aggiornamento: {new Date(selectedGameplayPage.updatedAt).toLocaleString('it-IT')}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {canEditWiki && (
+              <button
+                type="button"
+                onClick={() => setEditorOpen((prev) => !prev)}
+                className="inline-flex items-center gap-2 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary transition-colors hover:border-yt-accent hover:text-yt-accent"
+              >
+                <PenSquare className="h-3.5 w-3.5" />
+                {editorOpen ? 'Chiudi Editor' : 'Modifica Articolo'}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={closeGameplayArticleFullscreen}
+              className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary transition-colors hover:border-yt-accent hover:text-yt-accent"
+              aria-label="Chiudi articolo"
+            >
+              <X className="h-3.5 w-3.5" />
+              Chiudi
+            </button>
+          </div>
+        </div>
+
+        <div className="max-h-[40vh] overflow-auto rounded-xl border border-yt-border/75 bg-[#0c1320] px-4 py-3 sm:max-h-[46vh]">
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            {selectedGameplayPage.content}
+          </ReactMarkdown>
+        </div>
+
+        {canEditWiki && editorOpen && (
+          <div className="mt-4 rounded-xl border border-yt-border/80 bg-[#0b121d] p-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.1em] text-yt-text-secondary">
+                <Eye className="h-3.5 w-3.5" />
+                Editor Wiki + Preview
+              </div>
+              <div className="text-xs text-yt-text-secondary">{draftStatus}</div>
+            </div>
+
+            {draftLoading ? (
+              <div className="flex items-center gap-2 text-sm text-yt-text-secondary">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Caricamento bozza...
+              </div>
+            ) : (
+              <div className="grid gap-3 lg:grid-cols-2">
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={wikiDraft.title}
+                    onChange={(event) => setWikiDraft((prev) => ({ ...prev, title: event.target.value }))}
+                    placeholder="Titolo articolo"
+                    className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                  />
+                  <textarea
+                    rows={3}
+                    value={wikiDraft.summary}
+                    onChange={(event) => setWikiDraft((prev) => ({ ...prev, summary: event.target.value }))}
+                    placeholder="Descrizione breve"
+                    className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                  />
+                  <textarea
+                    rows={14}
+                    value={wikiDraft.content}
+                    onChange={(event) => setWikiDraft((prev) => ({ ...prev, content: event.target.value }))}
+                    placeholder="Contenuto markdown..."
+                    className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handlePublishGameplayArticle}
+                      className="inline-flex items-center gap-1 rounded border border-emerald-500/45 bg-emerald-500/15 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-emerald-300"
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      Pubblica
+                    </button>
+                    <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary hover:border-yt-accent hover:text-yt-accent">
+                      {uploadingMedia ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                      Media
+                      <input
+                        ref={wikiMediaInputRef}
+                        type="file"
+                        accept="image/*,video/*"
+                        className="hidden"
+                        onChange={(event) => handleUploadWikiMedia(Array.from(event.target.files || []))}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setEditorOpen(false)}
+                      className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      Chiudi
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded border border-yt-border/80 bg-[#111a28] p-3">
+                  <h4 className="mb-2 text-xs font-bold uppercase tracking-[0.1em] text-yt-accent">Preview</h4>
+                  <h3 className="text-lg font-extrabold uppercase tracking-[0.05em] text-yt-text-primary">{wikiDraft.title || 'Titolo'}</h3>
+                  <p className="mb-3 mt-1 text-sm text-yt-text-secondary">{wikiDraft.summary || 'Descrizione breve'}</p>
+                  <div className="max-h-[420px] overflow-auto rounded border border-yt-border/70 bg-[#0c1320] px-3 py-2">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                      {wikiDraft.content || '*Nessun contenuto*'}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </article>
+    );
   };
 
   const renderShowroomContent = ({ fullscreen = false } = {}) => (
@@ -773,14 +1081,35 @@ export default function WikiPage() {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 pb-6">
       <section className="rounded-3xl border border-yt-border/70 bg-yt-bg-secondary/85 p-5 shadow-[0_16px_34px_rgba(0,0,0,0.32)] backdrop-blur-sm">
-        <div className="mb-4 flex items-center gap-3">
-          <div className="rounded-xl border border-yt-accent/35 bg-yt-accent/12 p-2">
-            <Gamepad2 className="h-5 w-5 text-yt-accent" />
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl border border-yt-accent/35 bg-yt-accent/12 p-2">
+              <Gamepad2 className="h-5 w-5 text-yt-accent" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black uppercase tracking-[0.08em] text-yt-text-primary">Gameplay</h2>
+              <p className="text-sm text-yt-text-secondary">Feature di gioco principali della campagna.</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl font-black uppercase tracking-[0.08em] text-yt-text-primary">Gameplay</h2>
-            <p className="text-sm text-yt-text-secondary">Feature di gioco principali della campagna.</p>
-          </div>
+          {canEditWiki && (
+            <button
+              type="button"
+              onClick={() => {
+                if (newTopicOpen) {
+                  setNewTopicOpen(false);
+                  setNewTopicStatus('');
+                  return;
+                }
+                setNewTopicDraft({ ...EMPTY_NEW_TOPIC_DRAFT });
+                setNewTopicStatus('');
+                setNewTopicOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary transition-colors hover:border-yt-accent hover:text-yt-accent"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {newTopicOpen ? 'Chiudi Nuovo Argomento' : 'Nuovo Argomento'}
+            </button>
+          )}
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
@@ -804,6 +1133,63 @@ export default function WikiPage() {
           ))}
         </div>
 
+        {canEditWiki && newTopicOpen && (
+          <div className="mt-4 rounded-2xl border border-yt-border/80 bg-[#0f1723] p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-bold uppercase tracking-[0.1em] text-yt-accent">Crea Nuovo Argomento</h3>
+              {newTopicStatus && (
+                <span className="text-xs text-yt-text-secondary">{newTopicStatus}</span>
+              )}
+            </div>
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={newTopicDraft.title}
+                onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, title: event.target.value }))}
+                placeholder="Titolo argomento"
+                className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+              />
+              <textarea
+                rows={3}
+                value={newTopicDraft.summary}
+                onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, summary: event.target.value }))}
+                placeholder="Descrizione breve"
+                className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+              />
+              <textarea
+                rows={10}
+                value={newTopicDraft.content}
+                onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, content: event.target.value }))}
+                placeholder="Contenuto markdown iniziale"
+                className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+              />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleCreateGameplayTopic}
+                  disabled={creatingTopic}
+                  className="inline-flex items-center gap-1 rounded border border-emerald-500/45 bg-emerald-500/15 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-emerald-300 disabled:cursor-not-allowed disabled:opacity-65"
+                >
+                  {creatingTopic ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                  Crea Argomento
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewTopicOpen(false);
+                    setNewTopicStatus('');
+                    setNewTopicDraft({ ...EMPTY_NEW_TOPIC_DRAFT });
+                  }}
+                  className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Annulla
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {wikiLoading && (
           <div className="mt-4 rounded-xl border border-yt-border/80 bg-[#0e1520] px-3 py-2 text-sm text-yt-text-secondary">
             Caricamento articoli wiki...
@@ -815,125 +1201,29 @@ export default function WikiPage() {
           </div>
         )}
 
-        {selectedGameplayPage && (
-          <article className="mt-4 rounded-2xl border border-yt-border/80 bg-[#0f1723] p-4">
-            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-extrabold uppercase tracking-[0.05em] text-yt-text-primary">
-                  {selectedGameplayPage.title}
-                </h3>
-                <p className="mt-1 text-sm text-yt-text-secondary">{selectedGameplayPage.summary}</p>
-                {selectedGameplayPage.updatedAt && (
-                  <p className="mt-1 text-xs text-yt-text-secondary/80">
-                    Ultimo aggiornamento: {new Date(selectedGameplayPage.updatedAt).toLocaleString('it-IT')}
-                  </p>
-                )}
-              </div>
-              {canEditWiki && (
-                <button
-                  type="button"
-                  onClick={() => setEditorOpen((prev) => !prev)}
-                  className="inline-flex items-center gap-2 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary transition-colors hover:border-yt-accent hover:text-yt-accent"
-                >
-                  <PenSquare className="h-3.5 w-3.5" />
-                  {editorOpen ? 'Chiudi Editor' : 'Modifica Articolo'}
-                </button>
-              )}
-            </div>
-
-            <div className="rounded-xl border border-yt-border/75 bg-[#0c1320] px-4 py-3">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                {selectedGameplayPage.content}
-              </ReactMarkdown>
-            </div>
-
-            {canEditWiki && editorOpen && (
-              <div className="mt-4 rounded-xl border border-yt-border/80 bg-[#0b121d] p-3">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.1em] text-yt-text-secondary">
-                    <Eye className="h-3.5 w-3.5" />
-                    Editor Wiki + Preview
-                  </div>
-                  <div className="text-xs text-yt-text-secondary">{draftStatus}</div>
-                </div>
-
-                {draftLoading ? (
-                  <div className="flex items-center gap-2 text-sm text-yt-text-secondary">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Caricamento bozza...
-                  </div>
-                ) : (
-                  <div className="grid gap-3 lg:grid-cols-2">
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        value={wikiDraft.title}
-                        onChange={(event) => setWikiDraft((prev) => ({ ...prev, title: event.target.value }))}
-                        placeholder="Titolo articolo"
-                        className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
-                      />
-                      <textarea
-                        rows={3}
-                        value={wikiDraft.summary}
-                        onChange={(event) => setWikiDraft((prev) => ({ ...prev, summary: event.target.value }))}
-                        placeholder="Descrizione breve"
-                        className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
-                      />
-                      <textarea
-                        rows={14}
-                        value={wikiDraft.content}
-                        onChange={(event) => setWikiDraft((prev) => ({ ...prev, content: event.target.value }))}
-                        placeholder="Contenuto markdown..."
-                        className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
-                      />
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={handlePublishGameplayArticle}
-                          className="inline-flex items-center gap-1 rounded border border-emerald-500/45 bg-emerald-500/15 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-emerald-300"
-                        >
-                          <Save className="h-3.5 w-3.5" />
-                          Pubblica
-                        </button>
-                        <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary hover:border-yt-accent hover:text-yt-accent">
-                          {uploadingMedia ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                          Media
-                          <input
-                            ref={wikiMediaInputRef}
-                            type="file"
-                            accept="image/*,video/*"
-                            className="hidden"
-                            onChange={(event) => handleUploadWikiMedia(Array.from(event.target.files || []))}
-                          />
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => setEditorOpen(false)}
-                          className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                          Chiudi
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="rounded border border-yt-border/80 bg-[#111a28] p-3">
-                      <h4 className="mb-2 text-xs font-bold uppercase tracking-[0.1em] text-yt-accent">Preview</h4>
-                      <h3 className="text-lg font-extrabold uppercase tracking-[0.05em] text-yt-text-primary">{wikiDraft.title || 'Titolo'}</h3>
-                      <p className="mb-3 mt-1 text-sm text-yt-text-secondary">{wikiDraft.summary || 'Descrizione breve'}</p>
-                      <div className="max-h-[480px] overflow-auto rounded border border-yt-border/70 bg-[#0c1320] px-3 py-2">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                          {wikiDraft.content || '*Nessun contenuto*'}
-                        </ReactMarkdown>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </article>
-        )}
+        <p className="mt-4 text-xs uppercase tracking-[0.08em] text-yt-text-secondary/85">
+          Clicca una feature per aprire l&apos;articolo in fullscreen.
+        </p>
       </section>
+
+      {isGameplayArticleFullscreen && typeof document !== 'undefined' && createPortal(
+        <div
+          className={`fixed inset-0 z-[275] flex items-center justify-center bg-[#03070fe0] p-3 transition-opacity duration-300 sm:p-5 ${
+            isGameplayArticleFullscreenActive ? 'opacity-100' : 'opacity-0'
+          }`}
+          onClick={closeGameplayArticleFullscreen}
+        >
+          <section
+            className={`relative h-[min(92vh,1080px)] w-[min(1200px,96vw)] overflow-auto rounded-3xl border border-yt-border/85 bg-yt-bg-secondary/95 p-4 shadow-[0_26px_60px_rgba(0,0,0,0.62)] transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] sm:p-6 ${
+              isGameplayArticleFullscreenActive ? 'scale-100 opacity-100' : 'scale-[0.975] opacity-0'
+            }`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            {renderGameplayArticleContent()}
+          </section>
+        </div>,
+        document.body,
+      )}
 
       <section
         className="relative cursor-zoom-in overflow-hidden rounded-3xl border border-yt-border/70 bg-yt-bg-secondary/90 p-5 shadow-[0_20px_46px_rgba(0,0,0,0.38)]"
