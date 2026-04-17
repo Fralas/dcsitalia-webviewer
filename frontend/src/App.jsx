@@ -9,6 +9,8 @@ import * as api from './services/api';
 import socketService from './services/socket';
 import { t } from './utils/locale';
 import bannerImg from '../img/DCS_ITALIA_ICON.png';
+import gbFlagImg from '../img/flags/gb.svg';
+import itFlagImg from '../img/flags/it.svg';
 import { useUser } from './contexts/UserContext';
 
 const VIEW_TO_PATH = Object.freeze({
@@ -17,6 +19,7 @@ const VIEW_TO_PATH = Object.freeze({
   changelogs: '/changelogs',
   wiki: '/wiki',
 });
+const DEFAULT_WIKI_LANGUAGE = 'en';
 
 function normalizeView(view) {
   return Object.prototype.hasOwnProperty.call(VIEW_TO_PATH, view) ? view : 'frontline';
@@ -105,6 +108,7 @@ function buildFrontlineSummary(zones = []) {
 
 function App() {
   const [currentView, setCurrentView] = useState(() => viewFromLocation());
+  const [wikiLanguage, setWikiLanguage] = useState(DEFAULT_WIKI_LANGUAGE);
   const [airports, setAirports] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -121,6 +125,11 @@ function App() {
     const normalized = normalizeView(view);
     setCurrentView(normalized);
     syncUrlWithView(normalized);
+  };
+  const isItalianWiki = wikiLanguage === 'it';
+
+  const toggleWikiLanguage = () => {
+    setWikiLanguage((prev) => (prev === 'it' ? 'en' : 'it'));
   };
 
   useEffect(() => {
@@ -277,6 +286,33 @@ function App() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                onClick={toggleWikiLanguage}
+                className={`inline-flex items-center rounded border px-3 py-1.5 transition-colors ${
+                  currentView === 'wiki'
+                    ? 'border-yt-accent/70 bg-yt-accent/10'
+                    : 'border-yt-border/80 bg-[#151b25] hover:border-yt-accent/70'
+                }`}
+                role="switch"
+                aria-checked={isItalianWiki}
+                aria-label={isItalianWiki ? 'Switch wiki language to English' : 'Switch wiki language to Italian'}
+                title={isItalianWiki ? 'Switch wiki language to English' : 'Switch wiki language to Italian'}
+              >
+                <span className="relative flex h-5 w-14 items-center rounded-full border border-yt-border/80 bg-[#0f1826]">
+                  <span
+                    className={`pointer-events-none absolute top-0.5 h-4 w-6 rounded-full border border-yt-accent/50 bg-yt-accent/22 shadow-[0_0_10px_rgba(78,197,255,0.2)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                      isItalianWiki ? 'translate-x-[30px]' : 'translate-x-0.5'
+                    }`}
+                  />
+                  <span className="relative z-10 inline-flex w-1/2 items-center justify-center" aria-hidden="true">
+                    <img src={gbFlagImg} alt="" className="h-2.5 w-4 rounded-[2px] object-cover" />
+                  </span>
+                  <span className="relative z-10 inline-flex w-1/2 items-center justify-center" aria-hidden="true">
+                    <img src={itFlagImg} alt="" className="h-2.5 w-4 rounded-[2px] object-cover" />
+                  </span>
+                </span>
+              </button>
+              <button
+                type="button"
                 onClick={() => goToView('changelogs')}
                 className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] transition-colors ${
                   currentView === 'changelogs'
@@ -320,7 +356,7 @@ function App() {
           <ChangelogPage />
         )}
         {currentView === 'wiki' && (
-          <WikiPage />
+          <WikiPage language={wikiLanguage} />
         )}
       </main>
 

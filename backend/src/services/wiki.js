@@ -10,6 +10,7 @@ const MEDIA_DIR = path.join(DATA_DIR, 'media');
 const DEFAULT_PAGES = [
   {
     id: 'territory',
+    iconKey: 'radar',
     title: 'Frontline Dinamico',
     summary: 'Le zone cambiano stato in tempo reale. Ogni conquista modifica il bilanciamento del fronte.',
     content: `## Panoramica
@@ -29,6 +30,7 @@ Il **frontline** evolve in base alle azioni dei piloti e alle operazioni a terra
   },
   {
     id: 'logistics',
+    iconKey: 'truck',
     title: 'Logistica Strategica',
     summary: 'Gestione di rifornimenti, rotte e priorita missioni per mantenere operative le basi.',
     content: `## Panoramica
@@ -47,6 +49,7 @@ Base Sorgente -> Base Frontline -> Distribuzione locale
   },
   {
     id: 'combined',
+    iconKey: 'layers3',
     title: 'Operazioni Combined Arms',
     summary: 'Veicoli e unita di supporto lavorano in sinergia con i piloti per gli obiettivi a terra.',
     content: `## Panoramica
@@ -60,6 +63,7 @@ Le operazioni combined arms uniscono CAS, SEAD, trasporto e veicoli tattici.
   },
   {
     id: 'defense',
+    iconKey: 'shield_check',
     title: 'Difesa Attiva',
     summary: 'Assetti antiaerei e colonne mobili proteggono aeroporti, convogli e punti critici.',
     content: `## Panoramica
@@ -125,12 +129,21 @@ function normalizePageId(pageId) {
   return normalized.slice(0, 80);
 }
 
+function normalizeIconKey(iconKey) {
+  const normalized = String(iconKey || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, '');
+  return normalized.slice(0, 80);
+}
+
 function normalizePage(rawPage) {
   const id = normalizePageId(rawPage?.id);
   const createdAt = Number.isFinite(rawPage?.createdAt) ? rawPage.createdAt : Date.now();
   const updatedAt = Number.isFinite(rawPage?.updatedAt) ? rawPage.updatedAt : createdAt;
   return {
     id,
+    iconKey: normalizeIconKey(rawPage?.iconKey || ''),
     title: sanitizeText(rawPage?.title || '', 200),
     summary: sanitizeText(rawPage?.summary || '', 500),
     content: sanitizeMarkdown(rawPage?.content || '', 120000),
@@ -147,6 +160,7 @@ function normalizeDraft(rawDraft, userId = '', pageId = '') {
   return {
     pageId: normalizePageId(rawDraft?.pageId || pageId),
     userId: sanitizeText(String(userId || ''), 80),
+    iconKey: normalizeIconKey(rawDraft?.iconKey || ''),
     title: sanitizeText(rawDraft?.title || '', 200),
     summary: sanitizeText(rawDraft?.summary || '', 500),
     content: sanitizeMarkdown(rawDraft?.content || '', 120000),
@@ -288,6 +302,7 @@ export function updatePage({ pageId, userId, authorName, draft }) {
   const current = pages[index];
   const updated = normalizePage({
     ...current,
+    iconKey: payload.iconKey || current.iconKey || '',
     title: payload.title,
     summary: payload.summary,
     content: payload.content,
@@ -315,6 +330,7 @@ export function createPage({ pageId, userId, authorName, draft }) {
   const now = Date.now();
   const created = normalizePage({
     id: resolvedPageId,
+    iconKey: payload.iconKey || '',
     title: payload.title,
     summary: payload.summary,
     content: payload.content,
