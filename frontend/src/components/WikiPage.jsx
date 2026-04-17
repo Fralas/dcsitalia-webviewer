@@ -104,7 +104,7 @@ function getVisualFromPosition(positionPx) {
   if (normalized <= 1) {
     opacity = 1 - (0.5 * normalized);
     blur = 0.2 * normalized;
-    sizePx = 128 - (48 * normalized);
+    sizePx = 156 - (76 * normalized);
   } else if (normalized <= 2) {
     const local = normalized - 1;
     opacity = 0.5 - (0.32 * local);
@@ -120,7 +120,7 @@ function getVisualFromPosition(positionPx) {
   return {
     opacity: clamp(opacity, 0.05, 1),
     blur: clamp(blur, 0, 2.6),
-    sizePx: clamp(sizePx, 62, 128),
+    sizePx: clamp(sizePx, 62, 156),
   };
 }
 
@@ -473,7 +473,7 @@ export default function WikiPage() {
           onClick={closeShowroomFullscreen}
         >
           <section
-            className={`relative h-[min(84vh,900px)] w-[min(1180px,92vw)] overflow-hidden rounded-3xl border border-yt-border/80 bg-yt-bg-secondary/95 p-5 shadow-[0_24px_56px_rgba(0,0,0,0.56)] transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] sm:p-6 ${
+            className={`relative h-[min(90vh,1040px)] w-[min(1420px,96vw)] overflow-hidden rounded-3xl border border-yt-border/80 bg-yt-bg-secondary/95 p-5 shadow-[0_24px_56px_rgba(0,0,0,0.56)] transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] sm:p-6 ${
               isShowroomFullscreenActive ? 'scale-100 opacity-100' : 'scale-[0.975] opacity-0'
             }`}
             onClick={(event) => event.stopPropagation()}
