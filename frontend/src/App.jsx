@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Activity, AlertCircle, CalendarSync } from 'lucide-react';
+import { Activity, AlertCircle, BookOpen, CalendarSync } from 'lucide-react';
 import FrontlineMap from './components/FrontlineMap';
 import UserMenu from './components/UserMenu';
 import UserProfile from './components/UserProfile';
 import ChangelogPage from './components/ChangelogPage';
+import WikiPage from './components/WikiPage';
 import * as api from './services/api';
 import socketService from './services/socket';
 import { t } from './utils/locale';
@@ -14,6 +15,7 @@ const VIEW_TO_PATH = Object.freeze({
   frontline: '/',
   profile: '/profile',
   changelogs: '/changelogs',
+  wiki: '/wiki',
 });
 
 function normalizeView(view) {
@@ -34,6 +36,9 @@ function viewFromLocation() {
 
   if (currentPath === '/changelogs') {
     return 'changelogs';
+  }
+  if (currentPath === '/wiki') {
+    return 'wiki';
   }
   if (currentPath === '/profile') {
     return 'profile';
@@ -217,7 +222,7 @@ function App() {
   }
 
   return (
-    <div className="h-screen bg-yt-bg-primary flex flex-col overflow-hidden">
+    <div className="app-shell h-screen bg-yt-bg-primary flex flex-col overflow-hidden">
       <header className="sticky top-0 z-50 border-b border-yt-border/80 bg-[#0b1119f2] shadow-[0_8px_28px_rgba(0,0,0,0.35)] backdrop-blur-md">
         <div className="mx-auto w-full px-4 py-1.5">
           <div className="flex h-10 items-center justify-between gap-3">
@@ -282,6 +287,21 @@ function App() {
                 aria-label="Apri changelog"
               >
                 <CalendarSync className="w-4 h-4" />
+                <span className="hidden sm:inline">Changelog</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => goToView('wiki')}
+                className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] transition-colors ${
+                  currentView === 'wiki'
+                    ? 'border-yt-accent bg-yt-accent/20 text-yt-accent'
+                    : 'border-yt-border/80 bg-[#151b25] text-yt-text-primary hover:border-yt-accent hover:text-white'
+                }`}
+                title="Apri wiki"
+                aria-label="Apri wiki"
+              >
+                <BookOpen className="w-4 h-4" />
+                <span className="hidden sm:inline">Wiki</span>
               </button>
               <UserMenu />
             </div>
@@ -298,6 +318,9 @@ function App() {
         )}
         {currentView === 'changelogs' && (
           <ChangelogPage />
+        )}
+        {currentView === 'wiki' && (
+          <WikiPage />
         )}
       </main>
 
