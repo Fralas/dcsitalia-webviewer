@@ -136,7 +136,7 @@ const GAMEPLAY_ICON_LABEL_MAP = GAMEPLAY_ICON_LIBRARY.reduce((acc, iconDef) => {
 const VEHICLES = [
   {
     id: 'avenger',
-    category: { en: 'Air Defense', it: 'Difesa Aerea' },
+    category: { en: 'Air Defense', it: 'Air Defense' },
     name: 'Avenger',
     description: {
       en: 'Mobile SHORAD system designed to counter helicopters and low-altitude threats.',
@@ -146,7 +146,7 @@ const VEHICLES = [
   },
   {
     id: 'firtina',
-    category: { en: 'Artillery', it: 'Artiglieria' },
+    category: { en: 'SUPPORT', it: 'SUPPORT' },
     name: 'Firtina',
     description: {
       en: 'Self-propelled howitzer for long-range indirect fire on tactical targets.',
@@ -156,7 +156,7 @@ const VEHICLES = [
   },
   {
     id: 'fmtv',
-    category: { en: 'Logistics', it: 'Logistica' },
+    category: { en: 'SUPPORT', it: 'SUPPORT' },
     name: 'FMTV',
     description: {
       en: 'Multi-role tactical truck for transporting supplies, ammunition, and field support cargo.',
@@ -166,7 +166,7 @@ const VEHICLES = [
   },
   {
     id: 'gepard',
-    category: { en: 'Air Defense', it: 'Difesa Aerea' },
+    category: { en: 'Air Defense', it: 'Air Defense' },
     name: 'Gepard',
     description: {
       en: 'Gun-based anti-air platform for close protection of ground units.',
@@ -176,7 +176,7 @@ const VEHICLES = [
   },
   {
     id: 'gmlrs',
-    category: { en: 'Missile Artillery', it: 'Artiglieria Missilistica' },
+    category: { en: 'SUPPORT', it: 'SUPPORT' },
     name: 'GMLRS',
     description: {
       en: 'Long-range guided rockets for precision strikes on strategic targets.',
@@ -186,7 +186,7 @@ const VEHICLES = [
   },
   {
     id: 'atacms',
-    category: { en: 'Missile Artillery', it: 'Artiglieria Missilistica' },
+    category: { en: 'SUPPORT', it: 'SUPPORT' },
     name: 'ATACMS',
     description: {
       en: 'Tactical very-long-range missile to strike critical deep targets.',
@@ -196,7 +196,7 @@ const VEHICLES = [
   },
   {
     id: 'hemtt',
-    category: { en: 'Logistics', it: 'Logistica' },
+    category: { en: 'SUPPORT', it: 'SUPPORT' },
     name: 'HEMTT',
     description: {
       en: 'Heavy logistics platform for transporting fuel, containers, and frontline materiel.',
@@ -206,7 +206,7 @@ const VEHICLES = [
   },
   {
     id: 'hmmwv',
-    category: { en: 'Reconnaissance', it: 'Ricognizione' },
+    category: { en: 'RECON', it: 'RECON' },
     name: 'HMMWV',
     description: {
       en: 'Fast light vehicle for patrol, scouting, and mobile support tasks.',
@@ -216,7 +216,7 @@ const VEHICLES = [
   },
   {
     id: 'l118',
-    category: { en: 'Artillery', it: 'Artiglieria' },
+    category: { en: 'SUPPORT', it: 'SUPPORT' },
     name: 'L118',
     description: {
       en: '105mm towed howitzer for rapid and flexible fire support.',
@@ -226,7 +226,7 @@ const VEHICLES = [
   },
   {
     id: 'lav',
-    category: { en: 'Light Armored', it: 'Corazzato Leggero' },
+    category: { en: 'COMBAT', it: 'COMBAT' },
     name: 'LAV',
     description: {
       en: 'Fast armored vehicle for armed reconnaissance and convoy protection.',
@@ -236,7 +236,7 @@ const VEHICLES = [
   },
   {
     id: 'mbt',
-    category: { en: 'Armor', it: 'Corazzato' },
+    category: { en: 'COMBAT', it: 'COMBAT' },
     name: 'MBT',
     description: {
       en: 'Main battle tank for breakthrough operations and ground superiority.',
@@ -246,7 +246,7 @@ const VEHICLES = [
   },
   {
     id: 'roland',
-    category: { en: 'Air Defense', it: 'Difesa Aerea' },
+    category: { en: 'Air Defense', it: 'Air Defense' },
     name: 'Roland',
     description: {
       en: 'Mobile short/medium-range SAM system for frontline air cover.',
@@ -256,7 +256,7 @@ const VEHICLES = [
   },
   {
     id: 'scimitar',
-    category: { en: 'Reconnaissance', it: 'Ricognizione' },
+    category: { en: 'RECON', it: 'RECON' },
     name: 'Scimitar',
     description: {
       en: 'Light tracked vehicle for armed scouting and target acquisition.',
@@ -266,7 +266,7 @@ const VEHICLES = [
   },
   {
     id: 'scorpion',
-    category: { en: 'Air Defense', it: 'Difesa Aerea' },
+    category: { en: 'Air Defense', it: 'Air Defense' },
     name: 'Scorpion',
     description: {
       en: 'Close-in defense platform against drones and short-range threats.',
@@ -276,7 +276,7 @@ const VEHICLES = [
   },
   {
     id: 'tow',
-    category: { en: 'Anti-Tank', it: 'Controcarro' },
+    category: { en: 'COMBAT', it: 'COMBAT' },
     name: 'TOW',
     description: {
       en: 'Anti-tank missile system to neutralize high-priority armored targets.',
@@ -287,8 +287,8 @@ const VEHICLES = [
 ];
 
 const SLOT_ITEM_OFFSETS = [-3, -2, -1, 0, 1, 2, 3];
-const SLOT_STEP_DEFAULT = 186;
-const SLOT_STEP_FULLSCREEN = 278;
+const SLOT_STEP_DEFAULT = 110;
+const SLOT_STEP_FULLSCREEN = 180;
 const WHEEL_THRESHOLD = 40;
 const FULLSCREEN_TRANSITION_MS = 280;
 const SHOWROOM_BLUE_GLOW = 'rgba(78, 197, 255, 0.16)';
@@ -304,6 +304,7 @@ const UI_COPY = {
     showroomListAria: 'Vehicle showroom list',
     showroomHint: 'Click to open the showroom in fullscreen',
     category: 'Category',
+    noVehicles: 'No vehicle available.',
     close: 'Close',
     fullscreen: 'Fullscreen',
     openFullscreen: 'Open fullscreen',
@@ -374,6 +375,7 @@ const UI_COPY = {
     showroomListAria: 'Lista showroom veicoli',
     showroomHint: 'Clicca per aprire lo showroom in fullscreen',
     category: 'Categoria',
+    noVehicles: 'Nessun veicolo disponibile.',
     close: 'Chiudi',
     fullscreen: 'Schermo Intero',
     openFullscreen: 'Apri fullscreen',
@@ -513,6 +515,19 @@ function localizeText(value, language) {
   return String(value || '');
 }
 
+function getVehicleCategoryKey(category) {
+  if (category && typeof category === 'object' && !Array.isArray(category)) {
+    return String(category.en || category.it || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-');
+  }
+  return String(category || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-');
+}
+
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -578,6 +593,9 @@ function getVisualFromPosition(positionPx, slotStep = SLOT_STEP_DEFAULT, fullscr
 export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
   const { user } = useUser();
   const [selectedVehicleIndex, setSelectedVehicleIndex] = useState(0);
+  const [selectedVehicleCategoryKey, setSelectedVehicleCategoryKey] = useState(
+    () => getVehicleCategoryKey(VEHICLES[0]?.category),
+  );
   const [isShowroomFullscreen, setIsShowroomFullscreen] = useState(false);
   const [isShowroomFullscreenActive, setIsShowroomFullscreenActive] = useState(false);
   const [slotAnimating, setSlotAnimating] = useState(false);
@@ -645,10 +663,45 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
     return bestOffset;
   }, [slotTranslate, activeSlotStep]);
 
+  const vehicleCategories = useMemo(() => {
+    const categoriesByKey = new Map();
+    VEHICLES.forEach((vehicle) => {
+      const categoryKey = getVehicleCategoryKey(vehicle.category);
+      if (!categoriesByKey.has(categoryKey)) {
+        categoriesByKey.set(categoryKey, {
+          key: categoryKey,
+          category: vehicle.category,
+          image: vehicle.image,
+        });
+      }
+    });
+    return Array.from(categoriesByKey.values());
+  }, []);
+
+  const selectedCategory = useMemo(
+    () => vehicleCategories.find((category) => category.key === selectedVehicleCategoryKey) || vehicleCategories[0] || null,
+    [vehicleCategories, selectedVehicleCategoryKey],
+  );
+
+  const vehiclesForSelectedCategory = useMemo(() => {
+    if (!selectedCategory?.key) return [];
+    return VEHICLES.filter((vehicle) => getVehicleCategoryKey(vehicle.category) === selectedCategory.key);
+  }, [selectedCategory]);
+
+  useEffect(() => {
+    if (!vehicleCategories.length) return;
+    if (!selectedCategory) {
+      setSelectedVehicleCategoryKey(vehicleCategories[0].key);
+    }
+  }, [vehicleCategories, selectedCategory]);
+
   const selectedVehicle = useMemo(() => {
-    const visualIndex = wrapIndex(selectedVehicleIndex + priorityOffset, VEHICLES.length);
-    return VEHICLES[visualIndex];
-  }, [selectedVehicleIndex, priorityOffset]);
+    if (!vehiclesForSelectedCategory.length) {
+      return null;
+    }
+    const visualIndex = wrapIndex(selectedVehicleIndex + priorityOffset, vehiclesForSelectedCategory.length);
+    return vehiclesForSelectedCategory[visualIndex];
+  }, [selectedVehicleIndex, priorityOffset, vehiclesForSelectedCategory]);
 
   const gameplayItems = useMemo(() => {
     const featureById = new Map(GAMEPLAY_FEATURES.map((feature) => [feature.id, feature]));
@@ -751,7 +804,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
   }), []);
 
   const shiftVehicle = (direction) => {
-    if (!direction || slotAnimating) {
+    if (!direction || slotAnimating || vehiclesForSelectedCategory.length <= 1) {
       return;
     }
 
@@ -1177,11 +1230,11 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
     }
 
     const direction = slotPendingDirectionRef.current || 0;
-    if (!direction) {
+    if (!direction || !vehiclesForSelectedCategory.length) {
       return;
     }
 
-    setSelectedVehicleIndex((prev) => wrapIndex(prev + direction, VEHICLES.length));
+    setSelectedVehicleIndex((prev) => wrapIndex(prev + direction, vehiclesForSelectedCategory.length));
     setSlotTranslate(0);
     setSlotAnimating(false);
     slotPendingDirectionRef.current = 0;
@@ -1437,100 +1490,138 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
       </div>
 
       <div className="space-y-5">
-        <article className="relative flex items-start justify-center">
-          <div className={`w-full space-y-3 pt-1 text-center ${fullscreen ? 'max-w-5xl' : 'max-w-3xl'}`}>
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <h3 className={`font-black uppercase leading-tight tracking-[0.05em] text-yt-text-primary ${fullscreen ? 'text-4xl' : 'text-3xl'}`}>
-                {selectedVehicle.name}
-              </h3>
-              <div className="inline-flex items-center gap-2 rounded-full border border-yt-accent/40 bg-yt-accent/12 px-3 py-1">
-                <span className="h-2 w-2 rounded-full bg-yt-accent shadow-[0_0_10px_rgba(78,197,255,0.7)]" />
-                <span className="text-xs font-black uppercase tracking-[0.14em] text-yt-accent">
-                  {ui.category}: {localizeText(selectedVehicle.category, language)}
-                </span>
-              </div>
-            </div>
-            <p className={`mx-auto leading-relaxed text-yt-text-secondary ${fullscreen ? 'max-w-3xl text-lg' : 'max-w-2xl text-sm'}`}>
-              {localizeText(selectedVehicle.description, language)}
-            </p>
-          </div>
-        </article>
-
-        <div className="relative">
-          <div
-            className={`pointer-events-none absolute opacity-42 ${fullscreen ? '-inset-x-64 -top-56 -bottom-20' : '-inset-x-40 -top-44 -bottom-12'}`}
-            style={{
-              background: `radial-gradient(ellipse at 50% 60%, ${SHOWROOM_BLUE_GLOW} 0%, rgba(78,197,255,0.10) 32%, rgba(78,197,255,0.05) 56%, transparent 88%)`,
-            }}
-          />
-
-          <div
-            className={`relative mx-auto overflow-hidden outline-none focus:outline-none ${fullscreen ? 'h-[560px] max-w-[min(96vw,1560px)]' : 'h-[300px] max-w-[min(92vw,1040px)]'}`}
-            style={{
-              WebkitMaskImage: 'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.14) 8%, black 20%, black 80%, rgba(0,0,0,0.14) 92%, transparent 100%)',
-              maskImage: 'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.14) 8%, black 20%, black 80%, rgba(0,0,0,0.14) 92%, transparent 100%)',
-              overscrollBehavior: 'contain',
-            }}
-            onWheelCapture={handleWheel}
-            onWheel={handleWheel}
-            onKeyDown={handleKeyDown}
-            tabIndex={0}
-            role="listbox"
-            aria-label={ui.showroomListAria}
-          >
-            <div
-              className={`absolute inset-0 ${slotAnimating ? 'transition-transform duration-[420ms] ease-[cubic-bezier(0.22,0.61,0.36,1)]' : ''}`}
-              style={{
-                transform: `translateX(${slotTranslate}px)`,
-              }}
-              onTransitionEnd={handleSlotTrackTransitionEnd}
-            >
-              {SLOT_ITEM_OFFSETS.map((offset) => {
-                const itemIndex = wrapIndex(selectedVehicleIndex + offset, VEHICLES.length);
-                const vehicle = VEHICLES[itemIndex];
-                const position = (offset * showroomSlotStep) + slotTranslate;
-                const visual = getVisualFromPosition(position, showroomSlotStep, fullscreen);
-                const isPriority = offset === priorityOffset;
-
+        <div className={`grid gap-4 ${fullscreen ? 'xl:grid-cols-[260px,minmax(0,1fr),320px]' : 'lg:grid-cols-[220px,minmax(0,1fr),280px]'}`}>
+          <aside className={`rounded-2xl border border-yt-border/80 bg-[#0f1723] p-3 ${fullscreen ? 'max-h-[72vh]' : 'max-h-[420px]'} overflow-y-auto`}>
+            <div className="space-y-3">
+              {vehicleCategories.map((categoryItem) => {
+                const active = selectedCategory?.key === categoryItem.key;
                 return (
                   <button
-                    key={`${vehicle.id}_${offset}`}
                     type="button"
+                    key={categoryItem.key}
                     onClick={() => {
-                      if (offset === 0) {
-                        return;
+                      setSelectedVehicleCategoryKey(categoryItem.key);
+                      setSelectedVehicleIndex(0);
+                      setSlotTranslate(0);
+                      setSlotAnimating(false);
+                      if (slotRafRef.current) {
+                        cancelAnimationFrame(slotRafRef.current);
+                        slotRafRef.current = null;
                       }
-                      shiftVehicle(offset > 0 ? 1 : -1);
+                      slotPendingDirectionRef.current = 0;
                     }}
-                    className="absolute top-1/2 left-1/2 p-0 transition-all duration-250"
-                    style={{
-                      transform: `translate(calc(-50% + ${offset * showroomSlotStep}px), -50%)`,
-                      opacity: visual.opacity,
-                      filter: `blur(${visual.blur}px)`,
-                    }}
-                    role="option"
-                    aria-selected={isPriority}
+                    className={`w-full rounded-xl border px-3 py-2 text-left transition-all ${
+                      active
+                        ? 'border-yt-accent/60 bg-yt-accent/12 ring-1 ring-yt-accent/35'
+                        : 'border-yt-border/80 bg-[#101a29] hover:border-yt-accent/45'
+                    }`}
                   >
+                    <p className="mb-2 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary">
+                      {localizeText(categoryItem.category, language)}
+                    </p>
                     <img
-                      src={vehicle.image}
-                      alt={vehicle.name}
-                      className={`mx-auto object-contain transition-[filter] duration-200 ${
-                        isPriority
-                          ? (fullscreen
-                            ? 'drop-shadow-[0_0_26px_rgba(78,197,255,0.36)]'
-                            : 'drop-shadow-[0_0_14px_rgba(78,197,255,0.26)]')
-                          : ''
-                      }`}
-                      style={{
-                        width: `${visual.sizePx}px`,
-                        height: `${visual.sizePx}px`,
-                      }}
+                      src={categoryItem.image}
+                      alt={localizeText(categoryItem.category, language)}
+                      className={`mx-auto object-contain ${fullscreen ? 'h-24' : 'h-20'}`}
                     />
                   </button>
                 );
               })}
             </div>
+          </aside>
+
+          <div className="relative">
+            <div
+              className={`pointer-events-none absolute opacity-42 ${fullscreen ? '-inset-x-64 -top-56 -bottom-20' : '-inset-x-40 -top-44 -bottom-12'}`}
+              style={{
+                background: `radial-gradient(ellipse at 50% 60%, ${SHOWROOM_BLUE_GLOW} 0%, rgba(78,197,255,0.10) 32%, rgba(78,197,255,0.05) 56%, transparent 88%)`,
+              }}
+            />
+
+            <div
+              className={`relative mx-auto overflow-hidden outline-none focus:outline-none ${fullscreen ? 'h-[560px] max-w-[min(80vw,980px)]' : 'h-[300px] max-w-[min(88vw,760px)]'}`}
+              style={{
+                WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.14) 8%, black 20%, black 80%, rgba(0,0,0,0.14) 92%, transparent 100%)',
+                maskImage: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.14) 8%, black 20%, black 80%, rgba(0,0,0,0.14) 92%, transparent 100%)',
+                overscrollBehavior: 'contain',
+              }}
+              onWheelCapture={handleWheel}
+              onWheel={handleWheel}
+              onKeyDown={handleKeyDown}
+              tabIndex={0}
+              role="listbox"
+              aria-label={ui.showroomListAria}
+            >
+              <div
+                className={`absolute inset-0 ${slotAnimating ? 'transition-transform duration-[420ms] ease-[cubic-bezier(0.22,0.61,0.36,1)]' : ''}`}
+                style={{
+                  transform: `translateY(${slotTranslate}px)`,
+                }}
+                onTransitionEnd={handleSlotTrackTransitionEnd}
+              >
+                {SLOT_ITEM_OFFSETS.map((offset) => {
+                  if (!vehiclesForSelectedCategory.length) return null;
+                  const itemIndex = wrapIndex(selectedVehicleIndex + offset, vehiclesForSelectedCategory.length);
+                  const vehicle = vehiclesForSelectedCategory[itemIndex];
+                  const position = (offset * showroomSlotStep) + slotTranslate;
+                  const visual = getVisualFromPosition(position, showroomSlotStep, fullscreen);
+                  const isPriority = offset === priorityOffset;
+
+                  return (
+                    <button
+                      key={`${vehicle.id}_${offset}`}
+                      type="button"
+                      onClick={() => {
+                        if (offset === 0) {
+                          return;
+                        }
+                        shiftVehicle(offset > 0 ? 1 : -1);
+                      }}
+                      className="absolute top-1/2 left-1/2 p-0 transition-all duration-250"
+                      style={{
+                        transform: `translate(-50%, calc(-50% + ${offset * showroomSlotStep}px))`,
+                        opacity: visual.opacity,
+                        filter: `blur(${visual.blur}px)`,
+                      }}
+                      role="option"
+                      aria-selected={isPriority}
+                    >
+                      <img
+                        src={vehicle.image}
+                        alt={vehicle.name}
+                        className={`mx-auto object-contain transition-[filter] duration-200 ${
+                          isPriority
+                            ? (fullscreen
+                              ? 'drop-shadow-[0_0_26px_rgba(78,197,255,0.36)]'
+                              : 'drop-shadow-[0_0_14px_rgba(78,197,255,0.26)]')
+                            : ''
+                        }`}
+                        style={{
+                          width: `${visual.sizePx}px`,
+                          height: `${visual.sizePx}px`,
+                        }}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
+
+          <article className={`rounded-2xl bg-[#0f1723] p-4 ${fullscreen ? 'min-h-[340px]' : 'min-h-[260px]'}`}>
+            {selectedVehicle ? (
+              <div className="space-y-3">
+                <h3 className={`font-black uppercase leading-tight tracking-[0.05em] text-yt-text-primary ${fullscreen ? 'text-3xl' : 'text-2xl'}`}>
+                  {selectedVehicle.name}
+                </h3>
+                <p className={`leading-relaxed text-yt-text-secondary ${fullscreen ? 'text-lg' : 'text-sm'}`}>
+                  {localizeText(selectedVehicle.description, language)}
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-yt-text-secondary">{ui.noVehicles}</p>
+            )}
+          </article>
         </div>
       </div>
     </>
