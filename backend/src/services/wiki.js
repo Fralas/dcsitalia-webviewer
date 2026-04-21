@@ -6,6 +6,7 @@ const DATA_DIR = path.resolve(process.cwd(), 'data/wiki');
 const PAGES_FILE = path.join(DATA_DIR, 'pages.json');
 const DRAFTS_FILE = path.join(DATA_DIR, 'drafts.json');
 const MEDIA_DIR = path.join(DATA_DIR, 'media');
+const WIKI_SUMMARY_MAX_LENGTH = 82;
 
 const DEFAULT_PAGES = [
   {
@@ -280,7 +281,7 @@ function normalizePage(rawPage) {
       valueIt: rawPage?.summaryIt,
       fallbackEn: defaults?.summary?.en || '',
       fallbackIt: defaults?.summary?.it || '',
-      maxLen: 500,
+      maxLen: WIKI_SUMMARY_MAX_LENGTH,
     }),
     content: normalizeLocalizedValue({
       value: rawPage?.content,
@@ -315,7 +316,7 @@ function normalizeDraft(rawDraft, userId = '', pageId = '') {
       value: rawDraft?.summary,
       valueEn: rawDraft?.summaryEn,
       valueIt: rawDraft?.summaryIt,
-      maxLen: 500,
+      maxLen: WIKI_SUMMARY_MAX_LENGTH,
     }),
     content: normalizeLocalizedValue({
       value: rawDraft?.content,

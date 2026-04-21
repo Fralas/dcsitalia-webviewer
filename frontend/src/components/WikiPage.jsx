@@ -293,6 +293,7 @@ const WHEEL_THRESHOLD = 40;
 const FULLSCREEN_TRANSITION_MS = 280;
 const SHOWROOM_BLUE_GLOW = 'rgba(78, 197, 255, 0.16)';
 const WIKI_EDITOR_IDS = new Set(['675706661570347041']);
+const WIKI_SHORT_DESCRIPTION_MAX_LENGTH = 82;
 const DEFAULT_LANGUAGE = 'en';
 const UI_COPY = {
   en: {
@@ -1321,6 +1322,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                     value={wikiDraft.summaryEn}
                     onChange={(event) => setWikiDraft((prev) => ({ ...prev, summaryEn: event.target.value }))}
                     placeholder={ui.summaryPlaceholder}
+                    maxLength={WIKI_SHORT_DESCRIPTION_MAX_LENGTH}
                     className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
                   />
                   <textarea
@@ -1344,6 +1346,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                     value={wikiDraft.summaryIt}
                     onChange={(event) => setWikiDraft((prev) => ({ ...prev, summaryIt: event.target.value }))}
                     placeholder={ui.summaryPlaceholderIt}
+                    maxLength={WIKI_SHORT_DESCRIPTION_MAX_LENGTH}
                     className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
                   />
                   <textarea
@@ -1669,6 +1672,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                 value={newTopicDraft.summaryEn}
                 onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, summaryEn: event.target.value }))}
                 placeholder={ui.topicSummaryPlaceholder}
+                maxLength={WIKI_SHORT_DESCRIPTION_MAX_LENGTH}
                 className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
               />
               <textarea
@@ -1692,6 +1696,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                 value={newTopicDraft.summaryIt}
                 onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, summaryIt: event.target.value }))}
                 placeholder={ui.topicSummaryPlaceholderIt}
+                maxLength={WIKI_SHORT_DESCRIPTION_MAX_LENGTH}
                 className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
               />
               <textarea
