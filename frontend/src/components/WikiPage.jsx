@@ -285,6 +285,7 @@ const VEHICLES = [
 ];
 
 const FULLSCREEN_TRANSITION_MS = 280;
+const VEHICLE_FILTER_TRANSITION_MS = 170;
 const WIKI_EDITOR_IDS = new Set(['675706661570347041']);
 const WIKI_SHORT_DESCRIPTION_MAX_LENGTH = 82;
 const DEFAULT_LANGUAGE = 'en';
@@ -527,6 +528,22 @@ function getVehicleCategoryKey(category) {
     .replace(/[^a-z0-9]+/g, '-');
 }
 
+const VEHICLE_CATEGORY_KEYS = {
+  support: getVehicleCategoryKey('SUPPORT'),
+  airDefense: getVehicleCategoryKey('Air Defense'),
+  recon: getVehicleCategoryKey('RECON'),
+  combat: getVehicleCategoryKey('COMBAT'),
+};
+
+const DEFAULT_VEHICLE_CATEGORY_KEY = VEHICLE_CATEGORY_KEYS.support;
+
+const VEHICLE_CATEGORY_ICON_BY_KEY = {
+  [VEHICLE_CATEGORY_KEYS.support]: Truck,
+  [VEHICLE_CATEGORY_KEYS.airDefense]: ShieldCheck,
+  [VEHICLE_CATEGORY_KEYS.recon]: Eye,
+  [VEHICLE_CATEGORY_KEYS.combat]: Target,
+};
+
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -547,6 +564,8 @@ function resolveGameplayIcon(iconKey, fallback = Layers3) {
 
 export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
   const { user } = useUser();
+  const [selectedVehicleCategoryKey, setSelectedVehicleCategoryKey] = useState(DEFAULT_VEHICLE_CATEGORY_KEY);
+  const [isVehicleCategoryContentVisible, setIsVehicleCategoryContentVisible] = useState(true);
   const [wikiPagesById, setWikiPagesById] = useState({});
   const [wikiLoading, setWikiLoading] = useState(true);
   const [wikiError, setWikiError] = useState('');
@@ -566,6 +585,8 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
   const [draftStatus, setDraftStatus] = useState('');
   const [draftLoading, setDraftLoading] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
+  const vehicleCategorySwitchTimeoutRef = useRef(null);
+  const vehicleCategoryShowRafRef = useRef(null);
   const gameplayCloseTimeoutRef = useRef(null);
   const gameplayOpenRafRef = useRef(null);
   const wikiSaveTimerRef = useRef(null);
@@ -603,6 +624,20 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
     });
     return Array.from(groupsByKey.values());
   }, []);
+
+  const selectedVehicleGroup = useMemo(
+    () => vehicleGroups.find((group) => group.key === selectedVehicleCategoryKey) || vehicleGroups[0] || null,
+    [vehicleGroups, selectedVehicleCategoryKey],
+  );
+
+  useEffect(() => {
+    if (!vehicleGroups.length) return;
+    if (vehicleGroups.some((group) => group.key === selectedVehicleCategoryKey)) {
+      return;
+    }
+    const supportGroup = vehicleGroups.find((group) => group.key === DEFAULT_VEHICLE_CATEGORY_KEY);
+    setSelectedVehicleCategoryKey(supportGroup ? supportGroup.key : vehicleGroups[0].key);
+  }, [vehicleGroups, selectedVehicleCategoryKey]);
 
   const gameplayItems = useMemo(() => {
     const featureById = new Map(GAMEPLAY_FEATURES.map((feature) => [feature.id, feature]));
@@ -746,6 +781,12 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
   }, [isGameplayArticleFullscreen]);
 
   useEffect(() => () => {
+    if (vehicleCategorySwitchTimeoutRef.current) {
+      clearTimeout(vehicleCategorySwitchTimeoutRef.current);
+    }
+    if (vehicleCategoryShowRafRef.current) {
+      cancelAnimationFrame(vehicleCategoryShowRafRef.current);
+    }
     if (gameplayCloseTimeoutRef.current) {
       clearTimeout(gameplayCloseTimeoutRef.current);
     }
@@ -874,6 +915,30 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
       }
     }, 900);
   }, [canEditWiki, draftLoading, editorOpen, selectedGameplayFeature?.id, wikiDraft, ui.savingDraft, ui.draftSaved, ui.draftSaveError]);
+
+  const handleVehicleCategoryFilterChange = (nextCategoryKey) => {
+    if (!nextCategoryKey || nextCategoryKey === selectedVehicleCategoryKey) {
+      return;
+    }
+
+    if (vehicleCategorySwitchTimeoutRef.current) {
+      clearTimeout(vehicleCategorySwitchTimeoutRef.current);
+    }
+    if (vehicleCategoryShowRafRef.current) {
+      cancelAnimationFrame(vehicleCategoryShowRafRef.current);
+      vehicleCategoryShowRafRef.current = null;
+    }
+
+    setIsVehicleCategoryContentVisible(false);
+
+    vehicleCategorySwitchTimeoutRef.current = setTimeout(() => {
+      setSelectedVehicleCategoryKey(nextCategoryKey);
+      vehicleCategoryShowRafRef.current = requestAnimationFrame(() => {
+        setIsVehicleCategoryContentVisible(true);
+      });
+      vehicleCategorySwitchTimeoutRef.current = null;
+    }, VEHICLE_FILTER_TRANSITION_MS);
+  };
 
   const handleSelectGameplayItem = (itemId) => {
     setSelectedGameplayId(itemId);
@@ -1234,17 +1299,50 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
   const renderShowroomContent = () => (
     <div className="space-y-5">
       <h2 className="text-xl font-black uppercase tracking-[0.08em] text-yt-text-primary">{ui.vehicles}</h2>
-      {!vehicleGroups.length ? (
-        <p className="rounded-xl border border-yt-border/75 bg-[#0f1723] px-4 py-3 text-sm text-yt-text-secondary">
-          {ui.noVehicles}
-        </p>
-      ) : (
-        vehicleGroups.map((group) => (
-          <article key={group.key} className="rounded-2xl border border-yt-border/80 bg-[#0f1723] p-4">
+      <div className="grid items-start gap-4 lg:grid-cols-[64px,minmax(0,1fr)]">
+        <aside className="h-fit self-start rounded-2xl border border-yt-border/80 bg-[#0f1723] p-1.5">
+          <div className="flex items-center justify-center gap-2 lg:flex-col">
+            {vehicleGroups.map((group) => {
+              const categoryLabel = localizeText(group.category, language);
+              const active = selectedVehicleGroup?.key === group.key;
+              const CategoryIcon = VEHICLE_CATEGORY_ICON_BY_KEY[group.key] || Package;
+
+              return (
+                <button
+                  key={group.key}
+                  type="button"
+                  onClick={() => handleVehicleCategoryFilterChange(group.key)}
+                  title={categoryLabel}
+                  aria-label={categoryLabel}
+                  aria-pressed={active}
+                  className={`inline-flex h-11 w-11 items-center justify-center rounded-xl border transition-all ${
+                    active
+                      ? 'border-yt-accent/70 bg-yt-accent/15 text-yt-accent shadow-[0_0_0_1px_rgba(78,197,255,0.24)]'
+                      : 'border-yt-border/80 bg-[#111a28] text-yt-text-secondary hover:border-yt-accent/45 hover:text-yt-accent'
+                  }`}
+                >
+                  <CategoryIcon className="h-4 w-4" />
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+
+        {!selectedVehicleGroup ? (
+          <p className="flex h-[min(72vh,620px)] items-center rounded-xl border border-yt-border/75 bg-[#0f1723] px-4 py-3 text-sm text-yt-text-secondary">
+            {ui.noVehicles}
+          </p>
+        ) : (
+          <article
+            key={selectedVehicleGroup.key}
+            className={`flex h-[min(72vh,620px)] flex-col rounded-2xl border border-yt-border/80 bg-[#0f1723] p-4 transition-all duration-200 ease-out ${
+              isVehicleCategoryContentVisible ? 'translate-x-0 opacity-100' : 'translate-x-2 opacity-0'
+            }`}
+          >
             <h3 className="mb-3 text-sm font-extrabold uppercase tracking-[0.1em] text-yt-accent">
-              {localizeText(group.category, language)}
+              {localizeText(selectedVehicleGroup.category, language)}
             </h3>
-            <div className="overflow-x-auto rounded-xl border border-yt-border/70">
+            <div className="flex-1 overflow-auto rounded-xl border border-yt-border/70">
               <table className="min-w-full border-collapse text-sm">
                 <thead className="bg-[#111b2a]">
                   <tr>
@@ -1260,7 +1358,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {group.vehicles.map((vehicle) => (
+                  {selectedVehicleGroup.vehicles.map((vehicle) => (
                     <tr key={vehicle.id} className="bg-[#0f1723] align-top">
                       <td className="border border-yt-border/70 px-3 py-2 font-semibold text-yt-text-primary">
                         {vehicle.name}
@@ -1282,8 +1380,8 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
               </table>
             </div>
           </article>
-        ))
-      )}
+        )}
+      </div>
     </div>
   );
 
