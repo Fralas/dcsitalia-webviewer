@@ -11,9 +11,7 @@ import {
   Layers3,
   Loader2,
   MapPin,
-  Maximize2,
   Megaphone,
-  Minimize2,
   Package,
   PenSquare,
   Plane,
@@ -286,12 +284,7 @@ const VEHICLES = [
   },
 ];
 
-const SLOT_ITEM_OFFSETS = [-3, -2, -1, 0, 1, 2, 3];
-const SLOT_STEP_DEFAULT = 110;
-const SLOT_STEP_FULLSCREEN = 180;
-const WHEEL_THRESHOLD = 40;
 const FULLSCREEN_TRANSITION_MS = 280;
-const SHOWROOM_BLUE_GLOW = 'rgba(78, 197, 255, 0.16)';
 const WIKI_EDITOR_IDS = new Set(['675706661570347041']);
 const WIKI_SHORT_DESCRIPTION_MAX_LENGTH = 82;
 const DEFAULT_LANGUAGE = 'en';
@@ -304,6 +297,9 @@ const UI_COPY = {
     showroomListAria: 'Vehicle showroom list',
     showroomHint: 'Click to open the showroom in fullscreen',
     category: 'Category',
+    vehicleName: 'Vehicle',
+    vehicleImage: 'Image',
+    vehicleDescription: 'Description',
     noVehicles: 'No vehicle available.',
     close: 'Close',
     fullscreen: 'Fullscreen',
@@ -375,6 +371,9 @@ const UI_COPY = {
     showroomListAria: 'Lista showroom veicoli',
     showroomHint: 'Clicca per aprire lo showroom in fullscreen',
     category: 'Categoria',
+    vehicleName: 'Veicolo',
+    vehicleImage: 'Immagine',
+    vehicleDescription: 'Descrizione',
     noVehicles: 'Nessun veicolo disponibile.',
     close: 'Chiudi',
     fullscreen: 'Schermo Intero',
@@ -541,65 +540,13 @@ function fileToBase64(file) {
   });
 }
 
-function wrapIndex(value, length) {
-  return ((value % length) + length) % length;
-}
-
-function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
-}
-
 function resolveGameplayIcon(iconKey, fallback = Layers3) {
   const normalizedKey = normalizeGameplayIconKey(iconKey);
   return GAMEPLAY_ICON_MAP[normalizedKey] || fallback;
 }
 
-function getVisualFromPosition(positionPx, slotStep = SLOT_STEP_DEFAULT, fullscreen = false) {
-  const normalized = Math.abs(positionPx) / slotStep;
-
-  let opacity;
-  let blur;
-  let sizePx;
-  const centerSize = fullscreen ? 246 : 156;
-  const midSize = fullscreen ? 132 : 80;
-  const outerSize = fullscreen ? 118 : 72;
-  const minSize = fullscreen ? 84 : 62;
-  const maxBlur = fullscreen ? 2.2 : 2.6;
-  const centerOpacityDrop = fullscreen ? 0.42 : 0.5;
-
-  if (normalized <= 1) {
-    opacity = 1 - (centerOpacityDrop * normalized);
-    blur = 0.2 * normalized;
-    sizePx = centerSize - ((centerSize - midSize) * normalized);
-  } else if (normalized <= 2) {
-    const local = normalized - 1;
-    opacity = (1 - centerOpacityDrop) - (0.32 * local);
-    blur = 0.2 + (1.6 * local);
-    sizePx = midSize - ((midSize - outerSize) * local);
-  } else {
-    const local = normalized - 2;
-    opacity = 0.18 - (0.13 * local);
-    blur = 1.8 + (0.8 * local);
-    sizePx = outerSize - ((outerSize - minSize) * local);
-  }
-
-  return {
-    opacity: clamp(opacity, 0.05, 1),
-    blur: clamp(blur, 0, maxBlur),
-    sizePx: clamp(sizePx, minSize, centerSize),
-  };
-}
-
 export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
   const { user } = useUser();
-  const [selectedVehicleIndex, setSelectedVehicleIndex] = useState(0);
-  const [selectedVehicleCategoryKey, setSelectedVehicleCategoryKey] = useState(
-    () => getVehicleCategoryKey(VEHICLES[0]?.category),
-  );
-  const [isShowroomFullscreen, setIsShowroomFullscreen] = useState(false);
-  const [isShowroomFullscreenActive, setIsShowroomFullscreenActive] = useState(false);
-  const [slotAnimating, setSlotAnimating] = useState(false);
-  const [slotTranslate, setSlotTranslate] = useState(0);
   const [wikiPagesById, setWikiPagesById] = useState({});
   const [wikiLoading, setWikiLoading] = useState(true);
   const [wikiError, setWikiError] = useState('');
@@ -619,13 +566,8 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
   const [draftStatus, setDraftStatus] = useState('');
   const [draftLoading, setDraftLoading] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
-  const wheelAccumulatorRef = useRef(0);
-  const closeTimeoutRef = useRef(null);
-  const openRafRef = useRef(null);
   const gameplayCloseTimeoutRef = useRef(null);
   const gameplayOpenRafRef = useRef(null);
-  const slotRafRef = useRef(null);
-  const slotPendingDirectionRef = useRef(0);
   const wikiSaveTimerRef = useRef(null);
   const lastSavedDraftSerializedRef = useRef('');
   const wikiMediaInputRef = useRef(null);
@@ -633,7 +575,6 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
   const canEditWiki = Boolean(user?.id && WIKI_EDITOR_IDS.has(String(user.id)));
   const ui = UI_COPY[language] || UI_COPY.en;
   const dateLocale = language === 'it' ? 'it-IT' : 'en-US';
-  const activeSlotStep = isShowroomFullscreen ? SLOT_STEP_FULLSCREEN : SLOT_STEP_DEFAULT;
 
   const filteredNewTopicIcons = useMemo(() => {
     const query = String(newTopicIconSearch || '').trim().toLowerCase();
@@ -647,61 +588,21 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
     return GAMEPLAY_ICON_LIBRARY.filter((iconDef) => iconDef.label.toLowerCase().includes(query));
   }, [wikiDraftIconSearch]);
 
-  const priorityOffset = useMemo(() => {
-    let bestOffset = 0;
-    let bestDistance = Number.POSITIVE_INFINITY;
-
-    SLOT_ITEM_OFFSETS.forEach((offset) => {
-      const position = (offset * activeSlotStep) + slotTranslate;
-      const distance = Math.abs(position);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestOffset = offset;
-      }
-    });
-
-    return bestOffset;
-  }, [slotTranslate, activeSlotStep]);
-
-  const vehicleCategories = useMemo(() => {
-    const categoriesByKey = new Map();
+  const vehicleGroups = useMemo(() => {
+    const groupsByKey = new Map();
     VEHICLES.forEach((vehicle) => {
       const categoryKey = getVehicleCategoryKey(vehicle.category);
-      if (!categoriesByKey.has(categoryKey)) {
-        categoriesByKey.set(categoryKey, {
+      if (!groupsByKey.has(categoryKey)) {
+        groupsByKey.set(categoryKey, {
           key: categoryKey,
           category: vehicle.category,
-          image: vehicle.image,
+          vehicles: [],
         });
       }
+      groupsByKey.get(categoryKey).vehicles.push(vehicle);
     });
-    return Array.from(categoriesByKey.values());
+    return Array.from(groupsByKey.values());
   }, []);
-
-  const selectedCategory = useMemo(
-    () => vehicleCategories.find((category) => category.key === selectedVehicleCategoryKey) || vehicleCategories[0] || null,
-    [vehicleCategories, selectedVehicleCategoryKey],
-  );
-
-  const vehiclesForSelectedCategory = useMemo(() => {
-    if (!selectedCategory?.key) return [];
-    return VEHICLES.filter((vehicle) => getVehicleCategoryKey(vehicle.category) === selectedCategory.key);
-  }, [selectedCategory]);
-
-  useEffect(() => {
-    if (!vehicleCategories.length) return;
-    if (!selectedCategory) {
-      setSelectedVehicleCategoryKey(vehicleCategories[0].key);
-    }
-  }, [vehicleCategories, selectedCategory]);
-
-  const selectedVehicle = useMemo(() => {
-    if (!vehiclesForSelectedCategory.length) {
-      return null;
-    }
-    const visualIndex = wrapIndex(selectedVehicleIndex + priorityOffset, vehiclesForSelectedCategory.length);
-    return vehiclesForSelectedCategory[visualIndex];
-  }, [selectedVehicleIndex, priorityOffset, vehiclesForSelectedCategory]);
 
   const gameplayItems = useMemo(() => {
     const featureById = new Map(GAMEPLAY_FEATURES.map((feature) => [feature.id, feature]));
@@ -803,35 +704,6 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
     ),
   }), []);
 
-  const shiftVehicle = (direction) => {
-    if (!direction || slotAnimating || vehiclesForSelectedCategory.length <= 1) {
-      return;
-    }
-
-    const normalizedDirection = direction > 0 ? 1 : -1;
-    slotPendingDirectionRef.current = normalizedDirection;
-    setSlotAnimating(true);
-    setSlotTranslate(0);
-
-    if (slotRafRef.current) {
-      cancelAnimationFrame(slotRafRef.current);
-    }
-
-    slotRafRef.current = requestAnimationFrame(() => {
-      setSlotTranslate(-normalizedDirection * activeSlotStep);
-    });
-  };
-
-  const closeShowroomFullscreen = () => {
-    setIsShowroomFullscreenActive(false);
-    if (closeTimeoutRef.current) {
-      clearTimeout(closeTimeoutRef.current);
-    }
-    closeTimeoutRef.current = setTimeout(() => {
-      setIsShowroomFullscreen(false);
-    }, FULLSCREEN_TRANSITION_MS);
-  };
-
   const closeGameplayArticleFullscreen = () => {
     setIsGameplayArticleFullscreenActive(false);
     if (gameplayCloseTimeoutRef.current) {
@@ -854,19 +726,13 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
   };
 
   useEffect(() => {
-    if (!isShowroomFullscreen && !isGameplayArticleFullscreen) {
+    if (!isGameplayArticleFullscreen) {
       return undefined;
     }
 
     const onKeyDown = (event) => {
       if (event.key !== 'Escape') return;
-      if (isGameplayArticleFullscreen) {
-        closeGameplayArticleFullscreen();
-        return;
-      }
-      if (isShowroomFullscreen) {
-        closeShowroomFullscreen();
-      }
+      closeGameplayArticleFullscreen();
     };
 
     const previousOverflow = document.body.style.overflow;
@@ -877,30 +743,14 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [isShowroomFullscreen, isGameplayArticleFullscreen]);
-
-  useEffect(() => {
-    document.body.classList.toggle('wiki-showroom-open', isShowroomFullscreen);
-    return () => {
-      document.body.classList.remove('wiki-showroom-open');
-    };
-  }, [isShowroomFullscreen]);
+  }, [isGameplayArticleFullscreen]);
 
   useEffect(() => () => {
-    if (closeTimeoutRef.current) {
-      clearTimeout(closeTimeoutRef.current);
-    }
-    if (openRafRef.current) {
-      cancelAnimationFrame(openRafRef.current);
-    }
     if (gameplayCloseTimeoutRef.current) {
       clearTimeout(gameplayCloseTimeoutRef.current);
     }
     if (gameplayOpenRafRef.current) {
       cancelAnimationFrame(gameplayOpenRafRef.current);
-    }
-    if (slotRafRef.current) {
-      cancelAnimationFrame(slotRafRef.current);
     }
     if (wikiSaveTimerRef.current) {
       clearTimeout(wikiSaveTimerRef.current);
@@ -1024,72 +874,6 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
       }
     }, 900);
   }, [canEditWiki, draftLoading, editorOpen, selectedGameplayFeature?.id, wikiDraft, ui.savingDraft, ui.draftSaved, ui.draftSaveError]);
-
-  const openShowroomFullscreen = () => {
-    if (closeTimeoutRef.current) {
-      clearTimeout(closeTimeoutRef.current);
-      closeTimeoutRef.current = null;
-    }
-    setIsShowroomFullscreen(true);
-    openRafRef.current = requestAnimationFrame(() => {
-      setIsShowroomFullscreenActive(true);
-    });
-  };
-
-  const toggleShowroomFullscreen = () => {
-    if (isShowroomFullscreen) {
-      closeShowroomFullscreen();
-      return;
-    }
-    openShowroomFullscreen();
-  };
-
-  const handleWheel = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (slotAnimating) {
-      return;
-    }
-
-    const primaryDelta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
-    wheelAccumulatorRef.current += primaryDelta;
-
-    if (Math.abs(wheelAccumulatorRef.current) < WHEEL_THRESHOLD) {
-      return;
-    }
-
-    const direction = wheelAccumulatorRef.current > 0 ? 1 : -1;
-    wheelAccumulatorRef.current = 0;
-    shiftVehicle(direction);
-  };
-
-  const handleKeyDown = (event) => {
-    if (slotAnimating) {
-      return;
-    }
-    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-      event.preventDefault();
-      shiftVehicle(1);
-    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-      event.preventDefault();
-      shiftVehicle(-1);
-    }
-  };
-
-  const handleShowroomClick = (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) {
-      return;
-    }
-
-    const clickedInteractive = target.closest('button, a, input, textarea, select, [role="listbox"]');
-    if (clickedInteractive) {
-      return;
-    }
-
-    openShowroomFullscreen();
-  };
 
   const handleSelectGameplayItem = (itemId) => {
     setSelectedGameplayId(itemId);
@@ -1222,22 +1006,6 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
         wikiMediaInputRef.current.value = '';
       }
     }
-  };
-
-  const handleSlotTrackTransitionEnd = (event) => {
-    if (event.target !== event.currentTarget || event.propertyName !== 'transform' || !slotAnimating) {
-      return;
-    }
-
-    const direction = slotPendingDirectionRef.current || 0;
-    if (!direction || !vehiclesForSelectedCategory.length) {
-      return;
-    }
-
-    setSelectedVehicleIndex((prev) => wrapIndex(prev + direction, vehiclesForSelectedCategory.length));
-    setSlotTranslate(0);
-    setSlotAnimating(false);
-    slotPendingDirectionRef.current = 0;
   };
 
   const renderGameplayArticleContent = () => {
@@ -1463,170 +1231,60 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
     );
   };
 
-  const renderShowroomContent = ({ fullscreen = false } = {}) => (
-    (() => {
-      const showroomSlotStep = fullscreen ? SLOT_STEP_FULLSCREEN : SLOT_STEP_DEFAULT;
-      return (
-    <>
-      <div className="relative mb-4 flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-black uppercase tracking-[0.08em] text-yt-text-primary">{ui.vehicles}</h2>
-        </div>
-        <div className="flex items-center">
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              toggleShowroomFullscreen();
-            }}
-            className="inline-flex items-center gap-1 rounded-full border border-yt-border/80 bg-[#101827] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.1em] text-yt-text-primary transition-colors hover:border-yt-accent hover:text-yt-accent"
-            title={fullscreen ? ui.closeFullscreen : ui.openFullscreen}
-            aria-label={fullscreen ? ui.closeFullscreen : ui.openFullscreen}
-          >
-            {fullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-            {fullscreen ? ui.close : ui.fullscreen}
-          </button>
-        </div>
-      </div>
-
-      <div className="space-y-5">
-        <div className={`grid gap-4 ${fullscreen ? 'xl:grid-cols-[260px,minmax(0,1fr),320px]' : 'lg:grid-cols-[220px,minmax(0,1fr),280px]'}`}>
-          <aside className={`rounded-2xl border border-yt-border/80 bg-[#0f1723] p-3 ${fullscreen ? 'max-h-[72vh]' : 'max-h-[420px]'} overflow-y-auto`}>
-            <div className="space-y-3">
-              {vehicleCategories.map((categoryItem) => {
-                const active = selectedCategory?.key === categoryItem.key;
-                return (
-                  <button
-                    type="button"
-                    key={categoryItem.key}
-                    onClick={() => {
-                      setSelectedVehicleCategoryKey(categoryItem.key);
-                      setSelectedVehicleIndex(0);
-                      setSlotTranslate(0);
-                      setSlotAnimating(false);
-                      if (slotRafRef.current) {
-                        cancelAnimationFrame(slotRafRef.current);
-                        slotRafRef.current = null;
-                      }
-                      slotPendingDirectionRef.current = 0;
-                    }}
-                    className={`w-full rounded-xl border px-3 py-2 text-left transition-all ${
-                      active
-                        ? 'border-yt-accent/60 bg-yt-accent/12 ring-1 ring-yt-accent/35'
-                        : 'border-yt-border/80 bg-[#101a29] hover:border-yt-accent/45'
-                    }`}
-                  >
-                    <p className="mb-2 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary">
-                      {localizeText(categoryItem.category, language)}
-                    </p>
-                    <img
-                      src={categoryItem.image}
-                      alt={localizeText(categoryItem.category, language)}
-                      className={`mx-auto object-contain ${fullscreen ? 'h-24' : 'h-20'}`}
-                    />
-                  </button>
-                );
-              })}
+  const renderShowroomContent = () => (
+    <div className="space-y-5">
+      <h2 className="text-xl font-black uppercase tracking-[0.08em] text-yt-text-primary">{ui.vehicles}</h2>
+      {!vehicleGroups.length ? (
+        <p className="rounded-xl border border-yt-border/75 bg-[#0f1723] px-4 py-3 text-sm text-yt-text-secondary">
+          {ui.noVehicles}
+        </p>
+      ) : (
+        vehicleGroups.map((group) => (
+          <article key={group.key} className="rounded-2xl border border-yt-border/80 bg-[#0f1723] p-4">
+            <h3 className="mb-3 text-sm font-extrabold uppercase tracking-[0.1em] text-yt-accent">
+              {localizeText(group.category, language)}
+            </h3>
+            <div className="overflow-x-auto rounded-xl border border-yt-border/70">
+              <table className="min-w-full border-collapse text-sm">
+                <thead className="bg-[#111b2a]">
+                  <tr>
+                    <th className="border border-yt-border/70 px-3 py-2 text-left font-bold uppercase tracking-[0.08em] text-yt-text-primary">
+                      {ui.vehicleName}
+                    </th>
+                    <th className="border border-yt-border/70 px-3 py-2 text-left font-bold uppercase tracking-[0.08em] text-yt-text-primary">
+                      {ui.vehicleImage}
+                    </th>
+                    <th className="border border-yt-border/70 px-3 py-2 text-left font-bold uppercase tracking-[0.08em] text-yt-text-primary">
+                      {ui.vehicleDescription}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {group.vehicles.map((vehicle) => (
+                    <tr key={vehicle.id} className="bg-[#0f1723] align-top">
+                      <td className="border border-yt-border/70 px-3 py-2 font-semibold text-yt-text-primary">
+                        {vehicle.name}
+                      </td>
+                      <td className="border border-yt-border/70 px-3 py-2">
+                        <img
+                          src={vehicle.image}
+                          alt={vehicle.name}
+                          className="h-12 w-20 object-contain sm:h-14 sm:w-24"
+                          loading="lazy"
+                        />
+                      </td>
+                      <td className="border border-yt-border/70 px-3 py-2 leading-relaxed text-yt-text-secondary">
+                        {localizeText(vehicle.description, language)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </aside>
-
-          <div className="relative">
-            <div
-              className={`pointer-events-none absolute opacity-42 ${fullscreen ? '-inset-x-64 -top-56 -bottom-20' : '-inset-x-40 -top-44 -bottom-12'}`}
-              style={{
-                background: `radial-gradient(ellipse at 50% 60%, ${SHOWROOM_BLUE_GLOW} 0%, rgba(78,197,255,0.10) 32%, rgba(78,197,255,0.05) 56%, transparent 88%)`,
-              }}
-            />
-
-            <div
-              className={`relative mx-auto overflow-hidden outline-none focus:outline-none ${fullscreen ? 'h-[560px] max-w-[min(80vw,980px)]' : 'h-[300px] max-w-[min(88vw,760px)]'}`}
-              style={{
-                WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.14) 8%, black 20%, black 80%, rgba(0,0,0,0.14) 92%, transparent 100%)',
-                maskImage: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.14) 8%, black 20%, black 80%, rgba(0,0,0,0.14) 92%, transparent 100%)',
-                overscrollBehavior: 'contain',
-              }}
-              onWheelCapture={handleWheel}
-              onWheel={handleWheel}
-              onKeyDown={handleKeyDown}
-              tabIndex={0}
-              role="listbox"
-              aria-label={ui.showroomListAria}
-            >
-              <div
-                className={`absolute inset-0 ${slotAnimating ? 'transition-transform duration-[420ms] ease-[cubic-bezier(0.22,0.61,0.36,1)]' : ''}`}
-                style={{
-                  transform: `translateY(${slotTranslate}px)`,
-                }}
-                onTransitionEnd={handleSlotTrackTransitionEnd}
-              >
-                {SLOT_ITEM_OFFSETS.map((offset) => {
-                  if (!vehiclesForSelectedCategory.length) return null;
-                  const itemIndex = wrapIndex(selectedVehicleIndex + offset, vehiclesForSelectedCategory.length);
-                  const vehicle = vehiclesForSelectedCategory[itemIndex];
-                  const position = (offset * showroomSlotStep) + slotTranslate;
-                  const visual = getVisualFromPosition(position, showroomSlotStep, fullscreen);
-                  const isPriority = offset === priorityOffset;
-
-                  return (
-                    <button
-                      key={`${vehicle.id}_${offset}`}
-                      type="button"
-                      onClick={() => {
-                        if (offset === 0) {
-                          return;
-                        }
-                        shiftVehicle(offset > 0 ? 1 : -1);
-                      }}
-                      className="absolute top-1/2 left-1/2 p-0 transition-all duration-250"
-                      style={{
-                        transform: `translate(-50%, calc(-50% + ${offset * showroomSlotStep}px))`,
-                        opacity: visual.opacity,
-                        filter: `blur(${visual.blur}px)`,
-                      }}
-                      role="option"
-                      aria-selected={isPriority}
-                    >
-                      <img
-                        src={vehicle.image}
-                        alt={vehicle.name}
-                        className={`mx-auto object-contain transition-[filter] duration-200 ${
-                          isPriority
-                            ? (fullscreen
-                              ? 'drop-shadow-[0_0_26px_rgba(78,197,255,0.36)]'
-                              : 'drop-shadow-[0_0_14px_rgba(78,197,255,0.26)]')
-                            : ''
-                        }`}
-                        style={{
-                          width: `${visual.sizePx}px`,
-                          height: `${visual.sizePx}px`,
-                        }}
-                      />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          <article className={`rounded-2xl bg-[#0f1723] p-4 ${fullscreen ? 'min-h-[340px]' : 'min-h-[260px]'}`}>
-            {selectedVehicle ? (
-              <div className="space-y-3">
-                <h3 className={`font-black uppercase leading-tight tracking-[0.05em] text-yt-text-primary ${fullscreen ? 'text-3xl' : 'text-2xl'}`}>
-                  {selectedVehicle.name}
-                </h3>
-                <p className={`leading-relaxed text-yt-text-secondary ${fullscreen ? 'text-lg' : 'text-sm'}`}>
-                  {localizeText(selectedVehicle.description, language)}
-                </p>
-              </div>
-            ) : (
-              <p className="text-sm text-yt-text-secondary">{ui.noVehicles}</p>
-            )}
           </article>
-        </div>
-      </div>
-    </>
-      );
-    })()
+        ))
+      )}
+    </div>
   );
 
   return (
@@ -1857,36 +1515,11 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
         document.body,
       )}
 
-      <section
-        className="relative cursor-zoom-in overflow-hidden rounded-3xl border border-yt-border/70 bg-yt-bg-secondary/90 p-5 shadow-[0_20px_46px_rgba(0,0,0,0.38)]"
-        onClick={handleShowroomClick}
-        title={ui.showroomHint}
-      >
+      <section className="relative overflow-hidden rounded-3xl border border-yt-border/70 bg-yt-bg-secondary/90 p-5 shadow-[0_20px_46px_rgba(0,0,0,0.38)]">
         <div className="relative">
           {renderShowroomContent()}
         </div>
       </section>
-
-      {isShowroomFullscreen && typeof document !== 'undefined' && createPortal(
-        <div
-          className={`fixed inset-0 z-[260] flex items-center justify-center bg-[#03070eb8] p-3 backdrop-blur-sm transition-opacity duration-300 sm:p-5 ${
-            isShowroomFullscreenActive ? 'opacity-100' : 'opacity-0'
-          }`}
-          onClick={closeShowroomFullscreen}
-        >
-          <section
-            className={`relative h-[min(90vh,1040px)] w-[min(1420px,96vw)] overflow-hidden rounded-3xl border border-yt-border/80 bg-yt-bg-secondary/95 p-5 shadow-[0_24px_56px_rgba(0,0,0,0.56)] transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] sm:p-6 ${
-              isShowroomFullscreenActive ? 'scale-100 opacity-100' : 'scale-[0.975] opacity-0'
-            }`}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="relative h-full">
-              {renderShowroomContent({ fullscreen: true })}
-            </div>
-          </section>
-        </div>,
-        document.body,
-      )}
     </div>
   );
 }
