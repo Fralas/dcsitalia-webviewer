@@ -76,6 +76,38 @@ function fileToBase64(file) {
   });
 }
 
+function inferMediaMimeType(file) {
+  const fromFile = String(file?.type || '').trim().toLowerCase();
+  if (fromFile.startsWith('image/') || fromFile.startsWith('video/')) {
+    return fromFile;
+  }
+
+  const lowerName = String(file?.name || '').trim().toLowerCase();
+  if (!lowerName) return '';
+
+  const extensionMap = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp',
+    '.gif': 'image/gif',
+    '.bmp': 'image/bmp',
+    '.svg': 'image/svg+xml',
+    '.avif': 'image/avif',
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
+    '.ogg': 'video/ogg',
+    '.ogv': 'video/ogg',
+    '.mov': 'video/quicktime',
+    '.m4v': 'video/x-m4v',
+    '.avi': 'video/x-msvideo',
+    '.mkv': 'video/x-matroska',
+  };
+
+  const entry = Object.entries(extensionMap).find(([extension]) => lowerName.endsWith(extension));
+  return entry?.[1] || '';
+}
+
 function escapeHtml(text) {
   return String(text || '')
     .replaceAll('&', '&amp;')
@@ -85,8 +117,33 @@ function escapeHtml(text) {
     .replaceAll("'", '&#39;');
 }
 
+function isSafeMediaUrl(url) {
+  const raw = String(url || '').trim();
+  if (!raw) return false;
+  if (raw.startsWith('/api/changelogs/media/')) return true;
+  return /^https?:\/\/[^\s]+$/i.test(raw);
+}
+
+function mediaToMarkdownSnippet(media) {
+  if (!media?.url || !media?.type) return '';
+  const safeLabel = String(media.fileName || media.id || 'media')
+    .replaceAll('[', '')
+    .replaceAll(']', '');
+  return media.type === 'video'
+    ? `!video[${safeLabel}](${media.url})`
+    : `![${safeLabel}](${media.url})`;
+}
+
 function renderInlineMarkdown(text) {
   let out = escapeHtml(text);
+  out = out.replace(/!video\[([^\]]*)\]\(([^)\s]+)\)/g, (_match, _alt, rawUrl) => {
+    if (!isSafeMediaUrl(rawUrl)) return '[invalid-video-url]';
+    return `<video src="${rawUrl}" controls class="my-2 w-full max-h-80 rounded border border-yt-border/60 bg-black/40"></video>`;
+  });
+  out = out.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_match, altText, rawUrl) => {
+    if (!isSafeMediaUrl(rawUrl)) return '[invalid-image-url]';
+    return `<img src="${rawUrl}" alt="${altText || 'image'}" loading="lazy" class="my-2 w-full max-h-96 object-contain rounded border border-yt-border/60 bg-black/20" />`;
+  });
   out = out.replace(/`([^`]+)`/g, '<code class="rounded bg-black/35 px-1 py-0.5">$1</code>');
   out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   out = out.replace(/\*([^*]+)\*/g, '<em>$1</em>');
@@ -198,6 +255,9 @@ export default function ChangelogPage({ language = 'en' }) {
   const [fullscreenMedia, setFullscreenMedia] = useState(null);
   const [error, setError] = useState('');
   const lastSavedSerializedRef = useRef('');
+  const textareaRefs = useRef(new Map());
+  const activeEditorRef = useRef(null);
+  const pendingCaretRef = useRef(null);
   const viewLanguage = language === 'it' ? 'it' : 'en';
 
   const contributorsById = useMemo(() => {
@@ -299,6 +359,94 @@ export default function ChangelogPage({ language = 'en' }) {
     }));
   };
 
+  const getEditorKey = (rowId, field) => `${rowId}:${field}`;
+
+  const bindEditorRef = (rowId, field) => (element) => {
+    const key = getEditorKey(rowId, field);
+    if (element) {
+      textareaRefs.current.set(key, element);
+    } else {
+      textareaRefs.current.delete(key);
+    }
+  };
+
+  const syncActiveEditorSelection = (rowId, field) => {
+    const element = textareaRefs.current.get(getEditorKey(rowId, field));
+    if (!element) return;
+    activeEditorRef.current = {
+      rowId,
+      field,
+      selectionStart: Number.isFinite(element.selectionStart) ? element.selectionStart : 0,
+      selectionEnd: Number.isFinite(element.selectionEnd) ? element.selectionEnd : 0,
+    };
+  };
+
+  const insertMediaInEditor = (media, options = {}) => {
+    const snippet = mediaToMarkdownSnippet(media);
+    if (!snippet) return;
+
+    const addToLibrary = options.addToLibrary === true;
+    let nextCaret = null;
+
+    setDraft((prev) => {
+      if (!Array.isArray(prev.rows) || prev.rows.length === 0) return prev;
+
+      const active = activeEditorRef.current;
+      const rowExists = active?.rowId && prev.rows.some((row) => row.id === active.rowId);
+      const rowId = rowExists ? active.rowId : prev.rows[0].id;
+      const field = active?.field === 'textEn' ? 'textEn' : 'text';
+
+      const rows = prev.rows.map((row) => {
+        if (row.id !== rowId) return row;
+
+        const currentValue = String(row?.[field] || '');
+        const rawStart = Number(active?.selectionStart);
+        const rawEnd = Number(active?.selectionEnd);
+        const start = Math.max(0, Math.min(currentValue.length, Number.isFinite(rawStart) ? rawStart : currentValue.length));
+        const end = Math.max(start, Math.min(currentValue.length, Number.isFinite(rawEnd) ? rawEnd : start));
+        const prefix = start > 0 && !currentValue.slice(0, start).endsWith('\n') ? '\n' : '';
+        const suffix = end < currentValue.length && !currentValue.slice(end).startsWith('\n') ? '\n' : '';
+        const insertion = `${prefix}${snippet}${suffix}`;
+        const nextValue = `${currentValue.slice(0, start)}${insertion}${currentValue.slice(end)}`;
+        const caretPosition = start + insertion.length;
+
+        nextCaret = {
+          rowId,
+          field,
+          position: caretPosition,
+        };
+
+        return { ...row, [field]: nextValue };
+      });
+
+      return {
+        ...prev,
+        rows,
+        attachments: addToLibrary ? [...prev.attachments, media] : prev.attachments,
+      };
+    });
+
+    pendingCaretRef.current = nextCaret;
+    requestAnimationFrame(() => {
+      const pending = pendingCaretRef.current;
+      if (!pending) return;
+      const element = textareaRefs.current.get(getEditorKey(pending.rowId, pending.field));
+      if (!element) {
+        pendingCaretRef.current = null;
+        return;
+      }
+      element.focus();
+      element.setSelectionRange(pending.position, pending.position);
+      activeEditorRef.current = {
+        rowId: pending.rowId,
+        field: pending.field,
+        selectionStart: pending.position,
+        selectionEnd: pending.position,
+      };
+      pendingCaretRef.current = null;
+    });
+  };
+
   const addRow = () => {
     setDraft((prev) => ({
       ...prev,
@@ -307,6 +455,9 @@ export default function ChangelogPage({ language = 'en' }) {
   };
 
   const removeRow = (rowId) => {
+    if (activeEditorRef.current?.rowId === rowId) {
+      activeEditorRef.current = null;
+    }
     setDraft((prev) => {
       const nextRows = prev.rows.filter((row) => row.id !== rowId);
       return {
@@ -333,23 +484,50 @@ export default function ChangelogPage({ language = 'en' }) {
 
   const uploadFiles = async (files) => {
     if (!canEdit || !files?.length) return;
+    setError('');
     try {
       setBusyUpload(true);
+      const skipped = [];
+      const failed = [];
+      let uploaded = 0;
+
       for (const file of files) {
-        const mimeType = String(file.type || '').toLowerCase();
-        if (!mimeType.startsWith('image/') && !mimeType.startsWith('video/')) continue;
-        const base64Data = await fileToBase64(file);
-        const response = await api.uploadChangelogMedia({
-          fileName: file.name,
-          mimeType: file.type,
-          base64Data,
-        });
-        if (response?.media) {
-          setDraft((prev) => ({
-            ...prev,
-            attachments: [...prev.attachments, response.media],
-          }));
+        const mimeType = inferMediaMimeType(file);
+        if (!mimeType) {
+          skipped.push(file?.name || 'file');
+          continue;
         }
+
+        try {
+          const base64Data = await fileToBase64(file);
+          const response = await api.uploadChangelogMedia({
+            fileName: file.name,
+            mimeType,
+            base64Data,
+          });
+          if (response?.media) {
+            insertMediaInEditor(response.media, { addToLibrary: true });
+            uploaded += 1;
+          } else {
+            failed.push(`${file.name}: risposta upload non valida`);
+          }
+        } catch (err) {
+          failed.push(`${file.name}: ${err.message || 'upload fallito'}`);
+        }
+      }
+
+      if (uploaded > 0) {
+        setSaveStatus(`Caricati ${uploaded} media e inseriti nel testo`);
+      }
+      if (skipped.length || failed.length) {
+        const details = [];
+        if (skipped.length > 0) {
+          details.push(`File non supportati: ${skipped.join(', ')}`);
+        }
+        if (failed.length > 0) {
+          details.push(`Errori upload: ${failed.join(' | ')}`);
+        }
+        setError(details.join(' — '));
       }
     } catch (err) {
       setError(err.message || 'Upload media fallito');
@@ -365,6 +543,7 @@ export default function ChangelogPage({ language = 'en' }) {
       const next = { ...EMPTY_DRAFT, rows: [{ id: `row_${Date.now()}`, tag: 'UPD', text: '', textEn: '' }] };
       setDraft(next);
       setEditingPostId('');
+      activeEditorRef.current = null;
       lastSavedSerializedRef.current = JSON.stringify(next);
       if (user?.id) {
         localStorage.removeItem(getLocalDraftKey(user.id));
@@ -440,6 +619,7 @@ export default function ChangelogPage({ language = 'en' }) {
     const next = { ...EMPTY_DRAFT, rows: [{ id: `row_${Date.now()}`, tag: 'UPD', text: '', textEn: '' }] };
     setDraft(next);
     setEditingPostId('');
+    activeEditorRef.current = null;
     setSaveStatus('Modifica annullata');
   };
 
@@ -553,6 +733,11 @@ export default function ChangelogPage({ language = 'en' }) {
                           rows={3}
                           value={row.text}
                           onChange={(event) => updateRow(row.id, { text: event.target.value })}
+                          ref={bindEditorRef(row.id, 'text')}
+                          onFocus={() => syncActiveEditorSelection(row.id, 'text')}
+                          onClick={() => syncActiveEditorSelection(row.id, 'text')}
+                          onSelect={() => syncActiveEditorSelection(row.id, 'text')}
+                          onKeyUp={() => syncActiveEditorSelection(row.id, 'text')}
                           placeholder="Testo riga IT (supporto markdown)"
                           className="w-full rounded border border-yt-border/80 bg-[#0e1520] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
                         />
@@ -560,6 +745,11 @@ export default function ChangelogPage({ language = 'en' }) {
                           rows={3}
                           value={row.textEn || ''}
                           onChange={(event) => updateRow(row.id, { textEn: event.target.value })}
+                          ref={bindEditorRef(row.id, 'textEn')}
+                          onFocus={() => syncActiveEditorSelection(row.id, 'textEn')}
+                          onClick={() => syncActiveEditorSelection(row.id, 'textEn')}
+                          onSelect={() => syncActiveEditorSelection(row.id, 'textEn')}
+                          onKeyUp={() => syncActiveEditorSelection(row.id, 'textEn')}
                           placeholder="English row translation (markdown supported)"
                           className="w-full rounded border border-yt-border/80 bg-[#0e1520] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
                         />
@@ -596,7 +786,10 @@ export default function ChangelogPage({ language = 'en' }) {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-xs uppercase tracking-[0.08em] text-yt-text-secondary">
                   <Upload className="w-3.5 h-3.5" />
-                  Allegati immagini/video
+                  Media inline nel testo
+                </div>
+                <div className="text-xs text-yt-text-secondary">
+                  Posiziona il cursore in una riga IT/EN: ogni upload viene inserito nel punto scelto dentro il testo.
                 </div>
                 <label className="inline-flex cursor-pointer items-center gap-2 rounded border border-yt-border px-3 py-2 text-xs text-yt-text-primary hover:border-yt-accent">
                   {busyUpload ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
@@ -633,18 +826,30 @@ export default function ChangelogPage({ language = 'en' }) {
                             {attachment.type === 'video' ? <Video className="inline w-3.5 h-3.5 mr-1" /> : null}
                             {attachment.fileName || attachment.id}
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDraft((prev) => ({
-                                ...prev,
-                                attachments: prev.attachments.filter((item) => item.id !== attachment.id),
-                              }));
-                            }}
-                            className="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-300"
-                          >
-                            Rimuovi
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                insertMediaInEditor(attachment);
+                                setSaveStatus('Media inserito nel testo');
+                              }}
+                              className="rounded border border-yt-border px-2 py-1 text-xs text-yt-text-primary hover:border-yt-accent"
+                            >
+                              Inserisci
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDraft((prev) => ({
+                                  ...prev,
+                                  attachments: prev.attachments.filter((item) => item.id !== attachment.id),
+                                }));
+                              }}
+                              className="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-300"
+                            >
+                              Rimuovi
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -780,30 +985,6 @@ export default function ChangelogPage({ language = 'en' }) {
                 );
               })}
             </div>
-
-            {Array.isArray(post.attachments) && post.attachments.length > 0 && (
-              <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
-                {post.attachments.map((attachment) => (
-                  <div key={attachment.id} className="rounded border border-yt-border/70 bg-[#0d1520] p-2">
-                    {attachment.type === 'video' ? (
-                      <video
-                        src={attachment.url}
-                        controls
-                        className="w-full max-h-64 rounded cursor-zoom-in"
-                        onClick={() => openFullscreenMedia(attachment)}
-                      />
-                    ) : (
-                      <img
-                        src={attachment.url}
-                        alt={attachment.fileName || attachment.id}
-                        className="w-full max-h-64 object-contain rounded cursor-zoom-in"
-                        onClick={() => openFullscreenMedia(attachment)}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
 
             {Array.isArray(post.contributorIds) && post.contributorIds.length > 0 && (
               <div className="mt-3 text-xs text-yt-text-secondary">

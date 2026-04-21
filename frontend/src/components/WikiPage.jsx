@@ -557,6 +557,49 @@ function fileToBase64(file) {
   });
 }
 
+function inferMediaMimeType(file) {
+  const fromFile = String(file?.type || '').trim().toLowerCase();
+  if (fromFile.startsWith('image/') || fromFile.startsWith('video/')) {
+    return fromFile;
+  }
+
+  const lowerName = String(file?.name || '').trim().toLowerCase();
+  if (!lowerName) return '';
+
+  const extensionMap = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp',
+    '.gif': 'image/gif',
+    '.bmp': 'image/bmp',
+    '.svg': 'image/svg+xml',
+    '.avif': 'image/avif',
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
+    '.ogg': 'video/ogg',
+    '.ogv': 'video/ogg',
+    '.mov': 'video/quicktime',
+    '.m4v': 'video/x-m4v',
+    '.avi': 'video/x-msvideo',
+    '.mkv': 'video/x-matroska',
+  };
+
+  const entry = Object.entries(extensionMap).find(([extension]) => lowerName.endsWith(extension));
+  return entry?.[1] || '';
+}
+
+function mediaToMarkdownSnippet(media) {
+  if (!media?.url) return '';
+  const safeName = String(media.fileName || media.id || 'media')
+    .replaceAll('[', '')
+    .replaceAll(']', '');
+  if (media.type === 'image') {
+    return `![${safeName}](${media.url})`;
+  }
+  return `[${safeName}](${media.url})`;
+}
+
 function resolveGameplayIcon(iconKey, fallback = Layers3) {
   const normalizedKey = normalizeGameplayIconKey(iconKey);
   return GAMEPLAY_ICON_MAP[normalizedKey] || fallback;
@@ -592,6 +635,10 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
   const wikiSaveTimerRef = useRef(null);
   const lastSavedDraftSerializedRef = useRef('');
   const wikiMediaInputRef = useRef(null);
+  const newTopicMediaInputRef = useRef(null);
+  const markdownTextareaRefs = useRef(new Map());
+  const activeMarkdownEditorRef = useRef(null);
+  const pendingMarkdownCaretRef = useRef(null);
 
   const canEditWiki = Boolean(user?.id && WIKI_EDITOR_IDS.has(String(user.id)));
   const ui = UI_COPY[language] || UI_COPY.en;
@@ -916,6 +963,85 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
     }, 900);
   }, [canEditWiki, draftLoading, editorOpen, selectedGameplayFeature?.id, wikiDraft, ui.savingDraft, ui.draftSaved, ui.draftSaveError]);
 
+  const getMarkdownEditorKey = (scope, field) => `${scope}:${field}`;
+
+  const bindMarkdownEditorRef = (scope, field) => (element) => {
+    const key = getMarkdownEditorKey(scope, field);
+    if (element) {
+      markdownTextareaRefs.current.set(key, element);
+    } else {
+      markdownTextareaRefs.current.delete(key);
+    }
+  };
+
+  const syncMarkdownSelection = (scope, field) => {
+    const element = markdownTextareaRefs.current.get(getMarkdownEditorKey(scope, field));
+    if (!element) return;
+    activeMarkdownEditorRef.current = {
+      scope,
+      field,
+      selectionStart: Number.isFinite(element.selectionStart) ? element.selectionStart : 0,
+      selectionEnd: Number.isFinite(element.selectionEnd) ? element.selectionEnd : 0,
+    };
+  };
+
+  const insertMarkdownSnippetAtSelection = (snippet, scope) => {
+    if (!snippet) return;
+
+    const active = activeMarkdownEditorRef.current;
+    const sameScope = active?.scope === scope;
+    const targetField = sameScope && active?.field === 'contentIt' ? 'contentIt' : 'contentEn';
+    let nextCaret = null;
+
+    const setDraftState = scope === 'wikiDraft' ? setWikiDraft : setNewTopicDraft;
+    setDraftState((prev) => {
+      const currentValue = String(prev?.[targetField] || '');
+      const rawStart = Number(sameScope ? active?.selectionStart : currentValue.length);
+      const rawEnd = Number(sameScope ? active?.selectionEnd : rawStart);
+      const start = Math.max(0, Math.min(currentValue.length, Number.isFinite(rawStart) ? rawStart : currentValue.length));
+      const end = Math.max(start, Math.min(currentValue.length, Number.isFinite(rawEnd) ? rawEnd : start));
+
+      const before = currentValue.slice(0, start);
+      const after = currentValue.slice(end);
+      const leading = start > 0 && !before.endsWith('\n') ? '\n' : '';
+      const trailing = !after.startsWith('\n') ? '\n' : '';
+      const insertion = `${leading}${snippet}${trailing}`;
+      const nextValue = `${before}${insertion}${after}`;
+      const caretPosition = start + insertion.length;
+
+      nextCaret = {
+        scope,
+        field: targetField,
+        position: caretPosition,
+      };
+
+      return {
+        ...prev,
+        [targetField]: nextValue,
+      };
+    });
+
+    pendingMarkdownCaretRef.current = nextCaret;
+    requestAnimationFrame(() => {
+      const pending = pendingMarkdownCaretRef.current;
+      if (!pending) return;
+      const element = markdownTextareaRefs.current.get(getMarkdownEditorKey(pending.scope, pending.field));
+      if (!element) {
+        pendingMarkdownCaretRef.current = null;
+        return;
+      }
+      element.focus();
+      element.setSelectionRange(pending.position, pending.position);
+      activeMarkdownEditorRef.current = {
+        scope: pending.scope,
+        field: pending.field,
+        selectionStart: pending.position,
+        selectionEnd: pending.position,
+      };
+      pendingMarkdownCaretRef.current = null;
+    });
+  };
+
   const handleVehicleCategoryFilterChange = (nextCategoryKey) => {
     if (!nextCategoryKey || nextCategoryKey === selectedVehicleCategoryKey) {
       return;
@@ -1005,6 +1131,9 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
       setNewTopicIconSearch('');
       setNewTopicStatus('');
       setNewTopicDraft(buildEmptyNewTopicDraft());
+      if (newTopicMediaInputRef.current) {
+        newTopicMediaInputRef.current.value = '';
+      }
       openGameplayArticleFullscreen();
     } catch (error) {
       setNewTopicStatus(error.message || ui.topicCreateError);
@@ -1043,32 +1172,117 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
 
     try {
       setUploadingMedia(true);
+      const skipped = [];
+      const failed = [];
+      let uploaded = 0;
+
       for (const file of files) {
-        const mimeType = String(file.type || '').toLowerCase();
-        if (!mimeType.startsWith('image/') && !mimeType.startsWith('video/')) continue;
-        const base64Data = await fileToBase64(file);
-        const response = await api.uploadWikiMedia({
-          fileName: file.name,
-          mimeType: file.type,
-          base64Data,
-        });
-        const media = response?.media;
-        if (!media?.url) continue;
-        const snippet = media.type === 'image'
-          ? `\n\n![${media.fileName || media.id}](${media.url})\n`
-          : `\n\n[${media.fileName || media.id}](${media.url})\n`;
-        setWikiDraft((prev) => ({
-          ...prev,
-          contentEn: `${prev.contentEn || ''}${snippet}`,
-        }));
+        const mimeType = inferMediaMimeType(file);
+        if (!mimeType) {
+          skipped.push(file?.name || 'file');
+          continue;
+        }
+        try {
+          const base64Data = await fileToBase64(file);
+          const response = await api.uploadWikiMedia({
+            fileName: file.name,
+            mimeType,
+            base64Data,
+          });
+          const media = response?.media;
+          const snippet = mediaToMarkdownSnippet(media);
+          if (!snippet) {
+            failed.push(`${file.name}: invalid upload response`);
+            continue;
+          }
+          insertMarkdownSnippetAtSelection(snippet, 'wikiDraft');
+          uploaded += 1;
+        } catch (error) {
+          failed.push(`${file?.name || 'file'}: ${error.message || ui.mediaError}`);
+        }
       }
-      setDraftStatus(ui.mediaInserted);
+
+      if (uploaded > 0) {
+        setDraftStatus(ui.mediaInserted);
+      } else if (!failed.length && !skipped.length) {
+        setDraftStatus(ui.mediaError);
+      }
+      if (failed.length || skipped.length) {
+        const details = [];
+        if (skipped.length > 0) {
+          details.push(`Unsupported: ${skipped.join(', ')}`);
+        }
+        if (failed.length > 0) {
+          details.push(`Errors: ${failed.join(' | ')}`);
+        }
+        setDraftStatus(details.join(' — '));
+      }
     } catch (error) {
       setDraftStatus(error.message || ui.mediaError);
     } finally {
       setUploadingMedia(false);
       if (wikiMediaInputRef.current) {
         wikiMediaInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleUploadNewTopicMedia = async (files) => {
+    if (!canEditWiki || !files?.length) return;
+
+    try {
+      setUploadingMedia(true);
+      const skipped = [];
+      const failed = [];
+      let uploaded = 0;
+
+      for (const file of files) {
+        const mimeType = inferMediaMimeType(file);
+        if (!mimeType) {
+          skipped.push(file?.name || 'file');
+          continue;
+        }
+        try {
+          const base64Data = await fileToBase64(file);
+          const response = await api.uploadWikiMedia({
+            fileName: file.name,
+            mimeType,
+            base64Data,
+          });
+          const media = response?.media;
+          const snippet = mediaToMarkdownSnippet(media);
+          if (!snippet) {
+            failed.push(`${file.name}: invalid upload response`);
+            continue;
+          }
+          insertMarkdownSnippetAtSelection(snippet, 'newTopicDraft');
+          uploaded += 1;
+        } catch (error) {
+          failed.push(`${file?.name || 'file'}: ${error.message || ui.mediaError}`);
+        }
+      }
+
+      if (uploaded > 0) {
+        setNewTopicStatus(ui.mediaInserted);
+      } else if (!failed.length && !skipped.length) {
+        setNewTopicStatus(ui.mediaError);
+      }
+      if (failed.length || skipped.length) {
+        const details = [];
+        if (skipped.length > 0) {
+          details.push(`Unsupported: ${skipped.join(', ')}`);
+        }
+        if (failed.length > 0) {
+          details.push(`Errors: ${failed.join(' | ')}`);
+        }
+        setNewTopicStatus(details.join(' — '));
+      }
+    } catch (error) {
+      setNewTopicStatus(error.message || ui.mediaError);
+    } finally {
+      setUploadingMedia(false);
+      if (newTopicMediaInputRef.current) {
+        newTopicMediaInputRef.current.value = '';
       }
     }
   };
@@ -1215,6 +1429,11 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                     rows={10}
                     value={wikiDraft.contentEn}
                     onChange={(event) => setWikiDraft((prev) => ({ ...prev, contentEn: event.target.value }))}
+                    ref={bindMarkdownEditorRef('wikiDraft', 'contentEn')}
+                    onFocus={() => syncMarkdownSelection('wikiDraft', 'contentEn')}
+                    onClick={() => syncMarkdownSelection('wikiDraft', 'contentEn')}
+                    onSelect={() => syncMarkdownSelection('wikiDraft', 'contentEn')}
+                    onKeyUp={() => syncMarkdownSelection('wikiDraft', 'contentEn')}
                     placeholder={ui.contentPlaceholder}
                     className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
                   />
@@ -1239,6 +1458,11 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                     rows={8}
                     value={wikiDraft.contentIt}
                     onChange={(event) => setWikiDraft((prev) => ({ ...prev, contentIt: event.target.value }))}
+                    ref={bindMarkdownEditorRef('wikiDraft', 'contentIt')}
+                    onFocus={() => syncMarkdownSelection('wikiDraft', 'contentIt')}
+                    onClick={() => syncMarkdownSelection('wikiDraft', 'contentIt')}
+                    onSelect={() => syncMarkdownSelection('wikiDraft', 'contentIt')}
+                    onKeyUp={() => syncMarkdownSelection('wikiDraft', 'contentIt')}
                     placeholder={ui.contentPlaceholderIt}
                     className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
                   />
@@ -1258,6 +1482,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                         ref={wikiMediaInputRef}
                         type="file"
                         accept="image/*,video/*"
+                        multiple
                         className="hidden"
                         onChange={(event) => handleUploadWikiMedia(Array.from(event.target.files || []))}
                       />
@@ -1407,6 +1632,9 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                   setNewTopicIconPickerOpen(false);
                   setNewTopicIconSearch('');
                   setNewTopicStatus('');
+                  if (newTopicMediaInputRef.current) {
+                    newTopicMediaInputRef.current.value = '';
+                  }
                   return;
                 }
                 setNewTopicDraft(buildEmptyNewTopicDraft());
@@ -1526,6 +1754,11 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                 rows={8}
                 value={newTopicDraft.contentEn}
                 onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, contentEn: event.target.value }))}
+                ref={bindMarkdownEditorRef('newTopicDraft', 'contentEn')}
+                onFocus={() => syncMarkdownSelection('newTopicDraft', 'contentEn')}
+                onClick={() => syncMarkdownSelection('newTopicDraft', 'contentEn')}
+                onSelect={() => syncMarkdownSelection('newTopicDraft', 'contentEn')}
+                onKeyUp={() => syncMarkdownSelection('newTopicDraft', 'contentEn')}
                 placeholder={ui.topicContentPlaceholder}
                 className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
               />
@@ -1550,6 +1783,11 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                 rows={6}
                 value={newTopicDraft.contentIt}
                 onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, contentIt: event.target.value }))}
+                ref={bindMarkdownEditorRef('newTopicDraft', 'contentIt')}
+                onFocus={() => syncMarkdownSelection('newTopicDraft', 'contentIt')}
+                onClick={() => syncMarkdownSelection('newTopicDraft', 'contentIt')}
+                onSelect={() => syncMarkdownSelection('newTopicDraft', 'contentIt')}
+                onKeyUp={() => syncMarkdownSelection('newTopicDraft', 'contentIt')}
                 placeholder={ui.topicContentPlaceholderIt}
                 className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
               />
@@ -1563,6 +1801,18 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                   {creatingTopic ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                   {ui.createTopic}
                 </button>
+                <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary hover:border-yt-accent hover:text-yt-accent">
+                  {uploadingMedia ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                  {ui.uploadMedia}
+                  <input
+                    ref={newTopicMediaInputRef}
+                    type="file"
+                    accept="image/*,video/*"
+                    multiple
+                    className="hidden"
+                    onChange={(event) => handleUploadNewTopicMedia(Array.from(event.target.files || []))}
+                  />
+                </label>
                 <button
                   type="button"
                   onClick={() => {
@@ -1571,12 +1821,29 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                     setNewTopicIconSearch('');
                     setNewTopicStatus('');
                     setNewTopicDraft(buildEmptyNewTopicDraft());
+                    if (newTopicMediaInputRef.current) {
+                      newTopicMediaInputRef.current.value = '';
+                    }
                   }}
                   className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary"
                 >
                   <X className="h-3.5 w-3.5" />
                   {ui.cancel}
                 </button>
+              </div>
+              <div className="rounded border border-yt-border/80 bg-[#111a28] p-3">
+                <h4 className="mb-2 text-xs font-bold uppercase tracking-[0.1em] text-yt-accent">{ui.preview}</h4>
+                <h3 className="text-lg font-extrabold uppercase tracking-[0.05em] text-yt-text-primary">
+                  {getDraftLocalizedField(newTopicDraft, 'title', language) || ui.titleFallback}
+                </h3>
+                <p className="mb-3 mt-1 text-sm text-yt-text-secondary">
+                  {getDraftLocalizedField(newTopicDraft, 'summary', language) || ui.summaryFallback}
+                </p>
+                <div className="max-h-[340px] overflow-auto rounded border border-yt-border/70 bg-[#0c1320] px-3 py-2">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                    {getDraftLocalizedField(newTopicDraft, 'content', language) || ui.emptyContentFallback}
+                  </ReactMarkdown>
+                </div>
               </div>
             </div>
           </div>
