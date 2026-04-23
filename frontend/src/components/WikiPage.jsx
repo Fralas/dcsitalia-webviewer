@@ -127,7 +127,11 @@ const GAMEPLAY_ICON_LIBRARY = Object.entries(LucideIcons)
     if (!/^[A-Z]/.test(name)) return false;
     if (name.startsWith('Lucide')) return false;
     if (name.endsWith('Icon')) return false;
-    return typeof value === 'function';
+    if (typeof value === 'function') return true;
+    if (value && typeof value === 'object') {
+      return Boolean(value.$$typeof) || typeof value.render === 'function';
+    }
+    return false;
   })
   .map(([name, Icon]) => ({
     key: normalizeGameplayIconKey(name),
@@ -499,6 +503,8 @@ const UI_COPY = {
     chooseIcon: 'Choose Icon',
     hideIcons: 'Hide Icons',
     searchIcon: 'Search icon...',
+    iconSearchHint: 'All icons are shown below. Search is optional.',
+    noIconsFound: 'No icon matches your search.',
     newTopic: 'New Topic',
     closeNewTopic: 'Close New Topic',
     createNewTopic: 'Create New Topic',
@@ -574,6 +580,8 @@ const UI_COPY = {
     chooseIcon: 'Scegli Icona',
     hideIcons: 'Nascondi Icone',
     searchIcon: 'Cerca icona...',
+    iconSearchHint: 'Tutte le icone sono visibili sotto. La ricerca e opzionale.',
+    noIconsFound: 'Nessuna icona trovata con questa ricerca.',
     newTopic: 'Nuovo Argomento',
     closeNewTopic: 'Chiudi Nuovo Argomento',
     createNewTopic: 'Crea Nuovo Argomento',
@@ -1379,7 +1387,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
         if (failed.length > 0) {
           details.push(`Errors: ${failed.join(' | ')}`);
         }
-        setDraftStatus(details.join(' — '));
+        setDraftStatus(details.join(' - '));
       }
     } catch (error) {
       setDraftStatus(error.message || ui.mediaError);
@@ -1439,7 +1447,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
         if (failed.length > 0) {
           details.push(`Errors: ${failed.join(' | ')}`);
         }
-        setNewTopicStatus(details.join(' — '));
+        setNewTopicStatus(details.join(' - '));
       }
     } catch (error) {
       setNewTopicStatus(error.message || ui.mediaError);
@@ -1449,6 +1457,38 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
         newTopicMediaInputRef.current.value = '';
       }
     }
+  };
+
+  const handleMarkdownDragOver = (event) => {
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'copy';
+    }
+  };
+
+  const handleMarkdownDrop = (event, scope, field) => {
+    event.preventDefault();
+    const files = Array.from(event.dataTransfer?.files || []);
+    if (!files.length) return;
+
+    const textarea = event.currentTarget;
+    textarea.focus();
+    const fallbackPosition = String(textarea.value || '').length;
+    const selectionStart = Number.isFinite(textarea.selectionStart) ? textarea.selectionStart : fallbackPosition;
+    const selectionEnd = Number.isFinite(textarea.selectionEnd) ? textarea.selectionEnd : selectionStart;
+
+    activeMarkdownEditorRef.current = {
+      scope,
+      field,
+      selectionStart,
+      selectionEnd,
+    };
+
+    if (scope === 'wikiDraft') {
+      handleUploadWikiMedia(files);
+      return;
+    }
+    handleUploadNewTopicMedia(files);
   };
 
   const renderGameplayArticleContent = () => {
@@ -1541,6 +1581,9 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                     </div>
                     {wikiDraftIconPickerOpen && (
                       <div className="mt-2 space-y-2 rounded border border-yt-border/70 bg-[#0f1725] p-2.5">
+                        <p className="text-[11px] text-yt-text-secondary">
+                          {ui.iconSearchHint}
+                        </p>
                         <input
                           type="text"
                           value={wikiDraftIconSearch}
@@ -1573,6 +1616,9 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                               );
                             })}
                           </div>
+                          {filteredDraftIcons.length === 0 && (
+                            <p className="px-1 py-2 text-xs text-yt-text-secondary">{ui.noIconsFound}</p>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1602,6 +1648,8 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                     onClick={() => syncMarkdownSelection('wikiDraft', 'contentEn')}
                     onSelect={() => syncMarkdownSelection('wikiDraft', 'contentEn')}
                     onKeyUp={() => syncMarkdownSelection('wikiDraft', 'contentEn')}
+                    onDragOver={handleMarkdownDragOver}
+                    onDrop={(event) => handleMarkdownDrop(event, 'wikiDraft', 'contentEn')}
                     placeholder={ui.contentPlaceholder}
                     className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
                   />
@@ -1631,6 +1679,8 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                     onClick={() => syncMarkdownSelection('wikiDraft', 'contentIt')}
                     onSelect={() => syncMarkdownSelection('wikiDraft', 'contentIt')}
                     onKeyUp={() => syncMarkdownSelection('wikiDraft', 'contentIt')}
+                    onDragOver={handleMarkdownDragOver}
+                    onDrop={(event) => handleMarkdownDrop(event, 'wikiDraft', 'contentIt')}
                     placeholder={ui.contentPlaceholderIt}
                     className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
                   />
@@ -1869,6 +1919,9 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                 </div>
                 {newTopicIconPickerOpen && (
                   <div className="mt-2 space-y-2 rounded border border-yt-border/70 bg-[#0f1725] p-2.5">
+                    <p className="text-[11px] text-yt-text-secondary">
+                      {ui.iconSearchHint}
+                    </p>
                     <input
                       type="text"
                       value={newTopicIconSearch}
@@ -1901,6 +1954,9 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                           );
                         })}
                       </div>
+                      {filteredNewTopicIcons.length === 0 && (
+                        <p className="px-1 py-2 text-xs text-yt-text-secondary">{ui.noIconsFound}</p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1930,6 +1986,8 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                 onClick={() => syncMarkdownSelection('newTopicDraft', 'contentEn')}
                 onSelect={() => syncMarkdownSelection('newTopicDraft', 'contentEn')}
                 onKeyUp={() => syncMarkdownSelection('newTopicDraft', 'contentEn')}
+                onDragOver={handleMarkdownDragOver}
+                onDrop={(event) => handleMarkdownDrop(event, 'newTopicDraft', 'contentEn')}
                 placeholder={ui.topicContentPlaceholder}
                 className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
               />
@@ -1959,6 +2017,8 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                 onClick={() => syncMarkdownSelection('newTopicDraft', 'contentIt')}
                 onSelect={() => syncMarkdownSelection('newTopicDraft', 'contentIt')}
                 onKeyUp={() => syncMarkdownSelection('newTopicDraft', 'contentIt')}
+                onDragOver={handleMarkdownDragOver}
+                onDrop={(event) => handleMarkdownDrop(event, 'newTopicDraft', 'contentIt')}
                 placeholder={ui.topicContentPlaceholderIt}
                 className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
               />
