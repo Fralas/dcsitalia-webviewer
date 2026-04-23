@@ -28,18 +28,32 @@ import {
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import avengerImg from '../../img/wiki/veh/AVENGER.png';
+import blueBombImg from '../../img/wiki/veh/BLUE_BOMB.png';
+import blueCasImg from '../../img/wiki/veh/BLUE_CAS.png';
+import blueCruiseImg from '../../img/wiki/veh/BLUE_CRUISE.png';
+import blueDroneImg from '../../img/wiki/veh/BLUE_DRONE.png';
+import blueEwarImg from '../../img/wiki/veh/BLUE_EWAR.png';
+import bluePatrolImg from '../../img/wiki/veh/BLUE_PATROL.png';
 import firtinaImg from '../../img/wiki/veh/FIRTINA.png';
 import fmtvImg from '../../img/wiki/veh/FMTV.png';
 import gepardImg from '../../img/wiki/veh/GEPARD.png';
 import gmlrsAtacmsImg from '../../img/wiki/veh/GMLRS-ATACMS.png';
-import hemttImg from '../../img/wiki/veh/HEMTT.png';
+import heliSupplyImg from '../../img/wiki/veh/HELISUPPLY.png';
+import hmmweMgImg from '../../img/wiki/veh/HMMWE MG.png';
 import hmmwvImg from '../../img/wiki/veh/HMMWV.png';
+import iristImg from '../../img/wiki/veh/IRIST.png';
 import l118Img from '../../img/wiki/veh/L118.png';
 import lavImg from '../../img/wiki/veh/LAV.png';
+import manpadImg from '../../img/wiki/veh/MANPAD.png';
 import mbtImg from '../../img/wiki/veh/MBT.png';
+import nasamsImg from '../../img/wiki/veh/NASAMS.png';
+import patriotImg from '../../img/wiki/veh/PATRIOT.png';
 import rolandImg from '../../img/wiki/veh/ROLAND.png';
 import scimitarImg from '../../img/wiki/veh/SCIMITAR.png';
 import scorpionImg from '../../img/wiki/veh/SCORPION.png';
+import scoutImg from '../../img/wiki/veh/SCOUT.png';
+import shipImg from '../../img/wiki/veh/SHIP.png';
+import tankerImg from '../../img/wiki/veh/TANKER.png';
 import towImg from '../../img/wiki/veh/TOW.png';
 import { useUser } from '../contexts/UserContext';
 import * as api from '../services/api';
@@ -134,153 +148,293 @@ const GAMEPLAY_ICON_LABEL_MAP = GAMEPLAY_ICON_LIBRARY.reduce((acc, iconDef) => {
 const VEHICLES = [
   {
     id: 'avenger',
-    category: { en: 'Air Defense', it: 'Air Defense' },
+    category: { en: 'AIR DEFENCE', it: 'AIR DEFENCE' },
     name: 'Avenger',
     description: {
-      en: 'Mobile SHORAD system designed to counter helicopters and low-altitude threats.',
-      it: 'Sistema SHORAD mobile per contrastare elicotteri e minacce a bassa quota.',
+      en: 'US SHORAD system on HMMWV, fielded in the 1990s. Uses Stinger missiles for mobile close air defense. Range: 2.6 NM / 4,800 m. Ceiling: up to 12,500 ft. Targets: helicopters, drones, low-altitude aircraft. Seeker: IR fire-and-forget missile. Feature: Air-droppable.',
+      it: 'Sistema SHORAD statunitense su HMMWV, in servizio dagli anni 90. Usa missili Stinger per difesa ravvicinata mobile. Raggio: 2.6 NM / 4,800 m. Quota: fino a 12,500 ft. Bersagli: elicotteri, droni, aerei a bassa quota. Guida: missile IR fire-and-forget. Caratteristica: aviolanciabile.',
     },
     image: avengerImg,
   },
   {
-    id: 'firtina',
-    category: { en: 'SUPPORT', it: 'SUPPORT' },
-    name: 'Firtina',
+    id: 'roland',
+    category: { en: 'AIR DEFENCE', it: 'AIR DEFENCE' },
+    name: 'Roland',
     description: {
-      en: 'Self-propelled howitzer for long-range indirect fire on tactical targets.',
-      it: 'Obice semovente per fuoco indiretto a lunga distanza su obiettivi tattici.',
+      en: 'Franco-German short-range SAM developed during the Cold War for mobile defense of units and sensitive sites. Range: 4.3 NM / 8,000 m. Ceiling: up to 18,000 ft. Targets: aircraft, helicopters, low-altitude threats. Guidance: command-guided missile with radar/optical tracking.',
+      it: 'Sistema SAM franco-tedesco a corto raggio sviluppato nella Guerra Fredda per difesa mobile di unita e siti sensibili. Raggio: 4.3 NM / 8,000 m. Quota: fino a 18,000 ft. Bersagli: aerei, elicotteri, minacce a bassa quota. Guida: missile a comando con tracking radar/ottico.',
     },
-    image: firtinaImg,
-  },
-  {
-    id: 'fmtv',
-    category: { en: 'SUPPORT', it: 'SUPPORT' },
-    name: 'FMTV',
-    description: {
-      en: 'Multi-role tactical truck for transporting supplies, ammunition, and field support cargo.',
-      it: 'Camion tattico multiruolo per trasporto rifornimenti, munizioni e supporto operativo.',
-    },
-    image: fmtvImg,
+    image: rolandImg,
   },
   {
     id: 'gepard',
-    category: { en: 'Air Defense', it: 'Air Defense' },
+    category: { en: 'AIR DEFENCE', it: 'AIR DEFENCE' },
     name: 'Gepard',
     description: {
-      en: 'Gun-based anti-air platform for close protection of ground units.',
-      it: 'Piattaforma antiaerea a cannoni per protezione ravvicinata delle unita a terra.',
+      en: 'German SPAAG on Leopard 1 chassis designed for close anti-air protection of armored forces. Range: 2.7 NM / 5,000 m. Ceiling: up to 11,500 ft. Targets: helicopters, drones, and low pass aircraft. Weapon: twin 35 mm cannons with search and tracking radar.',
+      it: 'SPAAG tedesco su scafo Leopard 1, progettato per protezione antiaerea ravvicinata delle forze corazzate. Raggio: 2.7 NM / 5,000 m. Quota: fino a 11,500 ft. Bersagli: elicotteri, droni, aerei in passaggio ravvicinato. Arma: doppio cannone da 35 mm con radar di scoperta e inseguimento.',
     },
     image: gepardImg,
+  },
+  {
+    id: 'manpad',
+    category: { en: 'AIR DEFENCE', it: 'AIR DEFENCE' },
+    name: 'Manpad',
+    description: {
+      en: 'Shoulder-launched infantry air defense for lightweight and dispersed frontline coverage. Range: 2.6 NM / 4,800 m. Ceiling: up to 12,500 ft. Targets: helicopters, drones, low-altitude aircraft. Seeker: passive IR fire-and-forget. Feature: Helicopter transportable.',
+      it: 'Difesa antiaerea spalleggiabile di fanteria, pensata per copertura leggera e dispersa del fronte. Raggio: 2.6 NM / 4,800 m. Quota: fino a 12,500 ft. Bersagli: elicotteri, droni, aerei a bassa quota. Guida: missile IR passivo fire-and-forget. Caratteristica: trasportabile su elicottero.',
+    },
+    image: manpadImg,
+  },
+  {
+    id: 'tow',
+    category: { en: 'GROUND', it: 'GROUND' },
+    name: 'TOW',
+    description: {
+      en: 'US anti-tank missile introduced in the 1970s and still widely used on tripods and vehicles. Range: 2.0 NM / 3,750 m. Targets: MBTs, IFVs, bunkers, armored vehicles. Guidance: SACLOS, optically tracked, wire-guided. Feature: Air-droppable and sling-load transportable.',
+      it: 'Missile anticarro statunitense introdotto negli anni 70, ancora molto diffuso su treppiede e veicoli. Raggio: 2.0 NM / 3,750 m. Bersagli: MBT, IFV, bunker, veicoli corazzati. Guida: missile SACLOS, tracciamento ottico, wire-guided. Caratteristica: aviolanciabile e trasportabile via SlingLoad.',
+    },
+    image: towImg,
+  },
+  {
+    id: 'mbt',
+    category: { en: 'GROUND', it: 'GROUND' },
+    name: 'MBT',
+    description: {
+      en: 'Modern Main Battle Tank, the core of armored land forces, combining protection, mobility, and heavy direct fire. Range: 2.2 NM / 4,000 m. Targets: tanks, armored vehicles, fortifications, infantry. Weapon: direct-fire cannon with optics and fire-control system.',
+      it: 'Main Battle Tank moderno, cuore della forza corazzata terrestre. Combina protezione, mobilita e fuoco diretto pesante. Raggio: 2.2 NM / 4,000 m. Bersagli: carri, mezzi corazzati, fortificazioni, fanteria. Arma: cannone diretto con ottiche e fire control system.',
+    },
+    image: mbtImg,
+  },
+  {
+    id: 'lav25',
+    category: { en: 'GROUND', it: 'GROUND' },
+    name: 'LAV25',
+    description: {
+      en: 'Light 8x8 armored vehicle built for armed reconnaissance and rapid support. Range: 1.1 NM / 2,000 m. Targets: infantry, light vehicles, positions, and soft-skinned targets. Weapon: 25 mm autocannon, direct optical fire. Feature: Amphibious.',
+      it: 'Veicolo blindato leggero 8x8 nato per ricognizione armata e supporto rapido. Raggio: 1.1 NM / 2,000 m. Bersagli: fanteria, veicoli leggeri, postazioni, bersagli soft-skinned. Arma: cannone automatico da 25 mm, tiro diretto ottico. Caratteristica: anfibio.',
+    },
+    image: lavImg,
+  },
+  {
+    id: 'scorpion',
+    category: { en: 'GROUND', it: 'GROUND' },
+    name: 'SCORPION',
+    description: {
+      en: 'FV101 Scorpion, British reconnaissance vehicle with 76 mm cannon, introduced in the 1970s. Range: 1.2 NM / 2,200 m. Targets: light vehicles, infantry, exposed positions. Weapon: 76 mm direct-fire cannon. Feature: Air-droppable.',
+      it: 'FV101 Scorpion, veicolo britannico da ricognizione armato con cannone da 76 mm, introdotto negli anni 70. Raggio: 1.2 NM / 2,200 m. Bersagli: veicoli leggeri, fanteria, posizioni scoperte. Arma: cannone da 76 mm a tiro diretto. Caratteristica: aviolanciabile.',
+    },
+    image: scorpionImg,
+  },
+  {
+    id: 'scimitar',
+    category: { en: 'GROUND', it: 'GROUND' },
+    name: 'SCIMITAR',
+    description: {
+      en: 'British CVR(T) reconnaissance vehicle oriented to rapid direct fire compared to Scorpion. Range: 1.1 NM / 2,000 m. Targets: infantry, light vehicles, scouts, and positions. Weapon: 30 mm direct-fire cannon. Feature: Air-droppable.',
+      it: 'Veicolo da ricognizione britannico CVR(T), orientato al fuoco rapido rispetto allo Scorpion. Raggio: 1.1 NM / 2,000 m. Bersagli: fanteria, veicoli leggeri, scout, postazioni. Arma: cannone da 30 mm a tiro diretto. Caratteristica: aviolanciabile.',
+    },
+    image: scimitarImg,
+  },
+  {
+    id: 'atacms',
+    category: { en: 'SUPPORT', it: 'SUPPORT' },
+    name: 'ATCAMS',
+    description: {
+      en: 'Long-range tactical missile designed for deep precision strikes. Range: 162.0 NM / 300,000 m. Targets: depots, radars, SAM sites, airfields, and force concentrations. Guidance: tactical ballistic missile with INS/GPS.',
+      it: 'Missile tattico a lungo raggio pensato per colpire obiettivi in profondita con alta precisione. Raggio: 162.0 NM / 300,000 m. Bersagli: depositi, radar, SAM, aeroporti, concentrazioni di forze. Guida: missile balistico tattico INS/GPS.',
+    },
+    image: gmlrsAtacmsImg,
   },
   {
     id: 'gmlrs',
     category: { en: 'SUPPORT', it: 'SUPPORT' },
     name: 'GMLRS',
     description: {
-      en: 'Long-range guided rockets for precision strikes on strategic targets.',
-      it: 'Razzi guidati a lungo raggio per ingaggi di precisione su target strategici.',
+      en: 'Guided rocket for MLRS/HIMARS developed for precise medium-to-long range strikes. Range: 54.0 NM / 100,000 m. Targets: artillery, depots, vehicles, structures, and command points. Guidance: INS/GPS guided rocket.',
+      it: 'Razzo guidato per MLRS/HIMARS sviluppato per attacchi precisi a medio-lungo raggio. Raggio: 54.0 NM / 100,000 m. Bersagli: artiglieria, depositi, veicoli, strutture, punti di comando. Guida: razzo guidato INS/GPS.',
     },
     image: gmlrsAtacmsImg,
   },
   {
-    id: 'atacms',
+    id: 'firtina',
     category: { en: 'SUPPORT', it: 'SUPPORT' },
-    name: 'ATACMS',
+    name: 'FIRTINA',
     description: {
-      en: 'Tactical very-long-range missile to strike critical deep targets.',
-      it: 'Missile tattico a lunghissimo raggio per colpire nodi critici in profondita.',
+      en: 'Turkish 155 mm self-propelled howitzer derived from K9, used for mobile artillery support. Range: 21.6 NM / 40,000 m. Targets: infantry, artillery, positions, and logistic areas. Fire mode: indirect artillery with HE and special munitions.',
+      it: 'Obice semovente turco da 155 mm derivato dal K9, impiegato per supporto di artiglieria mobile. Raggio: 21.6 NM / 40,000 m. Bersagli: fanteria, artiglieria, postazioni, aree logistiche. Modalita: artiglieria indiretta con munizionamento HE e speciale.',
     },
-    image: gmlrsAtacmsImg,
-  },
-  {
-    id: 'hemtt',
-    category: { en: 'SUPPORT', it: 'SUPPORT' },
-    name: 'HEMTT',
-    description: {
-      en: 'Heavy logistics platform for transporting fuel, containers, and frontline materiel.',
-      it: 'Piattaforma pesante per trasporto carburante, container e materiali di prima linea.',
-    },
-    image: hemttImg,
-  },
-  {
-    id: 'hmmwv',
-    category: { en: 'RECON', it: 'RECON' },
-    name: 'HMMWV',
-    description: {
-      en: 'Fast light vehicle for patrol, scouting, and mobile support tasks.',
-      it: 'Veicolo leggero rapido per pattugliamento, scouting e supporto mobile.',
-    },
-    image: hmmwvImg,
+    image: firtinaImg,
   },
   {
     id: 'l118',
     category: { en: 'SUPPORT', it: 'SUPPORT' },
     name: 'L118',
     description: {
-      en: '105mm towed howitzer for rapid and flexible fire support.',
-      it: 'Obice trainato da 105mm per supporto di fuoco rapido e flessibile.',
+      en: 'British lightweight 105 mm howitzer, widely used for mobile support and rapid deployment. Range: 9.3 NM / 17,200 m. Targets: infantry, positions, area targets, and opportunity targets. Fire mode: indirect artillery (HE, illumination, target marking). Feature: Sling-load transportable.',
+      it: 'Obice leggero britannico da 105 mm, molto usato per supporto mobile e rapido schieramento. Raggio: 9.3 NM / 17,200 m. Bersagli: fanteria, postazioni, aree, bersagli di opportunita. Modalita: artiglieria indiretta, HE, illumination, target marking. Caratteristica: trasportabile via SlingLoad.',
     },
     image: l118Img,
   },
   {
-    id: 'lav',
-    category: { en: 'COMBAT', it: 'COMBAT' },
-    name: 'LAV',
+    id: 'scout',
+    category: { en: 'SCOUT', it: 'SCOUT' },
+    name: 'SCOUT',
     description: {
-      en: 'Fast armored vehicle for armed reconnaissance and convoy protection.',
-      it: 'Veicolo blindato veloce per ricognizione armata e protezione convogli.',
+      en: 'Light ground element for forward observation, contact, and target acquisition. Targets: reconnaissance of enemy ground units and movements. Method: optical/passive observation. Feature: Helicopter transportable. Active EFOW range: 2 km.',
+      it: 'Elemento terrestre leggero dedicato a osservazione avanzata, contatto e acquisizione bersagli. Bersagli: ricognizione su unita terrestri e movimenti nemici. Metodo: osservazione ottica/passiva. Caratteristica: trasportabile su elicottero. EFOW attiva: raggio 2 km.',
     },
-    image: lavImg,
+    image: scoutImg,
   },
   {
-    id: 'mbt',
-    category: { en: 'COMBAT', it: 'COMBAT' },
-    name: 'MBT',
+    id: 'hmmwv',
+    category: { en: 'SCOUT', it: 'SCOUT' },
+    name: 'HMMWV',
     description: {
-      en: 'Main battle tank for breakthrough operations and ground superiority.',
-      it: 'Main Battle Tank per sfondamento e superiorita sul terreno.',
+      en: 'Light multi-role vehicle used for transport, patrol, and tactical liaison. Targets: light support, patrolling, and team transport. Weapon: optional machine gun or AGL, direct fire. Features: Air-droppable and sling-load transportable. Active EFOW range: 5 km.',
+      it: 'Veicolo leggero multiruolo usato per trasporto, pattuglia e collegamento tattico. Bersagli: supporto leggero, pattugliamento, trasporto team. Arma: mitragliatrice o AGL opzionale, tiro diretto. Caratteristica: aviolanciabile e trasportabile via SlingLoad. EFOW attiva: raggio 5 km.',
     },
-    image: mbtImg,
+    image: hmmwvImg,
   },
   {
-    id: 'roland',
-    category: { en: 'Air Defense', it: 'Air Defense' },
-    name: 'Roland',
+    id: 'drone',
+    category: { en: 'SCOUT', it: 'SCOUT' },
+    name: 'DRONE',
     description: {
-      en: 'Mobile short/medium-range SAM system for frontline air cover.',
-      it: 'Sistema SAM mobile a corto-medio raggio per copertura antiaerea del fronte.',
+      en: 'UAV surveillance and spotting platform for tactical situational awareness. Targets: reconnaissance, target acquisition, and battle damage assessment. Sensors: EO/IR. Active EFOW range: 10 km.',
+      it: 'Piattaforma UAV da sorveglianza e spotting, fondamentale per consapevolezza tattica. Bersagli: ricognizione, acquisizione bersagli, battle damage assessment. Sensori: EO/IR. EFOW attiva: raggio 10 km.',
     },
-    image: rolandImg,
+    image: blueDroneImg,
   },
   {
-    id: 'scimitar',
-    category: { en: 'RECON', it: 'RECON' },
-    name: 'Scimitar',
+    id: 'patrol',
+    category: { en: 'AIRCRAFT', it: 'AIRCRAFT' },
+    name: 'PATROL',
     description: {
-      en: 'Light tracked vehicle for armed scouting and target acquisition.',
-      it: 'Veicolo cingolato leggero da esplorazione armata e acquisizione bersagli.',
+      en: 'Air patrol sortie for presence, interception, and sector control. Targets: hostile aircraft, helicopters, drones, and suspicious contacts. Method: air-to-air interception with radar and missiles.',
+      it: 'Sortita aerea di pattugliamento per presenza, intercettazione e controllo di settore. Bersagli: aerei ostili, elicotteri, droni, contatti sospetti. Metodo: intercettazione aria-aria con radar e missili.',
     },
-    image: scimitarImg,
+    image: bluePatrolImg,
   },
   {
-    id: 'scorpion',
-    category: { en: 'Air Defense', it: 'Air Defense' },
-    name: 'Scorpion',
+    id: 'cas',
+    category: { en: 'AIRCRAFT', it: 'AIRCRAFT' },
+    name: 'CAS',
     description: {
-      en: 'Close-in defense platform against drones and short-range threats.',
-      it: 'Piattaforma di difesa ravvicinata per contrasto droni e minacce a corto raggio.',
+      en: 'Close Air Support dedicated to direct support of troops in contact. Targets: infantry, vehicles, positions, columns, and light fortifications. Weapon delivery: guided bombs, rockets, cannon, laser, GPS, and CCIP.',
+      it: 'Close Air Support dedicato all appoggio diretto delle truppe a terra durante il combattimento. Bersagli: fanteria, veicoli, postazioni, colonne, fortificazioni leggere. Ingaggio: bombe guidate, razzi, cannon, laser, GPS, CCIP.',
     },
-    image: scorpionImg,
+    image: blueCasImg,
   },
   {
-    id: 'tow',
-    category: { en: 'COMBAT', it: 'COMBAT' },
-    name: 'TOW',
+    id: 'ewar',
+    category: { en: 'AIRCRAFT', it: 'AIRCRAFT' },
+    name: 'EWAR',
     description: {
-      en: 'Anti-tank missile system to neutralize high-priority armored targets.',
-      it: 'Sistema missilistico anticarro per neutralizzare veicoli blindati ad alta priorita.',
+      en: 'Electronic warfare asset used for radar disruption and SEAD/DEAD support. Targets: radar, SAM, and detection/tracking networks. Method: non-kinetic electronic jamming.',
+      it: 'Asset di guerra elettronica impiegato per disturbo radar e supporto SEAD/DEAD. Bersagli: radar, SAM, reti di scoperta e tracking. Metodo: jamming elettronico non cinetico.',
     },
-    image: towImg,
+    image: blueEwarImg,
+  },
+  {
+    id: 'bomb-f117',
+    category: { en: 'MARK ATTACK', it: 'MARK ATTACK' },
+    name: 'BOMB (F117)',
+    description: {
+      en: 'Stealth precision strike against high-value, heavily defended targets. Targets: bunkers, C2, hangars, radars, and strategic structures. Weapon: precision-guided bombs using laser or GPS.',
+      it: 'Attacco stealth di precisione contro obiettivi ad alto valore e ben difesi. Bersagli: bunker, C2, hangar, radar, strutture strategiche. Arma: bombe guidate di precisione, laser o GPS.',
+    },
+    image: blueBombImg,
+  },
+  {
+    id: 'cruise-b52',
+    category: { en: 'MARK ATTACK', it: 'MARK ATTACK' },
+    name: 'CRUISE (B52)',
+    description: {
+      en: 'Long-range strategic strike with cruise missiles launched by bomber aircraft. Targets: infrastructure, depots, SAM sites, and fixed high-value targets. Weapon: cruise missile guided by INS/GPS/TERCOM.',
+      it: 'Strike strategico a lungo raggio eseguito con missili cruise lanciati da bombardiere. Bersagli: infrastrutture, depositi, SAM, obiettivi fissi ad alto valore. Arma: missile cruise guidato INS/GPS/TERCOM.',
+    },
+    image: blueCruiseImg,
+  },
+  {
+    id: 'ship',
+    category: { en: 'MARK ATTACK', it: 'MARK ATTACK' },
+    name: 'SHIP',
+    description: {
+      en: 'Naval support or strike from surface units for coastal operations and deep strikes. Targets: coastal units, infrastructure, ships, and land targets. Weapon: naval artillery or anti-ship/land-attack missiles.',
+      it: 'Supporto o attacco navale da unita di superficie, utile per costa e strike di profondita. Bersagli: unita costiere, infrastrutture, navi, obiettivi terrestri. Arma: artiglieria navale o missile antinave/land-attack.',
+    },
+    image: shipImg,
+  },
+  {
+    id: 'patriot',
+    category: { en: 'SAM SITE', it: 'SAM SITE' },
+    name: 'PATRIOT',
+    description: {
+      en: 'US long-range, high-altitude SAM system for area defense and anti-missile operations. Range: 37.8 NM / 70,000 m. Ceiling: up to 65,600 ft. Targets: aircraft, cruise missiles, and some ballistic threats. Guidance: radar-guided / hit-to-kill depending on variant.',
+      it: 'Sistema SAM statunitense a lungo raggio e alta quota, impiegato per difesa area e antimissile. Raggio: 37.8 NM / 70,000 m. Quota: fino a 65,600 ft. Bersagli: aerei, cruise missile, alcune minacce balistiche. Guida: radar-guided / hit-to-kill secondo variante.',
+    },
+    image: patriotImg,
+  },
+  {
+    id: 'irist',
+    category: { en: 'SAM SITE', it: 'SAM SITE' },
+    name: 'IRIST',
+    description: {
+      en: 'Modern German medium-range system with 360-degree coverage and high precision. Range: 21.6 NM / 40,000 m. Ceiling: up to 65,600 ft. Targets: aircraft, helicopters, cruise missiles, drones. Guidance: IR seeker missile with system guidance/data link.',
+      it: 'Sistema tedesco moderno a medio raggio con copertura 360 gradi e alta precisione. Raggio: 21.6 NM / 40,000 m. Quota: fino a 65,600 ft. Bersagli: aerei, elicotteri, cruise missile, droni. Guida: missile con seeker IR e data link.',
+    },
+    image: iristImg,
+  },
+  {
+    id: 'nasams',
+    category: { en: 'SAM SITE', it: 'SAM SITE' },
+    name: 'NASAMS',
+    description: {
+      en: 'Norwegian-American modular short-to-medium range system for point defense. Range: 21.6 NM / 40,000 m. Ceiling: up to 50,000 ft. Targets: aircraft, helicopters, drones, cruise missiles. Guidance: active radar missiles AMRAAM / AMRAAM-ER.',
+      it: 'Sistema norvegese-americano modulare a corto-medio raggio per difesa di punti sensibili. Raggio: 21.6 NM / 40,000 m. Quota: fino a 50,000 ft. Bersagli: aerei, elicotteri, droni, cruise missile. Guida: missile radar attivo AMRAAM / AMRAAM-ER.',
+    },
+    image: nasamsImg,
+  },
+  {
+    id: 'fmtv',
+    category: { en: 'SUPPLY & LOGISTIC', it: 'SUPPLY & LOGISTIC' },
+    name: 'FMTV',
+    description: {
+      en: 'Medium tactical truck used for cargo, ammunition, and logistics sustainment across the frontline.',
+      it: 'Camion tattico medio usato per trasporto carichi, munizioni e sostegno logistico lungo il fronte.',
+    },
+    image: fmtvImg,
+  },
+  {
+    id: 'adv',
+    category: { en: 'SUPPLY & LOGISTIC', it: 'SUPPLY & LOGISTIC' },
+    name: 'ADV',
+    description: {
+      en: 'Armed escort and route-security vehicle used to protect logistic movements in contested sectors.',
+      it: 'Veicolo armato di scorta e sicurezza rotta usato per proteggere i movimenti logistici in settori contesi.',
+    },
+    image: hmmweMgImg,
+  },
+  {
+    id: 'supply',
+    category: { en: 'SUPPLY & LOGISTIC', it: 'SUPPLY & LOGISTIC' },
+    name: 'SUPPLY',
+    description: {
+      en: 'General supply convoy element carrying fuel and materiel for sustained operations.',
+      it: 'Elemento convoglio rifornimenti per trasporto carburante e materiali a supporto di operazioni prolungate.',
+    },
+    image: tankerImg,
+  },
+  {
+    id: 'helisupply',
+    category: { en: 'SUPPLY & LOGISTIC', it: 'SUPPLY & LOGISTIC' },
+    name: 'HELISUPPLY',
+    description: {
+      en: 'Rotary-wing resupply profile to deliver urgent logistics to hard-to-reach forward positions.',
+      it: 'Profilo di rifornimento ad ala rotante per consegne urgenti a posizioni avanzate difficili da raggiungere.',
+    },
+    image: heliSupplyImg,
   },
 ];
 
@@ -529,19 +683,27 @@ function getVehicleCategoryKey(category) {
 }
 
 const VEHICLE_CATEGORY_KEYS = {
+  airDefence: getVehicleCategoryKey('AIR DEFENCE'),
+  ground: getVehicleCategoryKey('GROUND'),
   support: getVehicleCategoryKey('SUPPORT'),
-  airDefense: getVehicleCategoryKey('Air Defense'),
-  recon: getVehicleCategoryKey('RECON'),
-  combat: getVehicleCategoryKey('COMBAT'),
+  scout: getVehicleCategoryKey('SCOUT'),
+  aircraft: getVehicleCategoryKey('AIRCRAFT'),
+  markAttack: getVehicleCategoryKey('MARK ATTACK'),
+  samSite: getVehicleCategoryKey('SAM SITE'),
+  supplyLogistic: getVehicleCategoryKey('SUPPLY & LOGISTIC'),
 };
 
-const DEFAULT_VEHICLE_CATEGORY_KEY = VEHICLE_CATEGORY_KEYS.support;
+const DEFAULT_VEHICLE_CATEGORY_KEY = VEHICLE_CATEGORY_KEYS.airDefence;
 
 const VEHICLE_CATEGORY_ICON_BY_KEY = {
+  [VEHICLE_CATEGORY_KEYS.airDefence]: ShieldCheck,
+  [VEHICLE_CATEGORY_KEYS.ground]: Target,
   [VEHICLE_CATEGORY_KEYS.support]: Truck,
-  [VEHICLE_CATEGORY_KEYS.airDefense]: ShieldCheck,
-  [VEHICLE_CATEGORY_KEYS.recon]: Eye,
-  [VEHICLE_CATEGORY_KEYS.combat]: Target,
+  [VEHICLE_CATEGORY_KEYS.scout]: Eye,
+  [VEHICLE_CATEGORY_KEYS.aircraft]: Plane,
+  [VEHICLE_CATEGORY_KEYS.markAttack]: Activity,
+  [VEHICLE_CATEGORY_KEYS.samSite]: Radar,
+  [VEHICLE_CATEGORY_KEYS.supplyLogistic]: Package,
 };
 
 function fileToBase64(file) {
