@@ -1,1 +1,308 @@
-[]
+[
+  {
+    "id": "changelog_1775908554652_bce5b0f8",
+    "title": "DCS Frontline - V2.7.0",
+    "titleEn": "DCS Frontline - V2.7.0",
+    "rows": [
+      {
+        "id": "row_1775908176948",
+        "tag": "NEW",
+        "text": "Introdotta la sezione Changelog completa: pagina dedicata, creazione post, gestione media e opzioni di traduzione.",
+        "textEn": "Introduced a full Changelog feature set: dedicated page, post creation, media handling, and translation options."
+      },
+      {
+        "id": "row_1775908350035_19386",
+        "tag": "UPD",
+        "text": "Forte evoluzione della mappa con focus su render 3D, miglioramenti visivi e stabilita runtime.",
+        "textEn": "Major map evolution focused on 3D rendering, visual quality, and runtime stability."
+      },
+      {
+        "id": "row_1775908358510_8bf23",
+        "tag": "UPD",
+        "text": "Migliorata la gestione convogli/logistica/CSAR con update realtime, fix rendering e affinamenti UX.",
+        "textEn": "Improved convoy/logistics/CSAR flows with realtime updates, rendering fixes, and UX refinements."
+      },
+      {
+        "id": "row_1775908362106_ec9c6",
+        "tag": "UPD",
+        "text": "Aggiornamenti su carrier missions, overlay, airfield UI e visibilita dati.",
+        "textEn": "Updates to carrier logistics missions, overlay styling, airfield UI, and visibility handling."
+      },
+      {
+        "id": "row_1775908365773_ef767",
+        "tag": "UPD",
+        "text": "Rifiniture finali su visibilita changelog e configurazione aeroporti/main base.",
+        "textEn": "Final polish on changelog visibility and airport/main-base configuration."
+      },
+      {
+        "id": "row_1775908385496_e04d3",
+        "tag": "FIX",
+        "text": "Migliorie a request button, suggerimenti armi e flussi missione manuale.",
+        "textEn": "Better request button behavior, weapon suggestion display, and manual mission creation flow."
+      },
+      {
+        "id": "row_1775908391289_e10fa",
+        "tag": "FIX",
+        "text": "Fix multipli su CSAR (snap marker/ground/render SVG/display rings).",
+        "textEn": "Multiple CSAR fixes (snap marker/ground behavior/SVG rendering/display rings)."
+      },
+      {
+        "id": "row_1775908397045_8b050",
+        "tag": "FIX",
+        "text": "Fix su rendering convogli (linee, dot, animazioni).",
+        "textEn": "Convoy rendering fixes (line, marker dot, animations)."
+      },
+      {
+        "id": "row_1775908402415_d4378",
+        "tag": "FIX",
+        "text": "Fix compatibilita espressioni dati con MapLibre 4.7.",
+        "textEn": "Fixed data-expression compatibility issues with MapLibre 4.7."
+      },
+      {
+        "id": "row_1775908420737_86ccf",
+        "tag": "UPD",
+        "text": "Integrazione con la nuova campagna HIDC",
+        "textEn": "Integration with the new HIDC Campaign"
+      },
+      {
+        "id": "row_1775908520692_4f3cc",
+        "tag": "WIP",
+        "text": "Supporto per campagna LIDC - Low Intensity Dynamic Campaign",
+        "textEn": "Integration for the LIDC - Low Intensity Dynamic Campaign"
+      }
+    ],
+    "attachments": [],
+    "contributorIds": [
+      "675706661570347041"
+    ],
+    "author": {
+      "id": "675706661570347041",
+      "name": "Fralas"
+    },
+    "createdAt": 1775908554652,
+    "updatedAt": 1775908554652
+  },
+  {
+    "id": "changelog_1775908684182_bbc8a734",
+    "title": "HIDC Dynamic Campaign Server - V2.7.0",
+    "titleEn": "HIDC Dynamic Campaign Server - V2.7.0",
+    "rows": [
+      {
+        "id": "row_1775908210989",
+        "tag": "NEW",
+        "text": "Script DSAVE: dopo diversi anni abbiamo deciso di rimuovere il DSMC e sviluppare un nostro script per salvare lo stato del server tra una sessione e l’altra (questa è la prima iterazione dello script, aspettatevi piccoli problemi; segnalate tutto nel forum bug-segnalazioni seguendo le linee guida).",
+        "textEn": "DSAVE Script: opo diversi anni abbiamo deciso di rimuovere il DSMC e sviluppare un nostro script per salvare lo stato del server tra una sessione e l’altra (questa è la prima iterazione dello script, aspettatevi piccoli problemi; segnalate tutto nel forum bug-segnalazioni seguendo le linee guida)."
+      },
+      {
+        "id": "row_1775908276304_dbd2b",
+        "tag": "NEW",
+        "text": "NUOVA REDSIDE FORCE: revisione completa delle capacità offensive della fazione rossa: \n- Revisione del combattimento aria-aria con un nuovo sistema di bilanciamento basato sul tipo di aereo blu, numero e risorse disponibili. Sono stati aggiunti anche intercettori speciali che, in determinate condizioni, ingaggeranno i nostri asset strategici aviotrasportati. \n- Miglioramento e correzione delle missioni CAS e STRIKE della RED, modificando aerei, codice e configurazioni (loadout) per aumentare le prestazioni. \n- Miglioramento e correzione dei convogli di cattura e attacco della RED. \n- NUOVO Attacco alle piste (Runway strike): ora il nemico è in grado di attaccare le piste per contrastare le attività della fazione blu. \n- NUOVA capacità antinave: ora il nemico è in grado di ingaggiare il nostro gruppo portaerei. \n- NUOVO Attacco con bombardieri strategici: il nemico può ora effettuare attacchi con bombardieri strategici lanciando missili da crociera (simili al nostro B-52). \n- NUOVA capacità SEAD: il nemico è ora in grado di ingaggiare i nostri siti SAM negli aeroporti blu conquistati. \n- NUOVO HELI CAS: alternativa al CAS con aerei per offrire maggiore varietà operativa. \n- NUOVO Convoglio di artiglieria: il nemico può inviare un convoglio di artiglieria per colpire le nostre forze terrestri a distanza; questo evento sarà segnalato sul sito web e sulla mappa F10. \n- NUOVA Batteria missilistica mobile (ARTEMIS): il nemico può ora attaccare le nostre forze terrestri da lunga distanza utilizzando missili balistici.",
+        "textEn": "NEW REDSIDE FORCE: complete overhaul of the offensive capabilities of the red faction:\n\n- Air-to-air combat revision: introduction of a new balancing system based on blue aircraft type, numbers, and available resources. Special interceptors have also been added which, under certain conditions, will engage our strategic airborne assets.\n- CAS and STRIKE improvements: RED CAS and STRIKE missions have been improved and fixed by modifying aircraft, code, and configurations (loadouts) to enhance performance.\n- Convoy improvements: RED capture and attack convoys have been improved and fixed.\n- NEW Runway Strike: the enemy is now capable of attacking runways to disrupt blue faction operations.\n- NEW Anti-ship capability: the enemy can now engage our carrier group.\n- NEW Strategic bomber attack: the enemy can now conduct strategic bomber strikes by launching cruise missiles (similar to our B-52).\n- NEW SEAD capability: the enemy is now able to engage our SAM sites at captured blue airfields.\n- NEW HELI CAS: an alternative to fixed-wing CAS, providing greater operational variety.\n- NEW Artillery convoy: the enemy can deploy artillery convoys to strike our ground forces from long range; this event will be reported on the website and the F10 map.\n- NEW Mobile missile battery (ARTEMIS): the enemy can now attack our ground forces from long range using ballistic missiles."
+      },
+      {
+        "id": "row_1775908450437_1ad91",
+        "tag": "NEW",
+        "text": "DSLTS - Dynamic Sling Load Transport System: nuovo sistema che consente il trasporto di HMMWV e cannoni tramite carico al gancio (sling load). Per utilizzarlo, è sufficiente posizionare un marker in un aeroporto blu e inserire un codice per generare una cassa (specifica per ciascun veicolo), agganciare la cassa e trasportarla fuori dall’aeroporto. Dopo un atterraggio morbido, posizionare un marker sulla cassa e scrivere ACTIVATE per generare il veicolo. Ogni veicolo ha un peso e un costo specifici.",
+        "textEn": "DSLTS – Dynamic Sling Load Transport System: a new system that allows the transport of HMMWVs and artillery pieces via sling load.\n\nTo use it, simply place a marker at a blue airfield and enter a code to spawn a crate (specific to each vehicle), hook the crate, and transport it outside the airfield. After a soft landing, place a marker on the crate and type ACTIVATE to spawn the vehicle.\n\nEach vehicle has its own specific weight and cost."
+      },
+      {
+        "id": "row_1775908478825_e9796",
+        "tag": "NEW",
+        "text": "EWAR: nuovo sistema che consente al giocatore di generare un A-6E AI per effettuare jamming sui sistemi SAM nemici e ridurre della metà il loro raggio di ingaggio. ATTENZIONE NON INIBISCE COMPLETAMENTE IL SAM!!",
+        "textEn": "EWAR: a new system that allows players to spawn an AI-controlled A-6E to perform jamming against enemy SAM systems, reducing their engagement range by half. WARNING: it does NOT completely disable SAM systems!!"
+      },
+      {
+        "id": "row_1775908492694_e75c8",
+        "tag": "UPD",
+        "text": "Situazione SAM & SHORAD: riduzione complessiva dei siti SAM principali riparabili (da 16 a 11), mentre sono stati aggiunti più sistemi SAM “legacy” come SA-3, SA-5 e SA-6 per proteggere le infrastrutture strategiche e dare varietà operativa. È stata inoltre ridotta drasticamente la presenza di SA-22 e SA-15M2 (in particolare nelle zone dinamiche).",
+        "textEn": "SAM & SHORAD Situation: overall reduction in the number of repairable primary SAM sites (from 16 to 11), while additional “legacy” SAM systems such as SA-3, SA-5, and SA-6 have been introduced to protect strategic infrastructure and provide greater operational variety. The presence of SA-22 and SA-15M2 systems has also been significantly reduced (especially in dynamic areas)."
+      },
+      {
+        "id": "row_1775908500786_d25c1",
+        "tag": "UPD",
+        "text": "Riposizionamento degli asset aerei blu. Ora, se un asset aereo AI blu è disponibile, è possibile riposizionarlo scrivendo il codice in un nuovo marker posizionato nel punto desiderato.",
+        "textEn": "Repositioning of Blue Air Assets: AI-controlled blue air assets can now be repositioned. If an asset is available, simply place a new marker at the desired location and enter the corresponding code to move it."
+      },
+      {
+        "id": "row_1775908524217_67d65",
+        "tag": "UPD",
+        "text": "Composizione di depositi e fabbriche modificata per ridurre i componenti statici.",
+        "textEn": "Depot and Factory Composition: adjusted to reduce the number of static components."
+      },
+      {
+        "id": "row_1775908532371_ad902",
+        "tag": "FIX",
+        "text": "Vari e numerosi mini fix, per migliorare performance di tutti i player",
+        "textEn": "Various fixes: numerous minor fixes implemented to improve performance for all players."
+      },
+      {
+        "id": "row_1775908594089_01864",
+        "tag": "WIP",
+        "text": "Nuovo Modulo DCORE - Guerra navale ampliata",
+        "textEn": "New DCORE Module – Expanded Naval Warfare"
+      },
+      {
+        "id": "row_1775908641611_f4462",
+        "tag": "WIP",
+        "text": "New DCORE - LIDC Low Intensity Dynamic Campaign",
+        "textEn": "New DCORE - LIDC Low Intensity Dynamic Campaign"
+      }
+    ],
+    "attachments": [
+      {
+        "id": "media_1775908682404_0256ef72f9",
+        "url": "/api/changelogs/media/media_1775908682404_0256ef72f9.png",
+        "type": "image",
+        "mimeType": "image/png",
+        "fileName": "immagine_2026-04-11_134810.png"
+      }
+    ],
+    "contributorIds": [
+      "714087060343881778",
+      "675706661570347041",
+      "153370631772045313"
+    ],
+    "author": {
+      "id": "714087060343881778",
+      "name": "DIOGO"
+    },
+    "createdAt": 1775908684182,
+    "updatedAt": 1775909645087
+  },
+  {
+    "id": "changelog_1776474358916_1f074129",
+    "title": "HIDC Dynamic Campaign Server - V2.7.0 Hotfix 02",
+    "titleEn": "HIDC Dynamic Campaign Server - V2.7.0 Hotfix 02",
+    "rows": [
+      {
+        "id": "row_1775908532371_ad902",
+        "tag": "FIX",
+        "text": "Risolto problema della Runway attack red  che bombardava un aeroporto RED come fallback",
+        "textEn": "Fixed Runway Attack Red bombing a RED airport as a fallback"
+      },
+      {
+        "id": "row_1775908594089_01864",
+        "tag": "FIX",
+        "text": "Rimossa F11 Free camera View",
+        "textEn": "Remove F11 Free camera View"
+      },
+      {
+        "id": "row_1776474440945_2783f",
+        "tag": "FIX",
+        "text": "Vari e numerosi mini fix, per migliorare performance di tutti i player",
+        "textEn": "Various and numerous mini fixes, to improve the performance of all players"
+      }
+    ],
+    "attachments": [],
+    "contributorIds": [
+      "714087060343881778"
+    ],
+    "author": {
+      "id": "714087060343881778",
+      "name": "DIOGO"
+    },
+    "createdAt": 1776474358916,
+    "updatedAt": 1776474465206
+  },
+  {
+    "id": "changelog_1776560004877_934847d0",
+    "title": "HIDC Dynamic Campaign Server - V2.7.0 Hotfix 03",
+    "titleEn": "HIDC Dynamic Campaign Server - V2.7.0 Hotfix 03",
+    "rows": [
+      {
+        "id": "row_1775908532371_ad902",
+        "tag": "FIX",
+        "text": "Cambiati i veicoli per attivare Advance Base;\n- 8 ADV",
+        "textEn": "Changed vehicles to activate Advance Base;\n- 8 ADV"
+      },
+      {
+        "id": "row_1775908594089_01864",
+        "tag": "FIX",
+        "text": "Cambiato template Red RunwayStrike:\n- MB339-->L39",
+        "textEn": "Red RunwayStrike template changed:\nMB339-->L39"
+      },
+      {
+        "id": "row_1776474440945_2783f",
+        "tag": "FIX",
+        "text": "Vari e numerosi mini fix, per migliorare performance di tutti i player",
+        "textEn": "Various and numerous mini fixes, to improve the performance of all players"
+      },
+      {
+        "id": "row_1776559462263_fcf54",
+        "tag": "FIX",
+        "text": "Ripristinato Patriot Incirlik (Player error.....or not)",
+        "textEn": "Restored Patriot Incirlik (Player error.....or not)"
+      },
+      {
+        "id": "row_1776559646252_26619",
+        "tag": "UPD",
+        "text": "Attivato Dynamic Spawn ad Adana  solo per aerei ed elicotteri logistici",
+        "textEn": "Dynamic Spawn activated in Adana for logistics planes and helicopters only"
+      }
+    ],
+    "attachments": [],
+    "contributorIds": [
+      "714087060343881778"
+    ],
+    "author": {
+      "id": "714087060343881778",
+      "name": "DIOGO"
+    },
+    "createdAt": 1776560004877,
+    "updatedAt": 1776560044530
+  },
+  {
+    "id": "changelog_1776779211810_16ab7dc2",
+    "title": "HIDC Dynamic Campaign Server - V2.7.0 Hotfix 04",
+    "titleEn": "HIDC Dynamic Campaign Server - V2.7.0 Hotfix 04",
+    "rows": [
+      {
+        "id": "row_1775908532371_ad902",
+        "tag": "NEW",
+        "text": "Implementata nuova REDARTY.\nL’artiglieria nemica attaccherà a distanza le unità alleate nelle zone dinamiche.",
+        "textEn": "Implemented new REDARTY.\nEnemy artillery will engage allied units at range inside dynamic zones."
+      },
+      {
+        "id": "row_1775908594089_01864",
+        "tag": "NEW",
+        "text": "Implementato un nuovo meteo dinamico nel DSAVE.\nOra, a ogni sessione, il meteo dovrebbe cambiare, mantenendo condizioni atmosferiche e vento controllati, salvo casi estremi.",
+        "textEn": "Implemented new dynamic weather in DSAVE.\nNow, in every session, the weather should change while keeping weather conditions and wind under control, except in extreme cases."
+      },
+      {
+        "id": "row_1776474440945_2783f",
+        "tag": "UPD",
+        "text": "Cambiato il colore di fabbriche e depositi nella mappa F10:\n- BLU → struttura distrutta\n- ROSSO → struttura da distruggere",
+        "textEn": "Changed the color of factories and depots on the F10 map:\n- BLUE → destroyed structure\n- RED → structure to be destroyed"
+      },
+      {
+        "id": "row_1776559462263_fcf54",
+        "tag": "FIX",
+        "text": "Ripristinato il Patriot su Incirlik e resa immortale la sua struttura.\nCausa: i player lo distruggevano.",
+        "textEn": "Restored the Patriot site at Incirlik and made its structure indestructible.\nReason: players were destroying it."
+      },
+      {
+        "id": "row_1776559646252_26619",
+        "tag": "FIX",
+        "text": "Aggiunti C-130 statici ad Adana.\nCausa: scarsità di slot dinamici in DCS.",
+        "textEn": "Added static C-130s at Adana.\nReason: lack of dynamic slots in DCS."
+      },
+      {
+        "id": "row_1776778908689_4dc78",
+        "tag": "FIX",
+        "text": "Risolto il problema del rifornimento DMAS per gli elicotteri.\nLe keyword HIHELI, HAGM, HAIR e HBOMB sono tornate a funzionare correttamente.",
+        "textEn": "Fixed the DMAS helicopter supply issue.\nThe keywords HIHELI, HAGM, HAIR, and HBOMB are working correctly again."
+      }
+    ],
+    "attachments": [],
+    "contributorIds": [
+      "714087060343881778",
+      "153370631772045313"
+    ],
+    "author": {
+      "id": "714087060343881778",
+      "name": "DIOGO"
+    },
+    "createdAt": 1776779211810,
+    "updatedAt": 1776779211810
+  }
+]
