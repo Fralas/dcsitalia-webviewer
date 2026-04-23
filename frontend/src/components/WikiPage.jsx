@@ -6,7 +6,9 @@ import {
   Anchor,
   ClipboardList,
   Eye,
+  Factory,
   Gamepad2,
+  Handshake,
   Helicopter,
   Layers3,
   Loader2,
@@ -14,15 +16,16 @@ import {
   Megaphone,
   Package,
   PenSquare,
-  Plane,
   Plus,
   Radar,
   Radio,
+  ScanEye,
   Save,
   ShieldCheck,
   Target,
   Truck,
   Upload,
+  Waypoints,
   X,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -53,7 +56,6 @@ import scimitarImg from '../../img/wiki/veh/SCIMITAR.png';
 import scorpionImg from '../../img/wiki/veh/SCORPION.png';
 import scoutImg from '../../img/wiki/veh/SCOUT.png';
 import shipImg from '../../img/wiki/veh/SHIP.png';
-import tankerImg from '../../img/wiki/veh/TANKER.png';
 import towImg from '../../img/wiki/veh/TOW.png';
 import { useUser } from '../contexts/UserContext';
 import * as api from '../services/api';
@@ -308,7 +310,7 @@ const VEHICLES = [
   },
   {
     id: 'patrol',
-    category: { en: 'AIRCRAFT', it: 'AIRCRAFT' },
+    category: { en: 'MARK ATTACK', it: 'MARK ATTACK' },
     name: 'PATROL',
     description: {
       en: 'Air patrol sortie for presence, interception, and sector control. Targets: hostile aircraft, helicopters, drones, and suspicious contacts. Method: air-to-air interception with radar and missiles.',
@@ -318,7 +320,7 @@ const VEHICLES = [
   },
   {
     id: 'cas',
-    category: { en: 'AIRCRAFT', it: 'AIRCRAFT' },
+    category: { en: 'MARK ATTACK', it: 'MARK ATTACK' },
     name: 'CAS',
     description: {
       en: 'Close Air Support dedicated to direct support of troops in contact. Targets: infantry, vehicles, positions, columns, and light fortifications. Weapon delivery: guided bombs, rockets, cannon, laser, GPS, and CCIP.',
@@ -328,7 +330,7 @@ const VEHICLES = [
   },
   {
     id: 'ewar',
-    category: { en: 'AIRCRAFT', it: 'AIRCRAFT' },
+    category: { en: 'MARK ATTACK', it: 'MARK ATTACK' },
     name: 'EWAR',
     description: {
       en: 'Electronic warfare asset used for radar disruption and SEAD/DEAD support. Targets: radar, SAM, and detection/tracking networks. Method: non-kinetic electronic jamming.',
@@ -424,7 +426,7 @@ const VEHICLES = [
       en: 'General supply convoy element carrying fuel and materiel for sustained operations.',
       it: 'Elemento convoglio rifornimenti per trasporto carburante e materiali a supporto di operazioni prolungate.',
     },
-    image: tankerImg,
+    image: fmtvImg,
   },
   {
     id: 'helisupply',
@@ -687,7 +689,6 @@ const VEHICLE_CATEGORY_KEYS = {
   ground: getVehicleCategoryKey('GROUND'),
   support: getVehicleCategoryKey('SUPPORT'),
   scout: getVehicleCategoryKey('SCOUT'),
-  aircraft: getVehicleCategoryKey('AIRCRAFT'),
   markAttack: getVehicleCategoryKey('MARK ATTACK'),
   samSite: getVehicleCategoryKey('SAM SITE'),
   supplyLogistic: getVehicleCategoryKey('SUPPLY & LOGISTIC'),
@@ -696,14 +697,13 @@ const VEHICLE_CATEGORY_KEYS = {
 const DEFAULT_VEHICLE_CATEGORY_KEY = VEHICLE_CATEGORY_KEYS.airDefence;
 
 const VEHICLE_CATEGORY_ICON_BY_KEY = {
-  [VEHICLE_CATEGORY_KEYS.airDefence]: ShieldCheck,
-  [VEHICLE_CATEGORY_KEYS.ground]: Target,
-  [VEHICLE_CATEGORY_KEYS.support]: Truck,
-  [VEHICLE_CATEGORY_KEYS.scout]: Eye,
-  [VEHICLE_CATEGORY_KEYS.aircraft]: Plane,
-  [VEHICLE_CATEGORY_KEYS.markAttack]: Activity,
-  [VEHICLE_CATEGORY_KEYS.samSite]: Radar,
-  [VEHICLE_CATEGORY_KEYS.supplyLogistic]: Package,
+  [VEHICLE_CATEGORY_KEYS.airDefence]: Radar,
+  [VEHICLE_CATEGORY_KEYS.ground]: Waypoints,
+  [VEHICLE_CATEGORY_KEYS.support]: Handshake,
+  [VEHICLE_CATEGORY_KEYS.scout]: ScanEye,
+  [VEHICLE_CATEGORY_KEYS.markAttack]: MapPin,
+  [VEHICLE_CATEGORY_KEYS.samSite]: ShieldCheck,
+  [VEHICLE_CATEGORY_KEYS.supplyLogistic]: Factory,
 };
 
 function fileToBase64(file) {
