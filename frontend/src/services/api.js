@@ -16,7 +16,15 @@ async function fetchAPI(endpoint, options = {}) {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(error.error || `HTTP ${response.status}`);
+      const apiError = new Error(error.error || `HTTP ${response.status}`);
+      apiError.status = response.status;
+      apiError.endpoint = endpoint;
+
+      if (response.status === 401 && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth:unauthorized', { detail: { endpoint } }));
+      }
+
+      throw apiError;
     }
 
     return await response.json();

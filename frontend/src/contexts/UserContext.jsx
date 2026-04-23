@@ -14,6 +14,18 @@ export function UserProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    const handleUnauthorized = () => {
+      setUser(null);
+      setProfile(null);
+    };
+
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => {
+      window.removeEventListener('auth:unauthorized', handleUnauthorized);
+    };
+  }, []);
+
+  useEffect(() => {
     if (user?.id) {
       const cachedProfile = loadUserProfile(user.id);
       setProfile(cachedProfile);

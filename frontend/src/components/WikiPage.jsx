@@ -665,6 +665,19 @@ function createWikiPayloadFromDraft(draft = {}) {
   };
 }
 
+function isEffectivelyEmptyWikiDraft(source = {}) {
+  const normalized = createWikiDraftFromSource(source);
+  const fields = [
+    normalized.titleEn,
+    normalized.summaryEn,
+    normalized.contentEn,
+    normalized.titleIt,
+    normalized.summaryIt,
+    normalized.contentIt,
+  ];
+  return !fields.some((value) => String(value || '').trim().length > 0);
+}
+
 function getDraftLocalizedField(draft = {}, field = 'title', language = DEFAULT_LANGUAGE) {
   const en = String(draft?.[`${field}En`] || '');
   const it = String(draft?.[`${field}It`] || '');
@@ -805,7 +818,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
   const gameplayCloseTimeoutRef = useRef(null);
   const gameplayOpenRafRef = useRef(null);
   const wikiSaveTimerRef = useRef(null);
-  const lastSavedDraftSerializedRef = useRef('');
+  const lastSavedDraftSerializedRef = useRef(null);
   const wikiMediaInputRef = useRef(null);
   const newTopicMediaInputRef = useRef(null);
   const markdownTextareaRefs = useRef(new Map());
@@ -1053,31 +1066,38 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
     }
 
     let cancelled = false;
+    const pageId = selectedGameplayFeature.id;
 
     const loadDraft = async () => {
       try {
         setDraftLoading(true);
         setDraftStatus(ui.loadingDraft);
-        const response = await api.getWikiDraft(selectedGameplayFeature.id);
+        const response = await api.getWikiDraft(pageId);
         if (cancelled) return;
         const incomingDraft = response?.draft;
         const basePage = selectedGameplayPage || {};
-        const nextDraft = incomingDraft
+        const baseDraft = createWikiDraftFromSource({
+          iconKey: basePage.iconKey || 'layers3',
+          title: basePage.title || '',
+          summary: basePage.summary || '',
+          content: basePage.content || '',
+        });
+        const hasIncomingDraft = Boolean(incomingDraft);
+        const shouldIgnoreIncomingDraft = hasIncomingDraft && isEffectivelyEmptyWikiDraft(incomingDraft);
+        const nextDraft = !shouldIgnoreIncomingDraft && hasIncomingDraft
           ? createWikiDraftFromSource({
             iconKey: incomingDraft.iconKey || basePage.iconKey || 'layers3',
             title: incomingDraft.title || basePage.title || '',
             summary: incomingDraft.summary || basePage.summary || '',
             content: incomingDraft.content || basePage.content || '',
           })
-          : createWikiDraftFromSource({
-            iconKey: basePage.iconKey || 'layers3',
-            title: basePage.title || '',
-            summary: basePage.summary || '',
-            content: basePage.content || '',
-          });
+          : baseDraft;
         setWikiDraft(nextDraft);
         lastSavedDraftSerializedRef.current = JSON.stringify(nextDraft);
-        setDraftStatus(incomingDraft ? ui.draftLoaded : ui.noDraftSaved);
+        setDraftStatus(hasIncomingDraft && !shouldIgnoreIncomingDraft ? ui.draftLoaded : ui.noDraftSaved);
+        if (shouldIgnoreIncomingDraft) {
+          api.deleteWikiDraft(pageId).catch(() => {});
+        }
       } catch (error) {
         if (cancelled) return;
         const basePage = selectedGameplayPage || {};
@@ -1109,6 +1129,14 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
 
   useEffect(() => {
     if (!canEditWiki || !editorOpen || draftLoading || !selectedGameplayFeature?.id) {
+      if (wikiSaveTimerRef.current) {
+        clearTimeout(wikiSaveTimerRef.current);
+        wikiSaveTimerRef.current = null;
+      }
+      return;
+    }
+
+    if (lastSavedDraftSerializedRef.current == null) {
       return;
     }
 
@@ -1133,6 +1161,13 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
         wikiSaveTimerRef.current = null;
       }
     }, 900);
+
+    return () => {
+      if (wikiSaveTimerRef.current) {
+        clearTimeout(wikiSaveTimerRef.current);
+        wikiSaveTimerRef.current = null;
+      }
+    };
   }, [canEditWiki, draftLoading, editorOpen, selectedGameplayFeature?.id, wikiDraft, ui.savingDraft, ui.draftSaved, ui.draftSaveError]);
 
   const getMarkdownEditorKey = (scope, field) => `${scope}:${field}`;
@@ -1239,6 +1274,11 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
   };
 
   const handleSelectGameplayItem = (itemId) => {
+    if (wikiSaveTimerRef.current) {
+      clearTimeout(wikiSaveTimerRef.current);
+      wikiSaveTimerRef.current = null;
+    }
+    lastSavedDraftSerializedRef.current = null;
     setSelectedGameplayId(itemId);
     setEditorOpen(false);
     setWikiDraftIconPickerOpen(false);
@@ -1341,6 +1381,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
 
   const handleUploadWikiMedia = async (files) => {
     if (!canEditWiki || !selectedGameplayFeature?.id || !files?.length) return;
+    const isAuthError = (error) => Number(error?.status) === 401 || String(error?.message || '').includes('Not authenticated');
 
     try {
       setUploadingMedia(true);
@@ -1370,6 +1411,9 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
           insertMarkdownSnippetAtSelection(snippet, 'wikiDraft');
           uploaded += 1;
         } catch (error) {
+          if (isAuthError(error)) {
+            throw error;
+          }
           failed.push(`${file?.name || 'file'}: ${error.message || ui.mediaError}`);
         }
       }
@@ -1390,7 +1434,11 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
         setDraftStatus(details.join(' - '));
       }
     } catch (error) {
-      setDraftStatus(error.message || ui.mediaError);
+      if (isAuthError(error)) {
+        setDraftStatus(ui.notAuthenticated);
+      } else {
+        setDraftStatus(error.message || ui.mediaError);
+      }
     } finally {
       setUploadingMedia(false);
       if (wikiMediaInputRef.current) {
@@ -1401,6 +1449,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
 
   const handleUploadNewTopicMedia = async (files) => {
     if (!canEditWiki || !files?.length) return;
+    const isAuthError = (error) => Number(error?.status) === 401 || String(error?.message || '').includes('Not authenticated');
 
     try {
       setUploadingMedia(true);
@@ -1430,6 +1479,9 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
           insertMarkdownSnippetAtSelection(snippet, 'newTopicDraft');
           uploaded += 1;
         } catch (error) {
+          if (isAuthError(error)) {
+            throw error;
+          }
           failed.push(`${file?.name || 'file'}: ${error.message || ui.mediaError}`);
         }
       }
@@ -1450,7 +1502,11 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
         setNewTopicStatus(details.join(' - '));
       }
     } catch (error) {
-      setNewTopicStatus(error.message || ui.mediaError);
+      if (isAuthError(error)) {
+        setNewTopicStatus(ui.notAuthenticated);
+      } else {
+        setNewTopicStatus(error.message || ui.mediaError);
+      }
     } finally {
       setUploadingMedia(false);
       if (newTopicMediaInputRef.current) {
@@ -1517,7 +1573,17 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
             {canEditWiki && (
               <button
                 type="button"
-                onClick={() => setEditorOpen((prev) => !prev)}
+                onClick={() => {
+                  if (editorOpen) {
+                    if (wikiSaveTimerRef.current) {
+                      clearTimeout(wikiSaveTimerRef.current);
+                      wikiSaveTimerRef.current = null;
+                    }
+                  } else {
+                    lastSavedDraftSerializedRef.current = null;
+                  }
+                  setEditorOpen((prev) => !prev);
+                }}
                 className="inline-flex items-center gap-2 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary transition-colors hover:border-yt-accent hover:text-yt-accent"
               >
                 <PenSquare className="h-3.5 w-3.5" />
@@ -1707,7 +1773,13 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                     </label>
                     <button
                       type="button"
-                      onClick={() => setEditorOpen(false)}
+                      onClick={() => {
+                        if (wikiSaveTimerRef.current) {
+                          clearTimeout(wikiSaveTimerRef.current);
+                          wikiSaveTimerRef.current = null;
+                        }
+                        setEditorOpen(false);
+                      }}
                       className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary"
                     >
                       <X className="h-3.5 w-3.5" />
