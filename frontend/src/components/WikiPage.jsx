@@ -62,44 +62,44 @@ import * as api from '../services/api';
 
 const GAMEPLAY_FEATURES = [
   {
-    id: 'territory',
-    iconKey: 'radar',
-    title: { en: 'Dynamic Frontline', it: 'Frontline Dinamico' },
+    id: 'dmas',
+    iconKey: 'mappin',
+    title: { en: 'DMAS - Mark Action System', it: 'DMAS - Sistema Mark Action' },
     description: {
-      en: 'Zones change status in real time. Every capture shifts the frontline balance.',
-      it: 'Le zone cambiano stato in tempo reale. Ogni conquista modifica il bilanciamento del fronte.',
+      en: 'F10 marker command system to spawn assets, request support, and drive operations.',
+      it: 'Sistema comandi via marker F10 per spawn asset, supporto e controllo operativo.',
     },
-    Icon: Radar,
+    Icon: MapPin,
   },
   {
-    id: 'logistics',
-    iconKey: 'truck',
-    title: { en: 'Strategic Logistics', it: 'Logistica Strategica' },
+    id: 'dmap-zones',
+    iconKey: 'waypoints',
+    title: { en: 'DMAP (Zones) - Dynamic Mapping Core', it: 'DMAP (Zone) - Dynamic Mapping Core' },
     description: {
-      en: 'Manage supplies, routes, and mission priorities to keep airbases operational.',
-      it: 'Gestione di rifornimenti, rotte e priorita missioni per mantenere operative le basi.',
+      en: 'Dynamic map logic: active/passive zones, front links, and capture progression.',
+      it: 'Logica mappa dinamica: zone attive/passive, linee fronte e progressione conquista.',
     },
-    Icon: Truck,
+    Icon: Waypoints,
   },
   {
-    id: 'combined',
-    iconKey: 'layers3',
-    title: { en: 'Combined Arms Operations', it: 'Operazioni Combined Arms' },
+    id: 'dfow',
+    iconKey: 'scaneye',
+    title: { en: 'DFOW - Dynamic Fog Of War', it: 'DFOW - Dynamic Fog Of War' },
     description: {
-      en: 'Ground vehicles and support units work in sync with pilots to secure objectives.',
-      it: 'Veicoli e unita di supporto lavorano in sinergia con i piloti per gli obiettivi a terra.',
+      en: 'Recon-driven map visibility: enemy contacts appear only when detected by scouts.',
+      it: 'Visibilita mappa guidata da recon: contatti nemici visibili solo se rilevati.',
     },
-    Icon: Layers3,
+    Icon: ScanEye,
   },
   {
-    id: 'defense',
-    iconKey: 'shieldcheck',
-    title: { en: 'Active Defense', it: 'Difesa Attiva' },
+    id: 'dcsar',
+    iconKey: 'helicopter',
+    title: { en: 'DCSAR - Combat Search And Rescue', it: 'DCSAR - Combat Search And Rescue' },
     description: {
-      en: 'Air-defense assets and mobile columns protect airfields, convoys, and key points.',
-      it: 'Assetti antiaerei e colonne mobili proteggono aeroporti, convogli e punti critici.',
+      en: 'Recover downed pilots and deliver them to BLUE airbases to earn campaign rewards.',
+      it: 'Recupera piloti eiettati e consegnali a basi BLUE per ottenere ricompense.',
     },
-    Icon: ShieldCheck,
+    Icon: Helicopter,
   },
 ];
 
@@ -451,6 +451,7 @@ const UI_COPY = {
     gameplay: 'Gameplay',
     gameplaySubtitle: 'Core campaign gameplay features.',
     vehicles: 'Vehicles',
+    vehiclesSubtitle: 'List of all BLUFOR spawnable assets',
     showroomListAria: 'Vehicle showroom list',
     showroomHint: 'Click to open the showroom in fullscreen',
     category: 'Category',
@@ -525,6 +526,7 @@ const UI_COPY = {
     gameplay: 'Gameplay',
     gameplaySubtitle: 'Feature di gioco principali della campagna.',
     vehicles: 'Veicoli',
+    vehiclesSubtitle: 'Lista di tutti gli asset BLUFOR Spawnabili',
     showroomListAria: 'Lista showroom veicoli',
     showroomHint: 'Clicca per aprire lo showroom in fullscreen',
     category: 'Categoria',
@@ -1457,7 +1459,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
     const DraftIcon = resolveGameplayIcon(wikiDraft.iconKey, Layers3);
 
     return (
-      <article className="h-full rounded-2xl border border-yt-border/80 bg-[#0f1723] p-4 sm:p-5">
+      <article className="flex h-full flex-col rounded-2xl border border-yt-border/80 bg-[#0f1723] p-4 sm:p-5">
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="inline-flex items-center gap-2 text-xl font-extrabold uppercase tracking-[0.05em] text-yt-text-primary">
@@ -1494,7 +1496,11 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
           </div>
         </div>
 
-        <div className="max-h-[40vh] overflow-auto rounded-xl border border-yt-border/75 bg-[#0c1320] px-4 py-3 sm:max-h-[46vh]">
+        <div
+          className={`overflow-auto rounded-xl border border-yt-border/75 bg-[#0c1320] px-4 py-3 ${
+            canEditWiki && editorOpen ? 'max-h-[40vh] sm:max-h-[46vh]' : 'min-h-0 flex-1'
+          }`}
+        >
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
             {selectedGameplayPageContent}
           </ReactMarkdown>
@@ -1685,7 +1691,10 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
 
   const renderShowroomContent = () => (
     <div className="space-y-5">
-      <h2 className="text-xl font-black uppercase tracking-[0.08em] text-yt-text-primary">{ui.vehicles}</h2>
+      <div>
+        <h2 className="text-xl font-black uppercase tracking-[0.08em] text-yt-text-primary">{ui.vehicles}</h2>
+        <p className="mt-1 text-xs text-yt-text-secondary">{ui.vehiclesSubtitle}</p>
+      </div>
       <div className="grid items-start gap-4 lg:grid-cols-[64px,minmax(0,1fr)]">
         <aside className="h-fit self-start rounded-2xl border border-yt-border/80 bg-[#0f1723] p-1.5">
           <div className="flex items-center justify-center gap-2 lg:flex-col">
@@ -1716,20 +1725,20 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
         </aside>
 
         {!selectedVehicleGroup ? (
-          <p className="flex h-[min(72vh,620px)] items-center rounded-xl border border-yt-border/75 bg-[#0f1723] px-4 py-3 text-sm text-yt-text-secondary">
+          <p className="flex items-center rounded-xl border border-yt-border/75 bg-[#0f1723] px-4 py-3 text-sm text-yt-text-secondary">
             {ui.noVehicles}
           </p>
         ) : (
           <article
             key={selectedVehicleGroup.key}
-            className={`flex h-[min(72vh,620px)] flex-col rounded-2xl border border-yt-border/80 bg-[#0f1723] p-4 transition-all duration-200 ease-out ${
+            className={`rounded-2xl border border-yt-border/80 bg-[#0f1723] p-4 transition-all duration-200 ease-out ${
               isVehicleCategoryContentVisible ? 'translate-x-0 opacity-100' : 'translate-x-2 opacity-0'
             }`}
           >
             <h3 className="mb-3 text-sm font-extrabold uppercase tracking-[0.1em] text-yt-accent">
               {localizeText(selectedVehicleGroup.category, language)}
             </h3>
-            <div className="flex-1 overflow-auto rounded-xl border border-yt-border/70">
+            <div className="max-h-[min(72vh,620px)] overflow-auto rounded-xl border border-yt-border/70">
               <table className="min-w-full border-collapse text-sm">
                 <thead className="bg-[#111b2a]">
                   <tr>
