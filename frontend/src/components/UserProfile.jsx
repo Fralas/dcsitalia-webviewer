@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Award, ChevronDown, Loader2, Pencil, Target, Trash2, Trophy, Upload, User as UserIcon } from 'lucide-react';
+import { Award, ChevronDown, Loader2, Pencil, Trash2, Trophy, Upload, User as UserIcon } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { useUser } from '../contexts/UserContext';
 import * as api from '../services/api';
 import velcroTextureImg from '../../img/velcrotexture.jpg';
@@ -24,28 +25,25 @@ function getLeaderboardBadgeClass(position) {
   return 'border-yt-border/80 bg-yt-bg-tertiary/80 text-yt-text-primary';
 }
 
-function ProfileStatCard({ label, value, icon: Icon }) {
-  return (
-    <div className="bg-yt-bg-tertiary/60 rounded-2xl p-4 border border-yt-border/70 shadow-[0_8px_18px_rgba(0,0,0,0.26)]">
-      <div className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-full border border-yt-accent/40 bg-yt-accent/15 text-yt-accent">
-        <Icon className="h-4 w-4" />
-      </div>
-      <div className="text-3xl font-black text-yt-text-primary">{value}</div>
-      <div className="mt-1 text-xs font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">{label}</div>
-    </div>
-  );
-}
-
 function normalizeUserName(value, fallback = '') {
   const trimmed = String(value || '').trim();
   if (trimmed) return trimmed;
   return String(fallback || '').trim();
 }
 
-const PATCH_DEPTH_STEPS = [-9, -7, -5, -3, -1, 1, 3, 5, 7, 9];
+const PATCH_DEPTH_STEPS = [-7, -5, -3, -1, 1, 3, 5, 7];
+const PATCH_GIMBAL_EPSILON_DEG = 0.05;
+
+function avoidOrthogonalYaw(yawDeg) {
+  const normalized = ((yawDeg % 180) + 180) % 180;
+  if (Math.abs(normalized - 90) < 0.0001) {
+    return yawDeg + PATCH_GIMBAL_EPSILON_DEG;
+  }
+  return yawDeg;
+}
 
 export default function UserProfile() {
-  const { user, profile } = useUser();
+  const { user } = useUser();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [catalog, setCatalog] = useState([]);
@@ -77,6 +75,7 @@ export default function UserProfile() {
   const [editStatus, setEditStatus] = useState('');
   const [patchViewerAchievement, setPatchViewerAchievement] = useState(null);
   const [patchRotation, setPatchRotation] = useState({ x: -12, y: 18 });
+  const [patchZoom, setPatchZoom] = useState(1);
   const [isDraggingPatch, setIsDraggingPatch] = useState(false);
   const patchDragRef = useRef({ active: false, lastX: 0, lastY: 0 });
 
@@ -201,8 +200,10 @@ export default function UserProfile() {
     const imageUrl = String(achievement?.imageUrl || '').trim();
     if (!imageUrl) return;
     setPatchRotation({ x: 0, y: 0 });
+    setPatchZoom(1);
     setPatchViewerAchievement({
       name: String(achievement?.name || 'Achievement'),
+      description: String(achievement?.description || '').trim(),
       imageUrl,
     });
   };
@@ -245,6 +246,15 @@ export default function UserProfile() {
     }
   };
 
+  const handlePatchWheel = (event) => {
+    event.preventDefault();
+    const delta = event.deltaY;
+    setPatchZoom((prev) => {
+      const next = delta < 0 ? prev + 0.12 : prev - 0.12;
+      return Math.max(1, Math.min(2.5, next));
+    });
+  };
+
   if (!user) {
     return (
       <div className="rounded-2xl border border-yt-border bg-yt-bg-secondary/90 p-8 text-center">
@@ -254,16 +264,6 @@ export default function UserProfile() {
       </div>
     );
   }
-
-  const missionsCompleted = Number.isFinite(profile?.stats?.missionsCompleted) ? profile.stats.missionsCompleted : 0;
-  const ordersCompleted = Number.isFinite(profile?.stats?.ordersCompleted) ? profile.stats.ordersCompleted : 0;
-  const recognitions = userAchievements.length;
-
-  const totalXp = (missionsCompleted * 100) + (ordersCompleted * 50) + (recognitions * 250);
-  const level = Math.max(1, Math.floor(totalXp / 1000) + 1);
-  const xpInLevel = totalXp % 1000;
-  const targetXp = 1000;
-  const progressPercentage = Math.min(100, Math.round((xpInLevel / targetXp) * 100));
 
   const ownLeaderboardEntry = leaderboard.find((entry) => String(entry?.userId || '') === String(user?.id || ''));
 
@@ -424,55 +424,119 @@ export default function UserProfile() {
     }
   };
 
+  const patchViewerModal = patchViewerAchievement ? (
+    <div
+      className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-xl"
+      onClick={closePatchViewer}
+    >
+      <div
+        className="flex w-full max-w-[900px] flex-col items-center gap-4"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <p className="text-center text-sm font-semibold text-slate-200">
+          {patchViewerAchievement.name}
+        </p>
+        <p className="text-center text-xs text-slate-300">
+          {patchViewerAchievement.description || 'Nessuna descrizione disponibile.'}
+        </p>
+
+        <div className="[perspective:1400px]">
+          <div
+            className={`mx-auto h-[min(72vh,72vw)] w-[min(72vh,72vw)] touch-none select-none ${isDraggingPatch ? 'cursor-grabbing' : 'cursor-grab'}`}
+            onPointerDown={handlePatchPointerDown}
+            onPointerMove={handlePatchPointerMove}
+            onPointerUp={handlePatchPointerUp}
+            onPointerCancel={handlePatchPointerUp}
+            onPointerLeave={handlePatchPointerUp}
+            onWheel={handlePatchWheel}
+          >
+            <div
+              className="relative h-full w-full [transform-style:preserve-3d]"
+              style={{
+                transform: `scale(${patchZoom}) rotateX(${patchRotation.x}deg) rotateY(${avoidOrthogonalYaw(patchRotation.y)}deg)`,
+                transition: isDraggingPatch ? 'none' : 'transform 120ms ease-out',
+              }}
+            >
+              {PATCH_DEPTH_STEPS.map((depth) => (
+                <div
+                  key={`patch-depth-${depth}`}
+                  className="absolute inset-0"
+                  style={{
+                    transform: `translateZ(${depth}px)`,
+                    WebkitMaskImage: `url(${patchViewerAchievement.imageUrl})`,
+                    maskImage: `url(${patchViewerAchievement.imageUrl})`,
+                    WebkitMaskRepeat: 'no-repeat',
+                    maskRepeat: 'no-repeat',
+                    WebkitMaskPosition: 'center',
+                    maskPosition: 'center',
+                    WebkitMaskSize: 'contain',
+                    maskSize: 'contain',
+                    backgroundImage: `url(${velcroTextureImg})`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'center',
+                    backgroundSize: 'cover',
+                    opacity: 0.96,
+                  }}
+                />
+              ))}
+              <div className="absolute inset-0 [backface-visibility:hidden] [transform:translateZ(9px)]">
+                <img
+                  src={patchViewerAchievement.imageUrl}
+                  alt={patchViewerAchievement.name}
+                  className="h-full w-full object-contain drop-shadow-[0_24px_34px_rgba(0,0,0,0.52)]"
+                  draggable={false}
+                />
+              </div>
+              <div
+                className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)_translateZ(9px)]"
+                style={{
+                  WebkitMaskImage: `url(${patchViewerAchievement.imageUrl})`,
+                  maskImage: `url(${patchViewerAchievement.imageUrl})`,
+                  WebkitMaskRepeat: 'no-repeat',
+                  maskRepeat: 'no-repeat',
+                  WebkitMaskPosition: 'center',
+                  maskPosition: 'center',
+                  WebkitMaskSize: 'contain',
+                  maskSize: 'contain',
+                }}
+              >
+                <img
+                  src={velcroTextureImg}
+                  alt="Retro patch velcro"
+                  className="h-full w-full object-cover drop-shadow-[0_24px_34px_rgba(0,0,0,0.52)]"
+                  draggable={false}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div className="mx-auto w-full max-w-[1240px] space-y-4 pb-6">
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <section className="bg-yt-bg-secondary/85 rounded-3xl border border-yt-border/70 p-5 shadow-[0_14px_30px_rgba(0,0,0,0.35)]">
+        <section className="bg-yt-bg-secondary/85 rounded-3xl border border-yt-border/70 p-4 shadow-[0_14px_30px_rgba(0,0,0,0.35)]">
           <div className="text-center">
-            <div className="mx-auto mb-4 h-36 w-36 overflow-hidden rounded-full border border-yt-border bg-yt-bg-tertiary p-1">
+            <div className="mx-auto mb-3 h-28 w-28 overflow-hidden rounded-full border border-yt-border bg-yt-bg-tertiary p-1">
               {avatarUrl ? (
                 <img src={avatarUrl} alt={displayName} className="h-full w-full rounded-full object-cover" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center rounded-full bg-yt-bg-primary">
-                  <UserIcon className="h-12 w-12 text-yt-text-secondary" />
+                  <UserIcon className="h-10 w-10 text-yt-text-secondary" />
                 </div>
               )}
             </div>
-            <h2 className="text-3xl font-black tracking-tight text-yt-text-primary">{displayName}</h2>
+            <h2 className="text-2xl font-black tracking-tight text-yt-text-primary">{displayName}</h2>
             <p className="mt-1 text-xs font-semibold uppercase tracking-[0.1em] text-yt-text-secondary">Discord ID: {user.id}</p>
-          </div>
-
-          <div className="mt-5 rounded-2xl border border-yt-border/70 bg-yt-bg-tertiary/70 p-4">
-            <div className="flex items-center gap-3">
-              <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl border border-yt-accent/60 bg-yt-accent/15 text-2xl font-black text-yt-accent">
-                {level}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs font-bold uppercase tracking-[0.12em] text-yt-text-secondary">Livello</div>
-                <div className="mt-2 h-2.5 rounded-full bg-yt-bg-primary">
-                  <div
-                    className="h-full rounded-full bg-yt-accent"
-                    style={{ width: `${progressPercentage}%` }}
-                  />
-                </div>
-                <div className="mt-1 text-xs font-semibold text-yt-text-secondary">
-                  {xpInLevel.toLocaleString('it-IT')} / {targetXp.toLocaleString('it-IT')} XP
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-1">
-            <ProfileStatCard label="Missioni completate" value={missionsCompleted} icon={Target} />
-            <ProfileStatCard label="Ordini completati" value={ordersCompleted} icon={Trophy} />
-            <ProfileStatCard label="Riconoscimenti" value={recognitions} icon={Award} />
           </div>
         </section>
 
-        <section className="bg-yt-bg-secondary/85 rounded-3xl border border-yt-border/70 p-5 shadow-[0_14px_30px_rgba(0,0,0,0.35)]">
-          <div className="mb-3 flex items-center justify-between gap-3">
+        <section className="bg-yt-bg-secondary/85 rounded-3xl border border-yt-border/70 p-4 shadow-[0_14px_30px_rgba(0,0,0,0.35)]">
+          <div className="mb-2 flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-3xl font-black uppercase tracking-[0.06em] text-yt-text-primary">Leaderboard Achievement</h3>
+              <h3 className="text-2xl font-black uppercase tracking-[0.06em] text-yt-text-primary">Leaderboard Achievement</h3>
               <p className="text-sm text-yt-text-secondary">Classifica utenti per riconoscimenti assegnati.</p>
             </div>
             <div className="inline-flex items-center rounded-lg border border-yt-border/70 bg-yt-bg-tertiary px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary">
@@ -496,7 +560,7 @@ export default function UserProfile() {
                 return (
                   <div
                     key={`${entry?.userId || 'user'}-${entry?.position || 0}`}
-                    className={`grid grid-cols-[72px_minmax(0,1fr)_120px] items-center border-b border-yt-border/40 px-4 py-2.5 last:border-b-0 ${
+                    className={`grid grid-cols-[72px_minmax(0,1fr)_120px] items-center border-b border-yt-border/40 px-4 py-2 last:border-b-0 ${
                       isSelf ? 'bg-yt-accent/8' : ''
                     }`}
                   >
@@ -507,7 +571,6 @@ export default function UserProfile() {
                     </div>
                     <div className="min-w-0">
                       <p className="truncate text-base font-semibold text-yt-text-primary">{rowName}</p>
-                      <p className="text-xs text-yt-text-secondary">{entry?.userId || '-'}</p>
                     </div>
                     <div className="text-right text-3xl font-black tracking-tight text-yt-text-primary">{entry?.achievementCount || 0}</div>
                   </div>
@@ -517,12 +580,11 @@ export default function UserProfile() {
           </div>
 
           {ownLeaderboardEntry ? (
-            <div className="mt-4 rounded-2xl border border-yt-accent/45 bg-yt-accent/12 px-5 py-3">
+            <div className="mt-3 rounded-2xl border border-yt-accent/45 bg-yt-accent/12 px-4 py-2">
               <div className="grid grid-cols-[56px_minmax(0,1fr)_120px] items-center gap-3">
                 <div className="text-center text-3xl font-black tracking-tight text-yt-accent">{ownLeaderboardEntry.position}</div>
                 <div className="min-w-0">
                   <p className="truncate text-lg font-bold text-yt-text-primary">{displayName} (Tu)</p>
-                  <p className="text-xs text-yt-text-secondary">{user.id}</p>
                 </div>
                 <div className="text-right text-4xl font-black tracking-tight text-yt-accent">{ownLeaderboardEntry.achievementCount}</div>
               </div>
@@ -838,91 +900,7 @@ export default function UserProfile() {
         </section>
       )}
 
-      {patchViewerAchievement && (
-        <div
-          className="fixed inset-0 z-[3500] flex items-center justify-center bg-black/70 p-4 backdrop-blur-xl"
-          onClick={closePatchViewer}
-        >
-          <div
-            className="flex w-full max-w-[900px] flex-col items-center gap-4"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <p className="text-center text-sm font-semibold text-slate-200">
-              {patchViewerAchievement.name}
-            </p>
-            <p className="text-center text-xs text-slate-300">
-              Trascina con mouse o touch per ruotare la patch. Premi ESC o clicca fuori per chiudere.
-            </p>
-
-            <div className="[perspective:1400px]">
-              <div
-                className={`mx-auto h-[min(72vh,72vw)] w-[min(72vh,72vw)] touch-none select-none ${isDraggingPatch ? 'cursor-grabbing' : 'cursor-grab'}`}
-                onPointerDown={handlePatchPointerDown}
-                onPointerMove={handlePatchPointerMove}
-                onPointerUp={handlePatchPointerUp}
-                onPointerCancel={handlePatchPointerUp}
-                onPointerLeave={handlePatchPointerUp}
-              >
-                <div
-                  className="relative h-full w-full [transform-style:preserve-3d]"
-                  style={{
-                    transform: `rotateX(${patchRotation.x}deg) rotateY(${patchRotation.y}deg)`,
-                    transition: isDraggingPatch ? 'none' : 'transform 120ms ease-out',
-                  }}
-                >
-                  {PATCH_DEPTH_STEPS.map((depth) => (
-                    <div
-                      key={`patch-depth-${depth}`}
-                      className="absolute inset-0"
-                      style={{
-                        transform: `translateZ(${depth}px)`,
-                        WebkitMaskImage: `url(${patchViewerAchievement.imageUrl})`,
-                        maskImage: `url(${patchViewerAchievement.imageUrl})`,
-                        WebkitMaskRepeat: 'no-repeat',
-                        maskRepeat: 'no-repeat',
-                        WebkitMaskPosition: 'center',
-                        maskPosition: 'center',
-                        WebkitMaskSize: 'contain',
-                        maskSize: 'contain',
-                        background: 'linear-gradient(90deg, rgba(44,52,64,0.94) 0%, rgba(85,96,112,0.95) 52%, rgba(33,40,52,0.94) 100%)',
-                        opacity: 0.92,
-                      }}
-                    />
-                  ))}
-                  <div className="absolute inset-0 [backface-visibility:hidden] [transform:translateZ(11px)]">
-                    <img
-                      src={patchViewerAchievement.imageUrl}
-                      alt={patchViewerAchievement.name}
-                      className="h-full w-full object-contain drop-shadow-[0_24px_34px_rgba(0,0,0,0.52)]"
-                      draggable={false}
-                    />
-                  </div>
-                  <div
-                    className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)_translateZ(11px)]"
-                    style={{
-                      WebkitMaskImage: `url(${patchViewerAchievement.imageUrl})`,
-                      maskImage: `url(${patchViewerAchievement.imageUrl})`,
-                      WebkitMaskRepeat: 'no-repeat',
-                      maskRepeat: 'no-repeat',
-                      WebkitMaskPosition: 'center',
-                      maskPosition: 'center',
-                      WebkitMaskSize: 'contain',
-                      maskSize: 'contain',
-                    }}
-                  >
-                    <img
-                      src={velcroTextureImg}
-                      alt="Retro patch velcro"
-                      className="h-full w-full object-cover drop-shadow-[0_24px_34px_rgba(0,0,0,0.52)]"
-                      draggable={false}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {typeof document !== 'undefined' && patchViewerModal ? createPortal(patchViewerModal, document.body) : null}
     </div>
   );
 }
