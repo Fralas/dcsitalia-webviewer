@@ -35,6 +35,7 @@ import * as convoysService from './services/convoys.js';
 import * as changelogsService from './services/changelogs.js';
 import * as changelogTranslator from './services/changelogTranslator.js';
 import * as wikiService from './services/wiki.js';
+import * as achievementsService from './services/achievements.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -242,7 +243,8 @@ async function ensureSessionUserPermissions(req, options = {}) {
   const cacheValid = !forceRefresh
     && Number.isFinite(lastResolvedAt)
     && (Date.now() - lastResolvedAt) < DISCORD_ROLE_CACHE_TTL_MS
-    && typeof sessionUser.canManageLogisticsRouteVisibility === 'boolean';
+    && typeof sessionUser.canManageLogisticsRouteVisibility === 'boolean'
+    && typeof sessionUser.canEditWiki === 'boolean';
 
   if (cacheValid) {
     return sessionUser;
@@ -253,6 +255,7 @@ async function ensureSessionUserPermissions(req, options = {}) {
     ...sessionUser,
     discordRoleIds: permissions.roleIds,
     canManageLogisticsRouteVisibility: permissions.canManageLogisticsRouteVisibility,
+    canEditWiki: isWikiEditor(sessionUser.id),
   };
   req.session.userPermissionsResolvedAt = Date.now();
   return req.session.user;
@@ -883,9 +886,14 @@ app.get('/api/auth/discord/callback', async (req, res) => {
       globalName: discordUser.global_name || discordUser.username,
       discordRoleIds: [],
       canManageLogisticsRouteVisibility: false,
+      canEditWiki: isWikiEditor(discordUser.id),
     };
 
     await ensureSessionUserPermissions(req, { forceRefresh: true });
+    achievementsService.rememberUser({
+      userId: discordUser.id,
+      name: discordUser.global_name || discordUser.username || discordUser.id,
+    });
 
     // Register user as active
     activeUsers.addActiveUser(discordUser);
@@ -926,6 +934,10 @@ app.get('/api/auth/user', async (req, res) => {
   }
 
   const user = await ensureSessionUserPermissions(req);
+  achievementsService.rememberUser({
+    userId: user?.id || req.session.user?.id,
+    name: user?.globalName || user?.username || req.session.user?.id,
+  });
   res.json(user || req.session.user);
 });
 
@@ -972,6 +984,10 @@ app.get('/api/profile', (req, res) => {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
+  achievementsService.rememberUser({
+    userId: req.session.user.id,
+    name: req.session.user.globalName || req.session.user.username || req.session.user.id,
+  });
   const profile = userProfiles.getProfile(req.session.user.id);
   res.json(profile);
 });
@@ -991,6 +1007,114 @@ app.put('/api/profile', (req, res) => {
 function isWikiEditor(sessionUserId) {
   return WIKI_EDITOR_IDS.has(String(sessionUserId || '').trim());
 }
+
+/**
+ * GET /api/achievements/catalog - Public list of all available achievements
+ */
+app.get('/api/achievements/catalog', (req, res) => {
+  const achievements = achievementsService.getCatalog();
+  res.json({ achievements });
+});
+
+/**
+ * POST /api/achievements/catalog - Create new achievement (wiki editor only)
+ */
+app.post('/api/achievements/catalog', (req, res) => {
+  const sessionUser = req.session?.user;
+  const userId = sessionUser?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!isWikiEditor(userId)) {
+    return res.status(403).json({ error: 'Only allowed contributors can manage achievements' });
+  }
+
+  try {
+    const achievement = achievementsService.createAchievement({
+      name: req.body?.name,
+      description: req.body?.description,
+      imageUrl: req.body?.imageUrl,
+      createdById: userId,
+      createdByName: sessionUser.globalName || sessionUser.username || String(userId),
+    });
+    return res.status(201).json({ achievement });
+  } catch (error) {
+    const message = String(error?.message || 'Failed to create achievement');
+    const lowered = message.toLowerCase();
+    const status = lowered.includes('already exists') ? 409 : 400;
+    return res.status(status).json({ error: message });
+  }
+});
+
+/**
+ * GET /api/achievements/users/:userId - Get assigned achievements for a user
+ */
+app.get('/api/achievements/users/:userId', (req, res) => {
+  const sessionUser = req.session?.user;
+  const requesterId = String(sessionUser?.id || '').trim();
+  const targetUserId = String(req.params.userId || '').trim();
+
+  if (!requesterId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!targetUserId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+  if (requesterId !== targetUserId && !isWikiEditor(requesterId)) {
+    return res.status(403).json({ error: 'Only allowed contributors can inspect other users achievements' });
+  }
+
+  const achievements = achievementsService.getUserAchievements(targetUserId);
+  const displayName = achievementsService.getUserDisplayName(targetUserId)
+    || (requesterId === targetUserId ? (sessionUser.globalName || sessionUser.username || requesterId) : '');
+
+  return res.json({
+    userId: targetUserId,
+    displayName,
+    recognitionsCount: achievements.length,
+    achievements,
+  });
+});
+
+/**
+ * POST /api/achievements/assign - Assign achievement to a user (wiki editor only)
+ */
+app.post('/api/achievements/assign', (req, res) => {
+  const sessionUser = req.session?.user;
+  const userId = sessionUser?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!isWikiEditor(userId)) {
+    return res.status(403).json({ error: 'Only allowed contributors can assign achievements' });
+  }
+
+  try {
+    const result = achievementsService.assignAchievement({
+      userId: req.body?.userId,
+      userName: req.body?.userName,
+      achievementId: req.body?.achievementId,
+      awardedById: userId,
+      awardedByName: sessionUser.globalName || sessionUser.username || String(userId),
+    });
+    return res.status(201).json(result);
+  } catch (error) {
+    const message = String(error?.message || 'Failed to assign achievement');
+    const lowered = message.toLowerCase();
+    const status = lowered.includes('already assigned') ? 409 : lowered.includes('not found') ? 404 : 400;
+    return res.status(status).json({ error: message });
+  }
+});
+
+/**
+ * GET /api/achievements/leaderboard - Public leaderboard by achievement count
+ */
+app.get('/api/achievements/leaderboard', (req, res) => {
+  const rawLimit = Number.parseInt(String(req.query?.limit || ''), 10);
+  const limit = Number.isFinite(rawLimit) ? rawLimit : 50;
+  const leaderboard = achievementsService.getLeaderboard(limit);
+  res.json({ leaderboard });
+});
 
 /**
  * GET /api/wiki/pages - Public list of wiki pages

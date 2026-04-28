@@ -378,6 +378,51 @@ export async function saveUserProfile(profile) {
 }
 
 /**
+ * Get achievements catalog
+ */
+export async function getAchievementsCatalog() {
+  return fetchAPI('/achievements/catalog');
+}
+
+/**
+ * Create a new achievement (wiki editor only)
+ */
+export async function createAchievement(payload) {
+  return fetchAPI('/achievements/catalog', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Get assigned achievements for a user
+ */
+export async function getUserAchievements(userId) {
+  return fetchAPI(`/achievements/users/${encodeURIComponent(userId)}`, {
+    credentials: 'include',
+  });
+}
+
+/**
+ * Assign achievement to a user (wiki editor only)
+ */
+export async function assignAchievement(payload) {
+  return fetchAPI('/achievements/assign', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Get achievements leaderboard
+ */
+export async function getAchievementsLeaderboard(limit = 50) {
+  return fetchAPI(`/achievements/leaderboard?limit=${encodeURIComponent(limit)}`);
+}
+
+/**
  * Get changelog posts
  */
 export async function getChangelogs() {
@@ -582,6 +627,11 @@ export default {
   postConvoyEvent,
   getUserProfile,
   saveUserProfile,
+  getAchievementsCatalog,
+  createAchievement,
+  getUserAchievements,
+  assignAchievement,
+  getAchievementsLeaderboard,
   getChangelogs,
   getChangelogDraft,
   saveChangelogDraft,
