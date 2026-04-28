@@ -354,7 +354,9 @@ export async function getMockUsers() {
  * Get logged-in users (real users from Discord OAuth)
  */
 export async function getLoggedInUsers() {
-  return fetchAPI('/logged-in-users');
+  return fetchAPI('/logged-in-users', {
+    credentials: 'include',
+  });
 }
 
 /**

@@ -14,7 +14,20 @@ export function UserProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    const handleUnauthorized = () => {
+    const handleUnauthorized = async () => {
+      try {
+        const response = await fetch('/api/auth/user', {
+          credentials: 'include',
+        });
+        if (response.ok) {
+          const userData = await response.json();
+          setUser(userData);
+          return;
+        }
+      } catch (error) {
+        console.warn('Auth re-check failed after unauthorized event:', error);
+      }
+
       setUser(null);
       setProfile(null);
     };

@@ -93,20 +93,25 @@ export default function UserProfile() {
     setLoading(true);
     setError('');
     try {
-      const calls = [
+      const [catalogResponse, userAchievementsResponse, leaderboardResponse] = await Promise.all([
         api.getAchievementsCatalog(),
         api.getUserAchievements(user.id),
         api.getAchievementsLeaderboard(50),
-      ];
-      if (canManageAchievements) {
-        calls.push(api.getLoggedInUsers());
-      }
-
-      const [catalogResponse, userAchievementsResponse, leaderboardResponse, loggedInUsersResponse] = await Promise.all(calls);
+      ]);
       setCatalog(Array.isArray(catalogResponse?.achievements) ? catalogResponse.achievements : []);
       setUserAchievements(Array.isArray(userAchievementsResponse?.achievements) ? userAchievementsResponse.achievements : []);
       setLeaderboard(Array.isArray(leaderboardResponse?.leaderboard) ? leaderboardResponse.leaderboard : []);
-      setLoggedInUsers(Array.isArray(loggedInUsersResponse) ? loggedInUsersResponse : []);
+
+      if (canManageAchievements) {
+        try {
+          const loggedInUsersResponse = await api.getLoggedInUsers();
+          setLoggedInUsers(Array.isArray(loggedInUsersResponse) ? loggedInUsersResponse : []);
+        } catch {
+          setLoggedInUsers([]);
+        }
+      } else {
+        setLoggedInUsers([]);
+      }
     } catch (requestError) {
       setError(requestError?.message || 'Errore durante il caricamento dei riconoscimenti.');
     } finally {
