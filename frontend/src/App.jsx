@@ -333,7 +333,7 @@ function App() {
               >
                 <BookOpen className="w-4 h-4" />
               </button>
-              <UserMenu />
+              <UserMenu onOpenProfile={() => goToView('profile')} />
             </div>
           </div>
         </div>

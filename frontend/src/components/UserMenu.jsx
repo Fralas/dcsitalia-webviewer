@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { LogOut, User, ChevronDown, X } from 'lucide-react';
+import { LogOut, User, UserCircle2, ChevronDown, X } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 
 /**
  * User Menu Component - Discord Authentication
  */
-export default function UserMenu() {
+export default function UserMenu({ onOpenProfile }) {
   const { user, loading, setUser } = useUser();
   const [menuOpen, setMenuOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
@@ -34,6 +34,13 @@ export default function UserMenu() {
   const getAvatarUrl = () => {
     if (!user || !user.avatar) return null;
     return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`;
+  };
+
+  const handleOpenProfile = () => {
+    if (typeof onOpenProfile === 'function') {
+      onOpenProfile();
+    }
+    setMenuOpen(false);
   };
 
   if (loading) {
@@ -125,7 +132,11 @@ export default function UserMenu() {
 
           {/* Menu */}
           <div className="absolute right-0 mt-2 w-48 bg-yt-bg-secondary border border-yt-border rounded-lg shadow-lg z-20">
-            <div className="p-3 border-b border-yt-border">
+            <button
+              type="button"
+              onClick={handleOpenProfile}
+              className="w-full p-3 border-b border-yt-border text-left hover:bg-yt-bg-tertiary transition-colors"
+            >
               <div className="text-sm font-semibold text-yt-text-primary">
                 {user.globalName || user.username}
               </div>
@@ -134,7 +145,14 @@ export default function UserMenu() {
                   #{user.discriminator}
                 </div>
               )}
-            </div>
+            </button>
+            <button
+              onClick={handleOpenProfile}
+              className="w-full px-3 py-2 text-left text-sm text-yt-text-primary hover:bg-yt-bg-tertiary flex items-center gap-2 transition-all"
+            >
+              <UserCircle2 className="w-4 h-4" />
+              Profilo
+            </button>
             <button
               onClick={handleLogout}
               className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-yt-bg-tertiary flex items-center gap-2 transition-all rounded-b-lg"
