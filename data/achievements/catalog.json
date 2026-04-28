@@ -1,27 +1,5 @@
 [
   {
-    "id": "achievement_1777377313375_0b80f064",
-    "name": "Cacca",
-    "description": "Caccapupu",
-    "imageUrl": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSKzCZrtyQaXIogk37SWoVXTJ6PO6xqSFQr3A&s",
-    "createdAt": 1777377313375,
-    "createdBy": {
-      "id": "675706661570347041",
-      "name": "Fralas"
-    }
-  },
-  {
-    "id": "achievement_1777377555794_23fb127e",
-    "name": "Pipì",
-    "description": "pipiì pupu",
-    "imageUrl": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSAOtFjSftb1FhuDfV60Wefwqz1CvGdR5FdSA&s",
-    "createdAt": 1777377555794,
-    "createdBy": {
-      "id": "675706661570347041",
-      "name": "Fralas"
-    }
-  },
-  {
     "id": "achievement_1777377614610_b0d38afb",
     "name": "Pula",
     "description": "pulacaramba",

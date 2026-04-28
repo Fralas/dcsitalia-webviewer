@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Award, Loader2, Target, Trophy, Upload, User as UserIcon } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Award, ChevronDown, Loader2, Pencil, Target, Trash2, Trophy, Upload, User as UserIcon } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import * as api from '../services/api';
+import velcroTextureImg from '../../img/velcrotexture.jpg';
 
 function formatDate(timestamp) {
   if (!Number.isFinite(timestamp)) return '-';
@@ -41,6 +42,8 @@ function normalizeUserName(value, fallback = '') {
   return String(fallback || '').trim();
 }
 
+const PATCH_DEPTH_STEPS = [-12, -10, -8, -6, -4, -2, 0, 2, 4, 6, 8, 10, 12];
+
 export default function UserProfile() {
   const { user, profile } = useUser();
   const [loading, setLoading] = useState(false);
@@ -62,6 +65,20 @@ export default function UserProfile() {
   const [assignAchievementId, setAssignAchievementId] = useState('');
   const [assigningAchievement, setAssigningAchievement] = useState(false);
   const [assignStatus, setAssignStatus] = useState('');
+  const [managementOpen, setManagementOpen] = useState(false);
+
+  const [editAchievementId, setEditAchievementId] = useState('');
+  const [editAchievementName, setEditAchievementName] = useState('');
+  const [editAchievementDescription, setEditAchievementDescription] = useState('');
+  const [editAchievementImageUrl, setEditAchievementImageUrl] = useState('');
+  const [editAchievementImageName, setEditAchievementImageName] = useState('');
+  const [editingAchievement, setEditingAchievement] = useState(false);
+  const [deletingAchievement, setDeletingAchievement] = useState(false);
+  const [editStatus, setEditStatus] = useState('');
+  const [patchViewerAchievement, setPatchViewerAchievement] = useState(null);
+  const [patchRotation, setPatchRotation] = useState({ x: -12, y: 18 });
+  const [isDraggingPatch, setIsDraggingPatch] = useState(false);
+  const patchDragRef = useRef({ active: false, lastX: 0, lastY: 0 });
 
   const canManageAchievements = Boolean(user?.canEditWiki);
   const displayName = user?.globalName || user?.username || '';
@@ -137,6 +154,97 @@ export default function UserProfile() {
     }
   }, [assignAchievementId, catalog]);
 
+  useEffect(() => {
+    if (editAchievementId) return;
+    if (catalog.length > 0) {
+      setEditAchievementId(String(catalog[0].id));
+    }
+  }, [editAchievementId, catalog]);
+
+  useEffect(() => {
+    const selectedId = String(editAchievementId || '').trim();
+    const selected = catalog.find((entry) => String(entry?.id || '') === selectedId);
+    if (!selected) {
+      setEditAchievementName('');
+      setEditAchievementDescription('');
+      setEditAchievementImageUrl('');
+      setEditAchievementImageName('');
+      return;
+    }
+
+    setEditAchievementName(String(selected.name || ''));
+    setEditAchievementDescription(String(selected.description || ''));
+    setEditAchievementImageUrl(String(selected.imageUrl || ''));
+    setEditAchievementImageName('');
+  }, [editAchievementId, catalog]);
+
+  useEffect(() => {
+    if (!patchViewerAchievement) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setPatchViewerAchievement(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => {
+      window.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [patchViewerAchievement]);
+
+  const openPatchViewer = (achievement) => {
+    const imageUrl = String(achievement?.imageUrl || '').trim();
+    if (!imageUrl) return;
+    setPatchRotation({ x: 0, y: 0 });
+    setPatchViewerAchievement({
+      name: String(achievement?.name || 'Achievement'),
+      imageUrl,
+    });
+  };
+
+  const closePatchViewer = () => {
+    setPatchViewerAchievement(null);
+    setIsDraggingPatch(false);
+    patchDragRef.current.active = false;
+  };
+
+  const handlePatchPointerDown = (event) => {
+    patchDragRef.current = {
+      active: true,
+      lastX: event.clientX,
+      lastY: event.clientY,
+    };
+    setIsDraggingPatch(true);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
+  const handlePatchPointerMove = (event) => {
+    if (!patchDragRef.current.active) return;
+
+    const dx = event.clientX - patchDragRef.current.lastX;
+
+    patchDragRef.current.lastX = event.clientX;
+    patchDragRef.current.lastY = event.clientY;
+
+    setPatchRotation((prev) => {
+      const nextY = prev.y + (dx * 0.45);
+      return { x: 0, y: nextY };
+    });
+  };
+
+  const handlePatchPointerUp = (event) => {
+    patchDragRef.current.active = false;
+    setIsDraggingPatch(false);
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture?.(event.pointerId);
+    }
+  };
+
   if (!user) {
     return (
       <div className="rounded-2xl border border-yt-border bg-yt-bg-secondary/90 p-8 text-center">
@@ -182,6 +290,7 @@ export default function UserProfile() {
       setNewAchievementImageName('');
       if (created?.id) {
         setAssignAchievementId(String(created.id));
+        setEditAchievementId(String(created.id));
       }
       await fetchAchievementData();
     } catch (requestError) {
@@ -200,6 +309,21 @@ export default function UserProfile() {
       if (typeof result === 'string') {
         setNewAchievementImageUrl(result);
         setNewAchievementImageName(file.name);
+      }
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
+  };
+
+  const handleEditImageFilePick = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === 'string') {
+        setEditAchievementImageUrl(result);
+        setEditAchievementImageName(file.name);
       }
     };
     reader.readAsDataURL(file);
@@ -231,6 +355,72 @@ export default function UserProfile() {
       setAssignStatus(requestError?.message || 'Impossibile assegnare l achievement.');
     } finally {
       setAssigningAchievement(false);
+    }
+  };
+
+  const handleUpdateAchievement = async (event) => {
+    event.preventDefault();
+    setEditStatus('');
+
+    const targetAchievementId = String(editAchievementId || '').trim();
+    const name = String(editAchievementName || '').trim();
+    const description = String(editAchievementDescription || '').trim();
+    const imageUrl = String(editAchievementImageUrl || '').trim();
+
+    if (!targetAchievementId || !name || !description || !imageUrl) {
+      setEditStatus('ID, nome, descrizione e immagine sono obbligatori.');
+      return;
+    }
+
+    setEditingAchievement(true);
+    try {
+      const response = await api.updateAchievement(targetAchievementId, {
+        name,
+        description,
+        imageUrl,
+      });
+      const updated = response?.achievement;
+      setEditStatus('Achievement aggiornato con successo.');
+      if (updated?.id) {
+        const updatedId = String(updated.id);
+        setAssignAchievementId(updatedId);
+        setEditAchievementId(updatedId);
+      }
+      await fetchAchievementData();
+    } catch (requestError) {
+      setEditStatus(requestError?.message || 'Impossibile aggiornare l achievement.');
+    } finally {
+      setEditingAchievement(false);
+    }
+  };
+
+  const handleDeleteAchievement = async () => {
+    setEditStatus('');
+    const targetAchievementId = String(editAchievementId || '').trim();
+    if (!targetAchievementId) {
+      setEditStatus('Seleziona un achievement da eliminare.');
+      return;
+    }
+
+    const selected = catalog.find((entry) => String(entry?.id || '') === targetAchievementId);
+    const selectedName = String(selected?.name || targetAchievementId);
+    const confirmed = window.confirm(`Confermi eliminazione achievement "${selectedName}"?`);
+    if (!confirmed) return;
+
+    setDeletingAchievement(true);
+    try {
+      const response = await api.deleteAchievement(targetAchievementId);
+      const removedAwards = Number(response?.removedAwards || 0);
+      setEditStatus(removedAwards > 0
+        ? `Achievement eliminato. Rimossi ${removedAwards} riconoscimenti assegnati.`
+        : 'Achievement eliminato con successo.');
+      setEditAchievementId('');
+      setAssignAchievementId('');
+      await fetchAchievementData();
+    } catch (requestError) {
+      setEditStatus(requestError?.message || 'Impossibile eliminare l achievement.');
+    } finally {
+      setDeletingAchievement(false);
     }
   };
 
@@ -375,7 +565,14 @@ export default function UserProfile() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {userAchievements.map((achievement) => (
               <article key={achievement.awardId || achievement.achievementId} className="group mx-auto w-full max-w-[260px] rounded-2xl border border-yt-border/70 bg-yt-bg-tertiary/65 p-2.5 shadow-[0_8px_18px_rgba(0,0,0,0.24)]">
-                <div className="mb-2 flex h-24 items-center justify-center overflow-visible">
+                <button
+                  type="button"
+                  onClick={() => openPatchViewer(achievement)}
+                  disabled={!achievement.imageUrl}
+                  className="mb-2 flex h-24 w-full items-center justify-center overflow-visible disabled:cursor-not-allowed"
+                  title={achievement.imageUrl ? 'Apri patch 3D' : 'Patch non disponibile'}
+                  aria-label={achievement.imageUrl ? `Apri patch 3D ${achievement.name || ''}` : 'Patch non disponibile'}
+                >
                   {achievement.imageUrl ? (
                     <img
                       src={achievement.imageUrl}
@@ -388,7 +585,7 @@ export default function UserProfile() {
                       <Award className="h-10 w-10 text-yt-accent" />
                     </div>
                   )}
-                </div>
+                </button>
                 <h4 className="text-sm font-bold uppercase tracking-[0.06em] text-yt-text-primary">{achievement.name}</h4>
                 <p className="mt-1.5 min-h-[42px] text-xs leading-relaxed text-yt-text-secondary">{achievement.description}</p>
                 <p className="mt-2 text-[11px] font-semibold text-yt-accent">Assegnato: {formatDate(achievement.awardedAt)}</p>
@@ -401,144 +598,311 @@ export default function UserProfile() {
 
       {canManageAchievements && (
         <section className="bg-yt-bg-secondary/85 rounded-3xl border border-yt-border/70 p-5 shadow-[0_14px_30px_rgba(0,0,0,0.35)]">
-          <div className="mb-4">
-            <h3 className="text-2xl font-black uppercase tracking-[0.06em] text-yt-text-primary">Gestione Achievement</h3>
-            <p className="text-sm text-yt-text-secondary">Area riservata agli editor wiki per creare e assegnare achievement.</p>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-2xl font-black uppercase tracking-[0.06em] text-yt-text-primary">Gestione Achievement</h3>
+              <p className="text-sm text-yt-text-secondary">Area riservata agli editor wiki per creare, modificare, eliminare e assegnare achievement.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setManagementOpen((prev) => !prev)}
+              className="inline-flex items-center gap-1 rounded border border-yt-border px-2 py-1 text-xs text-yt-text-primary hover:border-yt-accent"
+              title={managementOpen ? 'Chiudi gestione achievement' : 'Apri gestione achievement'}
+              aria-label={managementOpen ? 'Chiudi gestione achievement' : 'Apri gestione achievement'}
+            >
+              <ChevronDown className={`h-4 w-4 transition-transform ${managementOpen ? 'rotate-180' : ''}`} />
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <form onSubmit={handleCreateAchievement} className="rounded-2xl border border-yt-border/70 bg-yt-bg-tertiary/60 p-4 space-y-3">
-              <h4 className="text-sm font-bold uppercase tracking-[0.09em] text-yt-accent">Crea Nuovo Achievement</h4>
+          {managementOpen && (
+            <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
+              <form onSubmit={handleCreateAchievement} className="rounded-2xl border border-yt-border/70 bg-yt-bg-tertiary/60 p-4 space-y-3">
+                <h4 className="text-sm font-bold uppercase tracking-[0.09em] text-yt-accent">Crea Nuovo Achievement</h4>
 
-              <input
-                type="text"
-                value={newAchievementName}
-                onChange={(event) => setNewAchievementName(event.target.value)}
-                placeholder="Nome achievement"
-                className="w-full rounded border border-yt-border/80 bg-yt-bg-secondary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
-              />
-              <textarea
-                rows={3}
-                value={newAchievementDescription}
-                onChange={(event) => setNewAchievementDescription(event.target.value)}
-                placeholder="Descrizione achievement"
-                className="w-full rounded border border-yt-border/80 bg-yt-bg-secondary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
-              />
-              <input
-                type="text"
-                value={newAchievementImageUrl}
-                onChange={(event) => setNewAchievementImageUrl(event.target.value)}
-                placeholder="URL immagine o data URL"
-                className="w-full rounded border border-yt-border/80 bg-yt-bg-secondary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
-              />
+                <input
+                  type="text"
+                  value={newAchievementName}
+                  onChange={(event) => setNewAchievementName(event.target.value)}
+                  placeholder="Nome achievement"
+                  className="w-full rounded border border-yt-border/80 bg-yt-bg-secondary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                />
+                <textarea
+                  rows={3}
+                  value={newAchievementDescription}
+                  onChange={(event) => setNewAchievementDescription(event.target.value)}
+                  placeholder="Descrizione achievement"
+                  className="w-full rounded border border-yt-border/80 bg-yt-bg-secondary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                />
+                <input
+                  type="text"
+                  value={newAchievementImageUrl}
+                  onChange={(event) => setNewAchievementImageUrl(event.target.value)}
+                  placeholder="URL immagine o data URL"
+                  className="w-full rounded border border-yt-border/80 bg-yt-bg-secondary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                />
 
-              <div className="flex flex-wrap items-center gap-3 text-xs text-yt-text-secondary">
-                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-yt-border/80 bg-yt-bg-secondary px-3 py-1.5 font-semibold uppercase tracking-[0.08em] text-yt-text-primary hover:border-yt-accent hover:text-yt-accent">
-                  <Upload className="h-3.5 w-3.5" />
-                  Carica
-                  <input type="file" accept="image/*" className="hidden" onChange={handleImageFilePick} />
-                </label>
-                {newAchievementImageName && <span className="truncate max-w-[240px]">{newAchievementImageName}</span>}
-              </div>
-
-              {newAchievementImageUrl && (
-                <div className="flex h-36 items-center justify-center overflow-visible">
-                  <img
-                    src={newAchievementImageUrl}
-                    alt="Anteprima achievement"
-                    className="h-24 w-24 object-contain transition-all duration-200 ease-out hover:h-32 hover:w-32"
-                  />
+                <div className="flex flex-wrap items-center gap-3 text-xs text-yt-text-secondary">
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-yt-border/80 bg-yt-bg-secondary px-3 py-1.5 font-semibold uppercase tracking-[0.08em] text-yt-text-primary hover:border-yt-accent hover:text-yt-accent">
+                    <Upload className="h-3.5 w-3.5" />
+                    Carica
+                    <input type="file" accept="image/*" className="hidden" onChange={handleImageFilePick} />
+                  </label>
+                  {newAchievementImageName && <span className="truncate max-w-[240px]">{newAchievementImageName}</span>}
                 </div>
-              )}
 
-              {createStatus && (
-                <div className={`rounded border px-3 py-2 text-xs ${createStatus.includes('successo') ? 'border-emerald-500/45 bg-emerald-500/10 text-emerald-300' : 'border-orange-500/45 bg-orange-500/10 text-orange-200'}`}>
-                  {createStatus}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={creatingAchievement}
-                className="inline-flex items-center gap-2 rounded border border-yt-accent/50 bg-yt-accent/20 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.09em] text-yt-accent disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {creatingAchievement && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                Crea
-              </button>
-            </form>
-
-            <form onSubmit={handleAssignAchievement} className="rounded-2xl border border-yt-border/70 bg-yt-bg-tertiary/60 p-4 space-y-3">
-              <h4 className="text-sm font-bold uppercase tracking-[0.09em] text-yt-accent">Assegna Achievement</h4>
-
-              <select
-                value={assignAchievementId}
-                onChange={(event) => setAssignAchievementId(event.target.value)}
-                className="w-full rounded border border-yt-border/80 bg-yt-bg-secondary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
-              >
-                {catalog.length === 0 ? (
-                  <option value="">Nessun achievement disponibile</option>
-                ) : (
-                  catalog.map((entry) => (
-                    <option key={entry.id} value={entry.id}>
-                      {entry.name}
-                    </option>
-                  ))
+                {newAchievementImageUrl && (
+                  <div className="flex h-36 items-center justify-center overflow-visible">
+                    <img
+                      src={newAchievementImageUrl}
+                      alt="Anteprima achievement"
+                      className="h-24 w-24 object-contain transition-all duration-200 ease-out hover:h-32 hover:w-32"
+                    />
+                  </div>
                 )}
-              </select>
 
-              <input
-                type="text"
-                value={assignUserId}
-                onChange={(event) => setAssignUserId(event.target.value)}
-                placeholder="Discord user ID"
-                className="w-full rounded border border-yt-border/80 bg-yt-bg-secondary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
-              />
-              <input
-                type="text"
-                value={assignUserName}
-                onChange={(event) => setAssignUserName(event.target.value)}
-                placeholder="Nome visualizzato utente (opzionale)"
-                className="w-full rounded border border-yt-border/80 bg-yt-bg-secondary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
-              />
+                {createStatus && (
+                  <div className={`rounded border px-3 py-2 text-xs ${createStatus.includes('successo') ? 'border-emerald-500/45 bg-emerald-500/10 text-emerald-300' : 'border-orange-500/45 bg-orange-500/10 text-orange-200'}`}>
+                    {createStatus}
+                  </div>
+                )}
 
-              {knownUsers.length > 0 && (
-                <div>
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">Utenti online</p>
-                  <div className="flex flex-wrap gap-2">
-                    {knownUsers.map((entry) => (
-                      <button
-                        key={entry.id}
-                        type="button"
-                        onClick={() => {
-                          setAssignUserId(entry.id);
-                          setAssignUserName(entry.name);
-                        }}
-                        className="rounded border border-yt-border/70 bg-yt-bg-secondary px-2.5 py-1 text-[11px] text-yt-text-primary hover:border-yt-accent hover:text-yt-accent"
-                      >
+                <button
+                  type="submit"
+                  disabled={creatingAchievement}
+                  className="inline-flex items-center gap-2 rounded border border-yt-accent/50 bg-yt-accent/20 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.09em] text-yt-accent disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {creatingAchievement && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Crea
+                </button>
+              </form>
+
+              <form onSubmit={handleAssignAchievement} className="rounded-2xl border border-yt-border/70 bg-yt-bg-tertiary/60 p-4 space-y-3">
+                <h4 className="text-sm font-bold uppercase tracking-[0.09em] text-yt-accent">Assegna Achievement</h4>
+
+                <select
+                  value={assignAchievementId}
+                  onChange={(event) => setAssignAchievementId(event.target.value)}
+                  className="w-full rounded border border-yt-border/80 bg-yt-bg-secondary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                >
+                  {catalog.length === 0 ? (
+                    <option value="">Nessun achievement disponibile</option>
+                  ) : (
+                    catalog.map((entry) => (
+                      <option key={entry.id} value={entry.id}>
                         {entry.name}
-                      </button>
-                    ))}
+                      </option>
+                    ))
+                  )}
+                </select>
+
+                <input
+                  type="text"
+                  value={assignUserId}
+                  onChange={(event) => setAssignUserId(event.target.value)}
+                  placeholder="Discord user ID"
+                  className="w-full rounded border border-yt-border/80 bg-yt-bg-secondary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                />
+                <input
+                  type="text"
+                  value={assignUserName}
+                  onChange={(event) => setAssignUserName(event.target.value)}
+                  placeholder="Nome visualizzato utente (opzionale)"
+                  className="w-full rounded border border-yt-border/80 bg-yt-bg-secondary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                />
+
+                {knownUsers.length > 0 && (
+                  <div>
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">Utenti online</p>
+                    <div className="flex flex-wrap gap-2">
+                      {knownUsers.map((entry) => (
+                        <button
+                          key={entry.id}
+                          type="button"
+                          onClick={() => {
+                            setAssignUserId(entry.id);
+                            setAssignUserName(entry.name);
+                          }}
+                          className="rounded border border-yt-border/70 bg-yt-bg-secondary px-2.5 py-1 text-[11px] text-yt-text-primary hover:border-yt-accent hover:text-yt-accent"
+                        >
+                          {entry.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {assignStatus && (
+                  <div className={`rounded border px-3 py-2 text-xs ${assignStatus.includes('successo') ? 'border-emerald-500/45 bg-emerald-500/10 text-emerald-300' : 'border-orange-500/45 bg-orange-500/10 text-orange-200'}`}>
+                    {assignStatus}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={assigningAchievement || catalog.length === 0}
+                  className="inline-flex items-center gap-2 rounded border border-yt-accent/50 bg-yt-accent/20 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.09em] text-yt-accent disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {assigningAchievement && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Assegna
+                </button>
+              </form>
+
+              <form onSubmit={handleUpdateAchievement} className="rounded-2xl border border-yt-border/70 bg-yt-bg-tertiary/60 p-4 space-y-3">
+                <h4 className="text-sm font-bold uppercase tracking-[0.09em] text-yt-accent">Modifica / Elimina</h4>
+
+                <select
+                  value={editAchievementId}
+                  onChange={(event) => setEditAchievementId(event.target.value)}
+                  className="w-full rounded border border-yt-border/80 bg-yt-bg-secondary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                >
+                  {catalog.length === 0 ? (
+                    <option value="">Nessun achievement disponibile</option>
+                  ) : (
+                    catalog.map((entry) => (
+                      <option key={entry.id} value={entry.id}>
+                        {entry.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+
+                <input
+                  type="text"
+                  value={editAchievementName}
+                  onChange={(event) => setEditAchievementName(event.target.value)}
+                  placeholder="Nome achievement"
+                  className="w-full rounded border border-yt-border/80 bg-yt-bg-secondary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                />
+                <textarea
+                  rows={3}
+                  value={editAchievementDescription}
+                  onChange={(event) => setEditAchievementDescription(event.target.value)}
+                  placeholder="Descrizione achievement"
+                  className="w-full rounded border border-yt-border/80 bg-yt-bg-secondary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                />
+                <input
+                  type="text"
+                  value={editAchievementImageUrl}
+                  onChange={(event) => setEditAchievementImageUrl(event.target.value)}
+                  placeholder="URL immagine o data URL"
+                  className="w-full rounded border border-yt-border/80 bg-yt-bg-secondary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                />
+
+                <div className="flex flex-wrap items-center gap-3 text-xs text-yt-text-secondary">
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-yt-border/80 bg-yt-bg-secondary px-3 py-1.5 font-semibold uppercase tracking-[0.08em] text-yt-text-primary hover:border-yt-accent hover:text-yt-accent">
+                    <Upload className="h-3.5 w-3.5" />
+                    Carica
+                    <input type="file" accept="image/*" className="hidden" onChange={handleEditImageFilePick} />
+                  </label>
+                  {editAchievementImageName && <span className="truncate max-w-[240px]">{editAchievementImageName}</span>}
+                </div>
+
+                {editAchievementImageUrl && (
+                  <div className="flex h-36 items-center justify-center overflow-visible">
+                    <img
+                      src={editAchievementImageUrl}
+                      alt="Anteprima modifica achievement"
+                      className="h-24 w-24 object-contain transition-all duration-200 ease-out hover:h-32 hover:w-32"
+                    />
+                  </div>
+                )}
+
+                {editStatus && (
+                  <div className={`rounded border px-3 py-2 text-xs ${editStatus.includes('successo') || editStatus.includes('Rimossi') ? 'border-emerald-500/45 bg-emerald-500/10 text-emerald-300' : 'border-orange-500/45 bg-orange-500/10 text-orange-200'}`}>
+                    {editStatus}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="submit"
+                    disabled={editingAchievement || deletingAchievement || catalog.length === 0}
+                    className="inline-flex items-center gap-2 rounded border border-blue-500/45 bg-blue-500/15 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.09em] text-blue-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {editingAchievement ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Pencil className="h-3.5 w-3.5" />}
+                    Salva Modifiche
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteAchievement}
+                    disabled={editingAchievement || deletingAchievement || catalog.length === 0}
+                    className="inline-flex items-center gap-2 rounded border border-red-500/45 bg-red-500/12 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.09em] text-red-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {deletingAchievement ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                    Elimina
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </section>
+      )}
+
+      {patchViewerAchievement && (
+        <div
+          className="fixed inset-0 z-[3500] flex items-center justify-center bg-black/70 p-4 backdrop-blur-xl"
+          onClick={closePatchViewer}
+        >
+          <div
+            className="flex w-full max-w-[900px] flex-col items-center gap-4"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="text-center text-sm font-semibold text-slate-200">
+              {patchViewerAchievement.name}
+            </p>
+            <p className="text-center text-xs text-slate-300">
+              Trascina con mouse o touch per ruotare la patch. Premi ESC o clicca fuori per chiudere.
+            </p>
+
+            <div className="[perspective:1400px]">
+              <div
+                className={`mx-auto h-[min(72vh,72vw)] w-[min(72vh,72vw)] touch-none select-none ${isDraggingPatch ? 'cursor-grabbing' : 'cursor-grab'}`}
+                onPointerDown={handlePatchPointerDown}
+                onPointerMove={handlePatchPointerMove}
+                onPointerUp={handlePatchPointerUp}
+                onPointerCancel={handlePatchPointerUp}
+                onPointerLeave={handlePatchPointerUp}
+              >
+                <div
+                  className="relative h-full w-full [transform-style:preserve-3d]"
+                  style={{
+                    transform: `rotateX(${patchRotation.x}deg) rotateY(${patchRotation.y}deg)`,
+                    transition: isDraggingPatch ? 'none' : 'transform 120ms ease-out',
+                  }}
+                >
+                  <div className="absolute inset-0 [backface-visibility:hidden] [transform:translateZ(10px)]">
+                    <img
+                      src={patchViewerAchievement.imageUrl}
+                      alt={patchViewerAchievement.name}
+                      className="h-full w-full object-contain drop-shadow-[0_20px_30px_rgba(0,0,0,0.45)]"
+                      draggable={false}
+                    />
+                  </div>
+                  <div
+                    className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)_translateZ(10px)]"
+                    style={{
+                      WebkitMaskImage: `url(${patchViewerAchievement.imageUrl})`,
+                      maskImage: `url(${patchViewerAchievement.imageUrl})`,
+                      WebkitMaskRepeat: 'no-repeat',
+                      maskRepeat: 'no-repeat',
+                      WebkitMaskPosition: 'center',
+                      maskPosition: 'center',
+                      WebkitMaskSize: 'contain',
+                      maskSize: 'contain',
+                    }}
+                  >
+                    <img
+                      src={velcroTextureImg}
+                      alt="Retro patch velcro"
+                      className="h-full w-full object-cover drop-shadow-[0_20px_30px_rgba(0,0,0,0.45)]"
+                      draggable={false}
+                    />
                   </div>
                 </div>
-              )}
-
-              {assignStatus && (
-                <div className={`rounded border px-3 py-2 text-xs ${assignStatus.includes('successo') ? 'border-emerald-500/45 bg-emerald-500/10 text-emerald-300' : 'border-orange-500/45 bg-orange-500/10 text-orange-200'}`}>
-                  {assignStatus}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={assigningAchievement || catalog.length === 0}
-                className="inline-flex items-center gap-2 rounded border border-yt-accent/50 bg-yt-accent/20 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.09em] text-yt-accent disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {assigningAchievement && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                Assegna
-              </button>
-            </form>
+              </div>
+            </div>
           </div>
-        </section>
+        </div>
       )}
     </div>
   );

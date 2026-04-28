@@ -185,6 +185,82 @@ export function createAchievement({ name, description, imageUrl, createdById, cr
   return newEntry;
 }
 
+export function updateAchievement({ achievementId, name, description, imageUrl }) {
+  const safeAchievementId = sanitizeText(achievementId || '', 80);
+  if (!safeAchievementId) {
+    throw new Error('achievementId is required');
+  }
+
+  const catalog = readCatalog();
+  const index = catalog.findIndex((entry) => entry.id === safeAchievementId);
+  if (index < 0) {
+    throw new Error('Achievement not found');
+  }
+
+  const current = catalog[index];
+  const nextName = sanitizeText(name ?? current.name, 120);
+  const nextDescription = sanitizeText(description ?? current.description, 1200);
+  const nextImageUrl = sanitizeImageUrl(imageUrl ?? current.imageUrl);
+
+  if (!nextName) {
+    throw new Error('Achievement name is required');
+  }
+  if (!nextDescription) {
+    throw new Error('Achievement description is required');
+  }
+  if (!nextImageUrl) {
+    throw new Error('Achievement image is required');
+  }
+
+  const duplicate = catalog.find((entry) => (
+    entry.id !== safeAchievementId && entry.name.toLowerCase() === nextName.toLowerCase()
+  ));
+  if (duplicate) {
+    throw new Error('An achievement with this name already exists');
+  }
+
+  const updatedEntry = normalizeCatalogEntry({
+    ...current,
+    name: nextName,
+    description: nextDescription,
+    imageUrl: nextImageUrl,
+  }, index);
+  catalog[index] = updatedEntry;
+  writeCatalog(catalog);
+  return updatedEntry;
+}
+
+export function deleteAchievement(achievementId) {
+  const safeAchievementId = sanitizeText(achievementId || '', 80);
+  if (!safeAchievementId) {
+    throw new Error('achievementId is required');
+  }
+
+  const catalog = readCatalog();
+  const target = catalog.find((entry) => entry.id === safeAchievementId);
+  if (!target) {
+    throw new Error('Achievement not found');
+  }
+
+  const nextCatalog = catalog.filter((entry) => entry.id !== safeAchievementId);
+  writeCatalog(nextCatalog);
+
+  const awardsMap = readAwardsMap();
+  let removedAwards = 0;
+  Object.keys(awardsMap).forEach((userId) => {
+    const list = Array.isArray(awardsMap[userId]) ? awardsMap[userId] : [];
+    const filtered = list.filter((entry) => entry.achievementId !== safeAchievementId);
+    removedAwards += Math.max(0, list.length - filtered.length);
+    awardsMap[userId] = filtered;
+  });
+  writeAwardsMap(awardsMap);
+
+  return {
+    achievement: target,
+    removedAwards,
+  };
+}
+
 export function rememberUser({ userId, name }) {
   const safeUserId = sanitizeUserId(userId);
   const safeName = sanitizeText(name || '', 140);
@@ -316,6 +392,8 @@ export function getLeaderboard(limit = 50) {
 export default {
   getCatalog,
   createAchievement,
+  updateAchievement,
+  deleteAchievement,
   rememberUser,
   getUserDisplayName,
   assignAchievement,

@@ -398,6 +398,27 @@ export async function createAchievement(payload) {
 }
 
 /**
+ * Update an existing achievement (wiki editor only)
+ */
+export async function updateAchievement(achievementId, payload) {
+  return fetchAPI(`/achievements/catalog/${encodeURIComponent(achievementId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload || {}),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Delete an existing achievement (wiki editor only)
+ */
+export async function deleteAchievement(achievementId) {
+  return fetchAPI(`/achievements/catalog/${encodeURIComponent(achievementId)}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+}
+
+/**
  * Get assigned achievements for a user
  */
 export async function getUserAchievements(userId) {
@@ -631,6 +652,8 @@ export default {
   saveUserProfile,
   getAchievementsCatalog,
   createAchievement,
+  updateAchievement,
+  deleteAchievement,
   getUserAchievements,
   assignAchievement,
   getAchievementsLeaderboard,

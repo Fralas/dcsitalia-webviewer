@@ -1047,6 +1047,59 @@ app.post('/api/achievements/catalog', (req, res) => {
 });
 
 /**
+ * PUT /api/achievements/catalog/:achievementId - Update achievement (wiki editor only)
+ */
+app.put('/api/achievements/catalog/:achievementId', (req, res) => {
+  const sessionUser = req.session?.user;
+  const userId = sessionUser?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!isWikiEditor(userId)) {
+    return res.status(403).json({ error: 'Only allowed contributors can manage achievements' });
+  }
+
+  try {
+    const achievement = achievementsService.updateAchievement({
+      achievementId: req.params?.achievementId,
+      name: req.body?.name,
+      description: req.body?.description,
+      imageUrl: req.body?.imageUrl,
+    });
+    return res.json({ achievement });
+  } catch (error) {
+    const message = String(error?.message || 'Failed to update achievement');
+    const lowered = message.toLowerCase();
+    const status = lowered.includes('not found') ? 404 : lowered.includes('already exists') ? 409 : 400;
+    return res.status(status).json({ error: message });
+  }
+});
+
+/**
+ * DELETE /api/achievements/catalog/:achievementId - Delete achievement (wiki editor only)
+ */
+app.delete('/api/achievements/catalog/:achievementId', (req, res) => {
+  const sessionUser = req.session?.user;
+  const userId = sessionUser?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!isWikiEditor(userId)) {
+    return res.status(403).json({ error: 'Only allowed contributors can manage achievements' });
+  }
+
+  try {
+    const result = achievementsService.deleteAchievement(req.params?.achievementId);
+    return res.json(result);
+  } catch (error) {
+    const message = String(error?.message || 'Failed to delete achievement');
+    const lowered = message.toLowerCase();
+    const status = lowered.includes('not found') ? 404 : 400;
+    return res.status(status).json({ error: message });
+  }
+});
+
+/**
  * GET /api/achievements/users/:userId - Get assigned achievements for a user
  */
 app.get('/api/achievements/users/:userId', (req, res) => {
