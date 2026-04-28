@@ -374,18 +374,18 @@ export default function UserProfile() {
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {userAchievements.map((achievement) => (
-              <article key={achievement.awardId || achievement.achievementId} className="rounded-2xl border border-yt-border/70 bg-yt-bg-tertiary/65 p-3 shadow-[0_8px_18px_rgba(0,0,0,0.24)]">
-                <div className="mb-3 overflow-hidden rounded-lg border border-yt-border/70 bg-yt-bg-primary">
+              <article key={achievement.awardId || achievement.achievementId} className="group mx-auto w-full max-w-[260px] rounded-2xl border border-yt-border/70 bg-yt-bg-tertiary/65 p-2.5 shadow-[0_8px_18px_rgba(0,0,0,0.24)]">
+                <div className="mb-2 flex h-24 items-center justify-center overflow-visible">
                   {achievement.imageUrl ? (
                     <img
                       src={achievement.imageUrl}
                       alt={achievement.name || 'Achievement'}
-                      className="h-28 w-full object-cover"
+                      className="h-24 w-24 object-contain transition-all duration-200 ease-out group-hover:h-32 group-hover:w-32"
                       loading="lazy"
                     />
                   ) : (
-                    <div className="flex h-28 items-center justify-center">
-                      <Award className="h-8 w-8 text-yt-accent" />
+                    <div className="flex h-24 w-24 items-center justify-center transition-all duration-200 ease-out group-hover:h-32 group-hover:w-32">
+                      <Award className="h-10 w-10 text-yt-accent" />
                     </div>
                   )}
                 </div>
@@ -442,8 +442,12 @@ export default function UserProfile() {
               </div>
 
               {newAchievementImageUrl && (
-                <div className="overflow-hidden rounded-lg border border-yt-border/70 bg-yt-bg-primary">
-                  <img src={newAchievementImageUrl} alt="Anteprima achievement" className="h-28 w-full object-cover" />
+                <div className="flex h-36 items-center justify-center overflow-visible">
+                  <img
+                    src={newAchievementImageUrl}
+                    alt="Anteprima achievement"
+                    className="h-24 w-24 object-contain transition-all duration-200 ease-out hover:h-32 hover:w-32"
+                  />
                 </div>
               )}
 
