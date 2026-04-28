@@ -42,7 +42,7 @@ function normalizeUserName(value, fallback = '') {
   return String(fallback || '').trim();
 }
 
-const PATCH_DEPTH_STEPS = [-12, -10, -8, -6, -4, -2, 0, 2, 4, 6, 8, 10, 12];
+const PATCH_DEPTH_STEPS = [-9, -7, -5, -3, -1, 1, 3, 5, 7, 9];
 
 export default function UserProfile() {
   const { user, profile } = useUser();
@@ -870,16 +870,35 @@ export default function UserProfile() {
                     transition: isDraggingPatch ? 'none' : 'transform 120ms ease-out',
                   }}
                 >
-                  <div className="absolute inset-0 [backface-visibility:hidden] [transform:translateZ(10px)]">
+                  {PATCH_DEPTH_STEPS.map((depth) => (
+                    <div
+                      key={`patch-depth-${depth}`}
+                      className="absolute inset-0"
+                      style={{
+                        transform: `translateZ(${depth}px)`,
+                        WebkitMaskImage: `url(${patchViewerAchievement.imageUrl})`,
+                        maskImage: `url(${patchViewerAchievement.imageUrl})`,
+                        WebkitMaskRepeat: 'no-repeat',
+                        maskRepeat: 'no-repeat',
+                        WebkitMaskPosition: 'center',
+                        maskPosition: 'center',
+                        WebkitMaskSize: 'contain',
+                        maskSize: 'contain',
+                        background: 'linear-gradient(90deg, rgba(44,52,64,0.94) 0%, rgba(85,96,112,0.95) 52%, rgba(33,40,52,0.94) 100%)',
+                        opacity: 0.92,
+                      }}
+                    />
+                  ))}
+                  <div className="absolute inset-0 [backface-visibility:hidden] [transform:translateZ(11px)]">
                     <img
                       src={patchViewerAchievement.imageUrl}
                       alt={patchViewerAchievement.name}
-                      className="h-full w-full object-contain drop-shadow-[0_20px_30px_rgba(0,0,0,0.45)]"
+                      className="h-full w-full object-contain drop-shadow-[0_24px_34px_rgba(0,0,0,0.52)]"
                       draggable={false}
                     />
                   </div>
                   <div
-                    className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)_translateZ(10px)]"
+                    className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)_translateZ(11px)]"
                     style={{
                       WebkitMaskImage: `url(${patchViewerAchievement.imageUrl})`,
                       maskImage: `url(${patchViewerAchievement.imageUrl})`,
@@ -894,7 +913,7 @@ export default function UserProfile() {
                     <img
                       src={velcroTextureImg}
                       alt="Retro patch velcro"
-                      className="h-full w-full object-cover drop-shadow-[0_20px_30px_rgba(0,0,0,0.45)]"
+                      className="h-full w-full object-cover drop-shadow-[0_24px_34px_rgba(0,0,0,0.52)]"
                       draggable={false}
                     />
                   </div>
