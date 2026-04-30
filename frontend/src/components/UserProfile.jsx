@@ -31,8 +31,12 @@ function normalizeUserName(value, fallback = '') {
   return String(fallback || '').trim();
 }
 
-const PATCH_DEPTH_STEPS = [-7, -5, -3, -1, 1, 3, 5, 7];
+const PATCH_DEPTH_STEPS = [-5, -3, -1, 1, 3, 5];
 const PATCH_GIMBAL_EPSILON_DEG = 0.05;
+const PATCH_TEXTURE_TILE_SIZE_PX = 220;
+const PATCH_SPIN_DEG_PER_PX = 0.45;
+const PATCH_MOMENTUM_FRICTION_PER_FRAME = 0.94;
+const PATCH_MIN_MOMENTUM_DEG_PER_MS = 0.01;
 
 function avoidOrthogonalYaw(yawDeg) {
   const normalized = ((yawDeg % 180) + 180) % 180;
@@ -77,7 +81,13 @@ export default function UserProfile() {
   const [patchRotation, setPatchRotation] = useState({ x: -12, y: 18 });
   const [patchZoom, setPatchZoom] = useState(1);
   const [isDraggingPatch, setIsDraggingPatch] = useState(false);
-  const patchDragRef = useRef({ active: false, lastX: 0, lastY: 0 });
+  const [isPatchMomentumActive, setIsPatchMomentumActive] = useState(false);
+  const patchDragRef = useRef({ active: false, lastX: 0, lastY: 0, lastMoveTs: 0 });
+  const patchMomentumRef = useRef({
+    velocityDegPerMs: 0,
+    lastTs: 0,
+    rafId: null,
+  });
 
   const canManageAchievements = Boolean(user?.canEditWiki);
   const displayName = user?.globalName || user?.username || '';
@@ -185,6 +195,9 @@ export default function UserProfile() {
 
     const handleEscape = (event) => {
       if (event.key === 'Escape') {
+        stopPatchMomentum();
+        setIsDraggingPatch(false);
+        patchDragRef.current.active = false;
         setPatchViewerAchievement(null);
       }
     };
@@ -196,9 +209,75 @@ export default function UserProfile() {
     };
   }, [patchViewerAchievement]);
 
+  useEffect(() => () => {
+    if (patchMomentumRef.current.rafId !== null) {
+      window.cancelAnimationFrame(patchMomentumRef.current.rafId);
+      patchMomentumRef.current.rafId = null;
+    }
+  }, []);
+
+  const stopPatchMomentum = () => {
+    if (patchMomentumRef.current.rafId !== null) {
+      window.cancelAnimationFrame(patchMomentumRef.current.rafId);
+      patchMomentumRef.current.rafId = null;
+    }
+    patchMomentumRef.current.velocityDegPerMs = 0;
+    patchMomentumRef.current.lastTs = 0;
+    setIsPatchMomentumActive(false);
+  };
+
+  const startPatchMomentum = () => {
+    const initialVelocity = patchMomentumRef.current.velocityDegPerMs;
+    if (!Number.isFinite(initialVelocity) || Math.abs(initialVelocity) < PATCH_MIN_MOMENTUM_DEG_PER_MS) {
+      stopPatchMomentum();
+      return;
+    }
+
+    if (patchMomentumRef.current.rafId !== null) {
+      window.cancelAnimationFrame(patchMomentumRef.current.rafId);
+      patchMomentumRef.current.rafId = null;
+    }
+
+    patchMomentumRef.current.lastTs = 0;
+    setIsPatchMomentumActive(true);
+
+    const tick = (timestamp) => {
+      const state = patchMomentumRef.current;
+      if (!patchViewerAchievement) {
+        stopPatchMomentum();
+        return;
+      }
+
+      if (!state.lastTs) {
+        state.lastTs = timestamp;
+      }
+
+      const dtMs = Math.max(0, timestamp - state.lastTs);
+      state.lastTs = timestamp;
+
+      if (dtMs > 0) {
+        const deltaYaw = state.velocityDegPerMs * dtMs;
+        setPatchRotation((prev) => ({ x: 0, y: prev.y + deltaYaw }));
+
+        const friction = Math.pow(PATCH_MOMENTUM_FRICTION_PER_FRAME, dtMs / 16.6667);
+        state.velocityDegPerMs *= friction;
+      }
+
+      if (Math.abs(state.velocityDegPerMs) < PATCH_MIN_MOMENTUM_DEG_PER_MS) {
+        stopPatchMomentum();
+        return;
+      }
+
+      state.rafId = window.requestAnimationFrame(tick);
+    };
+
+    patchMomentumRef.current.rafId = window.requestAnimationFrame(tick);
+  };
+
   const openPatchViewer = (achievement) => {
     const imageUrl = String(achievement?.imageUrl || '').trim();
     if (!imageUrl) return;
+    stopPatchMomentum();
     setPatchRotation({ x: 0, y: 0 });
     setPatchZoom(1);
     setPatchViewerAchievement({
@@ -209,17 +288,21 @@ export default function UserProfile() {
   };
 
   const closePatchViewer = () => {
+    stopPatchMomentum();
     setPatchViewerAchievement(null);
     setIsDraggingPatch(false);
     patchDragRef.current.active = false;
   };
 
   const handlePatchPointerDown = (event) => {
+    stopPatchMomentum();
     patchDragRef.current = {
       active: true,
       lastX: event.clientX,
       lastY: event.clientY,
+      lastMoveTs: performance.now(),
     };
+    patchMomentumRef.current.velocityDegPerMs = 0;
     setIsDraggingPatch(true);
     event.currentTarget.setPointerCapture?.(event.pointerId);
   };
@@ -228,19 +311,29 @@ export default function UserProfile() {
     if (!patchDragRef.current.active) return;
 
     const dx = event.clientX - patchDragRef.current.lastX;
+    const nowTs = performance.now();
+    const dtMs = Math.max(1, nowTs - patchDragRef.current.lastMoveTs);
+    const deltaYaw = dx * PATCH_SPIN_DEG_PER_PX;
+    const instantVelocity = deltaYaw / dtMs;
+    patchMomentumRef.current.velocityDegPerMs = (patchMomentumRef.current.velocityDegPerMs * 0.65) + (instantVelocity * 0.35);
 
     patchDragRef.current.lastX = event.clientX;
     patchDragRef.current.lastY = event.clientY;
+    patchDragRef.current.lastMoveTs = nowTs;
 
     setPatchRotation((prev) => {
-      const nextY = prev.y + (dx * 0.45);
+      const nextY = prev.y + deltaYaw;
       return { x: 0, y: nextY };
     });
   };
 
   const handlePatchPointerUp = (event) => {
+    const wasDragging = patchDragRef.current.active;
     patchDragRef.current.active = false;
     setIsDraggingPatch(false);
+    if (wasDragging) {
+      startPatchMomentum();
+    }
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
       event.currentTarget.releasePointerCapture?.(event.pointerId);
     }
@@ -454,7 +547,7 @@ export default function UserProfile() {
               className="relative h-full w-full [transform-style:preserve-3d]"
               style={{
                 transform: `scale(${patchZoom}) rotateX(${patchRotation.x}deg) rotateY(${avoidOrthogonalYaw(patchRotation.y)}deg)`,
-                transition: isDraggingPatch ? 'none' : 'transform 120ms ease-out',
+                transition: (isDraggingPatch || isPatchMomentumActive) ? 'none' : 'transform 120ms ease-out',
               }}
             >
               {PATCH_DEPTH_STEPS.map((depth) => (
@@ -472,14 +565,14 @@ export default function UserProfile() {
                     WebkitMaskSize: 'contain',
                     maskSize: 'contain',
                     backgroundImage: `url(${velcroTextureImg})`,
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'center',
-                    backgroundSize: 'cover',
+                    backgroundRepeat: 'repeat',
+                    backgroundPosition: '0 0',
+                    backgroundSize: `${PATCH_TEXTURE_TILE_SIZE_PX}px ${PATCH_TEXTURE_TILE_SIZE_PX}px`,
                     opacity: 0.96,
                   }}
                 />
               ))}
-              <div className="absolute inset-0 [backface-visibility:hidden] [transform:translateZ(9px)]">
+              <div className="absolute inset-0 [backface-visibility:hidden] [transform:translateZ(7px)]">
                 <img
                   src={patchViewerAchievement.imageUrl}
                   alt={patchViewerAchievement.name}
@@ -488,7 +581,7 @@ export default function UserProfile() {
                 />
               </div>
               <div
-                className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)_translateZ(9px)]"
+                className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)_translateZ(7px)]"
                 style={{
                   WebkitMaskImage: `url(${patchViewerAchievement.imageUrl})`,
                   maskImage: `url(${patchViewerAchievement.imageUrl})`,
@@ -498,13 +591,15 @@ export default function UserProfile() {
                   maskPosition: 'center',
                   WebkitMaskSize: 'contain',
                   maskSize: 'contain',
+                  backgroundImage: `url(${velcroTextureImg})`,
+                  backgroundRepeat: 'repeat',
+                  backgroundPosition: '0 0',
+                  backgroundSize: `${PATCH_TEXTURE_TILE_SIZE_PX}px ${PATCH_TEXTURE_TILE_SIZE_PX}px`,
                 }}
               >
-                <img
-                  src={velcroTextureImg}
-                  alt="Retro patch velcro"
-                  className="h-full w-full object-cover drop-shadow-[0_24px_34px_rgba(0,0,0,0.52)]"
-                  draggable={false}
+                <div
+                  aria-label="Retro patch velcro"
+                  className="h-full w-full drop-shadow-[0_24px_34px_rgba(0,0,0,0.52)]"
                 />
               </div>
             </div>

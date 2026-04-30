@@ -6,6 +6,7 @@ const DATA_DIR = path.resolve(process.cwd(), 'data/achievements');
 const CATALOG_FILE = path.join(DATA_DIR, 'catalog.json');
 const AWARDS_FILE = path.join(DATA_DIR, 'awards.json');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const MAX_IMAGE_URL_LENGTH = 12_000_000;
 
 function ensureStorage() {
   if (!fs.existsSync(DATA_DIR)) {
@@ -45,7 +46,7 @@ function sanitizeText(value, maxLen = 300) {
 
 function sanitizeImageUrl(value) {
   if (typeof value !== 'string') return '';
-  return value.trim().slice(0, 2_000_000);
+  return value.trim();
 }
 
 function normalizeUserRecord(record) {
@@ -160,6 +161,9 @@ export function createAchievement({ name, description, imageUrl, createdById, cr
   if (!safeImageUrl) {
     throw new Error('Achievement image is required');
   }
+  if (safeImageUrl.length > MAX_IMAGE_URL_LENGTH) {
+    throw new Error(`Achievement image is too large (max ${MAX_IMAGE_URL_LENGTH} chars)`);
+  }
 
   const catalog = readCatalog();
   const duplicate = catalog.find((entry) => entry.name.toLowerCase() === safeName.toLowerCase());
@@ -210,6 +214,9 @@ export function updateAchievement({ achievementId, name, description, imageUrl }
   }
   if (!nextImageUrl) {
     throw new Error('Achievement image is required');
+  }
+  if (nextImageUrl.length > MAX_IMAGE_URL_LENGTH) {
+    throw new Error(`Achievement image is too large (max ${MAX_IMAGE_URL_LENGTH} chars)`);
   }
 
   const duplicate = catalog.find((entry) => (
