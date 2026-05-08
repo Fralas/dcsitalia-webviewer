@@ -721,16 +721,24 @@ function processData(data) {
 
   // Add isActive field to each airport based on airbase status
   Object.entries(airportDataMap).forEach(([airportId, airportData]) => {
-    // Keep static airport metadata (including coordinates) aligned with config,
+    // Keep static airport metadata aligned with config,
     // even when data is loaded from an old buffer snapshot.
     const airportConfig = getAirportById(airportId);
-    if (airportConfig?.coordinates) {
-      airportData.coordinates = airportConfig.coordinates;
+    if (airportConfig) {
+      airportData.name = airportConfig.name;
+      airportData.displayName = airportConfig.displayName;
+      airportData.icao = airportConfig.icao;
+      airportData.isMainBase = Boolean(airportConfig.isMainBase);
+      airportData.isHeliport = Boolean(airportConfig.isHeliport);
+      airportData.isCarrier = Boolean(airportConfig.isCarrier);
+      airportData.isAlwaysActive = Boolean(airportConfig.isAlwaysActive);
+      airportData.herculesBase = Boolean(airportConfig.herculesBase);
+      if (airportConfig.coordinates) {
+        airportData.coordinates = airportConfig.coordinates;
+      }
     }
 
-    // Add isActive field (carriers are always active)
-    airportData.isActive = airportData.isMainBase ||
-                           airportData.isCarrier ||
+    airportData.isActive = airbaseStatusManager.isAirportAlwaysActive(airportData) ||
                            airbaseStatusManager.isAirbaseActive(airportData.name);
 
     if (airportData.data && airportData.data.weapons) {
@@ -761,8 +769,14 @@ async function loadFromBuffer() {
   const bufferedData = dataBuffer.readBuffer(BUFFER_FILE_PATH);
 
   if (bufferedData) {
-    console.log('📂 Loaded data from buffer file.');
-    return processData(bufferedData);
+    const bufferedEntries = Object.keys(bufferedData || {}).length;
+    if (bufferedEntries > 0) {
+      console.log(`📂 Loaded data from buffer file (${bufferedEntries} airports).`);
+      return processData(bufferedData);
+    }
+
+    console.warn('⚠️  Buffer file is empty. Loading directly from CSV.');
+    return refreshDataFromCsv('buffer-empty');
   }
 
   console.warn('⚠️  Buffer file missing or unreadable. Loading directly from CSV.');
@@ -3317,7 +3331,7 @@ app.get('/api/admin/config/airports', authenticateToken, requireAdmin, (req, res
     const airbaseStatusData = airbaseStatusManager.getAirbaseStatus();
     const airportsWithStatus = airports.map(airport => ({
       ...airport,
-      isActive: airport.isMainBase || airport.isCarrier || airbaseStatusManager.isAirbaseActive(airport.name)
+      isActive: airbaseStatusManager.isAirportAlwaysActive(airport) || airbaseStatusManager.isAirbaseActive(airport.name)
     }));
 
     res.json({

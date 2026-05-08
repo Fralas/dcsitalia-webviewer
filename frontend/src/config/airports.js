@@ -4,6 +4,7 @@
  *
  * isHeliport: true if this is a heliport/FOB (only helicopters can land)
  * isCarrier: true if this is a carrier (naval aviation base)
+ * isAlwaysActive: true if this airbase must remain blue/active regardless of status file
  * herculesBase: true if C-130 Hercules can spawn/operate from this base
  */
 
@@ -13,7 +14,7 @@ const airports = [
     name: 'Aleppo',
     displayName: 'Aleppo International',
     icao: 'OSAP',
-    isMainBase: false,
+    isMainBase: true,
     isHeliport: false,
     herculesBase: true,
     coordinates: { lat: 36.179024, lon: 37.238350 },
@@ -304,6 +305,7 @@ const airports = [
     displayName: 'Abu al-Duhur',
     icao: '',
     isMainBase: false,
+    isAlwaysActive: true,
     isHeliport: false,
     herculesBase: false,
     coordinates: { lat: 35.731462, lon: 37.118802 },
@@ -313,7 +315,7 @@ const airports = [
     name: 'Adana Sakirpasa',
     displayName: 'Adana Sakirpasa',
     icao: '',
-    isMainBase: true,
+    isMainBase: false,
     isHeliport: false,
     herculesBase: true,
     coordinates: { lat: 36.988281, lon: 35.291372 },
@@ -334,6 +336,7 @@ const airports = [
     displayName: 'Bassel Al-Assad',
     icao: '',
     isMainBase: false,
+    isAlwaysActive: true,
     isHeliport: false,
     herculesBase: true,
     coordinates: { lat: 35.411590, lon: 35.950033 },
@@ -604,6 +607,7 @@ const airports = [
     displayName: 'Tabqa',
     icao: '',
     isMainBase: false,
+    isAlwaysActive: true,
     isHeliport: false,
     herculesBase: false,
     coordinates: { lat: 35.755614, lon: 38.551251 },

@@ -3166,7 +3166,8 @@ export default function FrontlineMap({ airportsData }) {
   );
 
   const validAirports = useMemo(() => {
-    const airportsList = Array.isArray(airportsData) ? airportsData : airports;
+    const hasDynamicAirports = Array.isArray(airportsData) && airportsData.length > 0;
+    const airportsList = hasDynamicAirports ? airportsData : airports;
     return airportsList.filter((airport) => airport.coordinates && airport.isActive !== false);
   }, [airportsData]);
 

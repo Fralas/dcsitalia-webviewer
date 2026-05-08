@@ -4,6 +4,7 @@
  *
  * isHeliport: true if this is a heliport/FOB (only helicopters can land)
  * isCarrier: true if this is a carrier (naval aviation base)
+ * isAlwaysActive: true if this airbase must remain blue/active regardless of status file
  * herculesBase: true if C-130 Hercules can spawn/operate from this base
  */
 export const airports = [
@@ -12,7 +13,7 @@ export const airports = [
     name: 'Aleppo',
     displayName: 'Aleppo International',
     icao: 'OSAP',
-    isMainBase: false,
+    isMainBase: true,
     isHeliport: false,
     herculesBase: true,
     csvPrefix: 'Aleppo',
@@ -332,6 +333,7 @@ export const airports = [
     displayName: 'Abu al-Duhur',
     icao: '',
     isMainBase: false,
+    isAlwaysActive: true,
     isHeliport: false,
     herculesBase: false,
     csvPrefix: 'Abu_al_Duhur',
@@ -342,7 +344,7 @@ export const airports = [
     name: 'Adana Sakirpasa',
     displayName: 'Adana Sakirpasa',
     icao: '',
-    isMainBase: true,
+    isMainBase: false,
     isHeliport: false,
     herculesBase: true,
     csvPrefix: 'Adana_Sakirpasa',
@@ -365,6 +367,7 @@ export const airports = [
     displayName: 'Bassel Al-Assad',
     icao: '',
     isMainBase: false,
+    isAlwaysActive: true,
     isHeliport: false,
     herculesBase: true,
     csvPrefix: 'Bassel_Al_Assad',
@@ -662,6 +665,7 @@ export const airports = [
     displayName: 'Tabqa',
     icao: '',
     isMainBase: false,
+    isAlwaysActive: true,
     isHeliport: false,
     herculesBase: false,
     csvPrefix: 'Tabqa',

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Award, ChevronDown, Loader2, Pencil, Trash2, Trophy, Upload, User as UserIcon } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useUser } from '../contexts/UserContext';
@@ -37,6 +37,17 @@ const PATCH_TEXTURE_TILE_SIZE_PX = 220;
 const PATCH_SPIN_DEG_PER_PX = 0.45;
 const PATCH_MOMENTUM_FRICTION_PER_FRAME = 0.94;
 const PATCH_MIN_MOMENTUM_DEG_PER_MS = 0.01;
+const ACHIEVEMENTS_REFRESH_INTERVAL_MS = 15000;
+
+function getAchievementAwardKey(achievement) {
+  const awardId = String(achievement?.awardId || '').trim();
+  if (awardId) return `award:${awardId}`;
+
+  const achievementId = String(achievement?.achievementId || '').trim();
+  const awardedAt = Number(achievement?.awardedAt || 0);
+  const achievementName = String(achievement?.name || '').trim();
+  return `fallback:${achievementId}:${awardedAt}:${achievementName}`;
+}
 
 function avoidOrthogonalYaw(yawDeg) {
   const normalized = ((yawDeg % 180) + 180) % 180;
@@ -78,10 +89,14 @@ export default function UserProfile() {
   const [deletingAchievement, setDeletingAchievement] = useState(false);
   const [editStatus, setEditStatus] = useState('');
   const [patchViewerAchievement, setPatchViewerAchievement] = useState(null);
+  const [pendingAchievementClaims, setPendingAchievementClaims] = useState([]);
   const [patchRotation, setPatchRotation] = useState({ x: -12, y: 18 });
   const [patchZoom, setPatchZoom] = useState(1);
   const [isDraggingPatch, setIsDraggingPatch] = useState(false);
   const [isPatchMomentumActive, setIsPatchMomentumActive] = useState(false);
+  const hasInitialAwardsSnapshotRef = useRef(false);
+  const knownAwardKeysRef = useRef(new Set());
+  const fetchInFlightRef = useRef(false);
   const patchDragRef = useRef({ active: false, lastX: 0, lastY: 0, lastMoveTs: 0 });
   const patchMomentumRef = useRef({
     velocityDegPerMs: 0,
@@ -114,10 +129,13 @@ export default function UserProfile() {
     return Array.from(map.values());
   }, [displayName, loggedInUsers, user?.id]);
 
-  const fetchAchievementData = async () => {
-    if (!user?.id) return;
-    setLoading(true);
-    setError('');
+  const fetchAchievementData = useCallback(async ({ background = false } = {}) => {
+    if (!user?.id || fetchInFlightRef.current) return;
+    fetchInFlightRef.current = true;
+    if (!background) {
+      setLoading(true);
+      setError('');
+    }
     try {
       const [catalogResponse, userAchievementsResponse, leaderboardResponse] = await Promise.all([
         api.getAchievementsCatalog(),
@@ -139,16 +157,28 @@ export default function UserProfile() {
         setLoggedInUsers([]);
       }
     } catch (requestError) {
-      setError(requestError?.message || 'Errore durante il caricamento dei riconoscimenti.');
+      if (!background) {
+        setError(requestError?.message || 'Errore durante il caricamento dei riconoscimenti.');
+      }
     } finally {
-      setLoading(false);
+      fetchInFlightRef.current = false;
+      if (!background) {
+        setLoading(false);
+      }
     }
-  };
+  }, [canManageAchievements, user?.id]);
 
   useEffect(() => {
-    if (!user?.id) return;
     fetchAchievementData();
-  }, [user?.id, canManageAchievements]);
+  }, [fetchAchievementData]);
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    const intervalId = window.setInterval(() => {
+      fetchAchievementData({ background: true });
+    }, ACHIEVEMENTS_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(intervalId);
+  }, [fetchAchievementData, user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -216,6 +246,51 @@ export default function UserProfile() {
     }
   }, []);
 
+  useEffect(() => {
+    hasInitialAwardsSnapshotRef.current = false;
+    knownAwardKeysRef.current = new Set();
+    setPendingAchievementClaims([]);
+  }, [user?.id]);
+
+  useEffect(() => {
+    const achievements = Array.isArray(userAchievements) ? userAchievements : [];
+    const currentKeys = new Set();
+    const justUnlocked = [];
+
+    achievements.forEach((achievement) => {
+      const key = getAchievementAwardKey(achievement);
+      currentKeys.add(key);
+      if (hasInitialAwardsSnapshotRef.current && !knownAwardKeysRef.current.has(key)) {
+        justUnlocked.push(achievement);
+      }
+    });
+
+    if (!hasInitialAwardsSnapshotRef.current) {
+      knownAwardKeysRef.current = currentKeys;
+      hasInitialAwardsSnapshotRef.current = true;
+      return;
+    }
+
+    knownAwardKeysRef.current = currentKeys;
+
+    if (justUnlocked.length === 0) return;
+
+    const sortedUnlocked = [...justUnlocked].sort(
+      (a, b) => (Number(b?.awardedAt) || 0) - (Number(a?.awardedAt) || 0),
+    );
+    setPendingAchievementClaims((prev) => {
+      const existing = new Set(prev.map((entry) => getAchievementAwardKey(entry)));
+      const additions = sortedUnlocked.filter((entry) => {
+        const key = getAchievementAwardKey(entry);
+        if (existing.has(key)) return false;
+        existing.add(key);
+        return true;
+      });
+      if (additions.length === 0) return prev;
+      return [...additions, ...prev];
+    });
+  }, [userAchievements]);
+
   const stopPatchMomentum = () => {
     if (patchMomentumRef.current.rafId !== null) {
       window.cancelAnimationFrame(patchMomentumRef.current.rafId);
@@ -276,7 +351,7 @@ export default function UserProfile() {
 
   const openPatchViewer = (achievement) => {
     const imageUrl = String(achievement?.imageUrl || '').trim();
-    if (!imageUrl) return;
+    if (!imageUrl) return false;
     stopPatchMomentum();
     setPatchRotation({ x: 0, y: 0 });
     setPatchZoom(1);
@@ -285,6 +360,7 @@ export default function UserProfile() {
       description: String(achievement?.description || '').trim(),
       imageUrl,
     });
+    return true;
   };
 
   const closePatchViewer = () => {
@@ -346,6 +422,14 @@ export default function UserProfile() {
       const next = delta < 0 ? prev + 0.12 : prev - 0.12;
       return Math.max(1, Math.min(2.5, next));
     });
+  };
+
+  const pendingClaim = pendingAchievementClaims[0] || null;
+
+  const handleClaimAchievement = () => {
+    if (!pendingClaim) return;
+    openPatchViewer(pendingClaim);
+    setPendingAchievementClaims((prev) => prev.slice(1));
   };
 
   if (!user) {
@@ -519,11 +603,11 @@ export default function UserProfile() {
 
   const patchViewerModal = patchViewerAchievement ? (
     <div
-      className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-xl"
+      className="fixed inset-0 z-[5000] flex items-center justify-center overflow-hidden bg-black/70 p-4 backdrop-blur-xl"
       onClick={closePatchViewer}
     >
       <div
-        className="flex w-full max-w-[900px] flex-col items-center gap-4"
+        className="relative z-10 flex w-full max-w-[900px] flex-col items-center gap-4"
         onClick={(event) => event.stopPropagation()}
       >
         <p className="text-center text-sm font-semibold text-slate-200">
@@ -535,7 +619,7 @@ export default function UserProfile() {
 
         <div className="[perspective:1400px]">
           <div
-            className={`mx-auto h-[min(72vh,72vw)] w-[min(72vh,72vw)] touch-none select-none ${isDraggingPatch ? 'cursor-grabbing' : 'cursor-grab'}`}
+            className={`relative mx-auto h-[min(72vh,72vw)] w-[min(72vh,72vw)] touch-none select-none ${isDraggingPatch ? 'cursor-grabbing' : 'cursor-grab'}`}
             onPointerDown={handlePatchPointerDown}
             onPointerMove={handlePatchPointerMove}
             onPointerUp={handlePatchPointerUp}
@@ -993,6 +1077,20 @@ export default function UserProfile() {
             </div>
           )}
         </section>
+      )}
+
+      {pendingClaim && (
+        <div className="fixed bottom-6 right-6 z-[4600] w-[min(92vw,360px)] rounded-2xl border border-amber-300/55 bg-[#121821ee] p-3 shadow-[0_18px_36px_rgba(0,0,0,0.45)] backdrop-blur-md">
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-amber-200">New achievement unlocked</p>
+          <p className="mt-1 text-sm font-semibold text-yt-text-primary">{pendingClaim.name || 'Achievement'}</p>
+          <button
+            type="button"
+            onClick={handleClaimAchievement}
+            className="mt-3 inline-flex items-center rounded-lg border border-amber-300/55 bg-amber-400/20 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-amber-100 hover:border-amber-200 hover:bg-amber-400/30"
+          >
+            Claim
+          </button>
+        </div>
       )}
 
       {typeof document !== 'undefined' && patchViewerModal ? createPortal(patchViewerModal, document.body) : null}
