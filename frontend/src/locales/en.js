@@ -400,13 +400,17 @@ export default {
       title: 'Invites',
       empty: 'No users available in login history.',
       receivedEmpty: 'You have no pending invites.',
+      searchLabel: 'Search user',
+      searchPlaceholder: 'Search by name or username...',
+      searchEmpty: 'No users found for this filter.',
       you: 'You',
       pending: 'Pending',
       add: 'Invite'
     },
     review: {
       createButton: 'Create Squadron',
-      created: 'Squadron created successfully'
+      created: 'Squadron created successfully',
+      assetsTitle: 'Selected assets'
     },
     preview: {
       eyebrow: 'Live Preview',

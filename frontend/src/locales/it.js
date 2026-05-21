@@ -400,13 +400,17 @@ export default {
       title: 'Inviti',
       empty: 'Nessun utente disponibile nello storico login.',
       receivedEmpty: 'Non hai inviti in attesa.',
+      searchLabel: 'Cerca utente',
+      searchPlaceholder: 'Cerca per nome o username...',
+      searchEmpty: 'Nessun utente trovato con questo filtro.',
       you: 'Tu',
       pending: 'Pending',
       add: 'Invita'
     },
     review: {
       createButton: 'Crea Squadrone',
-      created: 'Squadrone creato con successo'
+      created: 'Squadrone creato con successo',
+      assetsTitle: 'Asset selezionati'
     },
     preview: {
       eyebrow: 'Live Preview',

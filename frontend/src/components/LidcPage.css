@@ -1036,6 +1036,54 @@ body.lidc-wizard-open {
   color: var(--lidc-mute);
 }
 
+.lidc-review-assets {
+  margin-top: 4px;
+  border: 1px solid var(--lidc-hairline);
+  border-radius: var(--lidc-radius);
+  background: #151719;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.lidc-review-assets h4 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--lidc-body);
+}
+
+.lidc-review-assets-group {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.lidc-review-assets-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.lidc-review-assets-head span {
+  color: var(--lidc-mute);
+}
+
+.lidc-review-assets-list {
+  display: grid;
+  gap: 4px;
+}
+
+.lidc-review-asset-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--lidc-body);
+}
+
 .lidc-wizard-actions {
   display: flex;
   justify-content: space-between;
