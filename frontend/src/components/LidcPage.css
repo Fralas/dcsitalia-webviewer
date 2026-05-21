@@ -613,42 +613,113 @@ body.lidc-wizard-open {
   font-size: 12px;
 }
 
+.lidc-wizard-stepper-shell {
+  display: grid;
+  gap: 10px;
+}
+
 .lidc-wizard-steps {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.lidc-wizard-step-col {
+  position: relative;
+  display: grid;
+  justify-items: center;
   gap: 8px;
 }
 
-.lidc-wizard-step {
-  border: 1px solid var(--lidc-hairline);
-  border-radius: var(--lidc-pill);
-  padding: 7px 10px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--lidc-mute);
-  font-size: 11px;
-}
-
-.lidc-wizard-step.is-active {
-  border-color: rgba(255, 255, 255, 0.44);
-  color: var(--lidc-ink);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.lidc-wizard-step.is-done {
-  color: var(--lidc-body);
-}
-
-.lidc-wizard-step-index {
-  width: 18px;
-  height: 18px;
+.lidc-progress-node {
+  position: relative;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
   border-radius: 999px;
-  border: 1px solid var(--lidc-hairline);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  border: 1px solid #3a4047;
+  background: #1d2126;
+  color: #80858c;
+  font-size: 12px;
+  transition: all 240ms ease;
+}
+
+.lidc-progress-node:disabled {
+  cursor: not-allowed;
+}
+
+.lidc-progress-node.is-complete {
+  border-color: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.1);
+  color: #dde1e6;
+  cursor: pointer;
+}
+
+.lidc-progress-node.is-active {
+  border-color: rgba(255, 255, 255, 0.95);
+  background: #ffffff;
+  color: #0a0a0a;
+  box-shadow: 0 0 20px -6px rgba(255, 255, 255, 0.38);
+}
+
+.lidc-progress-node.is-upcoming {
+  border-color: #323840;
+  background: #181c20;
+  color: #676d75;
+}
+
+.lidc-progress-pulse {
+  position: absolute;
+  inset: -5px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  animation: lidc-step-pulse 1.6s ease-in-out infinite;
+}
+
+.lidc-progress-connector {
+  position: absolute;
+  top: 17px;
+  left: calc(50% + 20px);
+  width: calc(100% - 24px);
+  height: 2px;
+  border-radius: 999px;
+  background: #2b3138;
+  z-index: 1;
+}
+
+.lidc-progress-connector.is-complete {
+  background: #ffffff;
+}
+
+.lidc-progress-label {
+  text-align: center;
+  color: var(--lidc-mute);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.lidc-progress-label.is-active {
+  color: var(--lidc-ink);
+}
+
+.lidc-wizard-step-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  color: var(--lidc-body);
+  font-size: 12px;
+  border-top: 1px solid var(--lidc-hairline);
+  padding-top: 8px;
+}
+
+.lidc-wizard-step-meta strong {
+  font-family: GeistMono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 400;
+  color: var(--lidc-ink);
 }
 
 .lidc-wizard-body {
@@ -658,6 +729,27 @@ body.lidc-wizard-open {
   border-radius: var(--lidc-radius);
   background: var(--lidc-canvas-card);
   padding: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: #3a4048 #14171b;
+}
+
+.lidc-wizard-body::-webkit-scrollbar {
+  width: 10px;
+}
+
+.lidc-wizard-body::-webkit-scrollbar-track {
+  background: #14171b;
+  border-left: 1px solid #232830;
+}
+
+.lidc-wizard-body::-webkit-scrollbar-thumb {
+  background: #3a4048;
+  border-radius: 999px;
+  border: 2px solid #14171b;
+}
+
+.lidc-wizard-body::-webkit-scrollbar-thumb:hover {
+  background: #4a5058;
 }
 
 .lidc-form-stack,
@@ -805,6 +897,7 @@ body.lidc-wizard-open {
 
 .lidc-template-plan-list {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -1158,6 +1251,21 @@ body.lidc-wizard-open {
   to { transform: rotate(360deg); }
 }
 
+@keyframes lidc-step-pulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.25;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.04);
+    opacity: 0.15;
+  }
+}
+
 @media (max-width: 1120px) {
   .lidc-layout {
     grid-template-columns: 1fr;
@@ -1179,6 +1287,16 @@ body.lidc-wizard-open {
 
 @media (max-width: 900px) {
   .lidc-wizard-steps {
+    overflow-x: auto;
+    padding-bottom: 2px;
+    grid-template-columns: repeat(5, minmax(110px, 1fr));
+  }
+
+  .lidc-wizard-step-col {
+    min-width: 100px;
+  }
+
+  .lidc-template-plan-list {
     grid-template-columns: 1fr;
   }
 

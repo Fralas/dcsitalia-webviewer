@@ -902,7 +902,6 @@ export default function LidcPage() {
           <section className="lidc-wizard-card" role="dialog" aria-modal="true">
             <header className="lidc-wizard-head">
               <div>
-                <div className="lidc-eyebrow">LIDC WIZARD</div>
                 <h2>{t('lidc.wizard.title')}</h2>
                 <p>{t('lidc.wizard.subtitle')}</p>
               </div>
@@ -911,17 +910,44 @@ export default function LidcPage() {
               </button>
             </header>
 
-            <div className="lidc-wizard-steps" aria-label="Wizard steps">
-              {WIZARD_STEPS.map((stepKey, index) => {
-                const isActive = index === currentStep;
-                const isDone = index < currentStep;
-                return (
-                  <div key={stepKey} className={`lidc-wizard-step ${isActive ? 'is-active' : ''} ${isDone ? 'is-done' : ''}`}>
-                    <span className="lidc-wizard-step-index">{index + 1}</span>
-                    <span>{t(`lidc.steps.${stepKey}`)}</span>
-                  </div>
-                );
-              })}
+            <div className="lidc-wizard-stepper-shell">
+              <div className="lidc-wizard-steps" aria-label="Wizard steps">
+                {WIZARD_STEPS.map((stepKey, index) => {
+                  const isComplete = index < currentStep;
+                  const isActive = index === currentStep;
+                  const isUpcoming = index > currentStep;
+
+                  return (
+                    <div key={stepKey} className="lidc-wizard-step-col">
+                      <button
+                        type="button"
+                        onClick={() => isComplete && setCurrentStep(index)}
+                        disabled={!isComplete}
+                        className={`lidc-progress-node ${
+                          isComplete ? 'is-complete' : isActive ? 'is-active' : 'is-upcoming'
+                        }`}
+                        aria-current={isActive ? 'step' : undefined}
+                        aria-label={t(`lidc.steps.${stepKey}`)}
+                      >
+                        {isComplete ? <Check size={13} /> : <span>{index + 1}</span>}
+                        {isActive && <span className="lidc-progress-pulse" aria-hidden="true" />}
+                      </button>
+
+                      <span className={`lidc-progress-label ${isActive ? 'is-active' : ''}`}>
+                        {t(`lidc.steps.${stepKey}`)}
+                      </span>
+
+                      {index < WIZARD_STEPS.length - 1 && (
+                        <div className={`lidc-progress-connector ${index < currentStep ? 'is-complete' : ''}`} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="lidc-wizard-step-meta">
+                <strong>{currentStep + 1}/{WIZARD_STEPS.length}</strong>
+              </div>
             </div>
 
             <div className="lidc-wizard-body">
