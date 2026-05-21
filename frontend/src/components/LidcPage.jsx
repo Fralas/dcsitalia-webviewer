@@ -105,6 +105,7 @@ export default function LidcPage() {
   const [templateId, setTemplateId] = useState('');
   const [quantities, setQuantities] = useState({});
   const [selectedInviteIds, setSelectedInviteIds] = useState([]);
+  const [inviteSearchQuery, setInviteSearchQuery] = useState('');
 
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -368,6 +369,7 @@ export default function LidcPage() {
     setBaseId('');
     setQuantities({});
     setSelectedInviteIds([]);
+    setInviteSearchQuery('');
     setSubmitError('');
     setCreatedSquadron(null);
 
@@ -554,6 +556,18 @@ export default function LidcPage() {
   const selectedInvitesPreview = useMemo(() => {
     return selectedInviteIds.map((id) => inviteCandidates.find((entry) => entry.id === id)).filter(Boolean);
   }, [selectedInviteIds, inviteCandidates]);
+
+  const filteredInviteCandidates = useMemo(() => {
+    const query = inviteSearchQuery.trim().toLowerCase();
+    if (!query) return inviteCandidates;
+
+    return inviteCandidates.filter((entry) => {
+      const globalName = String(entry?.globalName || '').toLowerCase();
+      const username = String(entry?.username || '').toLowerCase();
+      const id = String(entry?.id || '').toLowerCase();
+      return globalName.includes(query) || username.includes(query) || id.includes(query);
+    });
+  }, [inviteCandidates, inviteSearchQuery]);
 
   function renderOverviewView() {
     return (
@@ -1056,6 +1070,16 @@ export default function LidcPage() {
                   </header>
 
                   <div className="lidc-invite-panel">
+                    <label className="lidc-field">
+                      <span>{t('lidc.invites.searchLabel')}</span>
+                      <input
+                        value={inviteSearchQuery}
+                        onChange={(event) => setInviteSearchQuery(event.target.value)}
+                        placeholder={t('lidc.invites.searchPlaceholder')}
+                        maxLength={80}
+                      />
+                    </label>
+
                     {loadingUsers && (
                       <div className="lidc-loading">
                         <Loader2 size={14} className="spin" />
@@ -1069,7 +1093,7 @@ export default function LidcPage() {
 
                     {!loadingUsers && inviteCandidates.length > 0 && (
                       <div className="lidc-user-list">
-                        {inviteCandidates.map((entry) => {
+                        {filteredInviteCandidates.map((entry) => {
                           const isSelected = selectedInviteIds.includes(entry.id);
                           const displayName = entry.globalName || entry.username || entry.id;
                           const avatarUrl = entry.avatarUrl || '';
@@ -1102,6 +1126,10 @@ export default function LidcPage() {
                         })}
                       </div>
                     )}
+
+                    {!loadingUsers && inviteCandidates.length > 0 && filteredInviteCandidates.length === 0 && (
+                      <div className="lidc-muted-box">{t('lidc.invites.searchEmpty')}</div>
+                    )}
                   </div>
                 </section>
               )}
@@ -1119,6 +1147,36 @@ export default function LidcPage() {
                     <div className="lidc-review-line"><span>{t('lidc.template.title')}</span><strong>{selectedTemplate?.name || '-'}</strong></div>
                     <div className="lidc-review-line"><span>{t('lidc.invites.title')}</span><strong>{selectedInviteIds.length}</strong></div>
                     <div className="lidc-review-line"><span>{t('lidc.deck.totalUnits')}</span><strong>{totalDeckUnits}</strong></div>
+
+                    <div className="lidc-review-assets">
+                      <h4>{t('lidc.review.assetsTitle')}</h4>
+                      {CATEGORY_META.map(({ key, labelKey }) => {
+                        const entries = deckPayload[key] || [];
+                        if (entries.length === 0) return null;
+
+                        return (
+                          <section key={key} className="lidc-review-assets-group">
+                            <div className="lidc-review-assets-head">
+                              <span>{t(labelKey)}</span>
+                              <strong>{spentByCategory[key] || 0}</strong>
+                            </div>
+                            <div className="lidc-review-assets-list">
+                              {entries.map((entry) => {
+                                const unit = units.find((candidate) => candidate.id === entry.unitId);
+                                const unitCost = Number(unit?.cost || 0);
+                                const quantity = Number(entry.quantity || 0);
+                                return (
+                                  <div key={`${key}-${entry.unitId}`} className="lidc-review-asset-item">
+                                    <span>{unit?.label || entry.unitId} x{quantity}</span>
+                                    <strong>{unitCost * quantity}</strong>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </section>
+                        );
+                      })}
+                    </div>
 
                     {submitError && <div className="lidc-inline-error">{submitError}</div>}
                   </div>
