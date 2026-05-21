@@ -391,6 +391,8 @@ export default {
         logistics: 'Logistics',
         groundAssets: 'Ground Assets'
       },
+      spentLabel: 'Speso:',
+      capLabel: 'Limite:',
       capLine: 'Speso {{spent}} / Limite {{cap}}',
       remaining: 'Residuo',
       unitCost: 'Costo: {{cost}}',

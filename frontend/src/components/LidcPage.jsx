@@ -1050,17 +1050,7 @@ export default function LidcPage() {
                     {CATEGORY_META.map(({ key, labelKey }) => (
                       <section key={key} className="lidc-deck-category">
                         <header>
-                          <div>
-                            <h3>{t(labelKey)}</h3>
-                            <div className="lidc-deck-cap-breakdown">
-                              <span>
-                                {t('lidc.deck.spentLabel')} <strong>{spentByCategory[key]}</strong>
-                              </span>
-                              <span>
-                                {t('lidc.deck.capLabel')} <strong>{capsByCategory[key]}</strong>
-                              </span>
-                            </div>
-                          </div>
+                          <h3>{t(labelKey)}</h3>
                           <span className={`lidc-cap-pill ${spentByCategory[key] > capsByCategory[key] ? 'is-over' : ''}`}>
                             {t('lidc.deck.remaining')}: <strong>{remainingByCategory[key]}</strong>
                           </span>
@@ -1068,23 +1058,23 @@ export default function LidcPage() {
 
                         <div className="lidc-unit-list">
                           {(unitsByCategory[key] || []).map((unit) => {
-                            const qty = Number(quantities[unit.id] || 0);
-                            const canIncrease = selectedTemplate && ((remainingByCategory[key] || 0) >= unit.cost || qty > 0);
+                          const qty = Number(quantities[unit.id] || 0);
+                          const canIncrease = selectedTemplate && ((remainingByCategory[key] || 0) >= unit.cost || qty > 0);
+                          const isBlocked = qty <= 0 && !canIncrease;
+                          const rowClassName = [
+                            'lidc-unit-row',
+                            isBlocked ? 'is-blocked' : '',
+                          ].filter(Boolean).join(' ');
 
-                            return (
-                              <div key={unit.id} className="lidc-unit-row">
+                          return (
+                              <div key={unit.id} className={rowClassName}>
                                 <div className="lidc-unit-main">
                                   <div className="lidc-unit-name"><strong>{unit.label}</strong></div>
                                   <div className="lidc-unit-meta">
-                                    <span className="lidc-unit-cost-chip" title={t('lidc.deck.unitCost', { cost: unit.cost })}>
+                                    <span className={`lidc-unit-cost-chip ${qty > 0 ? 'is-selected' : ''}`} title={t('lidc.deck.unitCost', { cost: unit.cost })}>
                                       <Coins size={13} />
-                                      <strong>{unit.cost}</strong>
+                                      <strong>{qty > 0 ? unit.cost * qty : unit.cost}</strong>
                                     </span>
-                                    {qty > 0 && (
-                                      <span className="lidc-unit-total-chip">
-                                        <strong>{unit.cost * qty}</strong>
-                                      </span>
-                                    )}
                                   </div>
                                 </div>
                                 <div className="lidc-stepper-controls">
