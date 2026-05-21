@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Activity, AlertCircle, BookOpen, CalendarSync } from 'lucide-react';
+import { Activity, AlertCircle, BookOpen, CalendarSync, Users } from 'lucide-react';
 import FrontlineMap from './components/FrontlineMap';
 import UserMenu from './components/UserMenu';
 import UserProfile from './components/UserProfile';
 import ChangelogPage from './components/ChangelogPage';
 import WikiPage from './components/WikiPage';
+import LidcPage from './components/LidcPage';
 import * as api from './services/api';
 import socketService from './services/socket';
 import { t } from './utils/locale';
@@ -18,6 +19,7 @@ const VIEW_TO_PATH = Object.freeze({
   profile: '/profile',
   changelogs: '/changelogs',
   wiki: '/wiki',
+  lidc: '/lidc',
 });
 const DEFAULT_WIKI_LANGUAGE = 'en';
 
@@ -45,6 +47,9 @@ function viewFromLocation() {
   }
   if (currentPath === '/profile') {
     return 'profile';
+  }
+  if (currentPath === '/lidc') {
+    return 'lidc';
   }
 
   const params = new URLSearchParams(window.location.search);
@@ -333,13 +338,26 @@ function App() {
               >
                 <BookOpen className="w-4 h-4" />
               </button>
+              <button
+                type="button"
+                onClick={() => goToView('lidc')}
+                className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] transition-colors ${
+                  currentView === 'lidc'
+                    ? 'border-yt-accent bg-yt-accent/20 text-yt-accent'
+                    : 'border-yt-border/80 bg-[#151b25] text-yt-text-primary hover:border-yt-accent hover:text-white'
+                }`}
+                title="Apri LIDC"
+                aria-label="Apri LIDC"
+              >
+                <Users className="w-4 h-4" />
+              </button>
               <UserMenu onOpenProfile={() => goToView('profile')} />
             </div>
           </div>
         </div>
       </header>
 
-      <main className={`flex-1 ${currentView === 'frontline' ? 'overflow-hidden' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
+      <main className={`flex-1 ${(currentView === 'frontline' || currentView === 'lidc') ? 'overflow-hidden' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
         {currentView === 'frontline' && (
           <FrontlineMap airportsData={Object.values(airports)} />
         )}
@@ -352,9 +370,12 @@ function App() {
         {currentView === 'wiki' && (
           <WikiPage language={appLanguage} />
         )}
+        {currentView === 'lidc' && (
+          <LidcPage />
+        )}
       </main>
 
-      {currentView !== 'frontline' && (
+      {currentView !== 'frontline' && currentView !== 'lidc' && (
         <footer className="bg-yt-bg-secondary border-t border-yt-border mt-8">
           <div className="container mx-auto px-4 py-3 text-center text-xs text-yt-text-secondary">
             <p>DCS Italia Warehouse Viewer v1.0 - Real-time logistics management</p>

@@ -36,6 +36,7 @@ import * as changelogsService from './services/changelogs.js';
 import * as changelogTranslator from './services/changelogTranslator.js';
 import * as wikiService from './services/wiki.js';
 import * as achievementsService from './services/achievements.js';
+import * as lidcService from './services/lidcService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -908,6 +909,13 @@ app.get('/api/auth/discord/callback', async (req, res) => {
       userId: discordUser.id,
       name: discordUser.global_name || discordUser.username || discordUser.id,
     });
+    lidcService.upsertDiscordUser({
+      id: discordUser.id,
+      globalName: discordUser.global_name || discordUser.username,
+      username: discordUser.username,
+      avatar: discordUser.avatar,
+      lastSeenAt: Date.now(),
+    });
 
     // Register user as active
     activeUsers.addActiveUser(discordUser);
@@ -951,6 +959,13 @@ app.get('/api/auth/user', async (req, res) => {
   achievementsService.rememberUser({
     userId: user?.id || req.session.user?.id,
     name: user?.globalName || user?.username || req.session.user?.id,
+  });
+  lidcService.upsertDiscordUser({
+    id: user?.id || req.session.user?.id,
+    globalName: user?.globalName || req.session.user?.globalName || req.session.user?.username,
+    username: user?.username || req.session.user?.username,
+    avatar: user?.avatar || req.session.user?.avatar,
+    lastSeenAt: Date.now(),
   });
   res.json(user || req.session.user);
 });
@@ -1016,6 +1031,93 @@ app.put('/api/profile', (req, res) => {
 
   const savedProfile = userProfiles.saveProfile(req.session.user.id, req.body);
   res.json(savedProfile);
+});
+
+/**
+ * GET /api/lidc/templates - Get LIDC templates and unit catalog
+ */
+app.get('/api/lidc/templates', (req, res) => {
+  const catalog = lidcService.getTemplatesCatalog();
+  res.json(catalog);
+});
+
+/**
+ * GET /api/lidc/users - Get historical Discord users for squadron invites
+ */
+app.get('/api/lidc/users', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const users = lidcService.getDiscordUsers();
+  res.json({ users });
+});
+
+/**
+ * GET /api/lidc/me - Get LIDC state for current user
+ */
+app.get('/api/lidc/me', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const state = lidcService.getUserLidcState(req.session.user.id);
+  res.json(state);
+});
+
+/**
+ * POST /api/lidc/squadrons - Create new LIDC squadron (authenticated users only)
+ */
+app.post('/api/lidc/squadrons', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const squadron = lidcService.createSquadron(req.body || {}, req.session.user);
+    return res.status(201).json({ squadron });
+  } catch (error) {
+    const message = String(error?.message || 'Failed to create squadron');
+    const status = message.toLowerCase().includes('authentication required') ? 401 : 400;
+    return res.status(status).json({ error: message });
+  }
+});
+
+/**
+ * GET /api/lidc/squadrons/:id - Get a single LIDC squadron by id
+ */
+app.get('/api/lidc/squadrons/:id', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const squadron = lidcService.getSquadronById(req.params.id);
+  if (!squadron) {
+    return res.status(404).json({ error: 'Squadron not found' });
+  }
+
+  res.json({ squadron });
+});
+
+/**
+ * PUT /api/lidc/templates - Update LIDC templates and units (wiki editors only)
+ */
+app.put('/api/lidc/templates', async (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const sessionUser = await ensureSessionUserPermissions(req);
+  if (!sessionUser?.canEditWiki) {
+    return res.status(403).json({ error: 'Only allowed contributors can edit LIDC templates' });
+  }
+
+  try {
+    const updated = lidcService.updateTemplatesCatalog(req.body || {});
+    return res.json(updated);
+  } catch (error) {
+    return res.status(400).json({ error: String(error?.message || 'Failed to update templates') });
+  }
 });
 
 function isWikiEditor(sessionUserId) {

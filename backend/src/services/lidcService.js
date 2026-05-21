@@ -1,0 +1,638 @@
+﻿import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+
+const DATA_DIR = path.resolve(process.cwd(), 'data/lidc');
+const TEMPLATES_FILE = path.join(DATA_DIR, 'templates.json');
+const SQUADRONS_FILE = path.join(DATA_DIR, 'squadrons.json');
+const DISCORD_USERS_FILE = path.join(DATA_DIR, 'discord-users.json');
+const MAX_LOGO_DATA_URL_LENGTH = 12_000_000;
+
+export const DECK_CATEGORIES = Object.freeze([
+  'aircrafts',
+  'helicopters',
+  'logistics',
+  'groundAssets',
+]);
+
+const DEFAULT_TEMPLATES_SEED = Object.freeze({
+  templates: [
+    {
+      id: 'group-helicopters',
+      name: 'Gruppo Elicotteri',
+      description: 'Focalizzato su rotanti e supporto avanzato.',
+      caps: {
+        aircrafts: 180,
+        helicopters: 460,
+        logistics: 260,
+        groundAssets: 200,
+      },
+    },
+    {
+      id: 'strike-wing',
+      name: 'Strike Wing',
+      description: 'Focalizzato su superiorita aerea e strike assets.',
+      caps: {
+        aircrafts: 420,
+        helicopters: 220,
+        logistics: 220,
+        groundAssets: 180,
+      },
+    },
+    {
+      id: 'task-force-logistics',
+      name: 'Task Force Logistica',
+      description: 'Focalizzato su sustainment, trasporto e supporto.',
+      caps: {
+        aircrafts: 160,
+        helicopters: 240,
+        logistics: 500,
+        groundAssets: 200,
+      },
+    },
+    {
+      id: 'combined-arms',
+      name: 'Combined Arms',
+      description: 'Bilanciato su tutte le categorie operative.',
+      caps: {
+        aircrafts: 300,
+        helicopters: 300,
+        logistics: 300,
+        groundAssets: 300,
+      },
+    },
+  ],
+  units: [
+    { id: 'f16c', label: 'F-16C', category: 'aircrafts', cost: 95 },
+    { id: 'fa18c', label: 'F/A-18C Hornet', category: 'aircrafts', cost: 100 },
+    { id: 'f15e', label: 'F-15E Strike Eagle', category: 'aircrafts', cost: 120 },
+    { id: 'a10c2', label: 'A-10C II', category: 'aircrafts', cost: 85 },
+    { id: 'm2000c', label: 'Mirage 2000C', category: 'aircrafts', cost: 80 },
+
+    { id: 'ah64d', label: 'AH-64D Apache', category: 'helicopters', cost: 110 },
+    { id: 'oh58d', label: 'OH-58D Kiowa', category: 'helicopters', cost: 65 },
+    { id: 'ka50', label: 'Ka-50', category: 'helicopters', cost: 95 },
+    { id: 'mi24p', label: 'Mi-24P Hind', category: 'helicopters', cost: 100 },
+    { id: 'sa342', label: 'SA-342 Gazelle', category: 'helicopters', cost: 55 },
+
+    { id: 'c130j', label: 'C-130J Super Hercules', category: 'logistics', cost: 130 },
+    { id: 'ch47f', label: 'CH-47F Chinook', category: 'logistics', cost: 115 },
+    { id: 'mi8mt', label: 'Mi-8MT', category: 'logistics', cost: 90 },
+    { id: 'uh1h', label: 'UH-1H Huey', category: 'logistics', cost: 70 },
+
+    { id: 'm1a2', label: 'M1A2 Abrams', category: 'groundAssets', cost: 85 },
+    { id: 'bradley', label: 'M2A2 Bradley IFV', category: 'groundAssets', cost: 60 },
+    { id: 'nasams', label: 'NASAMS Battery', category: 'groundAssets', cost: 105 },
+    { id: 'patriot', label: 'Patriot SAM Site', category: 'groundAssets', cost: 140 },
+    { id: 'farp-team', label: 'FARP Support Team', category: 'groundAssets', cost: 45 },
+  ],
+});
+
+function ensureStorage() {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+
+  if (!fs.existsSync(TEMPLATES_FILE)) {
+    writeJsonAtomic(TEMPLATES_FILE, {
+      templates: DEFAULT_TEMPLATES_SEED.templates,
+      units: DEFAULT_TEMPLATES_SEED.units,
+      updatedAt: Date.now(),
+    });
+  }
+
+  if (!fs.existsSync(SQUADRONS_FILE)) {
+    writeJsonAtomic(SQUADRONS_FILE, []);
+  }
+
+  if (!fs.existsSync(DISCORD_USERS_FILE)) {
+    writeJsonAtomic(DISCORD_USERS_FILE, []);
+  }
+}
+
+function readJson(filePath, fallback) {
+  try {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    return JSON.parse(raw);
+  } catch (error) {
+    console.error(`LIDC read error (${filePath}):`, error.message);
+    return fallback;
+  }
+}
+
+function writeJsonAtomic(filePath, payload) {
+  const tempPath = `${filePath}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), 'utf8');
+  fs.renameSync(tempPath, filePath);
+}
+
+function sanitizeText(value, maxLen = 500) {
+  if (typeof value !== 'string') return '';
+  return value.trim().slice(0, maxLen);
+}
+
+function normalizeCategory(value) {
+  const key = sanitizeText(value, 40);
+  return DECK_CATEGORIES.includes(key) ? key : null;
+}
+
+function normalizeCap(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0) return 0;
+  return Math.floor(num);
+}
+
+function normalizeQuantity(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) return 0;
+  return Math.floor(num);
+}
+
+function normalizeTemplateCaps(rawCaps) {
+  const caps = {};
+  DECK_CATEGORIES.forEach((category) => {
+    caps[category] = normalizeCap(rawCaps?.[category]);
+  });
+  return caps;
+}
+
+function normalizeTemplate(rawTemplate, index = 0) {
+  const id = sanitizeText(rawTemplate?.id, 80) || `template_${Date.now()}_${index}`;
+  const name = sanitizeText(rawTemplate?.name, 120) || `Template ${index + 1}`;
+  const description = sanitizeText(rawTemplate?.description, 500);
+  return {
+    id,
+    name,
+    description,
+    caps: normalizeTemplateCaps(rawTemplate?.caps),
+  };
+}
+
+function normalizeUnit(rawUnit, index = 0) {
+  const category = normalizeCategory(rawUnit?.category);
+  if (!category) return null;
+
+  const id = sanitizeText(rawUnit?.id, 80) || `unit_${Date.now()}_${index}`;
+  const label = sanitizeText(rawUnit?.label, 120) || id;
+  const cost = normalizeCap(rawUnit?.cost);
+
+  if (!id || !label || cost <= 0) {
+    return null;
+  }
+
+  return {
+    id,
+    label,
+    category,
+    cost,
+  };
+}
+
+function readTemplatesState() {
+  const raw = readJson(TEMPLATES_FILE, {
+    templates: DEFAULT_TEMPLATES_SEED.templates,
+    units: DEFAULT_TEMPLATES_SEED.units,
+    updatedAt: Date.now(),
+  });
+
+  const templates = Array.isArray(raw?.templates)
+    ? raw.templates.map((entry, index) => normalizeTemplate(entry, index)).filter(Boolean)
+    : [];
+
+  const units = Array.isArray(raw?.units)
+    ? raw.units.map((entry, index) => normalizeUnit(entry, index)).filter(Boolean)
+    : [];
+
+  return {
+    templates,
+    units,
+    updatedAt: Number.isFinite(raw?.updatedAt) ? raw.updatedAt : Date.now(),
+  };
+}
+
+function writeTemplatesState(state) {
+  const templates = Array.isArray(state?.templates)
+    ? state.templates.map((entry, index) => normalizeTemplate(entry, index)).filter(Boolean)
+    : [];
+
+  const units = Array.isArray(state?.units)
+    ? state.units.map((entry, index) => normalizeUnit(entry, index)).filter(Boolean)
+    : [];
+
+  if (templates.length === 0) {
+    throw new Error('At least one template is required');
+  }
+  if (units.length === 0) {
+    throw new Error('At least one unit is required');
+  }
+
+  const dedupeTemplateIds = new Set();
+  templates.forEach((template) => {
+    if (dedupeTemplateIds.has(template.id)) {
+      throw new Error(`Duplicate template id: ${template.id}`);
+    }
+    dedupeTemplateIds.add(template.id);
+  });
+
+  const dedupeUnitIds = new Set();
+  units.forEach((unit) => {
+    if (dedupeUnitIds.has(unit.id)) {
+      throw new Error(`Duplicate unit id: ${unit.id}`);
+    }
+    dedupeUnitIds.add(unit.id);
+  });
+
+  const payload = {
+    templates,
+    units,
+    updatedAt: Date.now(),
+  };
+
+  writeJsonAtomic(TEMPLATES_FILE, payload);
+  return payload;
+}
+
+function readSquadrons() {
+  const raw = readJson(SQUADRONS_FILE, []);
+  return Array.isArray(raw) ? raw : [];
+}
+
+function writeSquadrons(squadrons) {
+  writeJsonAtomic(SQUADRONS_FILE, Array.isArray(squadrons) ? squadrons : []);
+}
+
+function readDiscordUsers() {
+  const raw = readJson(DISCORD_USERS_FILE, []);
+  return Array.isArray(raw) ? raw : [];
+}
+
+function writeDiscordUsers(users) {
+  writeJsonAtomic(DISCORD_USERS_FILE, Array.isArray(users) ? users : []);
+}
+
+function buildAvatarUrl(userId, avatar) {
+  if (!userId || !avatar) return '';
+  return `https://cdn.discordapp.com/avatars/${userId}/${avatar}.png`;
+}
+
+function normalizeDiscordUser(rawUser) {
+  const id = sanitizeText(rawUser?.id, 80);
+  if (!id) return null;
+
+  const globalName = sanitizeText(
+    rawUser?.globalName || rawUser?.global_name || rawUser?.displayName || rawUser?.username,
+    140,
+  );
+  const username = sanitizeText(rawUser?.username, 140);
+  const avatar = sanitizeText(rawUser?.avatar, 200);
+  const lastSeenAt = Number.isFinite(rawUser?.lastSeenAt) ? rawUser.lastSeenAt : Date.now();
+
+  return {
+    id,
+    globalName,
+    username,
+    avatar,
+    avatarUrl: buildAvatarUrl(id, avatar),
+    lastSeenAt,
+  };
+}
+
+function normalizeDeckInput(rawDeck) {
+  const normalizedDeck = {};
+
+  DECK_CATEGORIES.forEach((category) => {
+    const list = Array.isArray(rawDeck?.[category]) ? rawDeck[category] : [];
+    const aggregated = new Map();
+
+    list.forEach((entry) => {
+      const unitId = sanitizeText(entry?.unitId || entry?.id, 80);
+      const quantity = normalizeQuantity(entry?.quantity ?? entry?.qty);
+      if (!unitId || quantity <= 0) return;
+      aggregated.set(unitId, (aggregated.get(unitId) || 0) + quantity);
+    });
+
+    normalizedDeck[category] = Array.from(aggregated.entries()).map(([unitId, quantity]) => ({
+      unitId,
+      quantity,
+    }));
+  });
+
+  return normalizedDeck;
+}
+
+function calculateCostSummary({ deck, template, unitsById }) {
+  const spent = {};
+  const caps = {};
+  const remaining = {};
+
+  let totalSpent = 0;
+  let totalUnits = 0;
+
+  DECK_CATEGORIES.forEach((category) => {
+    const entries = Array.isArray(deck?.[category]) ? deck[category] : [];
+    const cap = normalizeCap(template?.caps?.[category]);
+
+    let categorySpent = 0;
+    entries.forEach((entry) => {
+      const unit = unitsById.get(entry.unitId);
+      if (!unit) {
+        throw new Error(`Unknown unit: ${entry.unitId}`);
+      }
+      if (unit.category !== category) {
+        throw new Error(`Unit ${entry.unitId} does not belong to category ${category}`);
+      }
+
+      categorySpent += unit.cost * normalizeQuantity(entry.quantity);
+      totalUnits += normalizeQuantity(entry.quantity);
+    });
+
+    if (categorySpent > cap) {
+      throw new Error(`Category cap exceeded for ${category}`);
+    }
+
+    spent[category] = categorySpent;
+    caps[category] = cap;
+    remaining[category] = Math.max(0, cap - categorySpent);
+    totalSpent += categorySpent;
+  });
+
+  return {
+    caps,
+    spent,
+    remaining,
+    totalSpent,
+    totalUnits,
+  };
+}
+
+function normalizeInvites(rawInvites) {
+  const values = Array.isArray(rawInvites) ? rawInvites : [];
+  const unique = new Set();
+
+  values.forEach((entry) => {
+    const userId = sanitizeText(entry?.userId || entry?.id || entry, 80);
+    if (userId) unique.add(userId);
+  });
+
+  const invitedAt = Date.now();
+  return Array.from(unique.values()).map((userId) => ({
+    userId,
+    status: 'pending',
+    invitedAt,
+  }));
+}
+
+export function getTemplatesCatalog() {
+  ensureStorage();
+  return readTemplatesState();
+}
+
+export function updateTemplatesCatalog(payload) {
+  ensureStorage();
+  return writeTemplatesState(payload);
+}
+
+export function upsertDiscordUser(rawUser) {
+  ensureStorage();
+  const normalized = normalizeDiscordUser(rawUser);
+  if (!normalized) return null;
+
+  const users = readDiscordUsers();
+  const index = users.findIndex((entry) => sanitizeText(entry?.id, 80) === normalized.id);
+
+  if (index >= 0) {
+    const current = normalizeDiscordUser(users[index]) || {};
+    const merged = {
+      ...current,
+      ...normalized,
+      globalName: normalized.globalName || current.globalName || current.username || '',
+      username: normalized.username || current.username || '',
+      avatar: normalized.avatar || current.avatar || '',
+      lastSeenAt: Date.now(),
+    };
+    merged.avatarUrl = buildAvatarUrl(merged.id, merged.avatar);
+    users[index] = merged;
+    writeDiscordUsers(users);
+    return merged;
+  }
+
+  const nextUser = {
+    ...normalized,
+    lastSeenAt: Date.now(),
+    avatarUrl: buildAvatarUrl(normalized.id, normalized.avatar),
+  };
+  users.push(nextUser);
+  writeDiscordUsers(users);
+  return nextUser;
+}
+
+export function getDiscordUsers() {
+  ensureStorage();
+  return readDiscordUsers()
+    .map((entry) => normalizeDiscordUser(entry))
+    .filter(Boolean)
+    .sort((a, b) => (Number(b.lastSeenAt) || 0) - (Number(a.lastSeenAt) || 0));
+}
+
+export function createSquadron(payload, sessionUser) {
+  ensureStorage();
+
+  const userId = sanitizeText(sessionUser?.id, 80);
+  if (!userId) {
+    throw new Error('Authentication required');
+  }
+
+  const name = sanitizeText(payload?.name, 120);
+  if (!name) {
+    throw new Error('Squadron name is required');
+  }
+
+  const description = sanitizeText(payload?.description, 1200);
+  const baseId = sanitizeText(payload?.baseId, 120);
+  if (!baseId) {
+    throw new Error('Base is required');
+  }
+
+  const templateId = sanitizeText(payload?.templateId, 80);
+  if (!templateId) {
+    throw new Error('Template is required');
+  }
+
+  const logoDataUrl = sanitizeText(payload?.logoDataUrl, MAX_LOGO_DATA_URL_LENGTH);
+  if (logoDataUrl.length > MAX_LOGO_DATA_URL_LENGTH) {
+    throw new Error('Logo is too large');
+  }
+
+  const templatesState = readTemplatesState();
+  const template = templatesState.templates.find((entry) => entry.id === templateId);
+  if (!template) {
+    throw new Error('Template not found');
+  }
+
+  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+  const deck = normalizeDeckInput(payload?.deck || {});
+  const costSummary = calculateCostSummary({
+    deck,
+    template,
+    unitsById,
+  });
+
+  if (costSummary.totalUnits <= 0) {
+    throw new Error('Deck must include at least one unit');
+  }
+
+  const invites = normalizeInvites(payload?.invites);
+
+  const squadron = {
+    id: `lidc_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+    name,
+    description,
+    logoDataUrl,
+    baseId,
+    templateId: template.id,
+    templateName: template.name,
+    deck,
+    invites,
+    members: [
+      {
+        userId,
+        role: 'owner',
+        joinedAt: Date.now(),
+      },
+    ],
+    costSummary,
+    createdAt: Date.now(),
+    createdBy: {
+      id: userId,
+      globalName: sanitizeText(sessionUser?.globalName, 140),
+      username: sanitizeText(sessionUser?.username, 140),
+      avatar: sanitizeText(sessionUser?.avatar, 200),
+      avatarUrl: buildAvatarUrl(userId, sanitizeText(sessionUser?.avatar, 200)),
+    },
+  };
+
+  const squadrons = readSquadrons();
+  squadrons.push(squadron);
+  writeSquadrons(squadrons);
+
+  return squadron;
+}
+
+export function getSquadronById(squadronId) {
+  ensureStorage();
+  const targetId = sanitizeText(squadronId, 120);
+  if (!targetId) return null;
+
+  const squadrons = readSquadrons();
+  return squadrons.find((entry) => sanitizeText(entry?.id, 120) === targetId) || null;
+}
+
+function isUserMemberOfSquadron(squadron, userId) {
+  if (!squadron || !userId) return false;
+
+  if (sanitizeText(squadron?.createdBy?.id, 80) === userId) {
+    return true;
+  }
+
+  const members = Array.isArray(squadron?.members) ? squadron.members : [];
+  return members.some((entry) => sanitizeText(entry?.userId, 80) === userId);
+}
+
+export function getUserPrimarySquadron(userIdRaw) {
+  ensureStorage();
+  const userId = sanitizeText(userIdRaw, 80);
+  if (!userId) return null;
+
+  const squadrons = readSquadrons();
+  const mine = squadrons
+    .filter((entry) => isUserMemberOfSquadron(entry, userId))
+    .sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
+
+  return mine[0] || null;
+}
+
+export function getPendingInvitesForUser(userIdRaw) {
+  ensureStorage();
+  const userId = sanitizeText(userIdRaw, 80);
+  if (!userId) return [];
+
+  const squadrons = readSquadrons();
+  const invites = [];
+
+  squadrons.forEach((squadron) => {
+    const squadronInvites = Array.isArray(squadron?.invites) ? squadron.invites : [];
+
+    squadronInvites.forEach((invite) => {
+      const invitedUserId = sanitizeText(invite?.userId, 80);
+      if (invitedUserId !== userId) return;
+
+      const status = sanitizeText(invite?.status, 40) || 'pending';
+      invites.push({
+        squadronId: sanitizeText(squadron?.id, 120),
+        squadronName: sanitizeText(squadron?.name, 120),
+        templateName: sanitizeText(squadron?.templateName, 120),
+        baseId: sanitizeText(squadron?.baseId, 120),
+        invitedAt: Number.isFinite(invite?.invitedAt) ? invite.invitedAt : Number(squadron?.createdAt) || Date.now(),
+        status,
+        invitedBy: {
+          id: sanitizeText(squadron?.createdBy?.id, 80),
+          globalName: sanitizeText(squadron?.createdBy?.globalName, 140),
+          username: sanitizeText(squadron?.createdBy?.username, 140),
+          avatar: sanitizeText(squadron?.createdBy?.avatar, 200),
+          avatarUrl: buildAvatarUrl(
+            sanitizeText(squadron?.createdBy?.id, 80),
+            sanitizeText(squadron?.createdBy?.avatar, 200),
+          ),
+        },
+      });
+    });
+  });
+
+  return invites
+    .filter((entry) => entry.status === 'pending')
+    .sort((a, b) => (Number(b.invitedAt) || 0) - (Number(a.invitedAt) || 0));
+}
+
+export function getUserLidcState(userIdRaw) {
+  ensureStorage();
+  const userId = sanitizeText(userIdRaw, 80);
+  if (!userId) {
+    return {
+      hasSquadron: false,
+      squadron: null,
+      invites: [],
+    };
+  }
+
+  const squadron = getUserPrimarySquadron(userId);
+  const invites = getPendingInvitesForUser(userId);
+
+  return {
+    hasSquadron: Boolean(squadron),
+    squadron: squadron
+      ? {
+          id: sanitizeText(squadron?.id, 120),
+          name: sanitizeText(squadron?.name, 120),
+          templateName: sanitizeText(squadron?.templateName, 120),
+          baseId: sanitizeText(squadron?.baseId, 120),
+          createdAt: Number.isFinite(squadron?.createdAt) ? squadron.createdAt : null,
+        }
+      : null,
+    invites,
+  };
+}
+
+ensureStorage();
+
+export default {
+  DECK_CATEGORIES,
+  getTemplatesCatalog,
+  updateTemplatesCatalog,
+  upsertDiscordUser,
+  getDiscordUsers,
+  createSquadron,
+  getSquadronById,
+  getUserPrimarySquadron,
+  getPendingInvitesForUser,
+  getUserLidcState,
+};

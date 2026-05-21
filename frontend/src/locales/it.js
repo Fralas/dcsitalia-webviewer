@@ -294,6 +294,140 @@ export default {
     ok: 'OK',
     namePlaceholder: 'Il tuo nome...'
   },
+  lidc: {
+    title: 'Low Intensity Dynamic Campaign',
+    subtitle: 'Crea uno squadrone LIDC con deck e inviti',
+    sidebar: {
+      visualization: 'Visualizzazione squadrone'
+    },
+    views: {
+      overview: 'Visualizzazione squadrone',
+      caps: 'Limiti template',
+      deck: 'Visualizzazione deck',
+      invites: 'Visualizzazione inviti'
+    },
+    steps: {
+      info: 'Squadron Info',
+      template: 'Template',
+      deck: 'Deck',
+      invites: 'Inviti',
+      review: 'Review / Create'
+    },
+    wizard: {
+      title: 'Creazione guidata squadrone',
+      subtitle: 'Procedi step by step. Puoi avanzare solo dopo aver completato i campi richiesti.',
+      close: 'Chiudi',
+      requiredToContinue: 'Per continuare completa i campi richiesti',
+      sections: {
+        infoTitle: 'Identita squadrone',
+        infoHint: 'Inserisci nome, descrizione, base operativa e logo.',
+        templateTitle: 'Selezione template',
+        templateHint: 'Scegli il gruppo iniziale: definisce i limiti di costo per categoria.',
+        deckTitle: 'Composizione deck',
+        deckHint: 'Aggiungi unita per categoria rispettando il limite del template scelto.',
+        invitesTitle: 'Inviti squadra',
+        invitesHint: 'Seleziona i piloti da invitare. Gli inviti verranno creati in stato pending.',
+        reviewTitle: 'Controllo finale',
+        reviewHint: 'Verifica i dati prima della creazione dello squadrone.'
+      }
+    },
+    general: {
+      loading: 'Caricamento configurazione LIDC...',
+      loadingUsers: 'Caricamento utenti...',
+      loadingUserState: 'Caricamento stato utente...',
+      back: 'Indietro',
+      next: 'Avanti',
+      cancel: 'Annulla'
+    },
+    home: {
+      createSquadron: 'Crea nuovo squadrone',
+      invitesList: 'Lista inviti',
+      chooseAction: 'Seleziona una azione',
+      chooseActionHint: 'Non sei in uno squadrone: scegli se crearne uno nuovo o controllare gli inviti.'
+    },
+    center: {
+      loginTitle: 'Accesso richiesto',
+      loginHint: 'Effettua il login Discord per poter creare uno squadrone o vedere i tuoi inviti.',
+      notInSquadronTitle: 'Non sei in uno squadrone',
+      notInSquadronHint: 'Puoi creare un nuovo squadrone o aprire la lista inviti ricevuti.',
+      inviteListTitle: 'Lista inviti',
+      inviteListHint: 'Questi sono gli inviti LIDC attualmente in stato pending.',
+      inSquadronTitle: 'Squadrone gia assegnato',
+      inSquadronHint: 'Sei gia nel gruppo {{name}}.',
+      backHome: 'Torna alla selezione'
+    },
+    auth: {
+      loginToCreate: 'Per creare lo squadrone devi essere autenticato via Discord.',
+      loginButton: 'Accedi con Discord'
+    },
+    errors: {
+      catalogLoadFailed: 'Impossibile caricare catalogo template/unità.',
+      infoRequired: 'Nome squadrone e base operativa sono obbligatori.',
+      templateRequired: 'Seleziona un template di partenza.',
+      deckEmpty: 'Aggiungi almeno una unità nel deck.',
+      deckCapsExceeded: 'Il deck supera uno o più limiti di categoria.',
+      loginRequired: 'Devi effettuare il login per creare lo squadrone.',
+      createFailed: 'Creazione squadrone non riuscita.',
+      userStateFailed: 'Impossibile verificare il tuo stato LIDC.'
+    },
+    info: {
+      name: 'Nome squadrone',
+      description: 'Descrizione',
+      base: 'Base operativa',
+      basePlaceholder: 'Seleziona base...',
+      logo: 'Logo squadrone',
+      logoUpload: 'Carica logo'
+    },
+    template: {
+      title: 'Template',
+      noDescription: 'Nessuna descrizione',
+      recommended: 'consigliato',
+      totalCap: 'Capacita totale'
+    },
+    deck: {
+      categories: {
+        aircrafts: 'Aircrafts',
+        helicopters: 'Helicopters',
+        logistics: 'Logistics',
+        groundAssets: 'Ground Assets'
+      },
+      capLine: 'Speso {{spent}} / Limite {{cap}}',
+      remaining: 'Residuo',
+      unitCost: 'Costo: {{cost}}',
+      totalUnits: 'Unità totali'
+    },
+    invites: {
+      title: 'Inviti',
+      empty: 'Nessun utente disponibile nello storico login.',
+      receivedEmpty: 'Non hai inviti in attesa.',
+      you: 'Tu',
+      pending: 'Pending',
+      add: 'Invita'
+    },
+    review: {
+      createButton: 'Crea Squadrone',
+      created: 'Squadrone creato con successo'
+    },
+    preview: {
+      eyebrow: 'Live Preview',
+      fallbackName: 'Nuovo Squadrone LIDC',
+      fallbackDescription: 'Anteprima della configurazione operativa e del deck.',
+      logoPlaceholder: 'Nessun logo',
+      templateCaps: 'Limiti template',
+      invites: 'Inviti pending',
+      noInvites: 'Nessun invito selezionato',
+      deckSummary: 'Riepilogo deck',
+      emptyCategory: 'Nessuna unità'
+    },
+    admin: {
+      openEditor: 'Template Editor',
+      title: 'Editor Template LIDC',
+      subtitle: 'Modifica templates e catalogo unità (JSON)',
+      invalidJson: 'JSON non valido.',
+      saveFailed: 'Salvataggio template non riuscito.',
+      save: 'Salva modifiche'
+    }
+  },
   admin: {
     accessRestricted: 'Accesso riservato agli amministratori',
     passwordPlaceholder: 'Inserisci password',

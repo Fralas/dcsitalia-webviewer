@@ -613,6 +613,62 @@ export async function uploadWikiMedia(payload) {
   });
 }
 
+/**
+ * Get LIDC templates and units catalog
+ */
+export async function getLidcTemplates() {
+  return fetchAPI('/lidc/templates');
+}
+
+/**
+ * Get historical Discord users for LIDC invites
+ */
+export async function getLidcUsers() {
+  return fetchAPI('/lidc/users', {
+    credentials: 'include',
+  });
+}
+
+/**
+ * Get current user LIDC state (squadron membership + pending invites)
+ */
+export async function getLidcMe() {
+  return fetchAPI('/lidc/me', {
+    credentials: 'include',
+  });
+}
+
+/**
+ * Create a new LIDC squadron
+ */
+export async function createLidcSquadron(payload) {
+  return fetchAPI('/lidc/squadrons', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Get a single LIDC squadron by id
+ */
+export async function getLidcSquadron(squadronId) {
+  return fetchAPI(`/lidc/squadrons/${encodeURIComponent(squadronId)}`, {
+    credentials: 'include',
+  });
+}
+
+/**
+ * Update LIDC templates catalog (wiki editor only)
+ */
+export async function updateLidcTemplates(payload) {
+  return fetchAPI('/lidc/templates', {
+    method: 'PUT',
+    body: JSON.stringify(payload || {}),
+    credentials: 'include',
+  });
+}
+
 export default {
   getServerTime,
   getAirports,
@@ -674,4 +730,10 @@ export default {
   deleteWikiDraft,
   updateWikiPage,
   uploadWikiMedia,
+  getLidcTemplates,
+  getLidcMe,
+  getLidcUsers,
+  createLidcSquadron,
+  getLidcSquadron,
+  updateLidcTemplates,
 };
