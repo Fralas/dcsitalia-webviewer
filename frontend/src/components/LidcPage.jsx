@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
+  Coins,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -944,10 +945,6 @@ export default function LidcPage() {
                   );
                 })}
               </div>
-
-              <div className="lidc-wizard-step-meta">
-                <strong>{currentStep + 1}/{WIZARD_STEPS.length}</strong>
-              </div>
             </div>
 
             <div className="lidc-wizard-body">
@@ -1055,10 +1052,17 @@ export default function LidcPage() {
                         <header>
                           <div>
                             <h3>{t(labelKey)}</h3>
-                            <p>{t('lidc.deck.capLine', { spent: spentByCategory[key], cap: capsByCategory[key] })}</p>
+                            <div className="lidc-deck-cap-breakdown">
+                              <span>
+                                {t('lidc.deck.spentLabel')} <strong>{spentByCategory[key]}</strong>
+                              </span>
+                              <span>
+                                {t('lidc.deck.capLabel')} <strong>{capsByCategory[key]}</strong>
+                              </span>
+                            </div>
                           </div>
                           <span className={`lidc-cap-pill ${spentByCategory[key] > capsByCategory[key] ? 'is-over' : ''}`}>
-                            {t('lidc.deck.remaining')}: {remainingByCategory[key]}
+                            {t('lidc.deck.remaining')}: <strong>{remainingByCategory[key]}</strong>
                           </span>
                         </header>
 
@@ -1069,13 +1073,23 @@ export default function LidcPage() {
 
                             return (
                               <div key={unit.id} className="lidc-unit-row">
-                                <div>
-                                  <div className="lidc-unit-name">{unit.label}</div>
-                                  <div className="lidc-unit-cost">{t('lidc.deck.unitCost', { cost: unit.cost })}</div>
+                                <div className="lidc-unit-main">
+                                  <div className="lidc-unit-name"><strong>{unit.label}</strong></div>
+                                  <div className="lidc-unit-meta">
+                                    <span className="lidc-unit-cost-chip" title={t('lidc.deck.unitCost', { cost: unit.cost })}>
+                                      <Coins size={13} />
+                                      <strong>{unit.cost}</strong>
+                                    </span>
+                                    {qty > 0 && (
+                                      <span className="lidc-unit-total-chip">
+                                        <strong>{unit.cost * qty}</strong>
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                                 <div className="lidc-stepper-controls">
                                   <button type="button" className="lidc-icon-btn" onClick={() => updateQuantity(unit, qty - 1)} disabled={qty <= 0}>-</button>
-                                  <span>{qty}</span>
+                                  <span className="lidc-unit-qty">{qty}</span>
                                   <button type="button" className="lidc-icon-btn" onClick={() => updateQuantity(unit, qty + 1)} disabled={!canIncrease}>+</button>
                                 </div>
                               </div>

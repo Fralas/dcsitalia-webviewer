@@ -615,7 +615,9 @@ body.lidc-wizard-open {
 
 .lidc-wizard-stepper-shell {
   display: grid;
-  gap: 10px;
+  gap: 0;
+  padding: 2px 0;
+  margin: 4px 0;
 }
 
 .lidc-wizard-steps {
@@ -705,30 +707,13 @@ body.lidc-wizard-open {
   color: var(--lidc-ink);
 }
 
-.lidc-wizard-step-meta {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  color: var(--lidc-body);
-  font-size: 12px;
-  border-top: 1px solid var(--lidc-hairline);
-  padding-top: 8px;
-}
-
-.lidc-wizard-step-meta strong {
-  font-family: GeistMono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-weight: 400;
-  color: var(--lidc-ink);
-}
-
 .lidc-wizard-body {
   min-height: 0;
   overflow-y: auto;
   border: 1px solid var(--lidc-hairline);
   border-radius: var(--lidc-radius);
   background: var(--lidc-canvas-card);
-  padding: 12px;
+  padding: 2px 12px 12px;
   scrollbar-width: thin;
   scrollbar-color: #3a4048 #14171b;
 }
