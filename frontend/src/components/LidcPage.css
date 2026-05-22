@@ -1043,27 +1043,28 @@ body.lidc-wizard-open {
   -webkit-backdrop-filter: blur(15px) saturate(130%);
 }
 
-.lidc-airframe-editor-grid {
+.lidc-airframe-meta-stack {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 1px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: rgba(255, 255, 255, 0.13);
 }
 
 .lidc-airframe-readonly-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 1px;
+  border: 0;
+  background: transparent;
 }
 
 .lidc-airframe-readonly-item {
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 10px;
-  background:
-    linear-gradient(150deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.03) 100%),
-    rgba(16, 20, 27, 0.52);
-  padding: 10px;
+  border: 0;
+  border-radius: 0;
+  background: rgba(16, 20, 27, 0.86);
+  padding: 9px 10px;
   display: grid;
-  gap: 5px;
+  gap: 2px;
 }
 
 .lidc-airframe-readonly-item span {
@@ -1074,20 +1075,92 @@ body.lidc-wizard-open {
 }
 
 .lidc-airframe-readonly-item strong {
-  font-size: 13px;
+  font-size: 12px;
   color: #f6f8fb;
-  font-weight: 500;
+  font-weight: 600;
+}
+
+.lidc-airframe-inline-field {
+  display: grid;
+  gap: 2px;
+}
+
+.lidc-airframe-inline-field span {
+  color: #a9b2c0;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lidc-airframe-inline-field select {
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #f6f8fb;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0;
+  min-height: 0;
+  outline: none;
+  box-shadow: none;
+}
+
+.lidc-airframe-inline-field select:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.lidc-airframe-pilot-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  background: transparent;
+}
+
+.lidc-airframe-pilot-cell {
+  background: rgba(16, 20, 27, 0.86);
+  min-height: 70px;
+  display: grid;
+  place-items: center;
+  padding: 6px 10px;
+}
+
+.lidc-airframe-pilot-box {
+  width: min(320px, 100%);
+  margin: 0;
+  justify-self: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.lidc-airframe-pilot-box .lidc-airframe-inline-field {
+  width: 100%;
+  justify-items: center;
+  text-align: center;
+  transform: none;
+  gap: 5px;
+}
+
+.lidc-airframe-pilot-box .lidc-airframe-inline-field span {
+  text-align: center;
+}
+
+.lidc-airframe-pilot-box .lidc-airframe-inline-field select {
+  width: 100%;
+  max-width: none;
+  text-align: center;
+  text-align-last: center;
 }
 
 .lidc-airframe-log-panel {
   border: 1px solid rgba(255, 255, 255, 0.13);
-  border-radius: 10px;
-  background:
-    linear-gradient(150deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%),
-    rgba(14, 17, 23, 0.62);
-  padding: 10px;
+  border-radius: 0;
+  background: rgba(14, 17, 23, 0.8);
+  padding: 10px 11px;
   display: grid;
-  gap: 9px;
+  gap: 8px;
 }
 
 .lidc-airframe-log-panel header {
@@ -1104,51 +1177,69 @@ body.lidc-wizard-open {
 }
 
 .lidc-airframe-log-panel header span {
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: var(--lidc-pill);
-  padding: 2px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  padding: 2px 7px;
   font-size: 10px;
   color: #c6ced9;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .lidc-airframe-log-list {
   max-height: 250px;
   overflow-y: auto;
   display: grid;
-  gap: 8px;
+  gap: 2px;
 }
 
-.lidc-airframe-log-item {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 7px;
-  background:
-    linear-gradient(150deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.02) 100%),
-    rgba(17, 21, 28, 0.6);
-  padding: 8px 9px;
-  display: grid;
-  gap: 4px;
+.lidc-airframe-log-line {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 1px 0;
 }
 
-.lidc-airframe-log-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 11px;
-}
-
-.lidc-airframe-log-head strong {
-  color: #dbe3ea;
-}
-
-.lidc-airframe-log-head span {
-  color: var(--lidc-mute);
-}
-
-.lidc-airframe-log-item p {
+.lidc-airframe-log-line-text {
   margin: 0;
-  color: var(--lidc-body);
+  color: #d4dae2;
   font-size: 11px;
+  line-height: 1.45;
+  font-family: GeistMono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lidc-airframe-log-line.is-handover .lidc-airframe-log-line-text {
+  color: #98c6ff;
+}
+
+.lidc-airframe-log-line.is-startup .lidc-airframe-log-line-text {
+  color: #a8edc6;
+}
+
+.lidc-airframe-log-line.is-taxi .lidc-airframe-log-line-text {
+  color: #f3dc9a;
+}
+
+.lidc-airframe-log-line.is-takeoff .lidc-airframe-log-line-text {
+  color: #9fd7ff;
+}
+
+.lidc-airframe-log-line.is-position .lidc-airframe-log-line-text {
+  color: #d0d7e1;
+}
+
+.lidc-airframe-log-line.is-airborne .lidc-airframe-log-line-text {
+  color: #80c6ff;
+}
+
+.lidc-airframe-log-line.is-landing .lidc-airframe-log-line-text {
+  color: #9ee2bc;
+}
+
+.lidc-airframe-log-line.is-loss .lidc-airframe-log-line-text {
+  color: #ff9f9f;
 }
 
 .lidc-preview-chip-list {
@@ -2030,18 +2121,22 @@ body.lidc-wizard-open {
     overflow-x: auto;
   }
 
-  .lidc-airframe-editor-grid {
+  .lidc-airframe-readonly-grid {
     grid-template-columns: 1fr;
   }
 
-  .lidc-airframe-readonly-grid {
-    grid-template-columns: 1fr;
+  .lidc-airframe-pilot-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
 @media (max-width: 1200px) and (min-width: 901px) {
   .lidc-airframe-readonly-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .lidc-airframe-pilot-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

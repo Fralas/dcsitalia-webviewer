@@ -96,6 +96,16 @@ function formatTimestamp(value) {
   return new Date(value).toLocaleString();
 }
 
+function formatLogTime(value) {
+  if (!Number.isFinite(value)) return '--:--:--';
+  return new Date(value).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+}
+
 function formatUserLabel(entry) {
   if (!entry) return '-';
   return entry.globalName || entry.username || entry.userId || entry.id || '-';
@@ -1815,45 +1825,50 @@ export default function LidcPage() {
           <div className="lidc-modal-card lidc-airframe-modal-card">
             <div className="lidc-modal-head">
               <h3>{t('lidc.airframes.editorTitle')}</h3>
-              <p>{t('lidc.airframes.editorHint')}</p>
             </div>
 
             {selectedAirframeRow ? (
               <>
-                <div className="lidc-airframe-readonly-grid">
-                  <article className="lidc-airframe-readonly-item">
-                    <span>{t('lidc.airframes.columns.model')}</span>
-                    <strong>{selectedAirframeRow.model}</strong>
-                  </article>
-                  <article className="lidc-airframe-readonly-item">
-                    <span>{t('lidc.airframes.columns.base')}</span>
-                    <strong>{selectedAirframeRow.baseLabel}</strong>
-                  </article>
-                  <article className="lidc-airframe-readonly-item">
-                    <span>{t('lidc.airframes.columns.boardNumber')}</span>
-                    <strong>{selectedAirframeRow.boardNumber}</strong>
-                  </article>
-                  <article className="lidc-airframe-readonly-item">
-                    <span>{t('lidc.airframes.columns.status')}</span>
-                    <strong>{getAirframeStatusLabel(selectedAirframeRow.status)}</strong>
-                  </article>
-                </div>
+                <div className="lidc-airframe-meta-stack">
+                  <div className="lidc-airframe-readonly-grid">
+                    <article className="lidc-airframe-readonly-item">
+                      <span>{t('lidc.airframes.columns.model')}</span>
+                      <strong>{selectedAirframeRow.model}</strong>
+                    </article>
+                    <article className="lidc-airframe-readonly-item">
+                      <span>{t('lidc.airframes.columns.base')}</span>
+                      <strong>{selectedAirframeRow.baseLabel}</strong>
+                    </article>
+                    <article className="lidc-airframe-readonly-item">
+                      <span>{t('lidc.airframes.columns.boardNumber')}</span>
+                      <strong>{selectedAirframeRow.boardNumber}</strong>
+                    </article>
+                    <article className="lidc-airframe-readonly-item">
+                      <span>{t('lidc.airframes.columns.status')}</span>
+                      <strong>{getAirframeStatusLabel(selectedAirframeRow.status)}</strong>
+                    </article>
+                  </div>
 
-                <div className="lidc-airframe-editor-grid">
-                  <label className="lidc-field">
-                    <span>{t('lidc.airframes.columns.pilot')}</span>
-                    <select
-                      value={selectedAirframeDraft.pilotUserId || ''}
-                      onChange={(event) => updateAirframeDraft(event.target.value)}
-                    >
-                      <option value="">{t('lidc.airframes.unassigned')}</option>
-                      {squadronMembers.map((member) => (
-                        <option key={member.userId} value={member.userId}>
-                          {formatUserLabel(member)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <div className="lidc-airframe-pilot-grid">
+                    <article className="lidc-airframe-pilot-cell">
+                      <div className="lidc-airframe-pilot-box">
+                        <label className="lidc-airframe-inline-field">
+                          <span>{t('lidc.airframes.columns.pilot')}</span>
+                          <select
+                            value={selectedAirframeDraft.pilotUserId || ''}
+                            onChange={(event) => updateAirframeDraft(event.target.value)}
+                          >
+                            <option value="">{t('lidc.airframes.unassigned')}</option>
+                            {squadronMembers.map((member) => (
+                              <option key={member.userId} value={member.userId}>
+                                {formatUserLabel(member)}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                    </article>
+                  </div>
                 </div>
 
                 <section className="lidc-airframe-log-panel">
@@ -1863,12 +1878,13 @@ export default function LidcPage() {
                   </header>
                   <div className="lidc-airframe-log-list">
                     {(selectedAirframeRow.logs || []).map((log) => (
-                      <article key={log.id} className="lidc-airframe-log-item">
-                        <div className="lidc-airframe-log-head">
-                          <strong>{String(log.type || '-').toUpperCase()}</strong>
-                          <span>{formatTimestamp(log.at)}</span>
-                        </div>
-                        <p>{log.detail}</p>
+                      <article
+                        key={log.id}
+                        className={`lidc-airframe-log-line is-${String(log.type || 'unknown').toLowerCase()}`}
+                      >
+                        <p className="lidc-airframe-log-line-text">
+                          [{formatLogTime(log.at)}] {log.detail}
+                        </p>
                       </article>
                     ))}
                   </div>
