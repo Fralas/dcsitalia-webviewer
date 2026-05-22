@@ -98,8 +98,7 @@
         "cost": 85,
         "boardNumber": "889EY",
         "assignedPilotUserId": "675706661570347041",
-        "createdAt": 1779441392062,
-        "updatedAt": 1779442609249
+        "createdAt": 1779441392062
       },
       {
         "id": "airframe_farp-team_1_f7814d",
@@ -128,7 +127,7 @@
         "category": "helicopters",
         "cost": 110,
         "boardNumber": "125ZU",
-        "assignedPilotUserId": null,
+        "assignedPilotUserId": "675706661570347041",
         "createdAt": 1779441392062
       },
       {
@@ -138,8 +137,9 @@
         "category": "helicopters",
         "cost": 100,
         "boardNumber": "382CK",
-        "assignedPilotUserId": null,
-        "createdAt": 1779441392062
+        "assignedPilotUserId": "675706661570347041",
+        "createdAt": 1779441392062,
+        "updatedAt": 1779446063915
       },
       {
         "id": "airframe_mi24p_2_9cfbd4",

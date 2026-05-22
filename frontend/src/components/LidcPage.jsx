@@ -111,6 +111,12 @@ function formatUserLabel(entry) {
   return entry.globalName || entry.username || entry.userId || entry.id || '-';
 }
 
+function getUserInitial(entry) {
+  const label = formatUserLabel(entry);
+  const trimmed = String(label || '').trim();
+  return trimmed ? trimmed.charAt(0).toUpperCase() : '?';
+}
+
 function hashText(value) {
   const source = String(value || '');
   let hash = 0;
@@ -218,6 +224,8 @@ export default function LidcPage() {
   const [selectedAirframeDraft, setSelectedAirframeDraft] = useState(null);
   const [airframeEditorError, setAirframeEditorError] = useState('');
   const [airframeEditorSaving, setAirframeEditorSaving] = useState(false);
+  const [isPilotMenuOpen, setIsPilotMenuOpen] = useState(false);
+  const pilotMenuRef = useRef(null);
 
   const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false);
   const [templateEditorRaw, setTemplateEditorRaw] = useState('');
@@ -894,6 +902,35 @@ export default function LidcPage() {
     return airframeRows.find((entry) => entry.id === selectedId) || null;
   }, [selectedAirframeDraft?.id, airframeRows]);
 
+  const selectedPilotUserId = String(selectedAirframeDraft?.pilotUserId || '');
+  const selectedPilotProfile = selectedPilotUserId ? (squadronMembersById.get(selectedPilotUserId) || null) : null;
+  const selectedPilotLabel = selectedPilotProfile ? formatUserLabel(selectedPilotProfile) : t('lidc.airframes.unassigned');
+  const selectedPilotAvatarUrl = String(selectedPilotProfile?.avatarUrl || '');
+
+  useEffect(() => {
+    if (!selectedAirframeDraft || !isPilotMenuOpen) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (pilotMenuRef.current && !pilotMenuRef.current.contains(event.target)) {
+        setIsPilotMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setIsPilotMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedAirframeDraft, isPilotMenuOpen]);
+
   function getAirframeStatusLabel(statusKey) {
     const path = `lidc.airframes.statusOptions.${statusKey}`;
     const label = t(path);
@@ -903,6 +940,7 @@ export default function LidcPage() {
   function openAirframeEditor(row) {
     if (!row) return;
     setAirframeEditorError('');
+    setIsPilotMenuOpen(false);
     setSelectedAirframeDraft({
       id: row.id,
       pilotUserId: row.pilotUserId,
@@ -913,6 +951,7 @@ export default function LidcPage() {
     setSelectedAirframeDraft(null);
     setAirframeEditorError('');
     setAirframeEditorSaving(false);
+    setIsPilotMenuOpen(false);
   }
 
   function updateAirframeDraft(value) {
@@ -920,6 +959,7 @@ export default function LidcPage() {
       if (!prev) return prev;
       return { ...prev, pilotUserId: value };
     });
+    setIsPilotMenuOpen(false);
   }
 
   async function saveAirframeEditorDraft() {
@@ -1852,20 +1892,65 @@ export default function LidcPage() {
                   <div className="lidc-airframe-pilot-grid">
                     <article className="lidc-airframe-pilot-cell">
                       <div className="lidc-airframe-pilot-box">
-                        <label className="lidc-airframe-inline-field">
+                        <div className="lidc-airframe-inline-field" ref={pilotMenuRef}>
                           <span>{t('lidc.airframes.columns.pilot')}</span>
-                          <select
-                            value={selectedAirframeDraft.pilotUserId || ''}
-                            onChange={(event) => updateAirframeDraft(event.target.value)}
+                          <button
+                            type="button"
+                            className={`lidc-airframe-pilot-trigger ${isPilotMenuOpen ? 'is-open' : ''}`}
+                            aria-haspopup="listbox"
+                            aria-expanded={isPilotMenuOpen}
+                            onClick={() => setIsPilotMenuOpen((prev) => !prev)}
                           >
-                            <option value="">{t('lidc.airframes.unassigned')}</option>
-                            {squadronMembers.map((member) => (
-                              <option key={member.userId} value={member.userId}>
-                                {formatUserLabel(member)}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                            <span className="lidc-airframe-pilot-trigger-main">
+                              {selectedPilotAvatarUrl ? (
+                                <img src={selectedPilotAvatarUrl} alt={selectedPilotLabel} className="lidc-airframe-pilot-avatar" />
+                              ) : (
+                                <span className="lidc-airframe-pilot-avatar lidc-airframe-pilot-avatar-fallback">
+                                  {selectedPilotProfile ? getUserInitial(selectedPilotProfile) : '-'}
+                                </span>
+                              )}
+                              <span className="lidc-airframe-pilot-trigger-label">{selectedPilotLabel}</span>
+                            </span>
+                            <ChevronDown size={13} className={`lidc-airframe-pilot-caret ${isPilotMenuOpen ? 'is-open' : ''}`} />
+                          </button>
+
+                          {isPilotMenuOpen && (
+                            <div className="lidc-airframe-pilot-menu" role="listbox">
+                              <button
+                                type="button"
+                                className={`lidc-airframe-pilot-option ${selectedPilotUserId ? '' : 'is-selected'}`}
+                                onClick={() => updateAirframeDraft('')}
+                              >
+                                <span className="lidc-airframe-pilot-avatar lidc-airframe-pilot-avatar-fallback">-</span>
+                                <span className="lidc-airframe-pilot-option-label">{t('lidc.airframes.unassigned')}</span>
+                              </button>
+                              {squadronMembers.map((member) => {
+                                const memberId = String(member.userId || '');
+                                const label = formatUserLabel(member);
+                                const avatarUrl = String(member.avatarUrl || '');
+                                const isSelected = selectedPilotUserId === memberId;
+
+                                return (
+                                  <button
+                                    type="button"
+                                    key={memberId}
+                                    className={`lidc-airframe-pilot-option ${isSelected ? 'is-selected' : ''}`}
+                                    onClick={() => updateAirframeDraft(memberId)}
+                                  >
+                                    {avatarUrl ? (
+                                      <img src={avatarUrl} alt={label} className="lidc-airframe-pilot-avatar" />
+                                    ) : (
+                                      <span className="lidc-airframe-pilot-avatar lidc-airframe-pilot-avatar-fallback">
+                                        {getUserInitial(member)}
+                                      </span>
+                                    )}
+                                    <span className="lidc-airframe-pilot-option-label">{label}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </article>
                   </div>
