@@ -427,6 +427,7 @@ body.lidc-wizard-open {
 
 .lidc-visual-panel,
 .lidc-received-list,
+.lidc-member-cards,
 .lidc-airframe-table-wrap,
 .lidc-airframe-log-list,
 .lidc-airframe-pilot-menu,
@@ -437,6 +438,7 @@ body.lidc-wizard-open {
 
 .lidc-visual-panel::-webkit-scrollbar,
 .lidc-received-list::-webkit-scrollbar,
+.lidc-member-cards::-webkit-scrollbar,
 .lidc-airframe-table-wrap::-webkit-scrollbar,
 .lidc-airframe-log-list::-webkit-scrollbar,
 .lidc-airframe-pilot-menu::-webkit-scrollbar,
@@ -447,6 +449,7 @@ body.lidc-wizard-open {
 
 .lidc-visual-panel::-webkit-scrollbar-track,
 .lidc-received-list::-webkit-scrollbar-track,
+.lidc-member-cards::-webkit-scrollbar-track,
 .lidc-airframe-table-wrap::-webkit-scrollbar-track,
 .lidc-airframe-log-list::-webkit-scrollbar-track,
 .lidc-airframe-pilot-menu::-webkit-scrollbar-track,
@@ -457,6 +460,7 @@ body.lidc-wizard-open {
 
 .lidc-visual-panel::-webkit-scrollbar-thumb,
 .lidc-received-list::-webkit-scrollbar-thumb,
+.lidc-member-cards::-webkit-scrollbar-thumb,
 .lidc-airframe-table-wrap::-webkit-scrollbar-thumb,
 .lidc-airframe-log-list::-webkit-scrollbar-thumb,
 .lidc-airframe-pilot-menu::-webkit-scrollbar-thumb,
@@ -468,6 +472,7 @@ body.lidc-wizard-open {
 
 .lidc-visual-panel::-webkit-scrollbar-thumb:hover,
 .lidc-received-list::-webkit-scrollbar-thumb:hover,
+.lidc-member-cards::-webkit-scrollbar-thumb:hover,
 .lidc-airframe-table-wrap::-webkit-scrollbar-thumb:hover,
 .lidc-airframe-log-list::-webkit-scrollbar-thumb:hover,
 .lidc-airframe-pilot-menu::-webkit-scrollbar-thumb:hover,
@@ -546,11 +551,11 @@ body.lidc-wizard-open {
   box-shadow: none;
 }
 
-.lidc-visual-card-members .lidc-user-list {
+.lidc-visual-card-members .lidc-member-cards {
   height: 100%;
   min-height: 0;
   overflow-y: auto;
-  padding-top: 10px;
+  padding: 10px 18px 12px;
 }
 
 .lidc-visual-card h2 {
@@ -933,6 +938,182 @@ body.lidc-wizard-open {
   font-size: 10px;
   padding: 3px 7px;
   color: var(--lidc-body);
+}
+
+.lidc-member-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+  align-content: start;
+  padding-bottom: 4px;
+}
+
+.lidc-member-profile-card {
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 18px;
+  overflow: hidden;
+  min-height: 320px;
+  background:
+    radial-gradient(120% 160% at 100% 0%, rgba(48, 65, 92, 0.28) 0%, transparent 52%),
+    linear-gradient(180deg, #12161d 0%, #0d1117 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 14px 30px rgba(0, 0, 0, 0.28);
+}
+
+.lidc-member-profile-content {
+  display: grid;
+  gap: 12px;
+  padding: 18px 16px 16px;
+  min-height: 320px;
+  align-content: start;
+}
+
+.lidc-member-profile-avatar-wrap {
+  width: 74px;
+  height: 74px;
+  margin: 4px auto 2px;
+}
+
+.lidc-member-profile-avatar {
+  width: 74px;
+  height: 74px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  object-fit: cover;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.36);
+}
+
+.lidc-member-profile-avatar-fallback {
+  display: grid;
+  place-items: center;
+  color: #f3f7fc;
+  font-size: 24px;
+  font-weight: 700;
+  background:
+    radial-gradient(66% 66% at 18% 10%, rgba(113, 140, 184, 0.3) 0%, transparent 72%),
+    linear-gradient(160deg, #283242 0%, #161c27 60%, #11151d 100%);
+}
+
+.lidc-member-profile-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.lidc-member-profile-title-row h4 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #edf2f9;
+  max-width: calc(100% - 24px);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.lidc-member-profile-status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #23b067;
+  box-shadow: 0 0 0 2px rgba(4, 7, 11, 0.55);
+  flex: 0 0 auto;
+}
+
+.lidc-member-profile-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #d2dae6;
+  margin-top: 4px;
+}
+
+.lidc-member-profile-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.lidc-member-profile-stat strong {
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 600;
+  color: #f0f5fc;
+}
+
+.lidc-member-profile-stat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(200, 209, 222, 0.86);
+}
+
+.lidc-member-profile-stat-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.lidc-member-profile-btn {
+  margin-top: auto;
+  width: 100%;
+  border: 1px solid rgba(255, 113, 113, 0.36);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(120, 34, 34, 0.34) 0%, rgba(84, 20, 20, 0.34) 100%);
+  color: #ffd6d6;
+  min-height: 34px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 160ms ease, transform 160ms ease, background-color 160ms ease;
+}
+
+.lidc-member-profile-btn:hover {
+  border-color: rgba(255, 160, 160, 0.62);
+  transform: translateY(-1px);
+}
+
+.lidc-member-profile-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lidc-member-profile-foot span {
+  color: rgba(190, 200, 214, 0.84);
+  font-size: 11px;
+  font-family: GeistMono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.lidc-member-role-chip {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--lidc-pill);
+  padding: 3px 8px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  color: #d3dce9;
+  background: rgba(13, 18, 28, 0.5);
+}
+
+.lidc-member-role-chip.is-owner {
+  border-color: rgba(102, 190, 133, 0.42);
+  color: #afe6c5;
+  background: rgba(27, 76, 51, 0.38);
 }
 
 .lidc-airframe-table-wrap {

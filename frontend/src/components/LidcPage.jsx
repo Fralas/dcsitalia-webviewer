@@ -48,6 +48,51 @@ const AIRFRAME_STATUSES = Object.freeze({
   DESTROYED: 'destroyed',
 });
 
+const MOCK_MEMBER_PROFILES = Object.freeze([
+  {
+    userId: 'mock_member_01',
+    globalName: 'Marco Valli',
+    username: 'mvalli',
+    avatarUrl: 'https://i.pravatar.cc/80?img=12',
+    role: 'member',
+  },
+  {
+    userId: 'mock_member_02',
+    globalName: 'Luca Ferri',
+    username: 'lferri',
+    avatarUrl: 'https://i.pravatar.cc/80?img=15',
+    role: 'member',
+  },
+  {
+    userId: 'mock_member_03',
+    globalName: 'Giulia Neri',
+    username: 'gneri',
+    avatarUrl: 'https://i.pravatar.cc/80?img=5',
+    role: 'member',
+  },
+  {
+    userId: 'mock_member_04',
+    globalName: 'Alessio Rinaldi',
+    username: 'arinaldi',
+    avatarUrl: 'https://i.pravatar.cc/80?img=22',
+    role: 'member',
+  },
+  {
+    userId: 'mock_member_05',
+    globalName: 'Francesca Sala',
+    username: 'fsala',
+    avatarUrl: 'https://i.pravatar.cc/80?img=32',
+    role: 'member',
+  },
+  {
+    userId: 'mock_member_06',
+    globalName: 'Davide Conti',
+    username: 'dconti',
+    avatarUrl: 'https://i.pravatar.cc/80?img=41',
+    role: 'member',
+  },
+]);
+
 function createEmptyCategoryMap() {
   return {
     aircrafts: 0,
@@ -840,7 +885,24 @@ export default function LidcPage() {
 
   const squadronMembers = useMemo(() => {
     const list = Array.isArray(activeSquadron?.memberProfiles) ? activeSquadron.memberProfiles : [];
-    return [...list].sort((a, b) => formatUserLabel(a).localeCompare(formatUserLabel(b), 'en', { sensitivity: 'base' }));
+    const map = new Map();
+
+    list.forEach((member) => {
+      const memberId = String(member?.userId || '');
+      if (!memberId) return;
+      map.set(memberId, member);
+    });
+
+    MOCK_MEMBER_PROFILES.forEach((mockMember) => {
+      const memberId = String(mockMember.userId || '');
+      if (!memberId) return;
+      if (!map.has(memberId)) {
+        map.set(memberId, mockMember);
+      }
+    });
+
+    return Array.from(map.values())
+      .sort((a, b) => formatUserLabel(a).localeCompare(formatUserLabel(b), 'en', { sensitivity: 'base' }));
   }, [activeSquadron]);
 
   const squadronMembersById = useMemo(() => {
@@ -1067,26 +1129,52 @@ export default function LidcPage() {
         )}
 
         {!loadingSquadronDetails && !squadronDetailsError && squadronMembers.length > 0 && (
-          <div className="lidc-user-list">
+          <div className="lidc-member-cards">
             {squadronMembers.map((member) => {
+              const memberId = String(member?.userId || '');
               const label = formatUserLabel(member);
               const role = String(member?.role || '').toLowerCase();
               const roleLabel = role === 'owner' ? t('lidc.members.owner') : t('lidc.members.member');
+              const identityLabel = member.username ? `@${member.username}` : String(member.userId || '-');
+              const avatarFallback = label.slice(0, 1).toUpperCase();
+              const assignedAircraftCount = airframeRows.reduce((total, row) => (
+                String(row?.pilotUserId || '') === memberId ? total + 1 : total
+              ), 0);
 
               return (
-                <article key={member.userId} className="lidc-user-item lidc-user-item-readonly">
-                  {member.avatarUrl ? (
-                    <img src={member.avatarUrl} alt={label} className="lidc-user-avatar" />
-                  ) : (
-                    <div className="lidc-user-avatar lidc-user-avatar-fallback">{label.slice(0, 1).toUpperCase()}</div>
-                  )}
+                <article key={memberId} className="lidc-member-profile-card">
+                  <div className="lidc-member-profile-content">
+                    <div className="lidc-member-profile-avatar-wrap">
+                      {member.avatarUrl ? (
+                        <img src={member.avatarUrl} alt={label} className="lidc-member-profile-avatar" />
+                      ) : (
+                        <div className="lidc-member-profile-avatar lidc-member-profile-avatar-fallback">{avatarFallback}</div>
+                      )}
+                    </div>
 
-                  <div className="lidc-user-meta">
-                    <div className="lidc-user-name">{label}</div>
-                    <div className="lidc-user-sub">{member.username ? `@${member.username}` : '-'}</div>
+                    <div className="lidc-member-profile-title-row">
+                      <h4>{label}</h4>
+                      <span className="lidc-member-profile-status-dot" aria-hidden="true" />
+                    </div>
+
+                    <div className="lidc-member-profile-stats">
+                      <div className="lidc-member-profile-stat">
+                        <strong>{assignedAircraftCount}</strong>
+                        <span className="lidc-member-profile-stat-icon" title="Aerei assegnati" aria-label="Aerei assegnati">
+                          <Plane size={14} />
+                        </span>
+                      </div>
+                    </div>
+
+                    <button type="button" className="lidc-member-profile-btn" aria-label="Remove">
+                      X
+                    </button>
+
+                    <div className="lidc-member-profile-foot">
+                      <span>{identityLabel}</span>
+                      <span className={`lidc-member-role-chip ${role === 'owner' ? 'is-owner' : ''}`}>{roleLabel}</span>
+                    </div>
                   </div>
-
-                  <span className="lidc-user-tag">{roleLabel}</span>
                 </article>
               );
             })}
