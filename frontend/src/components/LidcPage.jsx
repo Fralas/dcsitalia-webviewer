@@ -8,6 +8,8 @@ import {
   ChevronDown,
   ChevronRight,
   Disc3,
+  Forklift,
+  Helicopter,
   List,
   Loader2,
   LogIn,
@@ -271,6 +273,8 @@ export default function LidcPage() {
   const [airframeEditorSaving, setAirframeEditorSaving] = useState(false);
   const [isPilotMenuOpen, setIsPilotMenuOpen] = useState(false);
   const pilotMenuRef = useRef(null);
+  const [memberActionMenuForId, setMemberActionMenuForId] = useState('');
+  const memberActionMenuRef = useRef(null);
 
   const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false);
   const [templateEditorRaw, setTemplateEditorRaw] = useState('');
@@ -967,9 +971,14 @@ export default function LidcPage() {
         ? t('lidc.members.owner')
         : (role === 'admin' ? 'Admin' : t('lidc.members.member'));
       const displayName = formatUserLabel(member);
-      const assignedAircraftCount = airframeRows.reduce((total, row) => (
-        String(row?.pilotUserId || '') === memberId ? total + 1 : total
-      ), 0);
+      const counts = airframeRows.reduce((acc, row) => {
+        if (String(row?.pilotUserId || '') !== memberId) return acc;
+        const category = String(row?.category || '').toLowerCase();
+        if (category === 'aircrafts') acc.a += 1;
+        if (category === 'helicopters') acc.h += 1;
+        if (category === 'logistics') acc.l += 1;
+        return acc;
+      }, { a: 0, h: 0, l: 0 });
 
       return {
         memberId,
@@ -978,7 +987,9 @@ export default function LidcPage() {
         roleLabel,
         avatarUrl: String(member?.avatarUrl || ''),
         avatarFallback: getUserInitial(member),
-        assignedAircraftCount,
+        assignedAircraftCountA: counts.a,
+        assignedAircraftCountH: counts.h,
+        assignedAircraftCountL: counts.l,
       };
     });
   }, [squadronMembers, airframeRows]);
@@ -1017,6 +1028,30 @@ export default function LidcPage() {
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [selectedAirframeDraft, isPilotMenuOpen]);
+
+  useEffect(() => {
+    if (!memberActionMenuForId) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (memberActionMenuRef.current && !memberActionMenuRef.current.contains(event.target)) {
+        setMemberActionMenuForId('');
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setMemberActionMenuForId('');
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [memberActionMenuForId]);
 
   function getAirframeStatusLabel(statusKey) {
     const path = `lidc.airframes.statusOptions.${statusKey}`;
@@ -1154,12 +1189,25 @@ export default function LidcPage() {
 
         {!loadingSquadronDetails && !squadronDetailsError && memberRows.length > 0 && (
           <div className="lidc-airframe-table-wrap">
-            <table className="lidc-airframe-table">
+            <table className="lidc-airframe-table lidc-member-table">
               <thead>
                 <tr>
-                  <th>Immagine profilo</th>
-                  <th>Nome</th>
-                  <th>Aerei assegnati</th>
+                  <th>Utente</th>
+                  <th title="Aircrafts assegnati">
+                    <span className="lidc-member-count-head">
+                      <Plane size={14} />
+                    </span>
+                  </th>
+                  <th title="Helicopters assegnati">
+                    <span className="lidc-member-count-head">
+                      <Helicopter size={14} />
+                    </span>
+                  </th>
+                  <th title="Logistics assegnati">
+                    <span className="lidc-member-count-head">
+                      <Forklift size={14} />
+                    </span>
+                  </th>
                   <th>Ruolo</th>
                   <th>Azioni</th>
                 </tr>
@@ -1168,53 +1216,73 @@ export default function LidcPage() {
                 {memberRows.map((member) => (
                   <tr key={member.memberId}>
                     <td>
-                      <div className="lidc-member-avatar-cell">
+                      <div className="lidc-member-user-cell">
                         {member.avatarUrl ? (
                           <img src={member.avatarUrl} alt={member.displayName} className="lidc-member-table-avatar" />
                         ) : (
                           <span className="lidc-member-table-avatar lidc-member-table-avatar-fallback">{member.avatarFallback}</span>
                         )}
+                        <div className="lidc-airframe-cell-main">
+                          <strong>{member.displayName}</strong>
+                        </div>
                       </div>
                     </td>
-                    <td>
-                      <div className="lidc-airframe-cell-main">
-                        <strong>{member.displayName}</strong>
-                      </div>
-                    </td>
-                    <td>
+                    <td className="lidc-member-count-cell">
                       <span className="lidc-member-assigned-count">
-                        <Plane size={13} />
-                        <strong>{member.assignedAircraftCount}</strong>
+                        <strong>{member.assignedAircraftCountA}</strong>
+                      </span>
+                    </td>
+                    <td className="lidc-member-count-cell">
+                      <span className="lidc-member-assigned-count">
+                        <strong>{member.assignedAircraftCountH}</strong>
+                      </span>
+                    </td>
+                    <td className="lidc-member-count-cell">
+                      <span className="lidc-member-assigned-count">
+                        <strong>{member.assignedAircraftCountL}</strong>
                       </span>
                     </td>
                     <td>
-                      <span className="lidc-status-pill">
+                      <span className="lidc-member-role-text">
                         {member.roleLabel}
                       </span>
                     </td>
                     <td>
-                      <div className="lidc-member-actions">
+                      <div className="lidc-member-actions" ref={memberActionMenuForId === member.memberId ? memberActionMenuRef : null}>
                         <button
                           type="button"
-                          className="lidc-status-pill lidc-member-action-pill is-grounded"
-                          disabled={member.role === 'owner' || member.role === 'admin'}
+                          className={`lidc-member-action-trigger ${memberActionMenuForId === member.memberId ? 'is-open' : ''}`}
+                          onClick={() => setMemberActionMenuForId((prev) => (prev === member.memberId ? '' : member.memberId))}
                         >
-                          Promuovi ad amministratore
+                          Azioni
+                          <ChevronDown size={12} />
                         </button>
-                        <button
-                          type="button"
-                          className="lidc-status-pill lidc-member-action-pill is-destroyed"
-                          disabled={member.role === 'owner'}
-                        >
-                          Rimuovi dal gruppo
-                        </button>
-                        <button
-                          type="button"
-                          className="lidc-status-pill lidc-member-action-pill is-airborne"
-                          disabled={member.role === 'owner' || member.role !== 'admin'}
-                        >
-                          Degrada a membro
-                        </button>
+
+                        {memberActionMenuForId === member.memberId && (
+                          <div className="lidc-member-action-menu" role="menu">
+                            <button
+                              type="button"
+                              className="lidc-member-action-menu-item"
+                              disabled={member.role === 'owner' || member.role === 'admin'}
+                            >
+                              Promuovi
+                            </button>
+                            <button
+                              type="button"
+                              className="lidc-member-action-menu-item"
+                              disabled={member.role === 'owner' || member.role !== 'admin'}
+                            >
+                              Degrada
+                            </button>
+                            <button
+                              type="button"
+                              className="lidc-member-action-menu-item is-danger"
+                              disabled={member.role === 'owner'}
+                            >
+                              Rimuovi
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
