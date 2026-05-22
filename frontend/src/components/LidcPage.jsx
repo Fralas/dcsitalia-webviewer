@@ -577,6 +577,7 @@ export default function LidcPage() {
   const currentStepKey = WIZARD_STEPS[currentStep] || WIZARD_STEPS[0];
   const isLogged = Boolean(user?.id);
   const userHasSquadron = Boolean(userLidcState.hasSquadron);
+  const isAircraftManagementView = activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS;
   const effectivePreviewBaseId = baseId
     || activeSquadron?.baseId
     || createdSquadron?.baseId
@@ -1048,9 +1049,7 @@ export default function LidcPage() {
 
   function renderAircraftManagementView() {
     return (
-      <div className="lidc-visual-card">
-        <h3>{t('lidc.sidebar.aircraftManagement')}</h3>
-
+      <div className="lidc-visual-card lidc-visual-card-aircrafts">
         {loadingSquadronDetails && (
           <div className="lidc-loading">
             <Loader2 size={14} className="spin" />
@@ -1107,10 +1106,6 @@ export default function LidcPage() {
                 })}
               </tbody>
             </table>
-
-            <div className="lidc-airframe-table-hint">
-              {t('lidc.airframes.rowHint')}
-            </div>
           </div>
         )}
       </div>
@@ -1424,7 +1419,7 @@ export default function LidcPage() {
         </aside>
 
         <section className="lidc-main">
-          <div className="lidc-main-shell">
+          <div className={`lidc-main-shell ${isAircraftManagementView ? 'is-aircraft-focus' : ''}`}>
             <header className="lidc-main-head">
               <div className="lidc-main-status">
                 {loadingCatalog ? (
@@ -1438,7 +1433,7 @@ export default function LidcPage() {
               </div>
             </header>
 
-            <div className="lidc-visual-panel">
+            <div className={`lidc-visual-panel ${isAircraftManagementView ? 'is-aircraft-focus' : ''}`}>
               {catalogError && <div className="lidc-inline-error">{catalogError}</div>}
               {renderVisualization()}
             </div>

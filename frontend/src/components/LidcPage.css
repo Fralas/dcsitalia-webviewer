@@ -400,6 +400,16 @@ body.lidc-wizard-open {
   gap: 12px;
 }
 
+.lidc-main-shell.is-aircraft-focus {
+  padding: 0;
+  gap: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.lidc-main-shell.is-aircraft-focus .lidc-main-head {
+  display: none;
+}
+
 .lidc-main-head {
   display: flex;
   align-items: center;
@@ -461,11 +471,31 @@ body.lidc-wizard-open {
 }
 
 .lidc-visual-panel {
-  border: 1px solid var(--lidc-hairline);
-  border-radius: var(--lidc-radius);
-  background: linear-gradient(180deg, #111315 0%, #0e0f11 100%);
-  padding: 14px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  min-height: 0;
+  display: grid;
+  align-content: start;
   overflow-y: auto;
+}
+
+.lidc-visual-panel.is-aircraft-focus {
+  overflow: hidden;
+}
+
+.lidc-visual-panel.is-aircraft-focus > .lidc-visual-card {
+  height: 100%;
+  min-height: 0;
+}
+
+.lidc-visual-panel.is-aircraft-focus > .lidc-visual-card.lidc-visual-card-aircrafts {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
 }
 
 .lidc-visual-grid {
@@ -486,6 +516,22 @@ body.lidc-wizard-open {
   padding: 14px;
   display: grid;
   gap: 8px;
+}
+
+.lidc-visual-card-aircrafts {
+  padding: 0;
+  border-radius: 0;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+}
+
+.lidc-visual-card-aircrafts .lidc-airframe-table-wrap {
+  width: 100%;
+  margin-inline: 0;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .lidc-visual-card h2 {
@@ -888,10 +934,10 @@ body.lidc-wizard-open {
 
 .lidc-airframe-table {
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0 7px;
+  border-collapse: collapse;
+  border-spacing: 0;
   min-width: 1060px;
-  padding: 0 6px 6px;
+  padding: 0;
 }
 
 .lidc-airframe-table thead th {
@@ -900,19 +946,18 @@ body.lidc-wizard-open {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #b8bdc7;
-  padding: 10px 12px;
+  padding: 9px 10px;
   background: transparent;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .lidc-airframe-table tbody tr {
   cursor: pointer;
-  transition: transform 150ms ease, filter 150ms ease;
+  transition: background-color 130ms ease;
 }
 
 .lidc-airframe-table tbody tr:hover td {
-  transform: translateY(-1px);
-  filter: brightness(1.07);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .lidc-airframe-table tbody tr.is-updating {
@@ -922,37 +967,22 @@ body.lidc-wizard-open {
 .lidc-airframe-table tbody td {
   font-size: 12px;
   color: #d8dde6;
-  padding: 10px 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  background:
-    linear-gradient(165deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.03) 55%, rgba(255, 255, 255, 0.015) 100%),
-    rgba(15, 18, 24, 0.48);
-  backdrop-filter: blur(10px) saturate(120%);
-  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(15, 18, 24, 0.42);
   vertical-align: middle;
-  transition: transform 150ms ease, filter 150ms ease;
-}
-
-.lidc-airframe-table tbody td:first-child {
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 11px 0 0 11px;
-}
-
-.lidc-airframe-table tbody td:last-child {
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 0 11px 11px 0;
+  transition: background-color 130ms ease;
 }
 
 .lidc-airframe-table tbody td code {
-  font-size: 12px;
+  font-size: 11px;
   color: #f2f5f8;
   font-family: GeistMono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 .lidc-airframe-cell-main {
   display: grid;
-  gap: 3px;
+  gap: 2px;
 }
 
 .lidc-airframe-cell-main strong {
@@ -968,7 +998,7 @@ body.lidc-wizard-open {
 .lidc-status-pill {
   display: inline-flex;
   align-items: center;
-  border-radius: var(--lidc-pill);
+  border-radius: 3px;
   border: 1px solid #384049;
   background: #1d2329;
   color: #d7dee5;
@@ -2018,6 +2048,10 @@ body.lidc-wizard-open {
 @media (max-width: 640px) {
   .lidc-main-shell {
     padding: 10px;
+  }
+
+  .lidc-main-shell.is-aircraft-focus {
+    padding: 0;
   }
 
   .lidc-center-stage {
