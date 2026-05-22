@@ -1106,6 +1106,40 @@ app.get('/api/lidc/squadrons/:id', (req, res) => {
 });
 
 /**
+ * PUT /api/lidc/squadrons/:id/airframes/:airframeId - Assign or unassign pilot from airframe
+ */
+app.put('/api/lidc/squadrons/:id/airframes/:airframeId', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const result = lidcService.updateAirframeAssignment({
+      squadronId: req.params.id,
+      airframeId: req.params.airframeId,
+      pilotUserId: req.body?.pilotUserId ?? null,
+      actorUserId: req.session.user.id,
+    });
+
+    return res.json(result);
+  } catch (error) {
+    const message = String(error?.message || 'Failed to update airframe assignment');
+    const lowered = message.toLowerCase();
+    let status = 400;
+
+    if (lowered.includes('authentication required')) {
+      status = 401;
+    } else if (lowered.includes('not found')) {
+      status = 404;
+    } else if (lowered.includes('only squadron members')) {
+      status = 403;
+    }
+
+    return res.status(status).json({ error: message });
+  }
+});
+
+/**
  * PUT /api/lidc/templates - Update LIDC templates and units (wiki editors only)
  */
 app.put('/api/lidc/templates', async (req, res) => {

@@ -776,6 +776,10 @@ body.lidc-wizard-open {
   cursor: default;
 }
 
+.lidc-user-item-readonly {
+  cursor: default;
+}
+
 .lidc-user-avatar {
   width: 34px;
   height: 34px;
@@ -814,6 +818,60 @@ body.lidc-wizard-open {
   font-size: 10px;
   padding: 3px 7px;
   color: var(--lidc-body);
+}
+
+.lidc-airframe-list {
+  display: grid;
+  gap: 8px;
+}
+
+.lidc-airframe-item {
+  border: 1px solid var(--lidc-hairline);
+  border-radius: var(--lidc-radius);
+  background: var(--lidc-canvas-soft);
+  padding: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  align-items: center;
+  gap: 10px;
+}
+
+.lidc-airframe-main {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.lidc-airframe-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lidc-airframe-topline strong {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.lidc-airframe-assign {
+  gap: 5px;
+}
+
+.lidc-airframe-assign > span {
+  font-size: 11px;
+}
+
+.lidc-airframe-assign select {
+  font-size: 12px;
+  padding: 8px 10px;
+}
+
+.lidc-airframe-updating {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: center;
+  color: var(--lidc-mute);
 }
 
 .lidc-preview-chip-list {
@@ -1709,6 +1767,10 @@ body.lidc-wizard-open {
   }
 
   .lidc-deck-sections {
+    grid-template-columns: 1fr;
+  }
+
+  .lidc-airframe-item {
     grid-template-columns: 1fr;
   }
 }

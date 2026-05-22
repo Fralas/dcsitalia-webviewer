@@ -659,6 +659,20 @@ export async function getLidcSquadron(squadronId) {
 }
 
 /**
+ * Assign (or clear) pilot for one squadron airframe
+ */
+export async function assignLidcAirframePilot(squadronId, airframeId, pilotUserId = null) {
+  return fetchAPI(
+    `/lidc/squadrons/${encodeURIComponent(squadronId)}/airframes/${encodeURIComponent(airframeId)}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ pilotUserId }),
+      credentials: 'include',
+    },
+  );
+}
+
+/**
  * Update LIDC templates catalog (wiki editor only)
  */
 export async function updateLidcTemplates(payload) {
@@ -735,5 +749,6 @@ export default {
   getLidcUsers,
   createLidcSquadron,
   getLidcSquadron,
+  assignLidcAirframePilot,
   updateLidcTemplates,
 };

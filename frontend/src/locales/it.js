@@ -374,7 +374,9 @@ export default {
       deckCapsExceeded: 'Il deck supera uno o più limiti di categoria.',
       loginRequired: 'Devi effettuare il login per creare lo squadrone.',
       createFailed: 'Creazione squadrone non riuscita.',
-      userStateFailed: 'Impossibile verificare il tuo stato LIDC.'
+      userStateFailed: 'Impossibile verificare il tuo stato LIDC.',
+      squadronLoadFailed: 'Impossibile caricare i dettagli dello squadrone.',
+      airframeAssignFailed: 'Impossibile aggiornare l\'assegnazione del velivolo.'
     },
     info: {
       name: 'Nome squadrone',
@@ -414,6 +416,16 @@ export default {
       you: 'Tu',
       pending: 'Pending',
       add: 'Invita'
+    },
+    members: {
+      empty: 'Nessun membro disponibile nello squadrone.',
+      owner: 'Owner',
+      member: 'Membro'
+    },
+    airframes: {
+      empty: 'Nessun velivolo acquistato nel deck.',
+      assignedPilot: 'Pilota assegnato',
+      unassigned: 'Non assegnato'
     },
     review: {
       createButton: 'Crea Squadrone',
@@ -486,3 +498,4 @@ export default {
     quantityLabel: 'Quantità: {{value}}'
   }
 };
+

@@ -374,7 +374,9 @@ export default {
       deckCapsExceeded: 'Deck exceeds one or more category caps.',
       loginRequired: 'You must login before creating a squadron.',
       createFailed: 'Failed to create squadron.',
-      userStateFailed: 'Failed to verify your LIDC state.'
+      userStateFailed: 'Failed to verify your LIDC state.',
+      squadronLoadFailed: 'Failed to load squadron details.',
+      airframeAssignFailed: 'Failed to update airframe assignment.'
     },
     info: {
       name: 'Squadron name',
@@ -414,6 +416,16 @@ export default {
       you: 'You',
       pending: 'Pending',
       add: 'Invite'
+    },
+    members: {
+      empty: 'No squadron members available.',
+      owner: 'Owner',
+      member: 'Member'
+    },
+    airframes: {
+      empty: 'No purchased airframes found in this deck.',
+      assignedPilot: 'Assigned pilot',
+      unassigned: 'Unassigned'
     },
     review: {
       createButton: 'Create Squadron',
@@ -486,3 +498,4 @@ export default {
     quantityLabel: 'Quantity: {{value}}'
   }
 };
+

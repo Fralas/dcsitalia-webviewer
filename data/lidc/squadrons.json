@@ -78,6 +78,109 @@
       "username": "fralas",
       "avatar": "395ada2d9da6bd7a6c7698d7879914ba",
       "avatarUrl": "https://cdn.discordapp.com/avatars/675706661570347041/395ada2d9da6bd7a6c7698d7879914ba.png"
-    }
+    },
+    "airframes": [
+      {
+        "id": "airframe_a10c2_1_42c7b2",
+        "unitId": "a10c2",
+        "unitLabel": "A-10C II",
+        "category": "aircrafts",
+        "cost": 85,
+        "boardNumber": "134TF",
+        "assignedPilotUserId": "675706661570347041",
+        "createdAt": 1779441392062,
+        "updatedAt": 1779441601561
+      },
+      {
+        "id": "airframe_a10c2_2_87d896",
+        "unitId": "a10c2",
+        "unitLabel": "A-10C II",
+        "category": "aircrafts",
+        "cost": 85,
+        "boardNumber": "889EY",
+        "assignedPilotUserId": null,
+        "createdAt": 1779441392062
+      },
+      {
+        "id": "airframe_farp-team_1_f7814d",
+        "unitId": "farp-team",
+        "unitLabel": "FARP Support Team",
+        "category": "groundAssets",
+        "cost": 45,
+        "boardNumber": "660KE",
+        "assignedPilotUserId": null,
+        "createdAt": 1779441392062
+      },
+      {
+        "id": "airframe_farp-team_2_c37d02",
+        "unitId": "farp-team",
+        "unitLabel": "FARP Support Team",
+        "category": "groundAssets",
+        "cost": 45,
+        "boardNumber": "810TO",
+        "assignedPilotUserId": null,
+        "createdAt": 1779441392062
+      },
+      {
+        "id": "airframe_ah64d_1_0d2c11",
+        "unitId": "ah64d",
+        "unitLabel": "AH-64D Apache",
+        "category": "helicopters",
+        "cost": 110,
+        "boardNumber": "125ZU",
+        "assignedPilotUserId": null,
+        "createdAt": 1779441392062
+      },
+      {
+        "id": "airframe_mi24p_1_f10fe6",
+        "unitId": "mi24p",
+        "unitLabel": "Mi-24P Hind",
+        "category": "helicopters",
+        "cost": 100,
+        "boardNumber": "382CK",
+        "assignedPilotUserId": null,
+        "createdAt": 1779441392062
+      },
+      {
+        "id": "airframe_mi24p_2_9cfbd4",
+        "unitId": "mi24p",
+        "unitLabel": "Mi-24P Hind",
+        "category": "helicopters",
+        "cost": 100,
+        "boardNumber": "377SK",
+        "assignedPilotUserId": null,
+        "createdAt": 1779441392062
+      },
+      {
+        "id": "airframe_oh58d_1_a99898",
+        "unitId": "oh58d",
+        "unitLabel": "OH-58D Kiowa",
+        "category": "helicopters",
+        "cost": 65,
+        "boardNumber": "879ZF",
+        "assignedPilotUserId": null,
+        "createdAt": 1779441392062
+      },
+      {
+        "id": "airframe_c130j_1_5c0afb",
+        "unitId": "c130j",
+        "unitLabel": "C-130J Super Hercules",
+        "category": "logistics",
+        "cost": 130,
+        "boardNumber": "226HG",
+        "assignedPilotUserId": null,
+        "createdAt": 1779441392062
+      },
+      {
+        "id": "airframe_c130j_2_102527",
+        "unitId": "c130j",
+        "unitLabel": "C-130J Super Hercules",
+        "category": "logistics",
+        "cost": 130,
+        "boardNumber": "462YH",
+        "assignedPilotUserId": null,
+        "createdAt": 1779441392062
+      }
+    ]
   }
 ]

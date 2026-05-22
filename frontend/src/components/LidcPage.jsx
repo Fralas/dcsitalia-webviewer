@@ -90,6 +90,11 @@ function formatTimestamp(value) {
   return new Date(value).toLocaleString();
 }
 
+function formatUserLabel(entry) {
+  if (!entry) return '-';
+  return entry.globalName || entry.username || entry.userId || entry.id || '-';
+}
+
 export default function LidcPage() {
   const { user } = useUser();
 
@@ -135,6 +140,11 @@ export default function LidcPage() {
     invites: [],
   });
   const [hideInSquadronNotice, setHideInSquadronNotice] = useState(false);
+  const [activeSquadron, setActiveSquadron] = useState(null);
+  const [loadingSquadronDetails, setLoadingSquadronDetails] = useState(false);
+  const [squadronDetailsError, setSquadronDetailsError] = useState('');
+  const [updatingAirframeId, setUpdatingAirframeId] = useState('');
+  const [airframeUpdateError, setAirframeUpdateError] = useState('');
 
   const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false);
   const [templateEditorRaw, setTemplateEditorRaw] = useState('');
@@ -151,6 +161,7 @@ export default function LidcPage() {
     setUserLidcState(nextState);
     if (!nextState.hasSquadron) {
       setPanelMode('home');
+      setActiveSquadron(null);
     }
 
     return nextState;
@@ -264,6 +275,10 @@ export default function LidcPage() {
           invites: [],
         });
         setHideInSquadronNotice(false);
+        setActiveSquadron(null);
+        setSquadronDetailsError('');
+        setAirframeUpdateError('');
+        setUpdatingAirframeId('');
         setPanelMode('home');
         return;
       }
@@ -292,6 +307,42 @@ export default function LidcPage() {
 
   useEffect(() => {
     setHideInSquadronNotice(false);
+  }, [user?.id, userLidcState?.squadron?.id]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadSquadronDetails() {
+      const squadronId = userLidcState?.squadron?.id;
+      if (!user?.id || !squadronId) {
+        if (!mounted) return;
+        setLoadingSquadronDetails(false);
+        setSquadronDetailsError('');
+        setActiveSquadron(null);
+        return;
+      }
+
+      setLoadingSquadronDetails(true);
+      setSquadronDetailsError('');
+
+      try {
+        const response = await api.getLidcSquadron(squadronId);
+        if (!mounted) return;
+        setActiveSquadron(response?.squadron || null);
+      } catch (error) {
+        if (!mounted) return;
+        setActiveSquadron(null);
+        setSquadronDetailsError(error.message || t('lidc.errors.squadronLoadFailed'));
+      } finally {
+        if (mounted) setLoadingSquadronDetails(false);
+      }
+    }
+
+    loadSquadronDetails();
+
+    return () => {
+      mounted = false;
+    };
   }, [user?.id, userLidcState?.squadron?.id]);
 
   function clearSidebarTimers() {
@@ -420,6 +471,13 @@ export default function LidcPage() {
     }, 0);
   }, [quantities]);
 
+  const effectiveTotalDeckUnits = useMemo(() => {
+    if (activeSquadron?.costSummary?.totalUnits != null) {
+      return Number(activeSquadron.costSummary.totalUnits) || 0;
+    }
+    return totalDeckUnits;
+  }, [activeSquadron, totalDeckUnits]);
+
   const validation = useMemo(() => {
     const infoValid = name.trim().length > 0 && baseId.trim().length > 0;
     const templateValid = Boolean(selectedTemplate);
@@ -444,20 +502,25 @@ export default function LidcPage() {
   const currentStepKey = WIZARD_STEPS[currentStep] || WIZARD_STEPS[0];
   const isLogged = Boolean(user?.id);
   const userHasSquadron = Boolean(userLidcState.hasSquadron);
+  const effectivePreviewBaseId = baseId
+    || activeSquadron?.baseId
+    || createdSquadron?.baseId
+    || userLidcState?.squadron?.baseId
+    || '';
   const previewBase = useMemo(
-    () => airports.find((entry) => entry.id === baseId) || null,
-    [baseId],
+    () => airports.find((entry) => entry.id === effectivePreviewBaseId) || null,
+    [effectivePreviewBaseId],
   );
 
   const previewIdentity = useMemo(() => {
-    const baseSquadron = createdSquadron || userLidcState.squadron || null;
+    const baseSquadron = activeSquadron || createdSquadron || userLidcState.squadron || null;
     return {
       name: name || baseSquadron?.name || t('lidc.preview.fallbackName'),
-      description: description || t('lidc.preview.fallbackDescription'),
+      description: description || baseSquadron?.description || t('lidc.preview.fallbackDescription'),
       baseLabel: previewBase?.displayName || previewBase?.name || baseSquadron?.baseId || '-',
-      templateName: selectedTemplate?.name || baseSquadron?.templateName || '-',
+      templateName: baseSquadron?.templateName || selectedTemplate?.name || '-',
     };
-  }, [createdSquadron, userLidcState.squadron, name, description, previewBase, selectedTemplate]);
+  }, [activeSquadron, createdSquadron, userLidcState.squadron, name, description, previewBase, selectedTemplate]);
 
   function resetWizardDraft() {
     setCurrentStep(0);
@@ -589,6 +652,7 @@ export default function LidcPage() {
       const response = await api.createLidcSquadron(payload);
       const created = response?.squadron || null;
       setCreatedSquadron(created);
+      setActiveSquadron(created);
 
       if (created) {
         setUserLidcState((prev) => ({
@@ -667,10 +731,6 @@ export default function LidcPage() {
     }
   }
 
-  const selectedInvitesPreview = useMemo(() => {
-    return selectedInviteIds.map((id) => inviteCandidates.find((entry) => entry.id === id)).filter(Boolean);
-  }, [selectedInviteIds, inviteCandidates]);
-
   const filteredInviteCandidates = useMemo(() => {
     const query = inviteSearchQuery.trim().toLowerCase();
     if (!query) return inviteCandidates;
@@ -683,7 +743,46 @@ export default function LidcPage() {
     });
   }, [inviteCandidates, inviteSearchQuery]);
 
+  const squadronMembers = useMemo(() => {
+    const list = Array.isArray(activeSquadron?.memberProfiles) ? activeSquadron.memberProfiles : [];
+    return [...list].sort((a, b) => formatUserLabel(a).localeCompare(formatUserLabel(b), 'en', { sensitivity: 'base' }));
+  }, [activeSquadron]);
+
+  const squadronAirframes = useMemo(() => {
+    const list = Array.isArray(activeSquadron?.airframes) ? activeSquadron.airframes : [];
+    return [...list].sort((a, b) => {
+      const categoryCompare = String(a?.category || '').localeCompare(String(b?.category || ''), 'en', { sensitivity: 'base' });
+      if (categoryCompare !== 0) return categoryCompare;
+      const labelCompare = String(a?.unitLabel || '').localeCompare(String(b?.unitLabel || ''), 'en', { sensitivity: 'base' });
+      if (labelCompare !== 0) return labelCompare;
+      return String(a?.boardNumber || '').localeCompare(String(b?.boardNumber || ''), 'en', { numeric: true, sensitivity: 'base' });
+    });
+  }, [activeSquadron]);
+
+  async function handleAssignAirframePilot(airframeId, nextPilotUserId) {
+    const squadronId = activeSquadron?.id || userLidcState?.squadron?.id || '';
+    if (!squadronId || !airframeId) return;
+
+    setAirframeUpdateError('');
+    setUpdatingAirframeId(airframeId);
+
+    try {
+      const response = await api.assignLidcAirframePilot(
+        squadronId,
+        airframeId,
+        nextPilotUserId || null,
+      );
+      setActiveSquadron(response?.squadron || null);
+    } catch (error) {
+      setAirframeUpdateError(error.message || t('lidc.errors.airframeAssignFailed'));
+    } finally {
+      setUpdatingAirframeId('');
+    }
+  }
+
   function renderOverviewView() {
+    const previewLogo = logoDataUrl || activeSquadron?.logoDataUrl || '';
+
     return (
       <div className="lidc-visual-grid">
         <article className="lidc-visual-card">
@@ -697,8 +796,8 @@ export default function LidcPage() {
         </article>
 
         <article className="lidc-visual-card lidc-visual-logo-card">
-          {logoDataUrl ? (
-            <img src={logoDataUrl} alt="Squadron logo" className="lidc-preview-logo" />
+          {previewLogo ? (
+            <img src={previewLogo} alt="Squadron logo" className="lidc-preview-logo" />
           ) : (
             <div className="lidc-preview-logo lidc-preview-logo-empty">{t('lidc.preview.logoPlaceholder')}</div>
           )}
@@ -708,6 +807,9 @@ export default function LidcPage() {
   }
 
   function renderCapsView() {
+    const capsSource = activeSquadron?.costSummary?.caps || capsByCategory;
+    const spentSource = activeSquadron?.costSummary?.spent || spentByCategory;
+
     return (
       <div className="lidc-visual-card">
         <h3>{t('lidc.preview.templateCaps')}</h3>
@@ -715,7 +817,7 @@ export default function LidcPage() {
           {CATEGORY_META.map(({ key, labelKey }) => (
             <div key={key} className="lidc-visual-row">
               <span>{t(labelKey)}</span>
-              <strong>{spentByCategory[key] || 0} / {capsByCategory[key] || 0}</strong>
+              <strong>{Number(spentSource[key] || 0)} / {Number(capsSource[key] || 0)}</strong>
             </div>
           ))}
         </div>
@@ -723,49 +825,115 @@ export default function LidcPage() {
     );
   }
 
-  function renderDeckView() {
+  function renderMemberManagementView() {
     return (
       <div className="lidc-visual-card">
-        <h3>{t('lidc.preview.deckSummary')}</h3>
-        <div className="lidc-visual-list">
-          {CATEGORY_META.map(({ key, labelKey }) => {
-            const entries = deckPayload[key] || [];
-            return (
-              <div key={key} className="lidc-visual-row lidc-visual-row-top">
-                <div>
-                  <span>{t(labelKey)}</span>
-                  <div className="lidc-mini-list">
-                    {entries.length === 0 && <div>{t('lidc.preview.emptyCategory')}</div>}
-                    {entries.map((entry) => {
-                      const unit = units.find((candidate) => candidate.id === entry.unitId);
-                      return <div key={`${key}-${entry.unitId}`}>{unit?.label || entry.unitId} x{entry.quantity}</div>;
-                    })}
+        <h3>{t('lidc.sidebar.memberManagement')}</h3>
+
+        {loadingSquadronDetails && (
+          <div className="lidc-loading">
+            <Loader2 size={14} className="spin" />
+            <span>{t('lidc.general.loading')}</span>
+          </div>
+        )}
+
+        {squadronDetailsError && <div className="lidc-inline-error">{squadronDetailsError}</div>}
+
+        {!loadingSquadronDetails && !squadronDetailsError && squadronMembers.length === 0 && (
+          <div className="lidc-muted-box">{t('lidc.members.empty')}</div>
+        )}
+
+        {!loadingSquadronDetails && !squadronDetailsError && squadronMembers.length > 0 && (
+          <div className="lidc-user-list">
+            {squadronMembers.map((member) => {
+              const label = formatUserLabel(member);
+              const role = String(member?.role || '').toLowerCase();
+              const roleLabel = role === 'owner' ? t('lidc.members.owner') : t('lidc.members.member');
+
+              return (
+                <article key={member.userId} className="lidc-user-item lidc-user-item-readonly">
+                  {member.avatarUrl ? (
+                    <img src={member.avatarUrl} alt={label} className="lidc-user-avatar" />
+                  ) : (
+                    <div className="lidc-user-avatar lidc-user-avatar-fallback">{label.slice(0, 1).toUpperCase()}</div>
+                  )}
+
+                  <div className="lidc-user-meta">
+                    <div className="lidc-user-name">{label}</div>
+                    <div className="lidc-user-sub">{member.username ? `@${member.username}` : '-'}</div>
                   </div>
-                </div>
-                <strong>{spentByCategory[key] || 0}</strong>
-              </div>
-            );
-          })}
-        </div>
+
+                  <span className="lidc-user-tag">{roleLabel}</span>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   }
 
-  function renderInvitesView() {
+  function renderAircraftManagementView() {
     return (
       <div className="lidc-visual-card">
-        <h3>{t('lidc.preview.invites')}</h3>
-        {selectedInvitesPreview.length === 0 ? (
-          <div className="lidc-muted-box">{t('lidc.preview.noInvites')}</div>
-        ) : (
-          <div className="lidc-preview-chip-list">
-            {selectedInvitesPreview.map((entry) => {
-              const label = entry.globalName || entry.username || entry.id;
+        <h3>{t('lidc.sidebar.aircraftManagement')}</h3>
+
+        {loadingSquadronDetails && (
+          <div className="lidc-loading">
+            <Loader2 size={14} className="spin" />
+            <span>{t('lidc.general.loading')}</span>
+          </div>
+        )}
+
+        {squadronDetailsError && <div className="lidc-inline-error">{squadronDetailsError}</div>}
+        {airframeUpdateError && <div className="lidc-inline-error">{airframeUpdateError}</div>}
+
+        {!loadingSquadronDetails && !squadronDetailsError && squadronAirframes.length === 0 && (
+          <div className="lidc-muted-box">{t('lidc.airframes.empty')}</div>
+        )}
+
+        {!loadingSquadronDetails && !squadronDetailsError && squadronAirframes.length > 0 && (
+          <div className="lidc-airframe-list">
+            {squadronAirframes.map((airframe) => {
+              const assignedPilotUserId = String(airframe?.assignedPilotUserId || '');
+              const isUpdating = updatingAirframeId === airframe.id;
+              const categoryKey = String(airframe?.category || '');
+              const categoryPath = `lidc.deck.categories.${categoryKey}`;
+              const categoryLabelRaw = t(categoryPath);
+              const categoryLabel = categoryLabelRaw === categoryPath ? (categoryKey || '-') : categoryLabelRaw;
+
               return (
-                <span key={entry.id} className="lidc-chip">
-                  <UserPlus size={12} />
-                  {label}
-                </span>
+                <article key={airframe.id} className="lidc-airframe-item">
+                  <div className="lidc-airframe-main">
+                    <div className="lidc-airframe-topline">
+                      <strong>{airframe.unitLabel || airframe.unitId}</strong>
+                      <span className="lidc-user-tag">{airframe.boardNumber}</span>
+                    </div>
+                    <div className="lidc-user-sub">{categoryLabel}</div>
+                  </div>
+
+                  <label className="lidc-field lidc-airframe-assign">
+                    <span>{t('lidc.airframes.assignedPilot')}</span>
+                    <select
+                      value={assignedPilotUserId}
+                      disabled={isUpdating || squadronMembers.length === 0}
+                      onChange={(event) => handleAssignAirframePilot(airframe.id, event.target.value)}
+                    >
+                      <option value="">{t('lidc.airframes.unassigned')}</option>
+                      {squadronMembers.map((member) => (
+                        <option key={member.userId} value={member.userId}>
+                          {formatUserLabel(member)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {isUpdating && (
+                    <div className="lidc-airframe-updating">
+                      <Loader2 size={12} className="spin" />
+                    </div>
+                  )}
+                </article>
               );
             })}
           </div>
@@ -775,8 +943,8 @@ export default function LidcPage() {
   }
 
   function renderVisualization() {
-    if (activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS) return renderInvitesView();
-    if (activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS) return renderDeckView();
+    if (activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS) return renderMemberManagementView();
+    if (activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS) return renderAircraftManagementView();
 
     return (
       <div className="lidc-squadron-view-stack">
@@ -1075,7 +1243,7 @@ export default function LidcPage() {
             </div>
             <div className="lidc-summary-row">
               <span>{t('lidc.deck.totalUnits')}</span>
-              <strong>{totalDeckUnits}</strong>
+              <strong>{effectiveTotalDeckUnits}</strong>
             </div>
           </div>
         </aside>

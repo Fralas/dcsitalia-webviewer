@@ -7,6 +7,9 @@ const TEMPLATES_FILE = path.join(DATA_DIR, 'templates.json');
 const SQUADRONS_FILE = path.join(DATA_DIR, 'squadrons.json');
 const DISCORD_USERS_FILE = path.join(DATA_DIR, 'discord-users.json');
 const MAX_LOGO_DATA_URL_LENGTH = 12_000_000;
+const BOARD_NUMBER_PATTERN = /^\d{3}[A-Z]{2}$/;
+const BOARD_NUMBER_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const BOARD_NUMBER_MAX_ATTEMPTS = 20_000;
 
 export const DECK_CATEGORIES = Object.freeze([
   'aircrafts',
@@ -382,6 +385,239 @@ function normalizeInvites(rawInvites) {
   }));
 }
 
+function normalizeBoardNumber(value) {
+  const normalized = sanitizeText(value, 32).toUpperCase().replace(/[^0-9A-Z]/g, '');
+  return BOARD_NUMBER_PATTERN.test(normalized) ? normalized : '';
+}
+
+function generateBoardNumber(taken) {
+  for (let attempt = 0; attempt < BOARD_NUMBER_MAX_ATTEMPTS; attempt += 1) {
+    const digits = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+    const firstLetter = BOARD_NUMBER_LETTERS[Math.floor(Math.random() * BOARD_NUMBER_LETTERS.length)];
+    const secondLetter = BOARD_NUMBER_LETTERS[Math.floor(Math.random() * BOARD_NUMBER_LETTERS.length)];
+    const boardNumber = `${digits}${firstLetter}${secondLetter}`;
+
+    if (!taken.has(boardNumber)) {
+      taken.add(boardNumber);
+      return boardNumber;
+    }
+  }
+
+  throw new Error('Unable to generate unique board number');
+}
+
+function buildSquadronMemberUserIdSet(squadron) {
+  const memberIds = new Set();
+
+  const createdById = sanitizeText(squadron?.createdBy?.id, 80);
+  if (createdById) {
+    memberIds.add(createdById);
+  }
+
+  const members = Array.isArray(squadron?.members) ? squadron.members : [];
+  members.forEach((entry) => {
+    const userId = sanitizeText(entry?.userId, 80);
+    if (userId) {
+      memberIds.add(userId);
+    }
+  });
+
+  return memberIds;
+}
+
+function toAirframeSortKey(unit) {
+  return `${sanitizeText(unit?.category, 40)}::${sanitizeText(unit?.label, 120)}::${sanitizeText(unit?.id, 80)}`;
+}
+
+function sanitizeAirframeAssignmentUserId(rawUserId, memberUserIds) {
+  const userId = sanitizeText(rawUserId, 80);
+  if (!userId) return null;
+  return memberUserIds.has(userId) ? userId : null;
+}
+
+function createAirframe(unit, memberUserIds, takenBoardNumbers, deckIndex = 0) {
+  return {
+    id: `airframe_${unit.id}_${deckIndex + 1}_${crypto.randomBytes(3).toString('hex')}`,
+    unitId: unit.id,
+    unitLabel: unit.label,
+    category: unit.category,
+    cost: normalizeCap(unit.cost),
+    boardNumber: generateBoardNumber(takenBoardNumbers),
+    assignedPilotUserId: sanitizeAirframeAssignmentUserId(null, memberUserIds),
+    createdAt: Date.now(),
+  };
+}
+
+function normalizeAirframeRecord(rawAirframe, unit, memberUserIds, takenBoardNumbers, deckIndex = 0) {
+  const id = sanitizeText(rawAirframe?.id, 160) || `airframe_${unit.id}_${deckIndex + 1}_${crypto.randomBytes(3).toString('hex')}`;
+
+  let boardNumber = normalizeBoardNumber(rawAirframe?.boardNumber);
+  if (!boardNumber || takenBoardNumbers.has(boardNumber)) {
+    boardNumber = generateBoardNumber(takenBoardNumbers);
+  } else {
+    takenBoardNumbers.add(boardNumber);
+  }
+
+  return {
+    id,
+    unitId: unit.id,
+    unitLabel: sanitizeText(rawAirframe?.unitLabel, 120) || unit.label,
+    category: unit.category,
+    cost: normalizeCap(rawAirframe?.cost) || normalizeCap(unit.cost),
+    boardNumber,
+    assignedPilotUserId: sanitizeAirframeAssignmentUserId(rawAirframe?.assignedPilotUserId, memberUserIds),
+    createdAt: Number.isFinite(rawAirframe?.createdAt) ? rawAirframe.createdAt : Date.now(),
+  };
+}
+
+function buildDeckEntriesExpanded(deck, unitsById) {
+  const expanded = [];
+
+  DECK_CATEGORIES.forEach((category) => {
+    const entries = Array.isArray(deck?.[category]) ? deck[category] : [];
+    entries.forEach((entry) => {
+      const unitId = sanitizeText(entry?.unitId, 80);
+      const quantity = normalizeQuantity(entry?.quantity);
+      const unit = unitsById.get(unitId);
+      if (!unit || quantity <= 0) return;
+
+      for (let index = 0; index < quantity; index += 1) {
+        expanded.push({ unit, deckIndex: index });
+      }
+    });
+  });
+
+  expanded.sort((a, b) => toAirframeSortKey(a.unit).localeCompare(toAirframeSortKey(b.unit), 'en', { numeric: true }));
+  return expanded;
+}
+
+function syncSquadronAirframesInMemory(squadron, unitsById) {
+  const memberUserIds = buildSquadronMemberUserIdSet(squadron);
+  const expandedEntries = buildDeckEntriesExpanded(squadron?.deck, unitsById);
+  const currentAirframes = Array.isArray(squadron?.airframes) ? squadron.airframes : [];
+
+  const bucketsByUnitId = new Map();
+  currentAirframes.forEach((airframe) => {
+    const unitId = sanitizeText(airframe?.unitId, 80);
+    if (!unitId) return;
+    if (!bucketsByUnitId.has(unitId)) {
+      bucketsByUnitId.set(unitId, []);
+    }
+    bucketsByUnitId.get(unitId).push(airframe);
+  });
+
+  const takenBoardNumbers = new Set();
+  const nextAirframes = expandedEntries.map(({ unit, deckIndex }) => {
+    const bucket = bucketsByUnitId.get(unit.id) || [];
+    const reusable = bucket.shift();
+    if (!reusable) {
+      return createAirframe(unit, memberUserIds, takenBoardNumbers, deckIndex);
+    }
+
+    return normalizeAirframeRecord(reusable, unit, memberUserIds, takenBoardNumbers, deckIndex);
+  });
+
+  const hadAirframes = Array.isArray(squadron?.airframes);
+  const changed = !hadAirframes
+    || nextAirframes.length !== currentAirframes.length
+    || nextAirframes.some((airframe, index) => {
+      const previous = currentAirframes[index];
+      if (!previous) return true;
+      return (
+        sanitizeText(previous?.id, 160) !== sanitizeText(airframe.id, 160)
+        || sanitizeText(previous?.unitId, 80) !== sanitizeText(airframe.unitId, 80)
+        || sanitizeText(previous?.unitLabel, 120) !== sanitizeText(airframe.unitLabel, 120)
+        || sanitizeText(previous?.category, 40) !== sanitizeText(airframe.category, 40)
+        || normalizeCap(previous?.cost) !== normalizeCap(airframe.cost)
+        || sanitizeText(previous?.boardNumber, 16).toUpperCase() !== airframe.boardNumber
+        || sanitizeText(previous?.assignedPilotUserId, 80) !== sanitizeText(airframe.assignedPilotUserId, 80)
+      );
+    });
+
+  squadron.airframes = nextAirframes;
+  return changed;
+}
+
+function ensureSquadronAirframesPersistedById(squadronId) {
+  const targetId = sanitizeText(squadronId, 120);
+  if (!targetId) return null;
+
+  const squadrons = readSquadrons();
+  const index = squadrons.findIndex((entry) => sanitizeText(entry?.id, 120) === targetId);
+  if (index < 0) return null;
+
+  const templatesState = readTemplatesState();
+  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+
+  const squadron = { ...squadrons[index] };
+  const changed = syncSquadronAirframesInMemory(squadron, unitsById);
+
+  if (changed) {
+    squadrons[index] = squadron;
+    writeSquadrons(squadrons);
+  }
+
+  return squadron;
+}
+
+function listSquadronMembersForDisplay(squadron) {
+  const users = getDiscordUsers();
+  const usersById = new Map(users.map((entry) => [sanitizeText(entry?.id, 80), entry]));
+  const memberIds = buildSquadronMemberUserIdSet(squadron);
+  const ownerId = sanitizeText(squadron?.createdBy?.id, 80);
+  const members = Array.isArray(squadron?.members) ? squadron.members : [];
+  const roleByUserId = new Map();
+
+  members.forEach((member) => {
+    const userId = sanitizeText(member?.userId, 80);
+    if (!userId) return;
+    const role = sanitizeText(member?.role, 80) || (userId === ownerId ? 'owner' : 'member');
+    roleByUserId.set(userId, role);
+  });
+
+  if (ownerId && !roleByUserId.has(ownerId)) {
+    roleByUserId.set(ownerId, 'owner');
+  }
+
+  return Array.from(memberIds.values())
+    .map((userId) => {
+      const fromHistory = usersById.get(userId) || null;
+      const isOwner = userId === ownerId;
+      const createdBy = sanitizeText(squadron?.createdBy?.id, 80) === userId ? squadron.createdBy : null;
+
+      const globalName = sanitizeText(
+        fromHistory?.globalName
+        || createdBy?.globalName
+        || fromHistory?.username
+        || createdBy?.username
+        || userId,
+        140,
+      );
+      const username = sanitizeText(fromHistory?.username || createdBy?.username, 140);
+      const avatar = sanitizeText(fromHistory?.avatar || createdBy?.avatar, 200);
+      const lastSeenAt = Number.isFinite(fromHistory?.lastSeenAt) ? fromHistory.lastSeenAt : null;
+
+      return {
+        userId,
+        role: roleByUserId.get(userId) || (isOwner ? 'owner' : 'member'),
+        globalName,
+        username,
+        avatar,
+        avatarUrl: buildAvatarUrl(userId, avatar),
+        lastSeenAt,
+      };
+    })
+    .sort((a, b) => {
+      if (a.role === 'owner' && b.role !== 'owner') return -1;
+      if (a.role !== 'owner' && b.role === 'owner') return 1;
+      return String(a.globalName || a.username || a.userId).localeCompare(
+        String(b.globalName || b.username || b.userId),
+        'en',
+        { sensitivity: 'base', numeric: true },
+      );
+    });
+}
+
 export function getTemplatesCatalog() {
   ensureStorage();
   return readTemplatesState();
@@ -488,6 +724,7 @@ export function createSquadron(payload, sessionUser) {
   }
 
   const invites = normalizeInvites(payload?.invites);
+  const createdAt = Date.now();
 
   const squadron = {
     id: `lidc_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
@@ -503,11 +740,11 @@ export function createSquadron(payload, sessionUser) {
       {
         userId,
         role: 'owner',
-        joinedAt: Date.now(),
+        joinedAt: createdAt,
       },
     ],
     costSummary,
-    createdAt: Date.now(),
+    createdAt,
     createdBy: {
       id: userId,
       globalName: sanitizeText(sessionUser?.globalName, 140),
@@ -516,6 +753,7 @@ export function createSquadron(payload, sessionUser) {
       avatarUrl: buildAvatarUrl(userId, sanitizeText(sessionUser?.avatar, 200)),
     },
   };
+  syncSquadronAirframesInMemory(squadron, unitsById);
 
   const squadrons = readSquadrons();
   squadrons.push(squadron);
@@ -529,8 +767,78 @@ export function getSquadronById(squadronId) {
   const targetId = sanitizeText(squadronId, 120);
   if (!targetId) return null;
 
+  const squadron = ensureSquadronAirframesPersistedById(targetId);
+  if (!squadron) return null;
+
+  return {
+    ...squadron,
+    memberProfiles: listSquadronMembersForDisplay(squadron),
+  };
+}
+
+export function updateAirframeAssignment({ squadronId, airframeId, pilotUserId, actorUserId }) {
+  ensureStorage();
+
+  const normalizedSquadronId = sanitizeText(squadronId, 120);
+  const normalizedAirframeId = sanitizeText(airframeId, 160);
+  const normalizedActorUserId = sanitizeText(actorUserId, 80);
+  const normalizedPilotUserId = sanitizeText(pilotUserId, 80);
+
+  if (!normalizedSquadronId || !normalizedAirframeId) {
+    throw new Error('squadronId and airframeId are required');
+  }
+  if (!normalizedActorUserId) {
+    throw new Error('Authentication required');
+  }
+
   const squadrons = readSquadrons();
-  return squadrons.find((entry) => sanitizeText(entry?.id, 120) === targetId) || null;
+  const squadronIndex = squadrons.findIndex((entry) => sanitizeText(entry?.id, 120) === normalizedSquadronId);
+  if (squadronIndex < 0) {
+    throw new Error('Squadron not found');
+  }
+
+  const squadron = { ...squadrons[squadronIndex] };
+  if (!isUserMemberOfSquadron(squadron, normalizedActorUserId)) {
+    throw new Error('Only squadron members can manage airframe assignments');
+  }
+
+  const templatesState = readTemplatesState();
+  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+  syncSquadronAirframesInMemory(squadron, unitsById);
+
+  const airframes = Array.isArray(squadron.airframes) ? squadron.airframes : [];
+  const airframeIndex = airframes.findIndex((entry) => sanitizeText(entry?.id, 160) === normalizedAirframeId);
+  if (airframeIndex < 0) {
+    throw new Error('Airframe not found');
+  }
+
+  const memberUserIds = buildSquadronMemberUserIdSet(squadron);
+  let nextPilotUserId = null;
+
+  if (normalizedPilotUserId) {
+    if (!memberUserIds.has(normalizedPilotUserId)) {
+      throw new Error('Pilot must be a squadron member');
+    }
+    nextPilotUserId = normalizedPilotUserId;
+  }
+
+  airframes[airframeIndex] = {
+    ...airframes[airframeIndex],
+    assignedPilotUserId: nextPilotUserId,
+    updatedAt: Date.now(),
+  };
+  squadron.airframes = airframes;
+
+  squadrons[squadronIndex] = squadron;
+  writeSquadrons(squadrons);
+
+  return {
+    squadron: {
+      ...squadron,
+      memberProfiles: listSquadronMembersForDisplay(squadron),
+    },
+    airframe: squadron.airframes[airframeIndex],
+  };
 }
 
 function isUserMemberOfSquadron(squadron, userId) {
@@ -638,6 +946,7 @@ export default {
   getDiscordUsers,
   createSquadron,
   getSquadronById,
+  updateAirframeAssignment,
   getUserPrimarySquadron,
   getPendingInvitesForUser,
   getUserLidcState,
