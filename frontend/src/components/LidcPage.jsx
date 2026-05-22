@@ -959,6 +959,30 @@ export default function LidcPage() {
     });
   }, [squadronAirframes, squadronMembersById, activeSquadron?.baseId, userLidcState?.squadron?.baseId]);
 
+  const memberRows = useMemo(() => {
+    return squadronMembers.map((member) => {
+      const memberId = String(member?.userId || '');
+      const role = String(member?.role || 'member').toLowerCase();
+      const roleLabel = role === 'owner'
+        ? t('lidc.members.owner')
+        : (role === 'admin' ? 'Admin' : t('lidc.members.member'));
+      const displayName = formatUserLabel(member);
+      const assignedAircraftCount = airframeRows.reduce((total, row) => (
+        String(row?.pilotUserId || '') === memberId ? total + 1 : total
+      ), 0);
+
+      return {
+        memberId,
+        displayName,
+        role,
+        roleLabel,
+        avatarUrl: String(member?.avatarUrl || ''),
+        avatarFallback: getUserInitial(member),
+        assignedAircraftCount,
+      };
+    });
+  }, [squadronMembers, airframeRows]);
+
   const selectedAirframeRow = useMemo(() => {
     const selectedId = String(selectedAirframeDraft?.id || '');
     if (!selectedId) return null;
@@ -1128,56 +1152,75 @@ export default function LidcPage() {
           <div className="lidc-muted-box">{t('lidc.members.empty')}</div>
         )}
 
-        {!loadingSquadronDetails && !squadronDetailsError && squadronMembers.length > 0 && (
-          <div className="lidc-member-cards">
-            {squadronMembers.map((member) => {
-              const memberId = String(member?.userId || '');
-              const label = formatUserLabel(member);
-              const role = String(member?.role || '').toLowerCase();
-              const roleLabel = role === 'owner' ? t('lidc.members.owner') : t('lidc.members.member');
-              const identityLabel = member.username ? `@${member.username}` : String(member.userId || '-');
-              const avatarFallback = label.slice(0, 1).toUpperCase();
-              const assignedAircraftCount = airframeRows.reduce((total, row) => (
-                String(row?.pilotUserId || '') === memberId ? total + 1 : total
-              ), 0);
-
-              return (
-                <article key={memberId} className="lidc-member-profile-card">
-                  <div className="lidc-member-profile-content">
-                    <div className="lidc-member-profile-avatar-wrap">
-                      {member.avatarUrl ? (
-                        <img src={member.avatarUrl} alt={label} className="lidc-member-profile-avatar" />
-                      ) : (
-                        <div className="lidc-member-profile-avatar lidc-member-profile-avatar-fallback">{avatarFallback}</div>
-                      )}
-                    </div>
-
-                    <div className="lidc-member-profile-title-row">
-                      <h4>{label}</h4>
-                      <span className="lidc-member-profile-status-dot" aria-hidden="true" />
-                    </div>
-
-                    <div className="lidc-member-profile-stats">
-                      <div className="lidc-member-profile-stat">
-                        <strong>{assignedAircraftCount}</strong>
-                        <span className="lidc-member-profile-stat-icon" title="Aerei assegnati" aria-label="Aerei assegnati">
-                          <Plane size={14} />
-                        </span>
+        {!loadingSquadronDetails && !squadronDetailsError && memberRows.length > 0 && (
+          <div className="lidc-airframe-table-wrap">
+            <table className="lidc-airframe-table">
+              <thead>
+                <tr>
+                  <th>Immagine profilo</th>
+                  <th>Nome</th>
+                  <th>Aerei assegnati</th>
+                  <th>Ruolo</th>
+                  <th>Azioni</th>
+                </tr>
+              </thead>
+              <tbody>
+                {memberRows.map((member) => (
+                  <tr key={member.memberId}>
+                    <td>
+                      <div className="lidc-member-avatar-cell">
+                        {member.avatarUrl ? (
+                          <img src={member.avatarUrl} alt={member.displayName} className="lidc-member-table-avatar" />
+                        ) : (
+                          <span className="lidc-member-table-avatar lidc-member-table-avatar-fallback">{member.avatarFallback}</span>
+                        )}
                       </div>
-                    </div>
-
-                    <button type="button" className="lidc-member-profile-btn" aria-label="Remove">
-                      X
-                    </button>
-
-                    <div className="lidc-member-profile-foot">
-                      <span>{identityLabel}</span>
-                      <span className={`lidc-member-role-chip ${role === 'owner' ? 'is-owner' : ''}`}>{roleLabel}</span>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
+                    </td>
+                    <td>
+                      <div className="lidc-airframe-cell-main">
+                        <strong>{member.displayName}</strong>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="lidc-member-assigned-count">
+                        <Plane size={13} />
+                        <strong>{member.assignedAircraftCount}</strong>
+                      </span>
+                    </td>
+                    <td>
+                      <span className="lidc-status-pill">
+                        {member.roleLabel}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="lidc-member-actions">
+                        <button
+                          type="button"
+                          className="lidc-status-pill lidc-member-action-pill is-grounded"
+                          disabled={member.role === 'owner' || member.role === 'admin'}
+                        >
+                          Promuovi ad amministratore
+                        </button>
+                        <button
+                          type="button"
+                          className="lidc-status-pill lidc-member-action-pill is-destroyed"
+                          disabled={member.role === 'owner'}
+                        >
+                          Rimuovi dal gruppo
+                        </button>
+                        <button
+                          type="button"
+                          className="lidc-status-pill lidc-member-action-pill is-airborne"
+                          disabled={member.role === 'owner' || member.role !== 'admin'}
+                        >
+                          Degrada a membro
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
