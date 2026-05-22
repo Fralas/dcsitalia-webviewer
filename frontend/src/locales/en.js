@@ -425,7 +425,28 @@ export default {
     airframes: {
       empty: 'No purchased airframes found in this deck.',
       assignedPilot: 'Assigned pilot',
-      unassigned: 'Unassigned'
+      unassigned: 'Unassigned',
+      rowHint: 'Click a row to edit details and open movement/takeoff logs (mock for now).',
+      editorTitle: 'Airframe details',
+      editorHint: 'Model, base, board number, and status are read-only (mock). Only pilot assignment is editable.',
+      logsTitle: 'Operational logs',
+      logsMockBadge: 'MOCK DATA',
+      save: 'Save airframe',
+      columns: {
+        model: 'Model',
+        pilot: 'Pilot',
+        base: 'Base',
+        boardNumber: 'Board Number',
+        status: 'Status'
+      },
+      statusOptions: {
+        airborne: 'In air',
+        grounded: 'On ground',
+        destroyed: 'Destroyed'
+      },
+      validation: {
+        pilotMustBeMember: 'Pilot must be a squadron member.'
+      }
     },
     review: {
       createButton: 'Create Squadron',

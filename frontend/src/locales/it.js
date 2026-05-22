@@ -425,7 +425,28 @@ export default {
     airframes: {
       empty: 'Nessun velivolo acquistato nel deck.',
       assignedPilot: 'Pilota assegnato',
-      unassigned: 'Non assegnato'
+      unassigned: 'Non assegnato',
+      rowHint: 'Clicca una riga per modificare dati e aprire i log operativi (mock).',
+      editorTitle: 'Dettaglio velivolo',
+      editorHint: 'Modello, base, board number e status sono in sola lettura (mock). Puoi assegnare solo il pilota.',
+      logsTitle: 'Log operativi',
+      logsMockBadge: 'MOCK DATA',
+      save: 'Salva velivolo',
+      columns: {
+        model: 'Modello',
+        pilot: 'Pilota',
+        base: 'Base',
+        boardNumber: 'Board Number',
+        status: 'Status'
+      },
+      statusOptions: {
+        airborne: 'In aria',
+        grounded: 'A terra',
+        destroyed: 'Distrutto'
+      },
+      validation: {
+        pilotMustBeMember: 'Il pilota deve essere un membro dello squadrone.'
+      }
     },
     review: {
       createButton: 'Crea Squadrone',

@@ -88,8 +88,7 @@
         "cost": 85,
         "boardNumber": "134TF",
         "assignedPilotUserId": "675706661570347041",
-        "createdAt": 1779441392062,
-        "updatedAt": 1779441601561
+        "createdAt": 1779441392062
       },
       {
         "id": "airframe_a10c2_2_87d896",
@@ -98,8 +97,9 @@
         "category": "aircrafts",
         "cost": 85,
         "boardNumber": "889EY",
-        "assignedPilotUserId": null,
-        "createdAt": 1779441392062
+        "assignedPilotUserId": "675706661570347041",
+        "createdAt": 1779441392062,
+        "updatedAt": 1779442609249
       },
       {
         "id": "airframe_farp-team_1_f7814d",
