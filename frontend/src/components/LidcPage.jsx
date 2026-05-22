@@ -1,18 +1,25 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
   Coins,
   Check,
   ChevronLeft,
+  ChevronDown,
   ChevronRight,
   Disc3,
+  List,
   Loader2,
   LogIn,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plane,
   Save,
   Settings,
   Upload,
+  Users,
   UserPlus,
+  X,
 } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import airports from '../config/airports';
@@ -29,12 +36,11 @@ const CATEGORY_META = [
   { key: 'groundAssets', labelKey: 'lidc.deck.categories.groundAssets' },
 ];
 
-const VIEW_SECTIONS = [
-  { key: 'overview', labelKey: 'lidc.views.overview' },
-  { key: 'caps', labelKey: 'lidc.views.caps' },
-  { key: 'deck', labelKey: 'lidc.views.deck' },
-  { key: 'invites', labelKey: 'lidc.views.invites' },
-];
+const LIDC_SIDEBAR_VIEWS = Object.freeze({
+  SQUADRON_LIST: 'squadronList',
+  SQUADRON_MEMBERS: 'squadronMembers',
+  SQUADRON_AIRCRAFTS: 'squadronAircrafts',
+});
 
 function createEmptyCategoryMap() {
   return {
@@ -94,7 +100,16 @@ export default function LidcPage() {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [catalogError, setCatalogError] = useState('');
 
-  const [activeView, setActiveView] = useState('overview');
+  const [activeView, setActiveView] = useState(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
+  const [isSquadronManagementOpen, setIsSquadronManagementOpen] = useState(true);
+  const [isSidebarPinned, setIsSidebarPinned] = useState(false);
+  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
+  const [isNarrowLayout, setIsNarrowLayout] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth <= 1120;
+  });
+  const sidebarOpenTimerRef = useRef(null);
+  const sidebarCloseTimerRef = useRef(null);
   const [panelMode, setPanelMode] = useState('home');
   const [isWizardOpen, setIsWizardOpen] = useState(false);
 
@@ -119,11 +134,27 @@ export default function LidcPage() {
     squadron: null,
     invites: [],
   });
+  const [hideInSquadronNotice, setHideInSquadronNotice] = useState(false);
 
   const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false);
   const [templateEditorRaw, setTemplateEditorRaw] = useState('');
   const [templateEditorError, setTemplateEditorError] = useState('');
   const [templateEditorSaving, setTemplateEditorSaving] = useState(false);
+
+  function applyUserLidcState(response) {
+    const nextState = {
+      hasSquadron: Boolean(response?.hasSquadron),
+      squadron: response?.squadron || null,
+      invites: Array.isArray(response?.invites) ? response.invites : [],
+    };
+
+    setUserLidcState(nextState);
+    if (!nextState.hasSquadron) {
+      setPanelMode('home');
+    }
+
+    return nextState;
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -232,6 +263,7 @@ export default function LidcPage() {
           squadron: null,
           invites: [],
         });
+        setHideInSquadronNotice(false);
         setPanelMode('home');
         return;
       }
@@ -242,17 +274,7 @@ export default function LidcPage() {
       try {
         const response = await api.getLidcMe();
         if (!mounted) return;
-
-        const nextState = {
-          hasSquadron: Boolean(response?.hasSquadron),
-          squadron: response?.squadron || null,
-          invites: Array.isArray(response?.invites) ? response.invites : [],
-        };
-
-        setUserLidcState(nextState);
-        if (!nextState.hasSquadron) {
-          setPanelMode('home');
-        }
+        applyUserLidcState(response);
       } catch (error) {
         if (!mounted) return;
         setUserStateError(error.message || t('lidc.errors.userStateFailed'));
@@ -267,6 +289,81 @@ export default function LidcPage() {
       mounted = false;
     };
   }, [user]);
+
+  useEffect(() => {
+    setHideInSquadronNotice(false);
+  }, [user?.id, userLidcState?.squadron?.id]);
+
+  function clearSidebarTimers() {
+    if (sidebarOpenTimerRef.current) {
+      clearTimeout(sidebarOpenTimerRef.current);
+      sidebarOpenTimerRef.current = null;
+    }
+    if (sidebarCloseTimerRef.current) {
+      clearTimeout(sidebarCloseTimerRef.current);
+      sidebarCloseTimerRef.current = null;
+    }
+  }
+
+  function handleSidebarMouseEnter() {
+    if (isNarrowLayout || isSidebarPinned) return;
+
+    if (sidebarCloseTimerRef.current) {
+      clearTimeout(sidebarCloseTimerRef.current);
+      sidebarCloseTimerRef.current = null;
+    }
+
+    if (isSidebarHovered || sidebarOpenTimerRef.current) return;
+
+    sidebarOpenTimerRef.current = setTimeout(() => {
+      setIsSidebarHovered(true);
+      sidebarOpenTimerRef.current = null;
+    }, 50);
+  }
+
+  function handleSidebarMouseLeave() {
+    if (isNarrowLayout || isSidebarPinned) return;
+
+    if (sidebarOpenTimerRef.current) {
+      clearTimeout(sidebarOpenTimerRef.current);
+      sidebarOpenTimerRef.current = null;
+    }
+
+    if (sidebarCloseTimerRef.current) return;
+
+    sidebarCloseTimerRef.current = setTimeout(() => {
+      setIsSidebarHovered(false);
+      sidebarCloseTimerRef.current = null;
+    }, 170);
+  }
+
+  useEffect(() => {
+    if (isNarrowLayout || isSidebarPinned) {
+      clearSidebarTimers();
+      setIsSidebarHovered(false);
+    }
+  }, [isNarrowLayout, isSidebarPinned]);
+
+  useEffect(() => {
+    return () => {
+      clearSidebarTimers();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const handleResize = () => {
+      setIsNarrowLayout(window.innerWidth <= 1120);
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   const selectedTemplate = useMemo(
     () => templates.find((entry) => entry.id === templateId) || null,
@@ -508,8 +605,24 @@ export default function LidcPage() {
       }
 
       closeWizard();
-      setActiveView('overview');
+      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
     } catch (error) {
+      if (Number(error?.status) === 409) {
+        try {
+          const stateResponse = await api.getLidcMe();
+          const nextState = applyUserLidcState(stateResponse);
+          if (nextState.hasSquadron) {
+            setHideInSquadronNotice(false);
+            setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
+            setPanelMode('home');
+            closeWizard();
+            return;
+          }
+        } catch (_) {
+          // Fall back to default error rendering.
+        }
+      }
+
       setSubmitError(error.message || t('lidc.errors.createFailed'));
     } finally {
       setSubmitting(false);
@@ -662,10 +775,15 @@ export default function LidcPage() {
   }
 
   function renderVisualization() {
-    if (activeView === 'caps') return renderCapsView();
-    if (activeView === 'deck') return renderDeckView();
-    if (activeView === 'invites') return renderInvitesView();
-    return renderOverviewView();
+    if (activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS) return renderInvitesView();
+    if (activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS) return renderDeckView();
+
+    return (
+      <div className="lidc-squadron-view-stack">
+        {renderOverviewView()}
+        {renderCapsView()}
+      </div>
+    );
   }
 
   function renderCenterStage() {
@@ -716,6 +834,15 @@ export default function LidcPage() {
       const squadronName = createdSquadron?.name || userLidcState?.squadron?.name || '-';
       return (
         <div className="lidc-center-card">
+          <button
+            type="button"
+            className="lidc-center-dismiss-btn"
+            onClick={() => setHideInSquadronNotice(true)}
+            aria-label={t('lidc.wizard.close')}
+            title={t('lidc.wizard.close')}
+          >
+            <X size={14} />
+          </button>
           <div className="lidc-center-head">
             <h2>{t('lidc.center.inSquadronTitle')}</h2>
             <p>{t('lidc.center.inSquadronHint', { name: squadronName })}</p>
@@ -817,32 +944,125 @@ export default function LidcPage() {
   }
 
   const wizardPortalTarget = typeof document !== 'undefined' ? document.body : null;
+  const showInlineCenterStage = !isWizardOpen
+    && !isEntryWizardVisible
+    && !(userHasSquadron && hideInSquadronNotice);
+  const isSidebarExpanded = isNarrowLayout || isSidebarPinned || isSidebarHovered;
 
   return (
     <div className="lidc-page">
-      <div className="lidc-layout">
-        <aside className="lidc-sidebar">
+      <div className={`lidc-layout ${isSidebarExpanded ? 'is-sidebar-expanded' : 'is-sidebar-collapsed'}`}>
+        <aside
+          className={`lidc-sidebar ${isSidebarExpanded ? 'is-expanded' : 'is-collapsed'}`}
+          onMouseEnter={handleSidebarMouseEnter}
+          onMouseLeave={handleSidebarMouseLeave}
+          onFocusCapture={() => setIsSidebarHovered(true)}
+          onBlurCapture={(event) => {
+            const nextTarget = event.relatedTarget;
+            if (!event.currentTarget.contains(nextTarget)) {
+              handleSidebarMouseLeave();
+            }
+          }}
+        >
+          <button
+            type="button"
+            className="lidc-sidebar-pin"
+            onClick={() => setIsSidebarPinned((prev) => !prev)}
+            aria-label={isSidebarPinned ? 'Collapse sidebar' : 'Pin sidebar'}
+            title={isSidebarPinned ? 'Collapse sidebar' : 'Pin sidebar'}
+          >
+            {isSidebarPinned ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
+          </button>
+
           <div className="lidc-sidebar-header">
             <div className="lidc-eyebrow">LIDC</div>
             <h1>{t('lidc.title')}</h1>
             <p>{t('lidc.subtitle')}</p>
           </div>
 
-          <div className="lidc-view-section">
-            <div className="lidc-eyebrow">{t('lidc.sidebar.visualization')}</div>
-            <div className="lidc-view-list">
-              {VIEW_SECTIONS.map((entry) => (
-                <button
-                  type="button"
-                  key={entry.key}
-                  className={`lidc-view-btn ${activeView === entry.key ? 'is-active' : ''}`}
-                  onClick={() => setActiveView(entry.key)}
+          <nav className="lidc-side-nav" aria-label="LIDC sidebar navigation">
+            <div className="lidc-eyebrow">{t('lidc.sidebar.navigation')}</div>
+
+            <div className="lidc-side-nav-list">
+              <button
+                type="button"
+                className={`lidc-side-nav-item ${
+                  activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_LIST ? 'is-active' : ''
+                }`}
+                onClick={() => setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST)}
+                title={t('lidc.sidebar.squadronList')}
+                aria-label={t('lidc.sidebar.squadronList')}
+              >
+                <List size={14} />
+                <span className="lidc-side-nav-label">{t('lidc.sidebar.squadronList')}</span>
+              </button>
+
+              <div className="lidc-side-nav-group">
+                {isSidebarExpanded ? (
+                  <button
+                    type="button"
+                    className="lidc-side-nav-group-trigger"
+                    onClick={() => setIsSquadronManagementOpen((prev) => !prev)}
+                    aria-expanded={isSquadronManagementOpen}
+                    title={t('lidc.sidebar.squadronManagement')}
+                    aria-label={t('lidc.sidebar.squadronManagement')}
+                  >
+                    <span className="lidc-side-nav-group-title">
+                      <Settings size={14} />
+                      <span className="lidc-side-nav-label">{t('lidc.sidebar.squadronManagement')}</span>
+                    </span>
+                    <ChevronDown
+                      size={14}
+                      className={`lidc-side-nav-group-caret ${isSquadronManagementOpen ? 'is-open' : ''}`}
+                    />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="lidc-side-nav-group-trigger lidc-side-nav-group-trigger-icon-only"
+                    onClick={() => setIsSquadronManagementOpen((prev) => !prev)}
+                    aria-expanded={false}
+                    title={t('lidc.sidebar.squadronManagement')}
+                    aria-label={t('lidc.sidebar.squadronManagement')}
+                  >
+                    <Settings size={14} />
+                  </button>
+                )}
+
+                <div
+                  className={`lidc-side-nav-children ${
+                    isSidebarExpanded && isSquadronManagementOpen ? 'is-open' : 'is-closed'
+                  }`}
+                  aria-hidden={!(isSidebarExpanded && isSquadronManagementOpen)}
                 >
-                  {t(entry.labelKey)}
-                </button>
-              ))}
+                    <button
+                      type="button"
+                      className={`lidc-side-nav-item is-child ${
+                        activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS ? 'is-active' : ''
+                      }`}
+                      onClick={() => setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS)}
+                      title={t('lidc.sidebar.memberManagement')}
+                      aria-label={t('lidc.sidebar.memberManagement')}
+                    >
+                      <Users size={14} />
+                      <span className="lidc-side-nav-label">{t('lidc.sidebar.memberManagement')}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`lidc-side-nav-item is-child ${
+                        activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS ? 'is-active' : ''
+                      }`}
+                      onClick={() => setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS)}
+                      title={t('lidc.sidebar.aircraftManagement')}
+                      aria-label={t('lidc.sidebar.aircraftManagement')}
+                    >
+                      <Plane size={14} />
+                      <span className="lidc-side-nav-label">{t('lidc.sidebar.aircraftManagement')}</span>
+                    </button>
+                </div>
+              </div>
             </div>
-          </div>
+          </nav>
 
           <div className="lidc-sidebar-summary">
             <div className="lidc-summary-row">
@@ -880,7 +1100,7 @@ export default function LidcPage() {
               {renderVisualization()}
             </div>
 
-            {!isWizardOpen && !isEntryWizardVisible && (
+            {showInlineCenterStage && (
               <div className="lidc-center-stage">
                 {renderCenterStage()}
               </div>

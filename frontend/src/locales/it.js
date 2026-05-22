@@ -298,7 +298,12 @@ export default {
     title: 'Low Intensity Dynamic Campaign',
     subtitle: 'Crea uno squadrone LIDC con deck e inviti',
     sidebar: {
-      visualization: 'Visualizzazione squadrone'
+      visualization: 'Visualizzazione squadrone',
+      navigation: 'Navigazione',
+      squadronList: 'Lista squadroni',
+      squadronManagement: 'Gestione squadrone',
+      memberManagement: 'Gestione membri',
+      aircraftManagement: 'Gestione velivoli'
     },
     views: {
       overview: 'Visualizzazione squadrone',
@@ -354,6 +359,7 @@ export default {
       inviteListHint: 'Questi sono gli inviti LIDC attualmente in stato pending.',
       inSquadronTitle: 'Squadrone gia assegnato',
       inSquadronHint: 'Sei gia nel gruppo {{name}}.',
+      dismissNotice: 'Chiudi avviso',
       backHome: 'Torna alla selezione'
     },
     auth: {

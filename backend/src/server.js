@@ -1078,7 +1078,13 @@ app.post('/api/lidc/squadrons', (req, res) => {
     return res.status(201).json({ squadron });
   } catch (error) {
     const message = String(error?.message || 'Failed to create squadron');
-    const status = message.toLowerCase().includes('authentication required') ? 401 : 400;
+    const lowered = message.toLowerCase();
+    let status = 400;
+    if (lowered.includes('authentication required')) {
+      status = 401;
+    } else if (lowered.includes('already in squadron')) {
+      status = 409;
+    }
     return res.status(status).json({ error: message });
   }
 });

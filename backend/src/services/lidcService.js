@@ -442,6 +442,12 @@ export function createSquadron(payload, sessionUser) {
     throw new Error('Authentication required');
   }
 
+  const existingSquadron = getUserPrimarySquadron(userId);
+  if (existingSquadron) {
+    const existingName = sanitizeText(existingSquadron?.name, 120) || '-';
+    throw new Error(`Already in squadron: ${existingName}`);
+  }
+
   const name = sanitizeText(payload?.name, 120);
   if (!name) {
     throw new Error('Squadron name is required');

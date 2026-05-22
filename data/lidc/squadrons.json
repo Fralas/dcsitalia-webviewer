@@ -1,1 +1,83 @@
-[]
+[
+  {
+    "id": "lidc_1779399906211_5d4154",
+    "name": "DJGAY",
+    "description": "DJGAY VERAMENTE GAY",
+    "logoDataUrl": "",
+    "baseId": "at-tanf",
+    "templateId": "group-helicopters",
+    "templateName": "Gruppo Elicotteri",
+    "deck": {
+      "aircrafts": [
+        {
+          "unitId": "a10c2",
+          "quantity": 2
+        }
+      ],
+      "helicopters": [
+        {
+          "unitId": "ah64d",
+          "quantity": 1
+        },
+        {
+          "unitId": "oh58d",
+          "quantity": 1
+        },
+        {
+          "unitId": "mi24p",
+          "quantity": 2
+        }
+      ],
+      "logistics": [
+        {
+          "unitId": "c130j",
+          "quantity": 2
+        }
+      ],
+      "groundAssets": [
+        {
+          "unitId": "farp-team",
+          "quantity": 2
+        }
+      ]
+    },
+    "invites": [],
+    "members": [
+      {
+        "userId": "675706661570347041",
+        "role": "owner",
+        "joinedAt": 1779399906211
+      }
+    ],
+    "costSummary": {
+      "caps": {
+        "aircrafts": 180,
+        "helicopters": 460,
+        "logistics": 260,
+        "groundAssets": 200
+      },
+      "spent": {
+        "aircrafts": 170,
+        "helicopters": 375,
+        "logistics": 260,
+        "groundAssets": 90
+      },
+      "remaining": {
+        "aircrafts": 10,
+        "helicopters": 85,
+        "logistics": 0,
+        "groundAssets": 110
+      },
+      "totalSpent": 895,
+      "totalUnits": 10
+    },
+    "createdAt": 1779399906211,
+    "createdBy": {
+      "id": "675706661570347041",
+      "globalName": "Fralas",
+      "username": "fralas",
+      "avatar": "395ada2d9da6bd7a6c7698d7879914ba",
+      "avatarUrl": "https://cdn.discordapp.com/avatars/675706661570347041/395ada2d9da6bd7a6c7698d7879914ba.png"
+    }
+  }
+]
