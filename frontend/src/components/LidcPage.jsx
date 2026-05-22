@@ -595,7 +595,8 @@ export default function LidcPage() {
   const currentStepKey = WIZARD_STEPS[currentStep] || WIZARD_STEPS[0];
   const isLogged = Boolean(user?.id);
   const userHasSquadron = Boolean(userLidcState.hasSquadron);
-  const isAircraftManagementView = activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS;
+  const isManagementFocusView = activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS
+    || activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS;
   const effectivePreviewBaseId = baseId
     || activeSquadron?.baseId
     || createdSquadron?.baseId
@@ -1051,9 +1052,7 @@ export default function LidcPage() {
 
   function renderMemberManagementView() {
     return (
-      <div className="lidc-visual-card">
-        <h3>{t('lidc.sidebar.memberManagement')}</h3>
-
+      <div className="lidc-visual-card lidc-visual-card-members">
         {loadingSquadronDetails && (
           <div className="lidc-loading">
             <Loader2 size={14} className="spin" />
@@ -1469,21 +1468,8 @@ export default function LidcPage() {
         </aside>
 
         <section className="lidc-main">
-          <div className={`lidc-main-shell ${isAircraftManagementView ? 'is-aircraft-focus' : ''}`}>
-            <header className="lidc-main-head">
-              <div className="lidc-main-status">
-                {loadingCatalog ? (
-                  <div className="lidc-loading">
-                    <Loader2 size={14} className="spin" />
-                    <span>{t('lidc.general.loading')}</span>
-                  </div>
-                ) : (
-                  <span>{t('lidc.preview.eyebrow')}</span>
-                )}
-              </div>
-            </header>
-
-            <div className={`lidc-visual-panel ${isAircraftManagementView ? 'is-aircraft-focus' : ''}`}>
+          <div className={`lidc-main-shell ${isManagementFocusView ? 'is-management-focus' : ''}`}>
+            <div className={`lidc-visual-panel ${isManagementFocusView ? 'is-management-focus' : ''}`}>
               {catalogError && <div className="lidc-inline-error">{catalogError}</div>}
               {renderVisualization()}
             </div>

@@ -396,17 +396,17 @@ body.lidc-wizard-open {
   height: 100%;
   padding: 18px;
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: minmax(0, 1fr);
   gap: 12px;
 }
 
-.lidc-main-shell.is-aircraft-focus {
+.lidc-main-shell.is-management-focus {
   padding: 0;
   gap: 0;
   grid-template-rows: minmax(0, 1fr);
 }
 
-.lidc-main-shell.is-aircraft-focus .lidc-main-head {
+.lidc-main-shell.is-management-focus .lidc-main-head {
   display: none;
 }
 
@@ -486,16 +486,17 @@ body.lidc-wizard-open {
   overflow-y: auto;
 }
 
-.lidc-visual-panel.is-aircraft-focus {
+.lidc-visual-panel.is-management-focus {
   overflow: hidden;
 }
 
-.lidc-visual-panel.is-aircraft-focus > .lidc-visual-card {
+.lidc-visual-panel.is-management-focus > .lidc-visual-card {
   height: 100%;
   min-height: 0;
 }
 
-.lidc-visual-panel.is-aircraft-focus > .lidc-visual-card.lidc-visual-card-aircrafts {
+.lidc-visual-panel.is-management-focus > .lidc-visual-card.lidc-visual-card-aircrafts,
+.lidc-visual-panel.is-management-focus > .lidc-visual-card.lidc-visual-card-members {
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -529,6 +530,12 @@ body.lidc-wizard-open {
   grid-template-rows: auto auto auto minmax(0, 1fr);
 }
 
+.lidc-visual-card-members {
+  padding: 0;
+  border-radius: 0;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+}
+
 .lidc-visual-card-aircrafts .lidc-airframe-table-wrap {
   width: 100%;
   margin-inline: 0;
@@ -537,6 +544,13 @@ body.lidc-wizard-open {
   border: 0;
   border-radius: 0;
   box-shadow: none;
+}
+
+.lidc-visual-card-members .lidc-user-list {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: 10px;
 }
 
 .lidc-visual-card h2 {
@@ -860,7 +874,7 @@ body.lidc-wizard-open {
   align-items: center;
   gap: 10px;
   border: 1px solid var(--lidc-hairline);
-  border-radius: var(--lidc-radius);
+  border-radius: 0;
   background: var(--lidc-canvas-soft);
   color: var(--lidc-ink);
   padding: 8px;
@@ -2256,7 +2270,7 @@ body.lidc-wizard-open {
     padding: 10px;
   }
 
-  .lidc-main-shell.is-aircraft-focus {
+  .lidc-main-shell.is-management-focus {
     padding: 0;
   }
 
