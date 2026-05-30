@@ -18,6 +18,7 @@ import {
   Plane,
   Save,
   Settings,
+  Trash2,
   Upload,
   Users,
   UserPlus,
@@ -258,6 +259,8 @@ export default function LidcPage() {
   const [loadingUserState, setLoadingUserState] = useState(false);
   const [userStateError, setUserStateError] = useState('');
   const [leavingSquadron, setLeavingSquadron] = useState(false);
+  const [deletingSquadron, setDeletingSquadron] = useState(false);
+  const [pendingSquadronAction, setPendingSquadronAction] = useState('');
   const [userLidcState, setUserLidcState] = useState({
     hasSquadron: false,
     squadron: null,
@@ -297,6 +300,8 @@ export default function LidcPage() {
       setAirframeEditorError('');
       setAirframeEditorSaving(false);
       setLeavingSquadron(false);
+      setDeletingSquadron(false);
+      setPendingSquadronAction('');
     }
 
     return nextState;
@@ -418,6 +423,8 @@ export default function LidcPage() {
         setAirframeEditorError('');
         setAirframeEditorSaving(false);
         setLeavingSquadron(false);
+        setDeletingSquadron(false);
+        setPendingSquadronAction('');
         setPanelMode('home');
         return;
       }
@@ -840,16 +847,24 @@ export default function LidcPage() {
     }
   }
 
+  function openSquadronActionConfirm(action) {
+    if (isSquadronActionBusy) return;
+    if (action !== 'leave' && action !== 'delete') return;
+    if (action === 'delete' && !isCurrentUserOwner) return;
+    setPendingSquadronAction(action);
+  }
+
+  function closeSquadronActionConfirm() {
+    if (isSquadronActionBusy) return;
+    setPendingSquadronAction('');
+  }
+
   async function handleLeaveSquadron() {
     const squadronId = activeSquadron?.id || userLidcState?.squadron?.id || '';
     if (!squadronId || leavingSquadron) return;
 
-    if (typeof window !== 'undefined') {
-      const confirmed = window.confirm(t('lidc.center.leaveConfirm'));
-      if (!confirmed) return;
-    }
-
     setLeavingSquadron(true);
+    setPendingSquadronAction('');
     setUserStateError('');
     setSquadronDetailsError('');
     setAirframeUpdateError('');
@@ -874,6 +889,50 @@ export default function LidcPage() {
       setUserStateError(error.message || t('lidc.errors.leaveFailed'));
     } finally {
       setLeavingSquadron(false);
+    }
+  }
+
+  async function handleDeleteSquadron() {
+    const squadronId = activeSquadron?.id || userLidcState?.squadron?.id || '';
+    if (!squadronId || deletingSquadron) return;
+
+    setDeletingSquadron(true);
+    setPendingSquadronAction('');
+    setUserStateError('');
+    setSquadronDetailsError('');
+    setAirframeUpdateError('');
+    setUpdatingAirframeId('');
+    setSelectedAirframeDraft(null);
+    setAirframeEditorError('');
+    setAirframeEditorSaving(false);
+    setMemberActionMenuForId('');
+
+    try {
+      await api.deleteLidcSquadron(squadronId);
+
+      const stateResponse = await api.getLidcMe();
+      applyUserLidcState(stateResponse);
+
+      setCreatedSquadron(null);
+      setActiveSquadron(null);
+      setHideInSquadronNotice(false);
+      setPanelMode('home');
+      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
+    } catch (error) {
+      setUserStateError(error.message || t('lidc.errors.deleteFailed'));
+    } finally {
+      setDeletingSquadron(false);
+    }
+  }
+
+  async function confirmPendingSquadronAction() {
+    if (isSquadronActionBusy) return;
+    if (pendingSquadronAction === 'leave') {
+      await handleLeaveSquadron();
+      return;
+    }
+    if (pendingSquadronAction === 'delete') {
+      await handleDeleteSquadron();
     }
   }
 
@@ -959,6 +1018,13 @@ export default function LidcPage() {
     });
     return map;
   }, [squadronMembers]);
+
+  const currentUserId = String(user?.id || '');
+  const currentUserProfile = currentUserId ? (squadronMembersById.get(currentUserId) || null) : null;
+  const currentUserRole = String(currentUserProfile?.role || '').toLowerCase();
+  const isCurrentUserOwner = currentUserRole === 'owner'
+    || (currentUserId !== '' && currentUserId === String(activeSquadron?.createdBy?.id || ''));
+  const isSquadronActionBusy = leavingSquadron || deletingSquadron;
 
   const squadronAirframes = useMemo(() => {
     const list = Array.isArray(activeSquadron?.airframes) ? activeSquadron.airframes : [];
@@ -1093,6 +1159,21 @@ export default function LidcPage() {
     };
   }, [memberActionMenuForId]);
 
+  useEffect(() => {
+    if (!pendingSquadronAction) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && !isSquadronActionBusy) {
+        setPendingSquadronAction('');
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [pendingSquadronAction, isSquadronActionBusy]);
+
   function getAirframeStatusLabel(statusKey) {
     const path = `lidc.airframes.statusOptions.${statusKey}`;
     const label = t(path);
@@ -1211,9 +1292,50 @@ export default function LidcPage() {
     );
   }
 
+  function getPendingSquadronActionText() {
+    if (pendingSquadronAction === 'leave') return t('lidc.center.confirmActionLeave');
+    if (pendingSquadronAction === 'delete') return t('lidc.center.confirmActionDelete');
+    return '';
+  }
+
+  function renderSquadronManagementActions() {
+    if (!userHasSquadron) return null;
+
+    return (
+      <div className="lidc-squadron-management-actions">
+        {!isCurrentUserOwner && (
+          <span className="lidc-squadron-management-actions-hint">
+            {t('lidc.center.deleteOwnerOnlyHint')}
+          </span>
+        )}
+        <button
+          type="button"
+          className="lidc-btn lidc-btn-outline"
+          onClick={() => openSquadronActionConfirm('leave')}
+          disabled={isSquadronActionBusy}
+        >
+          {leavingSquadron ? <Loader2 size={14} className="spin" /> : <X size={14} />}
+          {t('lidc.center.leaveSquadron')}
+        </button>
+        <button
+          type="button"
+          className="lidc-btn lidc-btn-danger"
+          onClick={() => openSquadronActionConfirm('delete')}
+          disabled={isSquadronActionBusy || !isCurrentUserOwner}
+          title={!isCurrentUserOwner ? t('lidc.center.deleteOwnerOnlyHint') : t('lidc.center.deleteSquadron')}
+        >
+          {deletingSquadron ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />}
+          {t('lidc.center.deleteSquadron')}
+        </button>
+      </div>
+    );
+  }
+
   function renderMemberManagementView() {
     return (
       <div className="lidc-visual-card lidc-visual-card-members">
+        {renderSquadronManagementActions()}
+
         {loadingSquadronDetails && (
           <div className="lidc-loading">
             <Loader2 size={14} className="spin" />
@@ -1338,6 +1460,8 @@ export default function LidcPage() {
   function renderAircraftManagementView() {
     return (
       <div className="lidc-visual-card lidc-visual-card-aircrafts">
+        {renderSquadronManagementActions()}
+
         {loadingSquadronDetails && (
           <div className="lidc-loading">
             <Loader2 size={14} className="spin" />
@@ -1487,8 +1611,8 @@ export default function LidcPage() {
             <button
               type="button"
               className="lidc-btn lidc-btn-outline"
-              onClick={handleLeaveSquadron}
-              disabled={leavingSquadron}
+              onClick={() => openSquadronActionConfirm('leave')}
+              disabled={isSquadronActionBusy}
             >
               {leavingSquadron ? <Loader2 size={14} className="spin" /> : <X size={14} />}
               {t('lidc.center.leaveSquadron')}
@@ -2232,6 +2356,46 @@ export default function LidcPage() {
               >
                 {airframeEditorSaving ? <Loader2 size={14} className="spin" /> : <Save size={14} />}
                 {t('lidc.airframes.save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingSquadronAction && (
+        <div className="lidc-modal-root lidc-confirm-modal-root">
+          <button
+            type="button"
+            className="lidc-modal-backdrop lidc-confirm-modal-backdrop"
+            onClick={closeSquadronActionConfirm}
+          />
+          <div className="lidc-modal-card lidc-confirm-modal-card" role="dialog" aria-modal="true">
+            <div className="lidc-modal-head">
+              <h3>{t('lidc.center.confirmTitle')}</h3>
+              <p>{t('lidc.center.confirmQuestion', { action: getPendingSquadronActionText() })}</p>
+            </div>
+
+            <div className="lidc-modal-actions lidc-confirm-modal-actions">
+              <button
+                type="button"
+                className="lidc-btn lidc-btn-outline"
+                onClick={closeSquadronActionConfirm}
+                disabled={isSquadronActionBusy}
+              >
+                {t('lidc.general.cancel')}
+              </button>
+              <button
+                type="button"
+                className={`lidc-btn ${pendingSquadronAction === 'delete' ? 'lidc-btn-danger' : 'lidc-btn-primary'}`}
+                onClick={confirmPendingSquadronAction}
+                disabled={isSquadronActionBusy}
+              >
+                {isSquadronActionBusy ? (
+                  <Loader2 size={14} className="spin" />
+                ) : (
+                  pendingSquadronAction === 'delete' ? <Trash2 size={14} /> : <X size={14} />
+                )}
+                {t('lidc.general.confirm')}
               </button>
             </div>
           </div>

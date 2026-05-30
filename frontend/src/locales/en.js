@@ -342,7 +342,8 @@ export default {
       loadingUserState: 'Loading user state...',
       back: 'Back',
       next: 'Next',
-      cancel: 'Cancel'
+      cancel: 'Cancel',
+      confirm: 'Confirm'
     },
     home: {
       createSquadron: 'Create new squadron',
@@ -360,6 +361,12 @@ export default {
       inSquadronTitle: 'Squadron already assigned',
       inSquadronHint: 'You are already in group {{name}}.',
       leaveSquadron: 'Leave squadron',
+      deleteSquadron: 'Delete squadron',
+      deleteOwnerOnlyHint: 'Only the owner can delete this squadron.',
+      confirmTitle: 'Confirm action',
+      confirmQuestion: 'Are you sure you want to {{action}}?',
+      confirmActionLeave: 'leave the squadron',
+      confirmActionDelete: 'delete the squadron',
       leaveConfirm: 'Do you really want to leave this squadron?',
       dismissNotice: 'Dismiss notice',
       backHome: 'Back to selection'
@@ -379,7 +386,8 @@ export default {
       userStateFailed: 'Failed to verify your LIDC state.',
       squadronLoadFailed: 'Failed to load squadron details.',
       airframeAssignFailed: 'Failed to update airframe assignment.',
-      leaveFailed: 'Failed to leave squadron.'
+      leaveFailed: 'Failed to leave squadron.',
+      deleteFailed: 'Failed to delete squadron.'
     },
     info: {
       name: 'Squadron name',

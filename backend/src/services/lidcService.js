@@ -1042,6 +1042,48 @@ export function leaveSquadron({
   };
 }
 
+export function deleteSquadron({
+  squadronId,
+  actorUserId,
+}) {
+  ensureStorage();
+
+  const normalizedSquadronId = sanitizeText(squadronId, 120);
+  const normalizedActorUserId = sanitizeText(actorUserId, 80);
+
+  if (!normalizedSquadronId) {
+    throw new Error('squadronId is required');
+  }
+  if (!normalizedActorUserId) {
+    throw new Error('Authentication required');
+  }
+
+  const squadrons = readSquadrons();
+  const squadronIndex = squadrons.findIndex((entry) => sanitizeText(entry?.id, 120) === normalizedSquadronId);
+  if (squadronIndex < 0) {
+    throw new Error('Squadron not found');
+  }
+
+  const squadron = squadrons[squadronIndex];
+  if (!isUserMemberOfSquadron(squadron, normalizedActorUserId)) {
+    throw new Error('Only squadron members can delete squadron');
+  }
+
+  const ownerId = sanitizeText(squadron?.createdBy?.id, 80);
+  if (!ownerId || normalizedActorUserId !== ownerId) {
+    throw new Error('Only owner can delete squadron');
+  }
+
+  const removed = squadrons.splice(squadronIndex, 1)[0];
+  writeSquadrons(squadrons);
+
+  return {
+    deleted: true,
+    squadronId: normalizedSquadronId,
+    squadronName: sanitizeText(removed?.name, 120),
+  };
+}
+
 function isUserMemberOfSquadron(squadron, userId) {
   if (!squadron || !userId) return false;
 
@@ -1151,6 +1193,7 @@ export default {
   updateAirframeAssignment,
   updateSquadronMemberRole,
   leaveSquadron,
+  deleteSquadron,
   getUserPrimarySquadron,
   getPendingInvitesForUser,
   getUserLidcState,

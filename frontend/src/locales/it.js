@@ -342,7 +342,8 @@ export default {
       loadingUserState: 'Caricamento stato utente...',
       back: 'Indietro',
       next: 'Avanti',
-      cancel: 'Annulla'
+      cancel: 'Annulla',
+      confirm: 'Conferma'
     },
     home: {
       createSquadron: 'Crea nuovo squadrone',
@@ -360,6 +361,12 @@ export default {
       inSquadronTitle: 'Squadrone gia assegnato',
       inSquadronHint: 'Sei gia nel gruppo {{name}}.',
       leaveSquadron: 'Abbandona squadrone',
+      deleteSquadron: 'Cancella squadrone',
+      deleteOwnerOnlyHint: 'Solo l\'owner puo cancellare lo squadrone.',
+      confirmTitle: 'Conferma azione',
+      confirmQuestion: 'Sei sicuro di {{action}}?',
+      confirmActionLeave: 'abbandonare lo squadrone',
+      confirmActionDelete: 'cancellare lo squadrone',
       leaveConfirm: 'Vuoi davvero abbandonare questo squadrone?',
       dismissNotice: 'Chiudi avviso',
       backHome: 'Torna alla selezione'
@@ -379,7 +386,8 @@ export default {
       userStateFailed: 'Impossibile verificare il tuo stato LIDC.',
       squadronLoadFailed: 'Impossibile caricare i dettagli dello squadrone.',
       airframeAssignFailed: 'Impossibile aggiornare l\'assegnazione del velivolo.',
-      leaveFailed: 'Impossibile abbandonare lo squadrone.'
+      leaveFailed: 'Impossibile abbandonare lo squadrone.',
+      deleteFailed: 'Impossibile cancellare lo squadrone.'
     },
     info: {
       name: 'Nome squadrone',

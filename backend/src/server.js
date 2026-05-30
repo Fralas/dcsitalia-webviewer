@@ -1216,6 +1216,41 @@ app.post('/api/lidc/squadrons/:id/leave', (req, res) => {
 });
 
 /**
+ * DELETE /api/lidc/squadrons/:id - Delete squadron as current user (owner only)
+ */
+app.delete('/api/lidc/squadrons/:id', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const result = lidcService.deleteSquadron({
+      squadronId: req.params.id,
+      actorUserId: req.session.user.id,
+    });
+
+    return res.json(result);
+  } catch (error) {
+    const message = String(error?.message || 'Failed to delete squadron');
+    const lowered = message.toLowerCase();
+    let status = 400;
+
+    if (lowered.includes('authentication required')) {
+      status = 401;
+    } else if (lowered.includes('not found')) {
+      status = 404;
+    } else if (
+      lowered.includes('only squadron members')
+      || lowered.includes('only owner')
+    ) {
+      status = 403;
+    }
+
+    return res.status(status).json({ error: message });
+  }
+});
+
+/**
  * PUT /api/lidc/templates - Update LIDC templates and units (wiki editors only)
  */
 app.put('/api/lidc/templates', async (req, res) => {

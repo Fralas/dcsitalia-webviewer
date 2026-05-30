@@ -697,6 +697,16 @@ export async function leaveLidcSquadron(squadronId) {
 }
 
 /**
+ * Delete a LIDC squadron as the current user (owner only)
+ */
+export async function deleteLidcSquadron(squadronId) {
+  return fetchAPI(`/lidc/squadrons/${encodeURIComponent(squadronId)}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+}
+
+/**
  * Update LIDC templates catalog (wiki editor only)
  */
 export async function updateLidcTemplates(payload) {
@@ -776,5 +786,6 @@ export default {
   assignLidcAirframePilot,
   updateLidcMemberRole,
   leaveLidcSquadron,
+  deleteLidcSquadron,
   updateLidcTemplates,
 };
