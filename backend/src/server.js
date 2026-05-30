@@ -1133,6 +1133,82 @@ app.put('/api/lidc/squadrons/:id/airframes/:airframeId', (req, res) => {
       status = 404;
     } else if (lowered.includes('only squadron members')) {
       status = 403;
+    } else if (lowered.includes('only leaders')) {
+      status = 403;
+    }
+
+    return res.status(status).json({ error: message });
+  }
+});
+
+/**
+ * PUT /api/lidc/squadrons/:id/members/:memberId/role - Promote/demote squadron member role
+ */
+app.put('/api/lidc/squadrons/:id/members/:memberId/role', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const result = lidcService.updateSquadronMemberRole({
+      squadronId: req.params.id,
+      targetUserId: req.params.memberId,
+      role: req.body?.role,
+      actorUserId: req.session.user.id,
+    });
+
+    return res.json(result);
+  } catch (error) {
+    const message = String(error?.message || 'Failed to update squadron member role');
+    const lowered = message.toLowerCase();
+    let status = 400;
+
+    if (lowered.includes('authentication required')) {
+      status = 401;
+    } else if (lowered.includes('not found')) {
+      status = 404;
+    } else if (
+      lowered.includes('only owners')
+      || lowered.includes('only squadron members')
+      || lowered.includes('cannot change owner role')
+      || lowered.includes('owner cannot change own role')
+    ) {
+      status = 403;
+    }
+
+    return res.status(status).json({ error: message });
+  }
+});
+
+/**
+ * POST /api/lidc/squadrons/:id/leave - Leave squadron as current user
+ */
+app.post('/api/lidc/squadrons/:id/leave', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const result = lidcService.leaveSquadron({
+      squadronId: req.params.id,
+      actorUserId: req.session.user.id,
+    });
+
+    return res.json(result);
+  } catch (error) {
+    const message = String(error?.message || 'Failed to leave squadron');
+    const lowered = message.toLowerCase();
+    let status = 400;
+
+    if (lowered.includes('authentication required')) {
+      status = 401;
+    } else if (lowered.includes('not found')) {
+      status = 404;
+    } else if (
+      lowered.includes('only squadron members')
+      || lowered.includes('owner cannot leave')
+    ) {
+      status = 403;
     }
 
     return res.status(status).json({ error: message });

@@ -359,6 +359,8 @@ export default {
       inviteListHint: 'Questi sono gli inviti LIDC attualmente in stato pending.',
       inSquadronTitle: 'Squadrone gia assegnato',
       inSquadronHint: 'Sei gia nel gruppo {{name}}.',
+      leaveSquadron: 'Abbandona squadrone',
+      leaveConfirm: 'Vuoi davvero abbandonare questo squadrone?',
       dismissNotice: 'Chiudi avviso',
       backHome: 'Torna alla selezione'
     },
@@ -376,7 +378,8 @@ export default {
       createFailed: 'Creazione squadrone non riuscita.',
       userStateFailed: 'Impossibile verificare il tuo stato LIDC.',
       squadronLoadFailed: 'Impossibile caricare i dettagli dello squadrone.',
-      airframeAssignFailed: 'Impossibile aggiornare l\'assegnazione del velivolo.'
+      airframeAssignFailed: 'Impossibile aggiornare l\'assegnazione del velivolo.',
+      leaveFailed: 'Impossibile abbandonare lo squadrone.'
     },
     info: {
       name: 'Nome squadrone',

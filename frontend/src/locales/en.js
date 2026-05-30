@@ -359,6 +359,8 @@ export default {
       inviteListHint: 'These are your current LIDC invites with pending status.',
       inSquadronTitle: 'Squadron already assigned',
       inSquadronHint: 'You are already in group {{name}}.',
+      leaveSquadron: 'Leave squadron',
+      leaveConfirm: 'Do you really want to leave this squadron?',
       dismissNotice: 'Dismiss notice',
       backHome: 'Back to selection'
     },
@@ -376,7 +378,8 @@ export default {
       createFailed: 'Failed to create squadron.',
       userStateFailed: 'Failed to verify your LIDC state.',
       squadronLoadFailed: 'Failed to load squadron details.',
-      airframeAssignFailed: 'Failed to update airframe assignment.'
+      airframeAssignFailed: 'Failed to update airframe assignment.',
+      leaveFailed: 'Failed to leave squadron.'
     },
     info: {
       name: 'Squadron name',

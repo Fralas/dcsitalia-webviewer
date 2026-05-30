@@ -673,6 +673,30 @@ export async function assignLidcAirframePilot(squadronId, airframeId, pilotUserI
 }
 
 /**
+ * Promote/demote squadron member role
+ */
+export async function updateLidcMemberRole(squadronId, memberUserId, role) {
+  return fetchAPI(
+    `/lidc/squadrons/${encodeURIComponent(squadronId)}/members/${encodeURIComponent(memberUserId)}/role`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+      credentials: 'include',
+    },
+  );
+}
+
+/**
+ * Leave a LIDC squadron as the current user
+ */
+export async function leaveLidcSquadron(squadronId) {
+  return fetchAPI(`/lidc/squadrons/${encodeURIComponent(squadronId)}/leave`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+}
+
+/**
  * Update LIDC templates catalog (wiki editor only)
  */
 export async function updateLidcTemplates(payload) {
@@ -750,5 +774,7 @@ export default {
   createLidcSquadron,
   getLidcSquadron,
   assignLidcAirframePilot,
+  updateLidcMemberRole,
+  leaveLidcSquadron,
   updateLidcTemplates,
 };

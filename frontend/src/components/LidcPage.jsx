@@ -257,6 +257,7 @@ export default function LidcPage() {
 
   const [loadingUserState, setLoadingUserState] = useState(false);
   const [userStateError, setUserStateError] = useState('');
+  const [leavingSquadron, setLeavingSquadron] = useState(false);
   const [userLidcState, setUserLidcState] = useState({
     hasSquadron: false,
     squadron: null,
@@ -295,6 +296,7 @@ export default function LidcPage() {
       setSelectedAirframeDraft(null);
       setAirframeEditorError('');
       setAirframeEditorSaving(false);
+      setLeavingSquadron(false);
     }
 
     return nextState;
@@ -415,6 +417,7 @@ export default function LidcPage() {
         setSelectedAirframeDraft(null);
         setAirframeEditorError('');
         setAirframeEditorSaving(false);
+        setLeavingSquadron(false);
         setPanelMode('home');
         return;
       }
@@ -834,6 +837,43 @@ export default function LidcPage() {
       setSubmitError(error.message || t('lidc.errors.createFailed'));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleLeaveSquadron() {
+    const squadronId = activeSquadron?.id || userLidcState?.squadron?.id || '';
+    if (!squadronId || leavingSquadron) return;
+
+    if (typeof window !== 'undefined') {
+      const confirmed = window.confirm(t('lidc.center.leaveConfirm'));
+      if (!confirmed) return;
+    }
+
+    setLeavingSquadron(true);
+    setUserStateError('');
+    setSquadronDetailsError('');
+    setAirframeUpdateError('');
+    setUpdatingAirframeId('');
+    setSelectedAirframeDraft(null);
+    setAirframeEditorError('');
+    setAirframeEditorSaving(false);
+    setMemberActionMenuForId('');
+
+    try {
+      await api.leaveLidcSquadron(squadronId);
+
+      const stateResponse = await api.getLidcMe();
+      applyUserLidcState(stateResponse);
+
+      setCreatedSquadron(null);
+      setActiveSquadron(null);
+      setHideInSquadronNotice(false);
+      setPanelMode('home');
+      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
+    } catch (error) {
+      setUserStateError(error.message || t('lidc.errors.leaveFailed'));
+    } finally {
+      setLeavingSquadron(false);
     }
   }
 
@@ -1442,7 +1482,19 @@ export default function LidcPage() {
               </div>
             </div>
           )}
-          {adminEditorButton}
+          {userStateError && <div className="lidc-inline-error">{userStateError}</div>}
+          <div className="lidc-center-actions">
+            <button
+              type="button"
+              className="lidc-btn lidc-btn-outline"
+              onClick={handleLeaveSquadron}
+              disabled={leavingSquadron}
+            >
+              {leavingSquadron ? <Loader2 size={14} className="spin" /> : <X size={14} />}
+              {t('lidc.center.leaveSquadron')}
+            </button>
+            {adminEditorButton}
+          </div>
         </div>
       );
     }

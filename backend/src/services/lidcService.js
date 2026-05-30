@@ -18,6 +18,20 @@ export const DECK_CATEGORIES = Object.freeze([
   'groundAssets',
 ]);
 
+export const LIDC_MEMBER_ROLES = Object.freeze([
+  'owner',
+  'admin',
+  'leader',
+  'member',
+]);
+
+const LIDC_ROLE_PRIORITY = Object.freeze({
+  owner: 0,
+  admin: 1,
+  leader: 2,
+  member: 3,
+});
+
 const DEFAULT_TEMPLATES_SEED = Object.freeze({
   templates: [
     {
@@ -149,6 +163,24 @@ function normalizeQuantity(value) {
   const num = Number(value);
   if (!Number.isFinite(num) || num <= 0) return 0;
   return Math.floor(num);
+}
+
+function normalizeMemberRole(value, fallback = 'member') {
+  const normalized = sanitizeText(value, 40).toLowerCase();
+  if (LIDC_MEMBER_ROLES.includes(normalized)) {
+    return normalized;
+  }
+  return fallback;
+}
+
+function getRolePermissions(roleRaw) {
+  const role = normalizeMemberRole(roleRaw);
+  return {
+    role,
+    canManageRoles: role === 'owner',
+    canPurchaseAirframes: role === 'admin',
+    canManageAssignedAirframes: role === 'leader',
+  };
 }
 
 function normalizeTemplateCaps(rawCaps) {
@@ -425,6 +457,22 @@ function buildSquadronMemberUserIdSet(squadron) {
   return memberIds;
 }
 
+function getMemberRoleInSquadron(squadron, userIdRaw) {
+  const userId = sanitizeText(userIdRaw, 80);
+  if (!userId || !squadron) return '';
+
+  const ownerId = sanitizeText(squadron?.createdBy?.id, 80);
+  if (ownerId && ownerId === userId) {
+    return 'owner';
+  }
+
+  const members = Array.isArray(squadron?.members) ? squadron.members : [];
+  const match = members.find((entry) => sanitizeText(entry?.userId, 80) === userId);
+  if (!match) return '';
+
+  return normalizeMemberRole(match.role, 'member');
+}
+
 function toAirframeSortKey(unit) {
   return `${sanitizeText(unit?.category, 40)}::${sanitizeText(unit?.label, 120)}::${sanitizeText(unit?.id, 80)}`;
 }
@@ -571,7 +619,7 @@ function listSquadronMembersForDisplay(squadron) {
   members.forEach((member) => {
     const userId = sanitizeText(member?.userId, 80);
     if (!userId) return;
-    const role = sanitizeText(member?.role, 80) || (userId === ownerId ? 'owner' : 'member');
+    const role = normalizeMemberRole(member?.role, userId === ownerId ? 'owner' : 'member');
     roleByUserId.set(userId, role);
   });
 
@@ -596,10 +644,13 @@ function listSquadronMembersForDisplay(squadron) {
       const username = sanitizeText(fromHistory?.username || createdBy?.username, 140);
       const avatar = sanitizeText(fromHistory?.avatar || createdBy?.avatar, 200);
       const lastSeenAt = Number.isFinite(fromHistory?.lastSeenAt) ? fromHistory.lastSeenAt : null;
+      const role = roleByUserId.get(userId) || (isOwner ? 'owner' : 'member');
+      const permissions = getRolePermissions(role);
 
       return {
         userId,
-        role: roleByUserId.get(userId) || (isOwner ? 'owner' : 'member'),
+        role: permissions.role,
+        permissions,
         globalName,
         username,
         avatar,
@@ -608,8 +659,9 @@ function listSquadronMembersForDisplay(squadron) {
       };
     })
     .sort((a, b) => {
-      if (a.role === 'owner' && b.role !== 'owner') return -1;
-      if (a.role !== 'owner' && b.role === 'owner') return 1;
+      const priorityA = Number.isFinite(LIDC_ROLE_PRIORITY[a.role]) ? LIDC_ROLE_PRIORITY[a.role] : 999;
+      const priorityB = Number.isFinite(LIDC_ROLE_PRIORITY[b.role]) ? LIDC_ROLE_PRIORITY[b.role] : 999;
+      if (priorityA !== priorityB) return priorityA - priorityB;
       return String(a.globalName || a.username || a.userId).localeCompare(
         String(b.globalName || b.username || b.userId),
         'en',
@@ -802,6 +854,12 @@ export function updateAirframeAssignment({ squadronId, airframeId, pilotUserId, 
     throw new Error('Only squadron members can manage airframe assignments');
   }
 
+  const actorRole = getMemberRoleInSquadron(squadron, normalizedActorUserId);
+  const actorPermissions = getRolePermissions(actorRole);
+  if (!actorPermissions.canManageAssignedAirframes) {
+    throw new Error('Only leaders can manage airframe assignments');
+  }
+
   const templatesState = readTemplatesState();
   const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
   syncSquadronAirframesInMemory(squadron, unitsById);
@@ -838,6 +896,149 @@ export function updateAirframeAssignment({ squadronId, airframeId, pilotUserId, 
       memberProfiles: listSquadronMembersForDisplay(squadron),
     },
     airframe: squadron.airframes[airframeIndex],
+  };
+}
+
+export function updateSquadronMemberRole({
+  squadronId,
+  targetUserId,
+  role,
+  actorUserId,
+}) {
+  ensureStorage();
+
+  const normalizedSquadronId = sanitizeText(squadronId, 120);
+  const normalizedTargetUserId = sanitizeText(targetUserId, 80);
+  const normalizedActorUserId = sanitizeText(actorUserId, 80);
+  const normalizedNextRole = normalizeMemberRole(role, '');
+
+  if (!normalizedSquadronId || !normalizedTargetUserId) {
+    throw new Error('squadronId and targetUserId are required');
+  }
+  if (!normalizedActorUserId) {
+    throw new Error('Authentication required');
+  }
+  if (!normalizedNextRole || normalizedNextRole === 'owner') {
+    throw new Error('Role must be one of: admin, leader, member');
+  }
+
+  const squadrons = readSquadrons();
+  const squadronIndex = squadrons.findIndex((entry) => sanitizeText(entry?.id, 120) === normalizedSquadronId);
+  if (squadronIndex < 0) {
+    throw new Error('Squadron not found');
+  }
+
+  const squadron = { ...squadrons[squadronIndex] };
+  if (!isUserMemberOfSquadron(squadron, normalizedActorUserId)) {
+    throw new Error('Only squadron members can manage roles');
+  }
+
+  const actorPermissions = getRolePermissions(getMemberRoleInSquadron(squadron, normalizedActorUserId));
+  if (!actorPermissions.canManageRoles) {
+    throw new Error('Only owners can manage roles');
+  }
+
+  const ownerId = sanitizeText(squadron?.createdBy?.id, 80);
+  if (normalizedTargetUserId === ownerId) {
+    throw new Error('Cannot change owner role');
+  }
+  if (normalizedTargetUserId === normalizedActorUserId) {
+    throw new Error('Owner cannot change own role');
+  }
+
+  if (!isUserMemberOfSquadron(squadron, normalizedTargetUserId)) {
+    throw new Error('Target user must be a squadron member');
+  }
+
+  const currentMembers = Array.isArray(squadron.members) ? squadron.members : [];
+  const memberIndex = currentMembers.findIndex((entry) => sanitizeText(entry?.userId, 80) === normalizedTargetUserId);
+
+  if (memberIndex < 0) {
+    throw new Error('Target user must be a squadron member');
+  }
+
+  const nextMembers = [...currentMembers];
+  nextMembers[memberIndex] = {
+    ...nextMembers[memberIndex],
+    role: normalizedNextRole,
+    updatedAt: Date.now(),
+  };
+  squadron.members = nextMembers;
+
+  squadrons[squadronIndex] = squadron;
+  writeSquadrons(squadrons);
+
+  return {
+    squadron: {
+      ...squadron,
+      memberProfiles: listSquadronMembersForDisplay(squadron),
+    },
+    targetUserId: normalizedTargetUserId,
+    role: normalizedNextRole,
+    permissions: getRolePermissions(normalizedNextRole),
+    purchaseAirframesFeature: {
+      enabled: false,
+      note: 'Placeholder: purchase flow not implemented yet',
+    },
+  };
+}
+
+export function leaveSquadron({
+  squadronId,
+  actorUserId,
+}) {
+  ensureStorage();
+
+  const normalizedSquadronId = sanitizeText(squadronId, 120);
+  const normalizedActorUserId = sanitizeText(actorUserId, 80);
+
+  if (!normalizedSquadronId) {
+    throw new Error('squadronId is required');
+  }
+  if (!normalizedActorUserId) {
+    throw new Error('Authentication required');
+  }
+
+  const squadrons = readSquadrons();
+  const squadronIndex = squadrons.findIndex((entry) => sanitizeText(entry?.id, 120) === normalizedSquadronId);
+  if (squadronIndex < 0) {
+    throw new Error('Squadron not found');
+  }
+
+  const squadron = { ...squadrons[squadronIndex] };
+  if (!isUserMemberOfSquadron(squadron, normalizedActorUserId)) {
+    throw new Error('Only squadron members can leave squadron');
+  }
+
+  const ownerId = sanitizeText(squadron?.createdBy?.id, 80);
+  if (normalizedActorUserId === ownerId) {
+    throw new Error('Owner cannot leave squadron');
+  }
+
+  const currentMembers = Array.isArray(squadron.members) ? squadron.members : [];
+  const nextMembers = currentMembers.filter(
+    (entry) => sanitizeText(entry?.userId, 80) !== normalizedActorUserId,
+  );
+
+  if (nextMembers.length === currentMembers.length) {
+    throw new Error('Target user must be a squadron member');
+  }
+
+  squadron.members = nextMembers;
+
+  const templatesState = readTemplatesState();
+  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+  syncSquadronAirframesInMemory(squadron, unitsById);
+
+  squadrons[squadronIndex] = squadron;
+  writeSquadrons(squadrons);
+
+  return {
+    squadron: {
+      ...squadron,
+      memberProfiles: listSquadronMembersForDisplay(squadron),
+    },
+    leftUserId: normalizedActorUserId,
   };
 }
 
@@ -940,6 +1141,7 @@ ensureStorage();
 
 export default {
   DECK_CATEGORIES,
+  LIDC_MEMBER_ROLES,
   getTemplatesCatalog,
   updateTemplatesCatalog,
   upsertDiscordUser,
@@ -947,6 +1149,8 @@ export default {
   createSquadron,
   getSquadronById,
   updateAirframeAssignment,
+  updateSquadronMemberRole,
+  leaveSquadron,
   getUserPrimarySquadron,
   getPendingInvitesForUser,
   getUserLidcState,
