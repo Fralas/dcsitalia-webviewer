@@ -474,6 +474,27 @@ const SPAWN_OFFSET_BEARING_DEG = 90;
 const MAP_ZOOM_DEFAULT_MAX = 14;
 const MAP_ZOOM_SPAWN_MAX = 18;
 
+const SPAWN_MENU_SECTIONS = [
+  {
+    id: 'infantry',
+    title: 'INFANTRY',
+    spawnType: 'inf_spawn',
+    keywords: ['MANPAD', 'SCOUT'],
+  },
+  {
+    id: 'build',
+    title: 'BUILD',
+    spawnType: 'crate_spawn',
+    keywords: ['AMMO', 'FUEL', 'BUILD'],
+  },
+  {
+    id: 'deployables',
+    title: 'DEPLOYABLES',
+    spawnType: 'crate_spawn',
+    keywords: ['HMMWV', 'TOW', 'L118', 'TACAN'],
+  },
+];
+
 function haversineNm(lat1, lon1, lat2, lon2) {
   const toRad = (deg) => (deg * Math.PI) / 180;
   const rKm = 6371;
@@ -4102,6 +4123,17 @@ export default function FrontlineMap({ airportsData }) {
     && selectedLargeContainerCount <= 2;
 
   const selectedAirport = selectedAirportId ? airportsById.get(selectedAirportId) : null;
+
+  const spawnOptionByKeyword = useMemo(() => {
+    const map = new Map();
+    (spawnOptions.infantry || []).forEach((option) => {
+      if (option?.keyword) map.set(option.keyword, option);
+    });
+    (spawnOptions.crate || []).forEach((option) => {
+      if (option?.keyword) map.set(option.keyword, option);
+    });
+    return map;
+  }, [spawnOptions]);
   const selectedAirportRoutesHidden = selectedAirportId ? hiddenLogisticsRouteAirportIds.has(String(selectedAirportId)) : false;
   const selectedAirportRequestedWeaponIds = useMemo(() => {
     const set = new Set();
@@ -4608,7 +4640,7 @@ export default function FrontlineMap({ airportsData }) {
       airportId: String(airportId),
       type,
       keyword: option.keyword,
-      label: option.label || option.keyword,
+      label: option.keyword || option.label,
       cost: option.cost,
       quantity: 1,
     });
@@ -5152,7 +5184,7 @@ export default function FrontlineMap({ airportsData }) {
               )}
 
               {selectedAirport && (
-                <div className="absolute left-4 bottom-4 z-[1000] w-[300px] rounded-xl border border-yt-border bg-[#101827f2] p-3 shadow-2xl backdrop-blur">
+                <div className="absolute left-4 bottom-4 z-[1000] w-[320px] rounded-xl border border-yt-border bg-[#101827f2] p-3 shadow-2xl backdrop-blur">
                   <div className="mb-2 flex items-center justify-between">
                     <div className="text-sm font-semibold text-yt-text-primary">
                       Spawn @ {selectedAirport.displayName || selectedAirport.name}
@@ -5170,45 +5202,44 @@ export default function FrontlineMap({ airportsData }) {
                       Login to spawn units and crates.
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      <div>
-                        <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">Infantry</div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {(spawnOptions.infantry || []).map((option) => (
-                            <button
-                              key={option.keyword}
-                              type="button"
-                              onClick={() => handleEnterSpawnMode(selectedAirport.id, 'inf_spawn', option)}
-                              className={`rounded border px-2 py-1 text-[11px] font-semibold ${
-                                spawnMode?.keyword === option.keyword && spawnMode?.type === 'inf_spawn'
-                                  ? 'border-amber-400/70 bg-amber-400/15 text-amber-200'
-                                  : 'border-yt-border text-yt-text-primary hover:bg-yt-bg-tertiary/50'
-                              }`}
-                            >
-                              {option.label} <span className="text-yt-text-secondary">({option.cost})</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">Crates</div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {(spawnOptions.crate || []).map((option) => (
-                            <button
-                              key={option.keyword}
-                              type="button"
-                              onClick={() => handleEnterSpawnMode(selectedAirport.id, 'crate_spawn', option)}
-                              className={`rounded border px-2 py-1 text-[11px] font-semibold ${
-                                spawnMode?.keyword === option.keyword && spawnMode?.type === 'crate_spawn'
-                                  ? 'border-amber-400/70 bg-amber-400/15 text-amber-200'
-                                  : 'border-yt-border text-yt-text-primary hover:bg-yt-bg-tertiary/50'
-                              }`}
-                            >
-                              {option.label} <span className="text-yt-text-secondary">({option.cost})</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+                    <div className="space-y-3">
+                      {SPAWN_MENU_SECTIONS.map((section) => {
+                        const sectionOptions = section.keywords
+                          .map((keyword) => {
+                            const option = spawnOptionByKeyword.get(keyword);
+                            return option ? { keyword, option } : null;
+                          })
+                          .filter(Boolean);
+                        if (sectionOptions.length === 0) return null;
+
+                        return (
+                          <div key={section.id}>
+                            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-yt-text-secondary">
+                              {section.title}
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {sectionOptions.map(({ keyword, option }) => {
+                                const selected = spawnMode?.keyword === keyword && spawnMode?.type === section.spawnType;
+                                return (
+                                  <button
+                                    key={`${section.id}-${keyword}`}
+                                    type="button"
+                                    onClick={() => handleEnterSpawnMode(selectedAirport.id, section.spawnType, option)}
+                                    className={`rounded border px-2.5 py-1 text-[11px] font-semibold tracking-[0.02em] ${
+                                      selected
+                                        ? 'border-amber-400/70 bg-amber-400/15 text-amber-200'
+                                        : 'border-yt-border text-yt-text-primary hover:bg-yt-bg-tertiary/50'
+                                    }`}
+                                  >
+                                    {keyword}
+                                    <span className="ml-1 text-yt-text-secondary">({option.cost})</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
                       {spawnMode && (
                         <div className="rounded border border-amber-400/30 bg-amber-400/5 px-2 py-2">
                           <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-200/90">

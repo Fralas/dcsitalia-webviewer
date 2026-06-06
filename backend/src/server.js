@@ -157,18 +157,18 @@ const WEB_COMMAND_RESULT_GRACE_MS = Number.parseInt(process.env.WEB_COMMAND_RESU
 // Web-initiated spawn catalog (mirrors DMAS_Config: spawn_cost + crate_build.catalog).
 // Costs are informational for the UI; DCORE remains authoritative on validation/economy.
 const WEB_INFANTRY_OPTIONS = [
-  { keyword: 'MANPAD', label: 'INF MANPAD', cost: 30 },
-  { keyword: 'SCOUT', label: 'INF SCOUT', cost: 20 },
+  { keyword: 'MANPAD', label: 'MANPAD', cost: 30 },
+  { keyword: 'SCOUT', label: 'SCOUT', cost: 20 },
 ];
 const WEB_CRATE_OPTIONS = [
-  { keyword: 'BUILD', label: 'CRATE BUILD', cost: 5, group: 'build' },
-  { keyword: 'AMMO', label: 'CRATE AMMO', cost: 5, group: 'build' },
-  { keyword: 'FUEL', label: 'CRATE FUEL', cost: 5, group: 'build' },
-  { keyword: 'PPBUILD', label: 'CRATE PPBUILD', cost: 20, group: 'build' },
-  { keyword: 'HMMWV', label: 'CRATE HMMWV', cost: 40, group: 'slingload' },
-  { keyword: 'TOW', label: 'CRATE TOW', cost: 45, group: 'slingload' },
-  { keyword: 'L118', label: 'CRATE L118', cost: 30, group: 'slingload' },
-  { keyword: 'TACAN', label: 'CRATE TACAN', cost: 50, group: 'slingload' },
+  { keyword: 'AMMO', label: 'AMMO', cost: 5, group: 'build' },
+  { keyword: 'FUEL', label: 'FUEL', cost: 5, group: 'build' },
+  { keyword: 'BUILD', label: 'BUILD', cost: 5, group: 'build' },
+  { keyword: 'PPBUILD', label: 'PPBUILD', cost: 20, group: 'build' },
+  { keyword: 'HMMWV', label: 'HMMWV', cost: 40, group: 'deployables' },
+  { keyword: 'TOW', label: 'TOW', cost: 45, group: 'deployables' },
+  { keyword: 'L118', label: 'L118', cost: 30, group: 'deployables' },
+  { keyword: 'TACAN', label: 'TACAN', cost: 50, group: 'deployables' },
 ];
 const WEB_INFANTRY_KEYWORDS = new Set(WEB_INFANTRY_OPTIONS.map((o) => o.keyword));
 const WEB_CRATE_KEYWORDS = new Set(WEB_CRATE_OPTIONS.map((o) => o.keyword));
