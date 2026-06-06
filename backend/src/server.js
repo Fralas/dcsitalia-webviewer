@@ -146,6 +146,9 @@ const WEB_SPAWN_MARKERS_FILE = process.env.WEB_SPAWN_MARKERS_FILE
 
 // Max placement distance from airport center (matches DMAS blue_airbase_radius_m).
 const AIRPORT_SPAWN_RADIUS_M = Number.parseInt(process.env.AIRPORT_SPAWN_RADIUS_M, 10) || 2500;
+const SPAWN_QUANTITY_MAX = 5;
+const SPAWN_OFFSET_METERS = 2;
+const SPAWN_OFFSET_BEARING_DEG = 90;
 
 // How long a queued web command lives before being pruned (also drives result grace).
 const WEB_COMMAND_TTL_MS = Number.parseInt(process.env.WEB_COMMAND_TTL_MS, 10) || 10 * 60 * 1000;
@@ -842,6 +845,45 @@ function haversineMeters(lat1, lon1, lat2, lon2) {
     Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return earthRadiusM * c;
+}
+
+function clampSpawnQuantity(raw) {
+  const parsed = Math.floor(Number(raw));
+  if (!Number.isFinite(parsed) || parsed < 1) return 1;
+  return Math.min(SPAWN_QUANTITY_MAX, parsed);
+}
+
+function offsetLatLon(lat, lon, distanceM, bearingDeg) {
+  const earthRadiusM = 6371008.8;
+  const bearingRad = (bearingDeg * Math.PI) / 180;
+  const latRad = (lat * Math.PI) / 180;
+  const lonRad = (lon * Math.PI) / 180;
+  const angularDistance = distanceM / earthRadiusM;
+  const lat2 = Math.asin(
+    Math.sin(latRad) * Math.cos(angularDistance)
+    + Math.cos(latRad) * Math.sin(angularDistance) * Math.cos(bearingRad)
+  );
+  const lon2 = lonRad + Math.atan2(
+    Math.sin(bearingRad) * Math.sin(angularDistance) * Math.cos(latRad),
+    Math.cos(angularDistance) - Math.sin(latRad) * Math.sin(lat2)
+  );
+  return {
+    lat: (lat2 * 180) / Math.PI,
+    lon: (lon2 * 180) / Math.PI,
+  };
+}
+
+function buildSpawnPlacementPositions(lat, lon, quantity) {
+  const qty = clampSpawnQuantity(quantity);
+  const positions = [];
+  for (let index = 0; index < qty; index += 1) {
+    positions.push(
+      index === 0
+        ? { lat, lon }
+        : offsetLatLon(lat, lon, SPAWN_OFFSET_METERS * index, SPAWN_OFFSET_BEARING_DEG)
+    );
+  }
+  return positions;
 }
 
 function validateAirportSpawnDistance(airport, lat, lon) {
@@ -2245,9 +2287,13 @@ function handleSpawnRequest(req, res, kind) {
     return res.status(400).json({ error: 'Valid lat/lon are required' });
   }
 
-  const distanceCheck = validateAirportSpawnDistance(airport, lat, lon);
-  if (!distanceCheck.ok) {
-    return res.status(400).json({ error: distanceCheck.error });
+  const quantity = clampSpawnQuantity(req.body?.quantity);
+  const placementPositions = buildSpawnPlacementPositions(lat, lon, quantity);
+  for (const position of placementPositions) {
+    const distanceCheck = validateAirportSpawnDistance(airport, position.lat, position.lon);
+    if (!distanceCheck.ok) {
+      return res.status(400).json({ error: distanceCheck.error });
+    }
   }
 
   const command = enqueueWebCommand({
@@ -2258,6 +2304,7 @@ function handleSpawnRequest(req, res, kind) {
     keyword,
     lat,
     lon,
+    quantity,
     requested_by: actor.name,
     requested_by_id: actor.id,
     ts: Date.now(),

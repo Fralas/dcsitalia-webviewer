@@ -468,6 +468,9 @@ function toLatLngPoint(position) {
 }
 
 const AIRPORT_SPAWN_RADIUS_M = 2500;
+const SPAWN_QUANTITY_MAX = 5;
+const SPAWN_OFFSET_METERS = 2;
+const SPAWN_OFFSET_BEARING_DEG = 90;
 const MAP_ZOOM_DEFAULT_MAX = 14;
 const MAP_ZOOM_SPAWN_MAX = 18;
 
@@ -487,6 +490,35 @@ function haversineNm(lat1, lon1, lat2, lon2) {
 
 function haversineMeters(lat1, lon1, lat2, lon2) {
   return haversineNm(lat1, lon1, lat2, lon2) * 1852;
+}
+
+function offsetLatLon(lat, lon, distanceM, bearingDeg) {
+  const earthRadiusM = 6371008.8;
+  const bearingRad = (bearingDeg * Math.PI) / 180;
+  const latRad = (lat * Math.PI) / 180;
+  const lonRad = (lon * Math.PI) / 180;
+  const angularDistance = distanceM / earthRadiusM;
+  const lat2 = Math.asin(
+    Math.sin(latRad) * Math.cos(angularDistance)
+    + Math.cos(latRad) * Math.sin(angularDistance) * Math.cos(bearingRad)
+  );
+  const lon2 = lonRad + Math.atan2(
+    Math.sin(bearingRad) * Math.sin(angularDistance) * Math.cos(latRad),
+    Math.cos(angularDistance) - Math.sin(latRad) * Math.sin(lat2)
+  );
+  return {
+    lat: (lat2 * 180) / Math.PI,
+    lon: (lon2 * 180) / Math.PI,
+  };
+}
+
+function buildSpawnPlacementPositions(lat, lon, quantity) {
+  const qty = Math.max(1, Math.min(SPAWN_QUANTITY_MAX, Math.floor(Number(quantity)) || 1));
+  return Array.from({ length: qty }, (_, index) => (
+    index === 0
+      ? { lat, lon }
+      : offsetLatLon(lat, lon, SPAWN_OFFSET_METERS * index, SPAWN_OFFSET_BEARING_DEG)
+  ));
 }
 
 function circlePolygon(lat, lon, radiusMeters, points = 64) {
@@ -4578,8 +4610,14 @@ export default function FrontlineMap({ airportsData }) {
       keyword: option.keyword,
       label: option.label || option.keyword,
       cost: option.cost,
+      quantity: 1,
     });
     setSelectedProductionPointId(null);
+  }, []);
+
+  const handleSetSpawnQuantity = useCallback((quantity) => {
+    const nextQty = Math.max(1, Math.min(SPAWN_QUANTITY_MAX, Math.floor(Number(quantity)) || 1));
+    setSpawnMode((current) => (current ? { ...current, quantity: nextQty } : current));
   }, []);
 
   const handleCancelSpawnMode = useCallback(() => {
@@ -4589,25 +4627,29 @@ export default function FrontlineMap({ airportsData }) {
   const handleSpawnPlace = useCallback(async ({ lat, lon }) => {
     if (!spawnMode) return;
     const { airportId, type, keyword } = spawnMode;
+    const quantity = Math.max(1, Math.min(SPAWN_QUANTITY_MAX, Math.floor(Number(spawnMode.quantity)) || 1));
     const airport = airportsById.get(airportId);
     const airportCoords = airport?.coordinates;
+    const placementPositions = buildSpawnPlacementPositions(lat, lon, quantity);
     if (airportCoords && Number.isFinite(airportCoords.lat) && Number.isFinite(airportCoords.lon)) {
-      const distanceM = haversineMeters(airportCoords.lat, airportCoords.lon, lat, lon);
-      if (distanceM > AIRPORT_SPAWN_RADIUS_M) {
-        setCommandToast({
-          ok: false,
-          message: `Too far from airport (${Math.round(distanceM)} m). Max ${AIRPORT_SPAWN_RADIUS_M / 1000} km from center.`,
-          balance: null,
-          ts: Date.now(),
-        });
-        return;
+      for (const position of placementPositions) {
+        const distanceM = haversineMeters(airportCoords.lat, airportCoords.lon, position.lat, position.lon);
+        if (distanceM > AIRPORT_SPAWN_RADIUS_M) {
+          setCommandToast({
+            ok: false,
+            message: `Placement out of range (${Math.round(distanceM)} m). Max ${AIRPORT_SPAWN_RADIUS_M / 1000} km from airport center.`,
+            balance: null,
+            ts: Date.now(),
+          });
+          return;
+        }
       }
     }
 
     setSubmittingCommand(true);
     try {
       const submit = type === 'inf_spawn' ? spawnAirportInfantry : spawnAirportCrate;
-      const response = await submit(airportId, keyword, lat, lon);
+      const response = await submit(airportId, keyword, lat, lon, quantity);
       if (response?.commandId) {
         pendingCommandIdsRef.current.add(response.commandId);
       }
@@ -4972,10 +5014,35 @@ export default function FrontlineMap({ airportsData }) {
               {spawnMode && (
                 <div className="absolute left-1/2 top-4 z-[1100] -translate-x-1/2 rounded-lg border border-amber-400/60 bg-[#1a1505f2] px-4 py-2 text-center shadow-2xl backdrop-blur">
                   <div className="text-sm font-semibold text-amber-200">
-                    Click within {AIRPORT_SPAWN_RADIUS_M / 1000} km of airport center to place: {spawnMode.label}
+                    Place {spawnMode.quantity || 1}× {spawnMode.label} within {AIRPORT_SPAWN_RADIUS_M / 1000} km of airport center
+                  </div>
+                  <div className="mt-2 flex items-center justify-center gap-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-100/70">Qty</span>
+                    {Array.from({ length: SPAWN_QUANTITY_MAX }, (_, index) => {
+                      const value = index + 1;
+                      const selected = (spawnMode.quantity || 1) === value;
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => handleSetSpawnQuantity(value)}
+                          className={`min-w-[28px] rounded border px-2 py-0.5 text-[11px] font-semibold ${
+                            selected
+                              ? 'border-amber-300 bg-amber-300/20 text-amber-100'
+                              : 'border-amber-400/40 text-amber-100/80 hover:bg-amber-400/10'
+                          }`}
+                        >
+                          {value}
+                        </button>
+                      );
+                    })}
                   </div>
                   <div className="mt-1 text-[11px] text-amber-100/80">
-                    Cost {spawnMode.cost} fp • {submittingCommand ? 'Sending...' : 'Click the highlighted area on the map'}
+                    Total {(spawnMode.cost || 0) * (spawnMode.quantity || 1)} fp
+                    {' • '}
+                    {SPAWN_OFFSET_METERS} m spacing
+                    {' • '}
+                    {submittingCommand ? 'Sending...' : 'Click the highlighted area on the map'}
                   </div>
                   <button
                     type="button"
@@ -5142,8 +5209,38 @@ export default function FrontlineMap({ airportsData }) {
                           ))}
                         </div>
                       </div>
+                      {spawnMode && (
+                        <div className="rounded border border-amber-400/30 bg-amber-400/5 px-2 py-2">
+                          <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-200/90">
+                            Quantity (max {SPAWN_QUANTITY_MAX})
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {Array.from({ length: SPAWN_QUANTITY_MAX }, (_, index) => {
+                              const value = index + 1;
+                              const selected = (spawnMode.quantity || 1) === value;
+                              return (
+                                <button
+                                  key={value}
+                                  type="button"
+                                  onClick={() => handleSetSpawnQuantity(value)}
+                                  className={`min-w-[30px] rounded border px-2 py-1 text-[11px] font-semibold ${
+                                    selected
+                                      ? 'border-amber-400/70 bg-amber-400/15 text-amber-200'
+                                      : 'border-yt-border text-yt-text-primary hover:bg-yt-bg-tertiary/50'
+                                  }`}
+                                >
+                                  {value}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="mt-1.5 text-[10px] text-yt-text-secondary">
+                            {spawnMode.quantity || 1}× {spawnMode.label} • total {(spawnMode.cost || 0) * (spawnMode.quantity || 1)} fp • {SPAWN_OFFSET_METERS} m between items
+                          </div>
+                        </div>
+                      )}
                       <div className="text-[10px] text-yt-text-secondary">
-                        Select an item, then click inside the airport on the map to place it.
+                        Select an item, choose quantity, then click inside the airport on the map.
                       </div>
                     </div>
                   )}

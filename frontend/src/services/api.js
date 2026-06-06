@@ -753,10 +753,10 @@ export async function requestProductionPointUpgrade(productionPointId) {
 /**
  * Spawn infantry (INF MANPAD / INF SCOUT) at a clicked point inside a BLUE airport.
  */
-export async function spawnAirportInfantry(airportId, keyword, lat, lon) {
+export async function spawnAirportInfantry(airportId, keyword, lat, lon, quantity = 1) {
   return fetchAPI(`/airports/${encodeURIComponent(airportId)}/spawn-infantry`, {
     method: 'POST',
-    body: JSON.stringify({ keyword, lat, lon }),
+    body: JSON.stringify({ keyword, lat, lon, quantity }),
     credentials: 'include',
   });
 }
@@ -764,10 +764,10 @@ export async function spawnAirportInfantry(airportId, keyword, lat, lon) {
 /**
  * Spawn a crate (CRATE BUILD/AMMO/FUEL, slingload HMMWV/L118/...) at a clicked point inside a BLUE airport.
  */
-export async function spawnAirportCrate(airportId, keyword, lat, lon) {
+export async function spawnAirportCrate(airportId, keyword, lat, lon, quantity = 1) {
   return fetchAPI(`/airports/${encodeURIComponent(airportId)}/spawn-crate`, {
     method: 'POST',
-    body: JSON.stringify({ keyword, lat, lon }),
+    body: JSON.stringify({ keyword, lat, lon, quantity }),
     credentials: 'include',
   });
 }
