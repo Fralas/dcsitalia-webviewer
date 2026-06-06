@@ -489,6 +489,25 @@ function haversineMeters(lat1, lon1, lat2, lon2) {
   return haversineNm(lat1, lon1, lat2, lon2) * 1852;
 }
 
+function circlePolygon(lat, lon, radiusMeters, points = 64) {
+  const coords = [];
+  const earthRadius = 6371000;
+  const latRad = (lat * Math.PI) / 180;
+  for (let i = 0; i <= points; i += 1) {
+    const angle = (i / points) * 2 * Math.PI;
+    const dx = radiusMeters * Math.cos(angle);
+    const dy = radiusMeters * Math.sin(angle);
+    const newLat = lat + (dy / earthRadius) * (180 / Math.PI);
+    const newLon = lon + (dx / (earthRadius * Math.cos(latRad))) * (180 / Math.PI);
+    coords.push([newLon, newLat]);
+  }
+  return {
+    type: 'Feature',
+    geometry: { type: 'Polygon', coordinates: [coords] },
+    properties: {},
+  };
+}
+
 function interpolateLatLon(start, end, progress) {
   if (!start || !end) return null;
   const clamped = Math.max(0, Math.min(1, progress));
@@ -950,16 +969,17 @@ function GlobeCanvas({ points, focusCoordinates, onScaleChange, mapMode, forcedS
   );
 }
 
-function FlatMapFocus({ center }) {
+function FlatMapFocus({ center, targetZoom }) {
   const map = useMap();
 
   useEffect(() => {
     if (!center) return;
-    map.setView([center.lat, center.lon], Math.max(map.getZoom(), 8), {
+    const zoom = Math.max(map.getZoom(), targetZoom || 8);
+    map.setView([center.lat, center.lon], zoom, {
       animate: true,
       duration: 0.7,
     });
-  }, [center, map]);
+  }, [center, map, targetZoom]);
 
   return null;
 }
@@ -1062,7 +1082,10 @@ function FlatMapView({
           url={activeBasemap.leafletUrl}
         />
         <FlatMapZoomWatcher onZoomChange={onZoomChange} />
-        <FlatMapFocus center={focusTargetKey ? focusCoordinates : null} />
+        <FlatMapFocus
+          center={focusTargetKey ? focusCoordinates : null}
+          targetZoom={spawnPlacementActive ? 15 : undefined}
+        />
 
         {showAto && gridConnections.map((connection) => (
           <Polyline
@@ -1420,6 +1443,8 @@ function MapLibreFlatMapView({
   onProductionPointSelect,
   spawnPlacementActive,
   onSpawnPlace,
+  spawnAirportCenter,
+  webSpawnMarkers,
 }) {
   const MIN_PITCH = 0;
   const MAX_PITCH = 85;
@@ -1435,7 +1460,7 @@ function MapLibreFlatMapView({
   const LOGISTICS_CH47_YAW_OFFSET_RAD = THREE.MathUtils.degToRad(70) + Math.PI;
   const LOGISTICS_CONVOY_YAW_OFFSET_RAD = 0;
   const MIN_SAFE_ZOOM = 5;
-  const MAX_SAFE_ZOOM = 11.8;
+  const effectiveMaxZoom = spawnPlacementActive ? MAP_ZOOM_SPAWN_MAX : 11.8;
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const dcsarByIdRef = useRef(new Map());
@@ -1752,6 +1777,39 @@ function MapLibreFlatMapView({
       }];
     }),
   }), [productionPoints, showProductionPoints, selectedProductionPointId]);
+
+  const fcWebSpawnMarkers = useMemo(() => ({
+    type: 'FeatureCollection',
+    features: (webSpawnMarkers || []).flatMap((marker) => {
+      if (!Number.isFinite(marker?.lat) || !Number.isFinite(marker?.lon)) return [];
+      return [{
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [marker.lon, marker.lat],
+        },
+        properties: {
+          id: marker.id || '',
+          label: marker.label || marker.keyword || marker.id || 'Crate',
+        },
+      }];
+    }),
+  }), [webSpawnMarkers]);
+
+  const fcSpawnRadius = useMemo(() => {
+    if (!spawnPlacementActive || !spawnAirportCenter) {
+      return { type: 'FeatureCollection', features: [] };
+    }
+    const lat = Number(spawnAirportCenter.lat);
+    const lon = Number(spawnAirportCenter.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      return { type: 'FeatureCollection', features: [] };
+    }
+    return {
+      type: 'FeatureCollection',
+      features: [circlePolygon(lat, lon, AIRPORT_SPAWN_RADIUS_M)],
+    };
+  }, [spawnPlacementActive, spawnAirportCenter]);
 
   const disposeThreeNode = useCallback((node) => {
     if (!node) return;
@@ -2158,7 +2216,7 @@ function MapLibreFlatMapView({
       center: initialCamera ? [initialCamera.lng, initialCamera.lat] : [center.lon, center.lat],
       zoom: initialCamera ? initialCamera.zoom : 7,
       minZoom: MIN_SAFE_ZOOM,
-      maxZoom: MAX_SAFE_ZOOM,
+      maxZoom: effectiveMaxZoom,
       pitch: initialCamera ? initialCamera.pitch : 0,
       bearing: initialCamera ? initialCamera.bearing : 0,
       minPitch: MIN_PITCH,
@@ -2566,6 +2624,55 @@ function MapLibreFlatMapView({
         hideHoverPopup();
       });
 
+      addGeoSource('web-spawn-markers-src', fcWebSpawnMarkers);
+      addGeoSource('spawn-radius-src', fcSpawnRadius);
+
+      map.addLayer({
+        id: 'spawn-radius-fill-layer',
+        type: 'fill',
+        source: 'spawn-radius-src',
+        paint: {
+          'fill-color': '#facc15',
+          'fill-opacity': 0.06,
+        },
+      });
+
+      map.addLayer({
+        id: 'spawn-radius-line-layer',
+        type: 'line',
+        source: 'spawn-radius-src',
+        paint: {
+          'line-color': '#facc15',
+          'line-width': 2,
+          'line-dasharray': [2, 2],
+          'line-opacity': 0.85,
+        },
+      });
+
+      map.addLayer({
+        id: 'web-spawn-markers-layer',
+        type: 'circle',
+        source: 'web-spawn-markers-src',
+        paint: {
+          'circle-radius': 7,
+          'circle-color': '#f59e0b',
+          'circle-opacity': 0.85,
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 1.5,
+        },
+      });
+
+      map.on('mousemove', 'web-spawn-markers-layer', (event) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const feature = event?.features?.[0];
+        const label = feature?.properties?.label || 'Crate';
+        showHoverPopup(event.lngLat, `<div style="font-size:11px;font-weight:600;">${label}</div>`);
+      });
+      map.on('mouseleave', 'web-spawn-markers-layer', () => {
+        if (!spawnPlacementActive) map.getCanvas().style.cursor = '';
+        hideHoverPopup();
+      });
+
       map.on('click', 'zones-hit-layer', (event) => {
         const feature = event?.features?.[0];
         const zoneId = feature?.properties?.id;
@@ -2703,7 +2810,7 @@ function MapLibreFlatMapView({
       map.on('zoom', () => {
         if (zoomGuardRef.current) return;
         const currentZoom = map.getZoom();
-        const clampedZoom = Math.max(MIN_SAFE_ZOOM, Math.min(MAX_SAFE_ZOOM, currentZoom));
+        const clampedZoom = Math.max(MIN_SAFE_ZOOM, Math.min(map.getMaxZoom(), currentZoom));
         if (Math.abs(clampedZoom - currentZoom) > 0.001) {
           zoomGuardRef.current = true;
           map.setZoom(clampedZoom);
@@ -2837,6 +2944,26 @@ function MapLibreFlatMapView({
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const source = map.getSource('web-spawn-markers-src');
+    if (source?.setData) source.setData(fcWebSpawnMarkers);
+  }, [fcWebSpawnMarkers]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const source = map.getSource('spawn-radius-src');
+    if (source?.setData) source.setData(fcSpawnRadius);
+  }, [fcSpawnRadius]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.setMaxZoom(effectiveMaxZoom);
+  }, [effectiveMaxZoom]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     if (!map) return;
 
     const handleSpawnClick = (event) => {
@@ -2908,14 +3035,18 @@ function MapLibreFlatMapView({
       currentZoom: Number(map.getZoom().toFixed(3)),
     });
 
+    const focusZoom = String(focusTargetKey || '').startsWith('spawn:')
+      ? Math.min(effectiveMaxZoom, 15)
+      : Math.min(effectiveMaxZoom, map.getZoom() + 0.35);
+
     map.easeTo({
       center: [nextLon, nextLat],
       offset: [0, MAPLIBRE_FOCUS_Y_OFFSET_PX],
-      zoom: Math.min(MAX_SAFE_ZOOM, map.getZoom() + 0.35),
+      zoom: focusZoom,
       duration: 950,
       easing: (t) => t * (2 - t),
     });
-  }, [focusTargetKey, focusCoordinates, logMapDebug]);
+  }, [focusTargetKey, focusCoordinates, effectiveMaxZoom, logMapDebug]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -3040,6 +3171,7 @@ export default function FrontlineMap({ airportsData }) {
   const [spawnOptions, setSpawnOptions] = useState({ infantry: [], crate: [] });
   // spawnMode: { airportId, type: 'inf_spawn'|'crate_spawn', keyword, label } | null
   const [spawnMode, setSpawnMode] = useState(null);
+  const [webSpawnMarkers, setWebSpawnMarkers] = useState([]);
   const [submittingCommand, setSubmittingCommand] = useState(false);
   const [upgradingPpId, setUpgradingPpId] = useState(null);
   const [commandToast, setCommandToast] = useState(null);
@@ -3231,7 +3363,7 @@ export default function FrontlineMap({ airportsData }) {
   // Initial load of Production Points + spawn catalog (DCORE bridge)
   useEffect(() => {
     let cancelled = false;
-    Promise.allSettled([getProductionPoints(), getSpawnOptions()]).then(([ppResult, optionsResult]) => {
+    Promise.allSettled([getProductionPoints(), getSpawnOptions(), getWebSpawnMarkers()]).then(([ppResult, optionsResult, markersResult]) => {
       if (cancelled) return;
       if (ppResult.status === 'fulfilled') {
         const list = ppResult.value?.productionPoints || ppResult.value;
@@ -3242,6 +3374,10 @@ export default function FrontlineMap({ airportsData }) {
           infantry: Array.isArray(optionsResult.value.infantry) ? optionsResult.value.infantry : [],
           crate: Array.isArray(optionsResult.value.crate) ? optionsResult.value.crate : [],
         });
+      }
+      if (markersResult.status === 'fulfilled' && markersResult.value) {
+        const list = markersResult.value?.markers || markersResult.value;
+        if (Array.isArray(list)) setWebSpawnMarkers(list);
       }
     });
     return () => {
@@ -3256,10 +3392,18 @@ export default function FrontlineMap({ airportsData }) {
       if (Array.isArray(list)) setProductionPoints(list);
     });
 
+    const unsubscribeMarkers = socketService.on('web-spawn-markers:updated', (data) => {
+      const list = data?.markers || data;
+      if (Array.isArray(list)) setWebSpawnMarkers(list);
+    });
+
     const unsubscribeResult = socketService.on('web-command:result', (data) => {
       if (!data || !data.id) return;
       if (!pendingCommandIdsRef.current.has(data.id)) return;
       pendingCommandIdsRef.current.delete(data.id);
+
+      const isSpawn = data.type === 'inf_spawn' || data.type === 'crate_spawn';
+      if (isSpawn && data.ok === true) return;
 
       if (commandToastTimerRef.current) {
         clearTimeout(commandToastTimerRef.current);
@@ -3275,6 +3419,7 @@ export default function FrontlineMap({ airportsData }) {
 
     return () => {
       unsubscribePp && unsubscribePp();
+      unsubscribeMarkers && unsubscribeMarkers();
       unsubscribeResult && unsubscribeResult();
       if (commandToastTimerRef.current) {
         clearTimeout(commandToastTimerRef.current);
@@ -3775,8 +3920,18 @@ export default function FrontlineMap({ airportsData }) {
   }, [selectedDcsarId, dcsarPoints]);
 
   const focusCoordinates = selectedDcsarFocus || focusedZone?.coordinates || zoneTheaterCenter || fallbackCenter || null;
-  const tacticalFocusCoordinates = selectedDcsarFocus || focusedZone?.coordinates || null;
-  const tacticalFocusTargetKey = selectedDcsarId || selectedZoneId || null;
+  const spawnAirportCenter = useMemo(() => {
+    if (!spawnMode) return null;
+    const airport = airportsById.get(spawnMode.airportId);
+    return airport?.coordinates || null;
+  }, [spawnMode, airportsById]);
+
+  const mapMaxZoom = spawnMode ? MAP_ZOOM_SPAWN_MAX : MAP_ZOOM_DEFAULT_MAX;
+
+  const tacticalFocusCoordinates = spawnAirportCenter || selectedDcsarFocus || focusedZone?.coordinates || null;
+  const tacticalFocusTargetKey = spawnMode
+    ? `spawn:${spawnMode.airportId}`
+    : (selectedDcsarId || selectedZoneId || null);
 
   const handleScaleChange = (scale) => {
     if (!isDesktopDevice) return;
@@ -4434,6 +4589,21 @@ export default function FrontlineMap({ airportsData }) {
   const handleSpawnPlace = useCallback(async ({ lat, lon }) => {
     if (!spawnMode) return;
     const { airportId, type, keyword } = spawnMode;
+    const airport = airportsById.get(airportId);
+    const airportCoords = airport?.coordinates;
+    if (airportCoords && Number.isFinite(airportCoords.lat) && Number.isFinite(airportCoords.lon)) {
+      const distanceM = haversineMeters(airportCoords.lat, airportCoords.lon, lat, lon);
+      if (distanceM > AIRPORT_SPAWN_RADIUS_M) {
+        setCommandToast({
+          ok: false,
+          message: `Too far from airport (${Math.round(distanceM)} m). Max ${AIRPORT_SPAWN_RADIUS_M / 1000} km from center.`,
+          balance: null,
+          ts: Date.now(),
+        });
+        return;
+      }
+    }
+
     setSubmittingCommand(true);
     try {
       const submit = type === 'inf_spawn' ? spawnAirportInfantry : spawnAirportCrate;
@@ -4441,15 +4611,14 @@ export default function FrontlineMap({ airportsData }) {
       if (response?.commandId) {
         pendingCommandIdsRef.current.add(response.commandId);
       }
-      setCommandToast({ ok: true, message: `Order sent: ${spawnMode.label}. Awaiting in-game result...`, balance: null, ts: Date.now() });
+      setSpawnMode(null);
     } catch (error) {
       console.error('Failed to submit spawn command:', error);
       setCommandToast({ ok: false, message: error.message || 'Failed to send spawn order.', balance: null, ts: Date.now() });
     } finally {
       setSubmittingCommand(false);
-      setSpawnMode(null);
     }
-  }, [spawnMode]);
+  }, [spawnMode, airportsById]);
 
   const canUpgradeSelectedPp = Boolean(
     selectedProductionPoint &&
@@ -4516,6 +4685,8 @@ export default function FrontlineMap({ airportsData }) {
                       onProductionPointSelect={handleProductionPointSelect}
                       spawnPlacementActive={Boolean(spawnMode)}
                       onSpawnPlace={handleSpawnPlace}
+                      spawnAirportCenter={spawnAirportCenter}
+                      webSpawnMarkers={webSpawnMarkers}
                     />
                   ) : (
                     <FlatMapView
@@ -4549,6 +4720,9 @@ export default function FrontlineMap({ airportsData }) {
                       onProductionPointSelect={handleProductionPointSelect}
                       spawnPlacementActive={Boolean(spawnMode)}
                       onSpawnPlace={handleSpawnPlace}
+                      spawnAirportCenter={spawnAirportCenter}
+                      webSpawnMarkers={webSpawnMarkers}
+                      mapMaxZoom={mapMaxZoom}
                     />
                   )}
                 </div>
@@ -4798,10 +4972,10 @@ export default function FrontlineMap({ airportsData }) {
               {spawnMode && (
                 <div className="absolute left-1/2 top-4 z-[1100] -translate-x-1/2 rounded-lg border border-amber-400/60 bg-[#1a1505f2] px-4 py-2 text-center shadow-2xl backdrop-blur">
                   <div className="text-sm font-semibold text-amber-200">
-                    Click inside the BLUE airport to place: {spawnMode.label}
+                    Click within {AIRPORT_SPAWN_RADIUS_M / 1000} km of airport center to place: {spawnMode.label}
                   </div>
                   <div className="mt-1 text-[11px] text-amber-100/80">
-                    Cost {spawnMode.cost} fp • {submittingCommand ? 'Sending...' : 'Awaiting map click'}
+                    Cost {spawnMode.cost} fp • {submittingCommand ? 'Sending...' : 'Click the highlighted area on the map'}
                   </div>
                   <button
                     type="button"
