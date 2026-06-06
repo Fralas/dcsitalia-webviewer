@@ -296,6 +296,8 @@ function getFeedTypeStyle(type) {
   if (type?.startsWith('convoy.')) return 'border-yellow-500/40 bg-yellow-500/10 text-yellow-200';
   if (type?.startsWith('dcsar.')) return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
   if (type?.startsWith('user.')) return 'border-green-500/40 bg-green-500/10 text-green-200';
+  if (type?.startsWith('dcore.pp_upgrade')) return 'border-blue-500/40 bg-blue-500/10 text-blue-200';
+  if (type?.startsWith('dcore.spawn')) return 'border-amber-500/40 bg-amber-500/10 text-amber-200';
   return 'border-slate-500/40 bg-slate-500/10 text-slate-200';
 }
 
@@ -306,6 +308,8 @@ function getFeedTypeLabel(type) {
   if (type?.startsWith('convoy.')) return 'Convoy';
   if (type?.startsWith('dcsar.')) return 'CSAR';
   if (type?.startsWith('user.')) return 'User';
+  if (type?.startsWith('dcore.pp_upgrade')) return 'Production';
+  if (type?.startsWith('dcore.spawn')) return 'Spawn';
   return 'System';
 }
 
@@ -473,6 +477,24 @@ const SPAWN_OFFSET_METERS = 2;
 const SPAWN_OFFSET_BEARING_DEG = 90;
 const MAP_ZOOM_DEFAULT_MAX = 14;
 const MAP_ZOOM_SPAWN_MAX = 18;
+
+const SPAWN_BANNER_DISPLAY_NAMES = {
+  MANPAD: 'MANPAD',
+  SCOUT: 'Scout',
+  AMMO: 'Ammo',
+  FUEL: 'Fuel',
+  BUILD: 'Build',
+  HMMWV: 'HMMWV',
+  TOW: 'TOW',
+  L118: 'L118',
+  TACAN: 'TACAN',
+};
+
+function formatSpawnBannerName(keyword) {
+  const value = String(keyword || '').trim().toUpperCase();
+  if (!value) return 'item';
+  return SPAWN_BANNER_DISPLAY_NAMES[value] || (value.charAt(0) + value.slice(1).toLowerCase());
+}
 
 const SPAWN_MENU_SECTIONS = [
   {
@@ -5046,7 +5068,7 @@ export default function FrontlineMap({ airportsData }) {
               {spawnMode && (
                 <div className="absolute left-1/2 top-4 z-[1100] -translate-x-1/2 rounded-lg border border-amber-400/60 bg-[#1a1505f2] px-4 py-2 text-center shadow-2xl backdrop-blur">
                   <div className="text-sm font-semibold text-amber-200">
-                    Place {spawnMode.quantity || 1}× {spawnMode.label} within {AIRPORT_SPAWN_RADIUS_M / 1000} km of airport center
+                    Place {spawnMode.quantity || 1}x {formatSpawnBannerName(spawnMode.label)} inside of the designated range
                   </div>
                   <div className="mt-2 flex items-center justify-center gap-1.5">
                     <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-100/70">Qty</span>

@@ -268,6 +268,7 @@ let productionPoints = [];
 let webCommands = []; // queued commands not yet pruned: { id, type, keyword, lat, lon, requested_by, requested_by_id, ts }
 let webCommandResultsById = new Map(); // id -> { ...result, _localTs }
 let webCommandResultSignature = '';
+let webCommandFeedEmittedIds = new Set(); // command id -> feed already written
 let webSpawnMarkersSyncSignature = '';
 let webSpawnMarkers = [];
 let zoneOperationsById = new Map();
@@ -465,6 +466,149 @@ function pushFeedEvent(event) {
 function getAirportDisplayName(airportId) {
   const airport = getAirportById(airportId);
   return airport?.displayName || airport?.name || airportId || 'Unknown';
+}
+
+const SPAWN_FEED_LABELS = {
+  MANPAD: 'MANPAD',
+  SCOUT: 'Scout',
+  AMMO: 'Ammo',
+  FUEL: 'Fuel',
+  BUILD: 'Build',
+  HMMWV: 'HMMWV',
+  TOW: 'TOW',
+  L118: 'L118',
+  TACAN: 'TACAN',
+};
+
+function formatSpawnKeywordLabel(keyword) {
+  const value = String(keyword || '').trim().toUpperCase();
+  if (!value) return 'item';
+  return SPAWN_FEED_LABELS[value] || (value.charAt(0) + value.slice(1).toLowerCase());
+}
+
+function getProductionPointDisplayName(ppId) {
+  const pp = productionPoints.find((entry) => entry.id === ppId);
+  return pp?.zone_name || pp?.id || ppId || 'Production Point';
+}
+
+function bootstrapWebCommandFeedDedup() {
+  feedService.getFeedEvents(1000).forEach((event) => {
+    const commandId = event?.metadata?.command_id;
+    if (commandId) {
+      webCommandFeedEmittedIds.add(String(commandId));
+    }
+    if (typeof event?.id === 'string' && event.id.startsWith('webcmd_')) {
+      webCommandFeedEmittedIds.add(event.id.slice('webcmd_'.length));
+    }
+  });
+}
+
+function buildWebCommandFeedEvent(command, stored) {
+  if (!command || !stored) return null;
+
+  const actor = command.requested_by || command.requested_by_id || 'Unknown user';
+  const cmdType = stored.type || command.type;
+
+  if (cmdType === 'pp_upgrade') {
+    const ppName = getProductionPointDisplayName(command.production_point_id);
+    const pp = productionPoints.find((entry) => entry.id === command.production_point_id);
+    const level = pp ? Number(pp.level) || 0 : null;
+    const nextLevel = level !== null ? level + 1 : null;
+    const levelHint = nextLevel !== null ? ` (Lv${level} -> Lv${nextLevel})` : '';
+
+    if (stored.ok) {
+      return {
+        type: 'dcore.pp_upgrade.started',
+        title: 'Production Point upgrade',
+        message: `${actor} started upgrade at ${ppName}${levelHint}`,
+        actor: command.requested_by_id || '',
+        metadata: {
+          command_id: stored.id,
+          production_point_id: command.production_point_id,
+          airport_id: null,
+          keyword: null,
+          quantity: null,
+          spawn_type: null,
+          ok: true,
+        },
+      };
+    }
+
+    return {
+      type: 'dcore.pp_upgrade.failed',
+      title: 'Production Point upgrade failed',
+      message: `${actor} could not upgrade ${ppName}: ${stored.message || 'unknown error'}`,
+      actor: command.requested_by_id || '',
+      metadata: {
+        command_id: stored.id,
+        production_point_id: command.production_point_id,
+        airport_id: null,
+        keyword: null,
+        quantity: null,
+        spawn_type: null,
+        ok: false,
+      },
+    };
+  }
+
+  if (cmdType === 'inf_spawn' || cmdType === 'crate_spawn') {
+    const airportName = getAirportDisplayName(command.airport_id);
+    const keyword = formatSpawnKeywordLabel(command.keyword);
+    const qty = clampSpawnQuantity(command.quantity);
+    const qtyLabel = qty > 1 ? `${qty}x ` : '';
+
+    if (stored.ok) {
+      return {
+        type: 'dcore.spawn.completed',
+        title: 'Spawn completed',
+        message: `${actor} placed ${qtyLabel}${keyword} at ${airportName}`,
+        actor: command.requested_by_id || '',
+        metadata: {
+          command_id: stored.id,
+          production_point_id: null,
+          airport_id: command.airport_id,
+          keyword: command.keyword,
+          quantity: qty,
+          spawn_type: cmdType,
+          ok: true,
+        },
+      };
+    }
+
+    return {
+      type: 'dcore.spawn.failed',
+      title: 'Spawn failed',
+      message: `${actor} failed to place ${qtyLabel}${keyword} at ${airportName}: ${stored.message || 'unknown error'}`,
+      actor: command.requested_by_id || '',
+      metadata: {
+        command_id: stored.id,
+        production_point_id: null,
+        airport_id: command.airport_id,
+        keyword: command.keyword,
+        quantity: qty,
+        spawn_type: cmdType,
+        ok: false,
+      },
+    };
+  }
+
+  return null;
+}
+
+function maybePushWebCommandFeedEvent(command, stored) {
+  if (!command || !stored?.id) return;
+  const cmdType = stored.type || command.type;
+  if (!['pp_upgrade', 'inf_spawn', 'crate_spawn'].includes(cmdType)) return;
+  if (webCommandFeedEmittedIds.has(stored.id)) return;
+
+  const event = buildWebCommandFeedEvent(command, stored);
+  if (!event) return;
+
+  pushFeedEvent({
+    id: `webcmd_${stored.id}`,
+    ...event,
+  });
+  webCommandFeedEmittedIds.add(stored.id);
 }
 
 function buildMissionSummary(mission) {
@@ -986,6 +1130,10 @@ function syncWebCommandResultsFromFile() {
         production_point_id: command && command.type === 'pp_upgrade' ? command.production_point_id : null,
         airport_id: command ? command.airport_id : null,
       });
+
+      if (command) {
+        maybePushWebCommandFeedEvent(command, stored);
+      }
     });
 
     // Drop stored results whose command is gone (avoid unbounded growth)
@@ -3995,6 +4143,7 @@ syncDcsarFromFile();
 syncAirliftPlayersFromFile();
 
 // Initialize DCORE bridge state
+bootstrapWebCommandFeedDedup();
 loadWebCommandsQueue();
 syncProductionPointsFromFile();
 syncWebCommandResultsFromFile();
