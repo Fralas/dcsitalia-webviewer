@@ -10,6 +10,7 @@ import chokidar from 'chokidar';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { randomUUID } from 'crypto';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
 
@@ -123,6 +124,52 @@ const AIRLIFT_PLAYERS_SYNC_FILE = process.env.AIRLIFT_PLAYERS_SYNC_FILE
   ? path.resolve(process.env.AIRLIFT_PLAYERS_SYNC_FILE)
   : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DRED_AIR\\Export_AirliftPlayers.json';
 
+// Production Points state exported by DCORE (DSCORE_Rigs.lua) for the map.
+const PRODUCTION_POINTS_FILE = process.env.PRODUCTION_POINTS_FILE
+  ? path.resolve(process.env.PRODUCTION_POINTS_FILE)
+  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DSCORE\\Export_Production_Points.json';
+
+// Web -> DCORE command bridge (DBRIDGE). The webviewer OWNS the command queue file
+// (append + prune); DCORE owns the result file (read-only here).
+const WEB_COMMANDS_FILE = process.env.WEB_COMMANDS_FILE
+  ? path.resolve(process.env.WEB_COMMANDS_FILE)
+  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DBRIDGE\\Export_WebCommands.json';
+
+const WEB_COMMANDS_RESULT_FILE = process.env.WEB_COMMANDS_RESULT_FILE
+  ? path.resolve(process.env.WEB_COMMANDS_RESULT_FILE)
+  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DBRIDGE\\Export_WebCommands_Result.json';
+
+// Tracked crate positions exported by DMAS (live until moved/activated in-game).
+const WEB_SPAWN_MARKERS_FILE = process.env.WEB_SPAWN_MARKERS_FILE
+  ? path.resolve(process.env.WEB_SPAWN_MARKERS_FILE)
+  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DBRIDGE\\Export_WebSpawn_Markers.json';
+
+// Max placement distance from airport center (matches DMAS blue_airbase_radius_m).
+const AIRPORT_SPAWN_RADIUS_M = Number.parseInt(process.env.AIRPORT_SPAWN_RADIUS_M, 10) || 2500;
+
+// How long a queued web command lives before being pruned (also drives result grace).
+const WEB_COMMAND_TTL_MS = Number.parseInt(process.env.WEB_COMMAND_TTL_MS, 10) || 10 * 60 * 1000;
+const WEB_COMMAND_RESULT_GRACE_MS = Number.parseInt(process.env.WEB_COMMAND_RESULT_GRACE_MS, 10) || 60 * 1000;
+
+// Web-initiated spawn catalog (mirrors DMAS_Config: spawn_cost + crate_build.catalog).
+// Costs are informational for the UI; DCORE remains authoritative on validation/economy.
+const WEB_INFANTRY_OPTIONS = [
+  { keyword: 'MANPAD', label: 'INF MANPAD', cost: 30 },
+  { keyword: 'SCOUT', label: 'INF SCOUT', cost: 20 },
+];
+const WEB_CRATE_OPTIONS = [
+  { keyword: 'BUILD', label: 'CRATE BUILD', cost: 5, group: 'build' },
+  { keyword: 'AMMO', label: 'CRATE AMMO', cost: 5, group: 'build' },
+  { keyword: 'FUEL', label: 'CRATE FUEL', cost: 5, group: 'build' },
+  { keyword: 'PPBUILD', label: 'CRATE PPBUILD', cost: 20, group: 'build' },
+  { keyword: 'HMMWV', label: 'CRATE HMMWV', cost: 40, group: 'slingload' },
+  { keyword: 'TOW', label: 'CRATE TOW', cost: 45, group: 'slingload' },
+  { keyword: 'L118', label: 'CRATE L118', cost: 30, group: 'slingload' },
+  { keyword: 'TACAN', label: 'CRATE TACAN', cost: 50, group: 'slingload' },
+];
+const WEB_INFANTRY_KEYWORDS = new Set(WEB_INFANTRY_OPTIONS.map((o) => o.keyword));
+const WEB_CRATE_KEYWORDS = new Set(WEB_CRATE_OPTIONS.map((o) => o.keyword));
+
 // CSV Directory - configurable via environment variable
 const CSV_DIR = process.env.CSV_DIR
   ? path.resolve(process.env.CSV_DIR)
@@ -212,6 +259,14 @@ let dcsarSyncSignature = '';
 let dcsarPoints = [];
 let airliftPlayersSyncSignature = '';
 let airliftPlayers = [];
+let productionPointsSyncSignature = '';
+let productionPoints = [];
+// Web command bridge state
+let webCommands = []; // queued commands not yet pruned: { id, type, keyword, lat, lon, requested_by, requested_by_id, ts }
+let webCommandResultsById = new Map(); // id -> { ...result, _localTs }
+let webCommandResultSignature = '';
+let webSpawnMarkersSyncSignature = '';
+let webSpawnMarkers = [];
 let zoneOperationsById = new Map();
 let hiddenLogisticsRouteAirportIds = new Set();
 const ZONE_OPERATION_TTL_MS = 45 * 60 * 1000;
@@ -664,6 +719,247 @@ function syncAirliftPlayersFromFile() {
     });
   } catch (error) {
     console.error('Failed airlift players sync from file:', error.message);
+  }
+}
+
+// ==================== PRODUCTION POINTS (DCORE -> web) ====================
+
+function normalizeProductionPointEntry(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  const toNum = (value) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
+  const zoneName = String(entry.zone_name || '').trim();
+  if (!zoneName) return null;
+  const lat = toNum(entry.lat);
+  const lon = toNum(entry.lon);
+
+  return {
+    id: zoneName,
+    zone_name: zoneName,
+    coordinates: (lat !== null && lon !== null) ? { lat, lon } : null,
+    radius_m: toNum(entry.radius_m),
+    owner: String(entry.owner || 'NEUTRAL').trim().toUpperCase(),
+    built: entry.built === true,
+    level: Math.max(0, Math.floor(toNum(entry.level) || 0)),
+    max_level: Math.max(1, Math.floor(toNum(entry.max_level) || 1)),
+    upgrading: entry.upgrading === true,
+    blue_units: Math.max(0, Math.floor(toNum(entry.blue_units) || 0)),
+    red_units: Math.max(0, Math.floor(toNum(entry.red_units) || 0)),
+    build_counts: (entry.build_counts && typeof entry.build_counts === 'object') ? entry.build_counts : {},
+    required_categories: (entry.required_categories && typeof entry.required_categories === 'object') ? entry.required_categories : {},
+    stock: Math.max(0, Math.floor(toNum(entry.stock) || 0)),
+    max_stock: Math.max(0, Math.floor(toNum(entry.max_stock) || 0)),
+  };
+}
+
+function syncProductionPointsFromFile() {
+  try {
+    if (!fs.existsSync(PRODUCTION_POINTS_FILE)) return;
+
+    const raw = fs.readFileSync(PRODUCTION_POINTS_FILE, 'utf8');
+    if (!raw || raw.trim() === '') return;
+    if (raw === productionPointsSyncSignature) return;
+    productionPointsSyncSignature = raw;
+
+    const parsed = JSON.parse(raw);
+    const incoming = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.production_points) ? parsed.production_points : []);
+    productionPoints = incoming.map(normalizeProductionPointEntry).filter(Boolean);
+
+    io.emit('production-points:updated', {
+      productionPoints,
+    });
+  } catch (error) {
+    console.error('Failed production points sync from file:', error.message);
+  }
+}
+
+// ==================== WEB COMMAND BRIDGE (web -> DCORE) ====================
+
+function writeJsonAtomic(targetPath, obj) {
+  const tempPath = `${targetPath}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(obj, null, 2), 'utf8');
+  fs.renameSync(tempPath, targetPath);
+}
+
+function persistWebCommands() {
+  try {
+    writeJsonAtomic(WEB_COMMANDS_FILE, {
+      commands: webCommands,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Failed to persist web commands queue:', error.message);
+    throw error;
+  }
+}
+
+function loadWebCommandsQueue() {
+  try {
+    if (!fs.existsSync(WEB_COMMANDS_FILE)) {
+      webCommands = [];
+      persistWebCommands();
+      return;
+    }
+    const raw = fs.readFileSync(WEB_COMMANDS_FILE, 'utf8');
+    const parsed = raw && raw.trim() !== '' ? JSON.parse(raw) : {};
+    const list = Array.isArray(parsed?.commands) ? parsed.commands : (Array.isArray(parsed) ? parsed : []);
+    webCommands = list.filter((cmd) => cmd && typeof cmd === 'object' && cmd.id);
+  } catch (error) {
+    console.error('Error loading web commands queue:', error.message);
+    webCommands = [];
+  }
+}
+
+function pruneWebCommands(now = Date.now()) {
+  const before = webCommands.length;
+  webCommands = webCommands.filter((cmd) => {
+    const ts = Number(cmd?.ts) || 0;
+    if (now - ts > WEB_COMMAND_TTL_MS) return false;
+    const result = webCommandResultsById.get(cmd.id);
+    if (result && now - (Number(result._localTs) || now) > WEB_COMMAND_RESULT_GRACE_MS) return false;
+    return true;
+  });
+  return webCommands.length !== before;
+}
+
+function enqueueWebCommand(command) {
+  pruneWebCommands();
+  webCommands.push(command);
+  persistWebCommands();
+  return command;
+}
+
+function haversineMeters(lat1, lon1, lat2, lon2) {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const earthRadiusM = 6371008.8;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusM * c;
+}
+
+function validateAirportSpawnDistance(airport, lat, lon) {
+  const airportLat = Number(airport?.coordinates?.lat);
+  const airportLon = Number(airport?.coordinates?.lon);
+  if (!Number.isFinite(airportLat) || !Number.isFinite(airportLon)) {
+    return { ok: false, error: 'Airport coordinates missing' };
+  }
+  const distanceM = haversineMeters(airportLat, airportLon, lat, lon);
+  if (distanceM > AIRPORT_SPAWN_RADIUS_M) {
+    return {
+      ok: false,
+      error: `Placement must be within ${AIRPORT_SPAWN_RADIUS_M / 1000} km of the airport center (${Math.round(distanceM)} m away).`,
+    };
+  }
+  return { ok: true, distanceM };
+}
+
+function syncWebSpawnMarkersFromFile() {
+  try {
+    if (!fs.existsSync(WEB_SPAWN_MARKERS_FILE)) return;
+
+    const raw = fs.readFileSync(WEB_SPAWN_MARKERS_FILE, 'utf8');
+    if (!raw || raw.trim() === '') return;
+    if (raw === webSpawnMarkersSyncSignature) return;
+    webSpawnMarkersSyncSignature = raw;
+
+    const parsed = JSON.parse(raw);
+    const incoming = Array.isArray(parsed?.markers) ? parsed.markers : [];
+    webSpawnMarkers = incoming
+      .map((entry) => {
+        const lat = Number(entry?.lat);
+        const lon = Number(entry?.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+        return {
+          id: String(entry?.id || '').trim() || null,
+          keyword: String(entry?.keyword || '').trim().toUpperCase() || null,
+          label: String(entry?.label || '').trim() || null,
+          lat,
+          lon,
+        };
+      })
+      .filter((entry) => entry && entry.id);
+
+    io.emit('web-spawn-markers:updated', {
+      markers: webSpawnMarkers,
+    });
+  } catch (error) {
+    console.error('Failed web spawn markers sync from file:', error.message);
+  }
+}
+
+function syncWebCommandResultsFromFile() {
+  try {
+    if (!fs.existsSync(WEB_COMMANDS_RESULT_FILE)) return;
+
+    const raw = fs.readFileSync(WEB_COMMANDS_RESULT_FILE, 'utf8');
+    if (!raw || raw.trim() === '') return;
+    if (raw === webCommandResultSignature) {
+      // Still prune in case TTL elapsed without new results
+      if (pruneWebCommands()) {
+        try { persistWebCommands(); } catch (_) { /* ignore */ }
+      }
+      return;
+    }
+    webCommandResultSignature = raw;
+
+    const parsed = JSON.parse(raw);
+    const list = Array.isArray(parsed?.results) ? parsed.results : (Array.isArray(parsed) ? parsed : []);
+    const now = Date.now();
+
+    list.forEach((result) => {
+      const id = result && result.id ? String(result.id) : null;
+      if (!id) return;
+      const previous = webCommandResultsById.get(id);
+      const signature = `${result.ok}:${result.message}:${result.balance}:${result.ts}`;
+      const prevSignature = previous ? `${previous.ok}:${previous.message}:${previous.balance}:${previous.ts}` : null;
+      if (signature === prevSignature) return;
+
+      const stored = {
+        id,
+        type: String(result.type || ''),
+        ok: result.ok === true,
+        message: String(result.message || ''),
+        balance: Number(result.balance) || 0,
+        ts: Number(result.ts) || 0,
+        _localTs: now,
+      };
+      webCommandResultsById.set(id, stored);
+
+      const command = webCommands.find((cmd) => cmd.id === id) || null;
+      io.emit('web-command:result', {
+        id,
+        type: stored.type || (command ? command.type : ''),
+        ok: stored.ok,
+        message: stored.message,
+        balance: stored.balance,
+        keyword: command ? command.keyword : null,
+        requested_by_id: command ? command.requested_by_id : null,
+        production_point_id: command && command.type === 'pp_upgrade' ? command.production_point_id : null,
+        airport_id: command ? command.airport_id : null,
+      });
+    });
+
+    // Drop stored results whose command is gone (avoid unbounded growth)
+    const liveIds = new Set(webCommands.map((cmd) => cmd.id));
+    for (const id of webCommandResultsById.keys()) {
+      const stored = webCommandResultsById.get(id);
+      if (!liveIds.has(id) && now - (Number(stored?._localTs) || now) > WEB_COMMAND_RESULT_GRACE_MS) {
+        webCommandResultsById.delete(id);
+      }
+    }
+
+    if (pruneWebCommands(now)) {
+      try { persistWebCommands(); } catch (_) { /* ignore */ }
+    }
+  } catch (error) {
+    console.error('Failed web command results sync from file:', error.message);
   }
 }
 
@@ -1833,6 +2129,155 @@ app.post('/api/logistics-route-visibility/:airportId', async (req, res) => {
     isPriority,
     hiddenAirportIds,
   });
+});
+
+// ==================== DCORE BRIDGE ROUTES (web -> game) ====================
+
+/**
+ * GET /api/spawn-options - Catalog of web-initiated spawns (keywords + costs).
+ */
+app.get('/api/spawn-options', (req, res) => {
+  res.json({
+    infantry: WEB_INFANTRY_OPTIONS,
+    crate: WEB_CRATE_OPTIONS,
+  });
+});
+
+/**
+ * GET /api/production-points - Current Production Points state exported by DCORE.
+ */
+app.get('/api/production-points', (req, res) => {
+  res.json({ productionPoints });
+});
+
+/**
+ * GET /api/web-spawn-markers - Live tracked crate positions from DMAS registry.
+ */
+app.get('/api/web-spawn-markers', (req, res) => {
+  res.json({ markers: webSpawnMarkers });
+});
+
+function getSessionActor(req) {
+  const user = req.session?.user;
+  if (!user) return null;
+  return {
+    id: String(user.id || '').trim() || 'unknown',
+    name: String(user.globalName || user.username || user.id || 'unknown').trim(),
+  };
+}
+
+function respondQueued(res, command) {
+  res.json({
+    success: true,
+    commandId: command.id,
+    command: {
+      id: command.id,
+      type: command.type,
+      keyword: command.keyword || null,
+    },
+  });
+}
+
+/**
+ * POST /api/production-points/:id/upgrade - Request a Production Point upgrade in-game.
+ */
+app.post('/api/production-points/:id/upgrade', (req, res) => {
+  const actor = getSessionActor(req);
+  if (!actor) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const ppId = String(req.params.id || '').trim();
+  const pp = productionPoints.find((entry) => entry.id === ppId);
+  if (!pp) {
+    return res.status(404).json({ error: 'Production point not found' });
+  }
+  if (!pp.coordinates || !Number.isFinite(pp.coordinates.lat) || !Number.isFinite(pp.coordinates.lon)) {
+    return res.status(400).json({ error: 'Production point has no known position' });
+  }
+  if (!pp.built) {
+    return res.status(400).json({ error: 'Production point is not built yet' });
+  }
+  if (pp.upgrading) {
+    return res.status(409).json({ error: 'Production point is already upgrading' });
+  }
+  if (pp.level >= pp.max_level) {
+    return res.status(400).json({ error: 'Production point is already at max level' });
+  }
+
+  const command = enqueueWebCommand({
+    id: randomUUID(),
+    type: 'pp_upgrade',
+    production_point_id: ppId,
+    airport_id: null,
+    keyword: null,
+    lat: pp.coordinates.lat,
+    lon: pp.coordinates.lon,
+    requested_by: actor.name,
+    requested_by_id: actor.id,
+    ts: Date.now(),
+  });
+
+  respondQueued(res, command);
+});
+
+function handleSpawnRequest(req, res, kind) {
+  const actor = getSessionActor(req);
+  if (!actor) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const airportId = String(req.params.id || '').trim();
+  const airport = getAirportById(airportId);
+  if (!airport) {
+    return res.status(404).json({ error: 'Airport not found' });
+  }
+
+  const keyword = String(req.body?.keyword || '').trim().toUpperCase();
+  const allowed = kind === 'inf_spawn' ? WEB_INFANTRY_KEYWORDS : WEB_CRATE_KEYWORDS;
+  if (!keyword || !allowed.has(keyword)) {
+    return res.status(400).json({ error: `Invalid keyword for ${kind}` });
+  }
+
+  const lat = Number(req.body?.lat);
+  const lon = Number(req.body?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return res.status(400).json({ error: 'Valid lat/lon are required' });
+  }
+
+  const distanceCheck = validateAirportSpawnDistance(airport, lat, lon);
+  if (!distanceCheck.ok) {
+    return res.status(400).json({ error: distanceCheck.error });
+  }
+
+  const command = enqueueWebCommand({
+    id: randomUUID(),
+    type: kind,
+    production_point_id: null,
+    airport_id: airportId,
+    keyword,
+    lat,
+    lon,
+    requested_by: actor.name,
+    requested_by_id: actor.id,
+    ts: Date.now(),
+  });
+
+  respondQueued(res, command);
+}
+
+/**
+ * POST /api/airports/:id/spawn-infantry - Body { keyword: MANPAD|SCOUT, lat, lon }
+ */
+app.post('/api/airports/:id/spawn-infantry', (req, res) => {
+  handleSpawnRequest(req, res, 'inf_spawn');
+});
+
+/**
+ * POST /api/airports/:id/spawn-crate - Body { keyword: BUILD|AMMO|FUEL|HMMWV|L118|..., lat, lon }
+ */
+app.post('/api/airports/:id/spawn-crate', (req, res) => {
+  handleSpawnRequest(req, res, 'crate_spawn');
 });
 
 // ==================== DATA ROUTES ====================
@@ -3283,6 +3728,12 @@ io.on('connection', (socket) => {
   socket.emit('logistics-route-visibility:updated', {
     hiddenAirportIds: getHiddenLogisticsRouteAirportIdsPayload(),
   });
+  socket.emit('production-points:updated', {
+    productionPoints,
+  });
+  socket.emit('web-spawn-markers:updated', {
+    markers: webSpawnMarkers,
+  });
 
   socket.on('disconnect', () => {
     console.log('🔌 Client disconnected:', socket.id);
@@ -3452,6 +3903,21 @@ setInterval(() => {
   syncAirliftPlayersFromFile();
 }, 2000);
 
+// Poll Production Points state exported by DCORE (DSCORE_Rigs.lua)
+setInterval(() => {
+  syncProductionPointsFromFile();
+}, 2000);
+
+// Poll web command results written by DCORE (DBRIDGE) and prune the queue
+setInterval(() => {
+  syncWebCommandResultsFromFile();
+}, 2000);
+
+// Poll tracked crate positions exported by DMAS
+setInterval(() => {
+  syncWebSpawnMarkersFromFile();
+}, 2000);
+
 // ==================== START SERVER ====================
 
 // Load airbase status first
@@ -3480,6 +3946,12 @@ io.emit('convoys:updated', {
 syncConvoysFromFile();
 syncDcsarFromFile();
 syncAirliftPlayersFromFile();
+
+// Initialize DCORE bridge state
+loadWebCommandsQueue();
+syncProductionPointsFromFile();
+syncWebCommandResultsFromFile();
+syncWebSpawnMarkersFromFile();
 
 httpServer.listen(PORT, () => {
   const activeAirports = airbaseStatusManager.getActiveAirports();

@@ -717,6 +717,61 @@ export async function updateLidcTemplates(payload) {
   });
 }
 
+// ==================== DCORE bridge (web -> game) ====================
+
+/**
+ * Get current Production Points state exported by DCORE.
+ */
+export async function getProductionPoints() {
+  return fetchAPI('/production-points');
+}
+
+/**
+ * Get live tracked crate positions exported by DMAS (until moved/activated in-game).
+ */
+export async function getWebSpawnMarkers() {
+  return fetchAPI('/web-spawn-markers');
+}
+
+/**
+ * Get the catalog of web-initiated spawns (infantry + crate keywords/costs).
+ */
+export async function getSpawnOptions() {
+  return fetchAPI('/spawn-options');
+}
+
+/**
+ * Request a Production Point upgrade in-game.
+ */
+export async function requestProductionPointUpgrade(productionPointId) {
+  return fetchAPI(`/production-points/${encodeURIComponent(productionPointId)}/upgrade`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+}
+
+/**
+ * Spawn infantry (INF MANPAD / INF SCOUT) at a clicked point inside a BLUE airport.
+ */
+export async function spawnAirportInfantry(airportId, keyword, lat, lon) {
+  return fetchAPI(`/airports/${encodeURIComponent(airportId)}/spawn-infantry`, {
+    method: 'POST',
+    body: JSON.stringify({ keyword, lat, lon }),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Spawn a crate (CRATE BUILD/AMMO/FUEL, slingload HMMWV/L118/...) at a clicked point inside a BLUE airport.
+ */
+export async function spawnAirportCrate(airportId, keyword, lat, lon) {
+  return fetchAPI(`/airports/${encodeURIComponent(airportId)}/spawn-crate`, {
+    method: 'POST',
+    body: JSON.stringify({ keyword, lat, lon }),
+    credentials: 'include',
+  });
+}
+
 export default {
   getServerTime,
   getAirports,
@@ -788,4 +843,10 @@ export default {
   leaveLidcSquadron,
   deleteLidcSquadron,
   updateLidcTemplates,
+  getProductionPoints,
+  getWebSpawnMarkers,
+  getSpawnOptions,
+  requestProductionPointUpgrade,
+  spawnAirportInfantry,
+  spawnAirportCrate,
 };

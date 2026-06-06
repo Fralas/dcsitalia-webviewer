@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import createGlobe from 'cobe';
 import * as mgrs from 'mgrs';
-import { MapContainer, TileLayer, CircleMarker, Marker, Polyline, Popup, Tooltip, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Circle, CircleMarker, Marker, Polyline, Popup, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import { divIcon } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import maplibregl from 'maplibre-gl';
@@ -12,13 +12,13 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import c130ModelUrl from '../assets/3D/yc-130prototype_of_c-130.glb';
 import ch47ModelUrl from '../assets/3D/ch47.glb';
 import t72ModelUrl from '../assets/3D/t90.glb';
-import { Ambulance, Anchor, Blend, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3, Forklift, MapPin, PersonStanding, Satellite, TowerControl } from 'lucide-react';
+import { Ambulance, Anchor, Blend, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3, Factory, Forklift, MapPin, PersonStanding, Satellite, TowerControl } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
 import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
-import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, createOrder, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getLogisticsRouteVisibility, getMissions, getServerTime, setAirportLogisticsRoutePriority } from '../services/api';
+import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, createOrder, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getLogisticsRouteVisibility, getMissions, getServerTime, setAirportLogisticsRoutePriority, getProductionPoints, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, spawnAirportInfantry, spawnAirportCrate } from '../services/api';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
@@ -467,6 +467,10 @@ function toLatLngPoint(position) {
   return [lat, lon];
 }
 
+const AIRPORT_SPAWN_RADIUS_M = 2500;
+const MAP_ZOOM_DEFAULT_MAX = 14;
+const MAP_ZOOM_SPAWN_MAX = 18;
+
 function haversineNm(lat1, lon1, lat2, lon2) {
   const toRad = (deg) => (deg * Math.PI) / 180;
   const rKm = 6371;
@@ -479,6 +483,10 @@ function haversineNm(lat1, lon1, lat2, lon2) {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const km = rKm * c;
   return km / 1.852;
+}
+
+function haversineMeters(lat1, lon1, lat2, lon2) {
+  return haversineNm(lat1, lon1, lat2, lon2) * 1852;
 }
 
 function interpolateLatLon(start, end, progress) {
@@ -970,6 +978,31 @@ function FlatMapZoomWatcher({ onZoomChange }) {
   return null;
 }
 
+// Captures map clicks while a web spawn is being placed (click-to-place flow).
+function FlatMapSpawnClickHandler({ active, onPlace }) {
+  useMapEvents({
+    click: (event) => {
+      if (!active) return;
+      const { lat, lng } = event.latlng || {};
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        onPlace({ lat, lon: lng });
+      }
+    },
+  });
+  return null;
+}
+
+const PRODUCTION_POINT_COLORS = {
+  BLUE: '#3b82f6',
+  RED: '#ef4444',
+  CONTESTED: '#f97316',
+  NEUTRAL: '#e2e8f0',
+};
+
+function getProductionPointColor(owner) {
+  return PRODUCTION_POINT_COLORS[String(owner || 'NEUTRAL').toUpperCase()] || PRODUCTION_POINT_COLORS.NEUTRAL;
+}
+
 function FlatMapView({
   zones,
   airportsData,
@@ -995,9 +1028,19 @@ function FlatMapView({
   animationTick,
   basemapMode,
   focusTargetKey,
+  productionPoints,
+  showProductionPoints,
+  selectedProductionPointId,
+  onProductionPointSelect,
+  spawnPlacementActive,
+  onSpawnPlace,
+  spawnAirportCenter,
+  webSpawnMarkers,
+  mapMaxZoom,
 }) {
   const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
   const activeBasemap = BASEMAP_CONFIG[basemapMode] || BASEMAP_CONFIG[BASEMAP_MODE_DARK];
+  const effectiveMaxZoom = mapMaxZoom || MAP_ZOOM_DEFAULT_MAX;
   const airportsById = useMemo(() => {
     const map = new Map();
     airportsData.forEach((airport) => map.set(airport.id, airport));
@@ -1010,7 +1053,7 @@ function FlatMapView({
         center={[center.lat, center.lon]}
         zoom={7}
         minZoom={4}
-        maxZoom={14}
+        maxZoom={effectiveMaxZoom}
         style={{ height: '100%', width: '100%' }}
         scrollWheelZoom
       >
@@ -1275,6 +1318,72 @@ function FlatMapView({
             </Tooltip>
           </Marker>
         ))}
+
+        {showProductionPoints && (productionPoints || []).map((pp) => {
+          if (!pp.coordinates || !Number.isFinite(pp.coordinates.lat) || !Number.isFinite(pp.coordinates.lon)) {
+            return null;
+          }
+          const isSelected = pp.id === selectedProductionPointId;
+          const color = getProductionPointColor(pp.owner);
+          return (
+            <CircleMarker
+              key={`pp-${pp.id}`}
+              center={[pp.coordinates.lat, pp.coordinates.lon]}
+              radius={isSelected ? 11 : 8}
+              pathOptions={{
+                color: pp.upgrading ? '#facc15' : color,
+                fillColor: color,
+                fillOpacity: isSelected ? 0.92 : 0.7,
+                weight: pp.upgrading ? 3.5 : (isSelected ? 3 : 2),
+                dashArray: pp.upgrading ? '4,3' : undefined,
+              }}
+              eventHandlers={{
+                click: () => onProductionPointSelect && onProductionPointSelect(pp.id),
+              }}
+            >
+              <Tooltip direction="top" offset={[0, -4]} opacity={0.95}>
+                {`${pp.zone_name} • LV${pp.level}${pp.upgrading ? ' • UPGRADING' : ''}`}
+              </Tooltip>
+            </CircleMarker>
+          );
+        })}
+
+        {spawnPlacementActive && spawnAirportCenter && Number.isFinite(spawnAirportCenter.lat) && Number.isFinite(spawnAirportCenter.lon) && (
+          <Circle
+            center={[spawnAirportCenter.lat, spawnAirportCenter.lon]}
+            radius={AIRPORT_SPAWN_RADIUS_M}
+            pathOptions={{
+              color: '#facc15',
+              fillColor: '#facc15',
+              fillOpacity: 0.06,
+              weight: 2,
+              dashArray: '6,6',
+            }}
+          />
+        )}
+
+        {(webSpawnMarkers || []).map((marker) => {
+          if (!Number.isFinite(marker?.lat) || !Number.isFinite(marker?.lon)) return null;
+          return (
+            <CircleMarker
+              key={`web-spawn-${marker.id}`}
+              center={[marker.lat, marker.lon]}
+              radius={7}
+              pathOptions={{
+                color: '#f59e0b',
+                fillColor: '#f59e0b',
+                fillOpacity: 0.85,
+                weight: 2,
+              }}
+            >
+              <Tooltip direction="top" offset={[0, -4]} opacity={0.95}>
+                {marker.label || marker.keyword || marker.id}
+              </Tooltip>
+            </CircleMarker>
+          );
+        })}
+
+        <FlatMapSpawnClickHandler active={spawnPlacementActive} onPlace={onSpawnPlace} />
       </MapContainer>
     </div>
   );
@@ -1305,6 +1414,12 @@ function MapLibreFlatMapView({
   onDcsarSelect,
   basemapMode,
   focusTargetKey,
+  productionPoints,
+  showProductionPoints,
+  selectedProductionPointId,
+  onProductionPointSelect,
+  spawnPlacementActive,
+  onSpawnPlace,
 }) {
   const MIN_PITCH = 0;
   const MAX_PITCH = 85;
@@ -1614,6 +1729,29 @@ function MapLibreFlatMapView({
       }];
     }),
   }), [airportsData, showAirports]);
+
+  const fcProductionPoints = useMemo(() => ({
+    type: 'FeatureCollection',
+    features: !showProductionPoints ? [] : (productionPoints || []).flatMap((pp) => {
+      if (!Number.isFinite(pp?.coordinates?.lat) || !Number.isFinite(pp?.coordinates?.lon)) return [];
+      const owner = String(pp.owner || 'NEUTRAL').toUpperCase();
+      return [{
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [pp.coordinates.lon, pp.coordinates.lat],
+        },
+        properties: {
+          id: pp.id || pp.zone_name || '',
+          name: pp.zone_name || pp.id || 'PP',
+          owner,
+          level: Number(pp.level) || 0,
+          upgrading: pp.upgrading ? 1 : 0,
+          selected: pp.id === selectedProductionPointId ? 1 : 0,
+        },
+      }];
+    }),
+  }), [productionPoints, showProductionPoints, selectedProductionPointId]);
 
   const disposeThreeNode = useCallback((node) => {
     if (!node) return;
@@ -2102,6 +2240,7 @@ function MapLibreFlatMapView({
       addGeoSource('dcsar-points-src', fcDcsarPoints);
       addGeoSource('zones-src', fcZones);
       addGeoSource('airports-src', fcAirports);
+      addGeoSource('production-points-src', fcProductionPoints);
 
       const domeLayer = {
         id: 'zone-domes-3d-layer',
@@ -2374,6 +2513,59 @@ function MapLibreFlatMapView({
         },
       });
 
+      map.addLayer({
+        id: 'production-points-layer',
+        type: 'circle',
+        source: 'production-points-src',
+        paint: {
+          'circle-radius': ['case', ['==', ['get', 'selected'], 1], 11, 8],
+          'circle-color': [
+            'match',
+            ['get', 'owner'],
+            'BLUE', '#3b82f6',
+            'RED', '#ef4444',
+            'CONTESTED', '#f97316',
+            '#e2e8f0',
+          ],
+          'circle-opacity': 0.78,
+          'circle-stroke-color': ['case', ['==', ['get', 'upgrading'], 1], '#facc15', '#ffffff'],
+          'circle-stroke-width': ['case', ['==', ['get', 'upgrading'], 1], 3, ['case', ['==', ['get', 'selected'], 1], 2.5, 1.5]],
+        },
+      });
+
+      map.addLayer({
+        id: 'production-points-hit-layer',
+        type: 'circle',
+        source: 'production-points-src',
+        paint: {
+          'circle-radius': 16,
+          'circle-color': '#000000',
+          'circle-opacity': 0.001,
+        },
+      });
+
+      map.on('click', 'production-points-hit-layer', (event) => {
+        const feature = event?.features?.[0];
+        const ppId = feature?.properties?.id;
+        if (ppId && onProductionPointSelect) onProductionPointSelect(ppId);
+      });
+
+      map.on('mousemove', 'production-points-hit-layer', (event) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const feature = event?.features?.[0];
+        const name = feature?.properties?.name || feature?.properties?.id || 'PP';
+        const level = feature?.properties?.level ?? 0;
+        const upgrading = Number(feature?.properties?.upgrading) === 1;
+        showHoverPopup(
+          event.lngLat,
+          `<div style="font-size:11px;font-weight:600;">${name} • LV${level}${upgrading ? ' • UPGRADING' : ''}</div>`
+        );
+      });
+      map.on('mouseleave', 'production-points-hit-layer', () => {
+        map.getCanvas().style.cursor = '';
+        hideHoverPopup();
+      });
+
       map.on('click', 'zones-hit-layer', (event) => {
         const feature = event?.features?.[0];
         const zoneId = feature?.properties?.id;
@@ -2638,6 +2830,38 @@ function MapLibreFlatMapView({
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const source = map.getSource('production-points-src');
+    if (source?.setData) source.setData(fcProductionPoints);
+  }, [fcProductionPoints]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const handleSpawnClick = (event) => {
+      if (!spawnPlacementActive || !onSpawnPlace) return;
+      const { lat, lng } = event.lngLat || {};
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        onSpawnPlace({ lat, lon: lng });
+      }
+    };
+
+    if (spawnPlacementActive) {
+      map.on('click', handleSpawnClick);
+      map.getCanvas().style.cursor = 'crosshair';
+    }
+
+    return () => {
+      map.off('click', handleSpawnClick);
+      if (map.getCanvas()) {
+        map.getCanvas().style.cursor = '';
+      }
+    };
+  }, [spawnPlacementActive, onSpawnPlace]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     if (!map) return;
 
     const applyBasemapVisibility = () => {
@@ -2806,8 +3030,21 @@ export default function FrontlineMap({ airportsData }) {
     showConvoys: false,
     showAirliftPlayers: false,
     showDcsar: true,
+    showProductionPoints: true,
   });
   const mapModeRef = useRef(false);
+
+  // DCORE bridge state (Production Points + web-initiated spawns)
+  const [productionPoints, setProductionPoints] = useState([]);
+  const [selectedProductionPointId, setSelectedProductionPointId] = useState(null);
+  const [spawnOptions, setSpawnOptions] = useState({ infantry: [], crate: [] });
+  // spawnMode: { airportId, type: 'inf_spawn'|'crate_spawn', keyword, label } | null
+  const [spawnMode, setSpawnMode] = useState(null);
+  const [submittingCommand, setSubmittingCommand] = useState(false);
+  const [upgradingPpId, setUpgradingPpId] = useState(null);
+  const [commandToast, setCommandToast] = useState(null);
+  const pendingCommandIdsRef = useRef(new Set());
+  const commandToastTimerRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -2988,6 +3225,60 @@ export default function FrontlineMap({ airportsData }) {
       unsubscribeAirliftPlayers && unsubscribeAirliftPlayers();
       unsubscribeDcsar && unsubscribeDcsar();
       unsubscribeRouteVisibility && unsubscribeRouteVisibility();
+    };
+  }, []);
+
+  // Initial load of Production Points + spawn catalog (DCORE bridge)
+  useEffect(() => {
+    let cancelled = false;
+    Promise.allSettled([getProductionPoints(), getSpawnOptions()]).then(([ppResult, optionsResult]) => {
+      if (cancelled) return;
+      if (ppResult.status === 'fulfilled') {
+        const list = ppResult.value?.productionPoints || ppResult.value;
+        if (Array.isArray(list)) setProductionPoints(list);
+      }
+      if (optionsResult.status === 'fulfilled' && optionsResult.value) {
+        setSpawnOptions({
+          infantry: Array.isArray(optionsResult.value.infantry) ? optionsResult.value.infantry : [],
+          crate: Array.isArray(optionsResult.value.crate) ? optionsResult.value.crate : [],
+        });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Socket subscriptions for Production Points + web command results
+  useEffect(() => {
+    const unsubscribePp = socketService.on('production-points:updated', (data) => {
+      const list = data?.productionPoints || data;
+      if (Array.isArray(list)) setProductionPoints(list);
+    });
+
+    const unsubscribeResult = socketService.on('web-command:result', (data) => {
+      if (!data || !data.id) return;
+      if (!pendingCommandIdsRef.current.has(data.id)) return;
+      pendingCommandIdsRef.current.delete(data.id);
+
+      if (commandToastTimerRef.current) {
+        clearTimeout(commandToastTimerRef.current);
+      }
+      setCommandToast({
+        ok: data.ok === true,
+        message: data.message || (data.ok ? 'Command executed.' : 'Command failed.'),
+        balance: Number.isFinite(Number(data.balance)) ? Number(data.balance) : null,
+        ts: Date.now(),
+      });
+      commandToastTimerRef.current = setTimeout(() => setCommandToast(null), 8000);
+    });
+
+    return () => {
+      unsubscribePp && unsubscribePp();
+      unsubscribeResult && unsubscribeResult();
+      if (commandToastTimerRef.current) {
+        clearTimeout(commandToastTimerRef.current);
+      }
     };
   }, []);
 
@@ -4059,6 +4350,9 @@ export default function FrontlineMap({ airportsData }) {
     if (!airportId) return;
     const normalizedAirportId = String(airportId);
     setSelectedAirportId(normalizedAirportId);
+    setSelectedZoneId(null);
+    setSelectedZoneDetailsId(null);
+    setSelectedProductionPointId(null);
   }, []);
 
   const handleToggleAirportRoutePriority = useCallback(async (airportId) => {
@@ -4081,6 +4375,90 @@ export default function FrontlineMap({ airportsData }) {
       setUpdatingRoutePriorityAirportId(null);
     }
   }, [canManageLogisticsRouteVisibility, hiddenLogisticsRouteAirportIds]);
+
+  // ===== DCORE bridge: Production Points + web spawns =====
+  const isAuthenticated = Boolean(user?.id);
+
+  const selectedProductionPoint = useMemo(
+    () => (selectedProductionPointId ? productionPoints.find((pp) => pp.id === selectedProductionPointId) || null : null),
+    [selectedProductionPointId, productionPoints]
+  );
+
+  const handleProductionPointSelect = useCallback((ppId) => {
+    setSelectedProductionPointId(ppId);
+    setSelectedAirportId(null);
+    setSelectedZoneId(null);
+    setSelectedZoneDetailsId(null);
+    setSpawnMode(null);
+  }, []);
+
+  // Keep zone / production-point / airport selection mutually exclusive (panels share the bottom-left slot).
+  useEffect(() => {
+    if (selectedZoneId) {
+      setSelectedProductionPointId(null);
+      setSelectedAirportId(null);
+    }
+  }, [selectedZoneId]);
+
+  const handleRequestUpgrade = useCallback(async (ppId) => {
+    if (!ppId) return;
+    setUpgradingPpId(ppId);
+    try {
+      const response = await requestProductionPointUpgrade(ppId);
+      if (response?.commandId) {
+        pendingCommandIdsRef.current.add(response.commandId);
+      }
+    } catch (error) {
+      console.error('Failed to request PP upgrade:', error);
+      setCommandToast({ ok: false, message: error.message || 'Failed to request upgrade.', balance: null, ts: Date.now() });
+    } finally {
+      setUpgradingPpId(null);
+    }
+  }, []);
+
+  const handleEnterSpawnMode = useCallback((airportId, type, option) => {
+    setSpawnMode({
+      airportId: String(airportId),
+      type,
+      keyword: option.keyword,
+      label: option.label || option.keyword,
+      cost: option.cost,
+    });
+    setSelectedProductionPointId(null);
+  }, []);
+
+  const handleCancelSpawnMode = useCallback(() => {
+    setSpawnMode(null);
+  }, []);
+
+  const handleSpawnPlace = useCallback(async ({ lat, lon }) => {
+    if (!spawnMode) return;
+    const { airportId, type, keyword } = spawnMode;
+    setSubmittingCommand(true);
+    try {
+      const submit = type === 'inf_spawn' ? spawnAirportInfantry : spawnAirportCrate;
+      const response = await submit(airportId, keyword, lat, lon);
+      if (response?.commandId) {
+        pendingCommandIdsRef.current.add(response.commandId);
+      }
+      setCommandToast({ ok: true, message: `Order sent: ${spawnMode.label}. Awaiting in-game result...`, balance: null, ts: Date.now() });
+    } catch (error) {
+      console.error('Failed to submit spawn command:', error);
+      setCommandToast({ ok: false, message: error.message || 'Failed to send spawn order.', balance: null, ts: Date.now() });
+    } finally {
+      setSubmittingCommand(false);
+      setSpawnMode(null);
+    }
+  }, [spawnMode]);
+
+  const canUpgradeSelectedPp = Boolean(
+    selectedProductionPoint &&
+    selectedProductionPoint.built &&
+    !selectedProductionPoint.upgrading &&
+    selectedProductionPoint.owner === 'BLUE' &&
+    Number(selectedProductionPoint.red_units || 0) === 0 &&
+    Number(selectedProductionPoint.level || 0) < Number(selectedProductionPoint.max_level || 1)
+  );
 
   return (
     <div className="h-full overflow-hidden bg-yt-bg-primary p-3">
@@ -4132,6 +4510,12 @@ export default function FrontlineMap({ airportsData }) {
                       showDcsar={filters.showDcsar}
                       basemapMode={basemapMode}
                       focusTargetKey={tacticalFocusTargetKey}
+                      productionPoints={productionPoints}
+                      showProductionPoints={filters.showProductionPoints}
+                      selectedProductionPointId={selectedProductionPointId}
+                      onProductionPointSelect={handleProductionPointSelect}
+                      spawnPlacementActive={Boolean(spawnMode)}
+                      onSpawnPlace={handleSpawnPlace}
                     />
                   ) : (
                     <FlatMapView
@@ -4159,6 +4543,12 @@ export default function FrontlineMap({ airportsData }) {
                       animationTick={animationTick}
                       basemapMode={basemapMode}
                       focusTargetKey={tacticalFocusTargetKey}
+                      productionPoints={productionPoints}
+                      showProductionPoints={filters.showProductionPoints}
+                      selectedProductionPointId={selectedProductionPointId}
+                      onProductionPointSelect={handleProductionPointSelect}
+                      spawnPlacementActive={Boolean(spawnMode)}
+                      onSpawnPlace={handleSpawnPlace}
                     />
                   )}
                 </div>
@@ -4215,6 +4605,19 @@ export default function FrontlineMap({ airportsData }) {
                       }`}
                     >
                       <Ambulance className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Toggle Production Points"
+                      title="Production Points"
+                      onClick={() => setFilters((current) => ({ ...current, showProductionPoints: !current.showProductionPoints }))}
+                      className={`rounded-md border p-2 transition-colors ${
+                        filters.showProductionPoints
+                          ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
+                          : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
+                      }`}
+                    >
+                      <Factory className="h-4 w-4" />
                     </button>
                     <button
                       type="button"
@@ -4389,6 +4792,187 @@ export default function FrontlineMap({ airportsData }) {
                       {dcsarCoordinatesFormat}
                     </span>
                   </button>
+                </div>
+              )}
+
+              {spawnMode && (
+                <div className="absolute left-1/2 top-4 z-[1100] -translate-x-1/2 rounded-lg border border-amber-400/60 bg-[#1a1505f2] px-4 py-2 text-center shadow-2xl backdrop-blur">
+                  <div className="text-sm font-semibold text-amber-200">
+                    Click inside the BLUE airport to place: {spawnMode.label}
+                  </div>
+                  <div className="mt-1 text-[11px] text-amber-100/80">
+                    Cost {spawnMode.cost} fp • {submittingCommand ? 'Sending...' : 'Awaiting map click'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCancelSpawnMode}
+                    className="mt-1 rounded border border-amber-400/60 px-2 py-0.5 text-[11px] font-semibold text-amber-200 hover:bg-amber-400/15"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+
+              {commandToast && (
+                <div
+                  className={`absolute left-1/2 bottom-4 z-[1100] -translate-x-1/2 rounded-lg border px-4 py-2 text-sm font-semibold shadow-2xl backdrop-blur ${
+                    commandToast.ok
+                      ? 'border-green-500/50 bg-[#0c1f14f2] text-green-200'
+                      : 'border-red-500/50 bg-[#1f0c0cf2] text-red-200'
+                  }`}
+                >
+                  {commandToast.message}
+                  {Number.isFinite(commandToast.balance) && (
+                    <span className="ml-2 text-yt-text-secondary">(BLUE: {commandToast.balance} fp)</span>
+                  )}
+                </div>
+              )}
+
+              {selectedProductionPoint && (
+                <div className="absolute left-4 bottom-4 z-[1000] w-[320px] rounded-xl border border-yt-border bg-[#101827f2] p-3 shadow-2xl backdrop-blur">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="text-sm font-semibold text-yt-text-primary">
+                      {selectedProductionPoint.zone_name}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedProductionPointId(null)}
+                      className="text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <div className="space-y-1 text-[12px] text-yt-text-secondary">
+                    <div className="flex items-center justify-between">
+                      <span>Owner</span>
+                      <span className="font-semibold" style={{ color: getProductionPointColor(selectedProductionPoint.owner) }}>
+                        {selectedProductionPoint.owner}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Level</span>
+                      <span className="font-semibold text-yt-text-primary">
+                        LV{selectedProductionPoint.level} / {selectedProductionPoint.max_level}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Status</span>
+                      <span className="font-semibold text-yt-text-primary">
+                        {selectedProductionPoint.built ? (selectedProductionPoint.upgrading ? 'Upgrading' : 'Built') : 'Building'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Stock</span>
+                      <span className="font-semibold text-yt-text-primary">
+                        {selectedProductionPoint.stock} / {selectedProductionPoint.max_stock}
+                      </span>
+                    </div>
+                    {Object.keys(selectedProductionPoint.required_categories || {}).length > 0 && (
+                      <div className="border-t border-yt-border/60 pt-1">
+                        <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">
+                          {selectedProductionPoint.upgrading ? 'Upgrade crates' : 'Build crates'}
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {Object.entries(selectedProductionPoint.required_categories).map(([cat, need]) => {
+                            const have = Number(selectedProductionPoint.build_counts?.[cat] || 0);
+                            const ok = have >= Number(need);
+                            return (
+                              <span
+                                key={cat}
+                                className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${
+                                  ok ? 'border-green-500/50 text-green-300' : 'border-yt-border text-yt-text-secondary'
+                                }`}
+                              >
+                                {cat} {have}/{need}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRequestUpgrade(selectedProductionPoint.id)}
+                    disabled={!isAuthenticated || !canUpgradeSelectedPp || upgradingPpId === selectedProductionPoint.id}
+                    className="mt-3 w-full rounded border border-blue-500/50 bg-blue-500/15 px-2.5 py-1.5 text-xs font-semibold text-blue-200 hover:bg-blue-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+                    title={!isAuthenticated ? 'Login required' : (!canUpgradeSelectedPp ? 'Upgrade not available' : 'Start upgrade')}
+                  >
+                    {selectedProductionPoint.upgrading
+                      ? 'Upgrade in progress...'
+                      : upgradingPpId === selectedProductionPoint.id
+                        ? 'Sending...'
+                        : 'Start Upgrade'}
+                  </button>
+                  {!isAuthenticated && (
+                    <div className="mt-1 text-center text-[10px] text-yt-text-secondary">Login to interact</div>
+                  )}
+                </div>
+              )}
+
+              {selectedAirport && (
+                <div className="absolute left-4 bottom-4 z-[1000] w-[300px] rounded-xl border border-yt-border bg-[#101827f2] p-3 shadow-2xl backdrop-blur">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="text-sm font-semibold text-yt-text-primary">
+                      Spawn @ {selectedAirport.displayName || selectedAirport.name}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedAirportId(null); setSpawnMode(null); }}
+                      className="text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  {!isAuthenticated ? (
+                    <div className="rounded border border-dashed border-yt-border px-2 py-2 text-[11px] text-yt-text-secondary">
+                      Login to spawn units and crates.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div>
+                        <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">Infantry</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(spawnOptions.infantry || []).map((option) => (
+                            <button
+                              key={option.keyword}
+                              type="button"
+                              onClick={() => handleEnterSpawnMode(selectedAirport.id, 'inf_spawn', option)}
+                              className={`rounded border px-2 py-1 text-[11px] font-semibold ${
+                                spawnMode?.keyword === option.keyword && spawnMode?.type === 'inf_spawn'
+                                  ? 'border-amber-400/70 bg-amber-400/15 text-amber-200'
+                                  : 'border-yt-border text-yt-text-primary hover:bg-yt-bg-tertiary/50'
+                              }`}
+                            >
+                              {option.label} <span className="text-yt-text-secondary">({option.cost})</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">Crates</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(spawnOptions.crate || []).map((option) => (
+                            <button
+                              key={option.keyword}
+                              type="button"
+                              onClick={() => handleEnterSpawnMode(selectedAirport.id, 'crate_spawn', option)}
+                              className={`rounded border px-2 py-1 text-[11px] font-semibold ${
+                                spawnMode?.keyword === option.keyword && spawnMode?.type === 'crate_spawn'
+                                  ? 'border-amber-400/70 bg-amber-400/15 text-amber-200'
+                                  : 'border-yt-border text-yt-text-primary hover:bg-yt-bg-tertiary/50'
+                              }`}
+                            >
+                              {option.label} <span className="text-yt-text-secondary">({option.cost})</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="text-[10px] text-yt-text-secondary">
+                        Select an item, then click inside the airport on the map to place it.
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
