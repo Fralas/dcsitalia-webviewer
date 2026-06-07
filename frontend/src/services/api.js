@@ -751,6 +751,17 @@ export async function requestProductionPointUpgrade(productionPointId) {
 }
 
 /**
+ * Retrieve production crates (RETRIEVE) at a clicked point within 500 m of the PP center.
+ */
+export async function retrieveProductionPointCrates(productionPointId, lat, lon, quantity = 1) {
+  return fetchAPI(`/production-points/${encodeURIComponent(productionPointId)}/retrieve`, {
+    method: 'POST',
+    body: JSON.stringify({ lat, lon, quantity }),
+    credentials: 'include',
+  });
+}
+
+/**
  * Spawn infantry (INF MANPAD / INF SCOUT) at a clicked point inside a BLUE airport.
  */
 export async function spawnAirportInfantry(airportId, keyword, lat, lon, quantity = 1) {

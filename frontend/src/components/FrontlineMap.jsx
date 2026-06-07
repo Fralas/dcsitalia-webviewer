@@ -18,7 +18,7 @@ import airports from '../config/airports';
 import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
 import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
-import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getLogisticsRouteVisibility, getMissions, getServerTime, setAirportLogisticsRoutePriority, getProductionPoints, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, spawnAirportInfantry, spawnAirportCrate } from '../services/api';
+import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getLogisticsRouteVisibility, getMissions, getServerTime, setAirportLogisticsRoutePriority, getProductionPoints, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate } from '../services/api';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
@@ -305,7 +305,7 @@ function getFeedTypeStyle(type) {
   if (type?.startsWith('convoy.')) return 'border-yellow-500/40 bg-yellow-500/10 text-yellow-200';
   if (type?.startsWith('dcsar.')) return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
   if (type?.startsWith('user.')) return 'border-green-500/40 bg-green-500/10 text-green-200';
-  if (type?.startsWith('dcore.pp_upgrade')) return 'border-blue-500/40 bg-blue-500/10 text-blue-200';
+  if (type?.startsWith('dcore.pp_upgrade') || type?.startsWith('dcore.pp_retrieve')) return 'border-blue-500/40 bg-blue-500/10 text-blue-200';
   if (type?.startsWith('dcore.spawn')) return 'border-amber-500/40 bg-amber-500/10 text-amber-200';
   if (type?.startsWith('dcore.dbuild')) return 'border-violet-500/40 bg-violet-500/10 text-violet-200';
   return 'border-slate-500/40 bg-slate-500/10 text-slate-200';
@@ -318,7 +318,7 @@ function getFeedTypeLabel(type) {
   if (type?.startsWith('convoy.')) return 'Convoy';
   if (type?.startsWith('dcsar.')) return 'CSAR';
   if (type?.startsWith('user.')) return 'User';
-  if (type?.startsWith('dcore.pp_upgrade')) return 'Production';
+  if (type?.startsWith('dcore.pp_upgrade') || type?.startsWith('dcore.pp_retrieve')) return 'Production';
   if (type?.startsWith('dcore.spawn')) return 'Spawn';
   if (type?.startsWith('dcore.dbuild')) return 'Build';
   return 'System';
@@ -483,6 +483,7 @@ function toLatLngPoint(position) {
 }
 
 const AIRPORT_SPAWN_RADIUS_M = 2500;
+const PP_RETRIEVE_RADIUS_M = 500;
 const SPAWN_QUANTITY_MAX = 5;
 const SPAWN_OFFSET_METERS = 2;
 const SPAWN_OFFSET_BEARING_DEG = 90;
@@ -1385,6 +1386,58 @@ function getProductionPointFactoryKind(pp) {
   return getProductionPointFactoryColor(pp) === '#3b82f6' ? 'pp-blue' : 'pp-white';
 }
 
+function formatProductionPointNumber(rawId) {
+  const id = String(rawId || '').trim();
+  const match = id.match(/^PP[_\s-]*0*(\d+)$/i);
+  return match ? match[1].padStart(2, '0') : null;
+}
+
+function formatProductionPointHoverLabel(pp) {
+  const raw = typeof pp === 'string' ? pp : (pp?.zone_name || pp?.id);
+  const num = formatProductionPointNumber(raw);
+  if (num) return `Prod. Point ${num}`;
+  return String(raw || 'PP');
+}
+
+function formatProductionPointPanelLabel(pp) {
+  const raw = typeof pp === 'string' ? pp : (pp?.zone_name || pp?.id);
+  const num = formatProductionPointNumber(raw);
+  if (num) return `Production Point ${num}`;
+  return String(raw || 'Production Point');
+}
+
+function clampRetrieveQuantity(quantity, maxStock) {
+  const max = Math.max(1, Math.floor(Number(maxStock)) || 1);
+  return Math.max(1, Math.min(max, Math.floor(Number(quantity)) || 1));
+}
+
+function RetrieveQuantitySlider({ value, max, onChange, disabled = false, tone = 'panel' }) {
+  const safeMax = Math.max(1, Math.floor(Number(max)) || 1);
+  const safeValue = clampRetrieveQuantity(value, safeMax);
+  const accentClass = tone === 'banner' ? 'accent-blue-300' : 'accent-blue-400';
+  const labelClass = tone === 'banner' ? 'text-blue-100/80' : 'text-yt-text-secondary';
+  const valueClass = tone === 'banner' ? 'text-blue-100' : 'text-yt-text-primary';
+
+  return (
+    <div>
+      <div className={`flex items-center justify-between text-[11px] ${labelClass}`}>
+        <span>Quantity</span>
+        <span className={`font-semibold ${valueClass}`}>{safeValue} / {safeMax}</span>
+      </div>
+      <input
+        type="range"
+        min={1}
+        max={safeMax}
+        step={1}
+        value={safeValue}
+        onChange={(event) => onChange(Number(event.target.value))}
+        disabled={disabled}
+        className={`mt-1.5 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-yt-border/80 ${accentClass} disabled:cursor-not-allowed disabled:opacity-50`}
+      />
+    </div>
+  );
+}
+
 function isProductionPointZone(zone, productionPoints = []) {
   const id = String(zone?.id || '').trim();
   const name = String(zone?.name || zone?.zone_name || '').trim();
@@ -1567,6 +1620,9 @@ function FlatMapView({
   spawnPlacementActive,
   onSpawnPlace,
   spawnAirportCenter,
+  retrievePlacementActive,
+  onRetrievePlace,
+  retrievePpCenter,
   crateClusters,
   mapMaxZoom,
   dbuildMapMarkers,
@@ -1579,6 +1635,10 @@ function FlatMapView({
   const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
   const activeBasemap = BASEMAP_CONFIG[basemapMode] || BASEMAP_CONFIG[BASEMAP_MODE_DARK];
   const effectiveMaxZoom = mapMaxZoom || MAP_ZOOM_DEFAULT_MAX;
+  const placementActive = spawnPlacementActive || retrievePlacementActive;
+  const placementCenter = spawnPlacementActive ? spawnAirportCenter : retrievePpCenter;
+  const placementRadiusM = spawnPlacementActive ? AIRPORT_SPAWN_RADIUS_M : PP_RETRIEVE_RADIUS_M;
+  const onPlacementPlace = spawnPlacementActive ? onSpawnPlace : onRetrievePlace;
   const airportsById = useMemo(() => {
     const map = new Map();
     airportsData.forEach((airport) => map.set(airport.id, airport));
@@ -1602,7 +1662,7 @@ function FlatMapView({
         <FlatMapZoomWatcher onZoomChange={onZoomChange} />
         <FlatMapFocus
           center={focusTargetKey ? focusCoordinates : null}
-          targetZoom={spawnPlacementActive ? 15 : undefined}
+          targetZoom={placementActive ? 15 : undefined}
         />
 
         {showAto && gridConnections.map((connection) => (
@@ -1875,16 +1935,16 @@ function FlatMapView({
               }}
             >
               <Tooltip direction="top" offset={[0, -12]} opacity={0.95}>
-                {`${pp.zone_name} • LV${pp.level}${pp.upgrading ? ' • UPGRADING' : ''}`}
+                {`${formatProductionPointHoverLabel(pp)} • LV${pp.level}${pp.upgrading ? ' • UPGRADING' : ''}`}
               </Tooltip>
             </Marker>
           );
         })}
 
-        {spawnPlacementActive && spawnAirportCenter && Number.isFinite(spawnAirportCenter.lat) && Number.isFinite(spawnAirportCenter.lon) && (
+        {placementActive && placementCenter && Number.isFinite(placementCenter.lat) && Number.isFinite(placementCenter.lon) && (
           <Circle
-            center={[spawnAirportCenter.lat, spawnAirportCenter.lon]}
-            radius={AIRPORT_SPAWN_RADIUS_M}
+            center={[placementCenter.lat, placementCenter.lon]}
+            radius={placementRadiusM}
             pathOptions={{
               color: '#facc15',
               fillColor: '#facc15',
@@ -1961,7 +2021,7 @@ function FlatMapView({
         })}
 
         <FlatMapContextMenuHandler enabled={mapContextMenuEnabled} onContextMenu={onMapContextMenu} />
-        <FlatMapSpawnClickHandler active={spawnPlacementActive} onPlace={onSpawnPlace} />
+        <FlatMapSpawnClickHandler active={placementActive} onPlace={onPlacementPlace} />
       </MapContainer>
     </div>
   );
@@ -1999,6 +2059,9 @@ function MapLibreFlatMapView({
   spawnPlacementActive,
   onSpawnPlace,
   spawnAirportCenter,
+  retrievePlacementActive,
+  onRetrievePlace,
+  retrievePpCenter,
   crateClusters,
   dbuildMapMarkers,
   selectedDbuildPlacementId,
@@ -2010,6 +2073,10 @@ function MapLibreFlatMapView({
 }) {
   const MIN_PITCH = 0;
   const MAX_PITCH = 85;
+  const placementActive = spawnPlacementActive || retrievePlacementActive;
+  const placementCenter = spawnPlacementActive ? spawnAirportCenter : retrievePpCenter;
+  const placementRadiusM = spawnPlacementActive ? AIRPORT_SPAWN_RADIUS_M : PP_RETRIEVE_RADIUS_M;
+  const onPlacementPlace = spawnPlacementActive ? onSpawnPlace : onRetrievePlace;
   const ZONE_DOME_RADIUS_METERS = 3000;
   const LOGISTICS_ROUTE_RADIUS_METERS = 120;
   const LOGISTICS_C130_MODEL_SIZE_METERS = 110;
@@ -2330,7 +2397,7 @@ function MapLibreFlatMapView({
         },
         properties: {
           id: pp.id || pp.zone_name || '',
-          name: pp.zone_name || pp.id || 'PP',
+          name: formatProductionPointHoverLabel(pp),
           owner,
           built: pp.built ? 1 : 0,
           factoryKind: getProductionPointFactoryKind(pp),
@@ -2364,19 +2431,19 @@ function MapLibreFlatMapView({
   }), [crateClusters]);
 
   const fcSpawnRadius = useMemo(() => {
-    if (!spawnPlacementActive || !spawnAirportCenter) {
+    if (!placementActive || !placementCenter) {
       return { type: 'FeatureCollection', features: [] };
     }
-    const lat = Number(spawnAirportCenter.lat);
-    const lon = Number(spawnAirportCenter.lon);
+    const lat = Number(placementCenter.lat);
+    const lon = Number(placementCenter.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
       return { type: 'FeatureCollection', features: [] };
     }
     return {
       type: 'FeatureCollection',
-      features: [circlePolygon(lat, lon, AIRPORT_SPAWN_RADIUS_M)],
+      features: [circlePolygon(lat, lon, placementRadiusM)],
     };
-  }, [spawnPlacementActive, spawnAirportCenter]);
+  }, [placementActive, placementCenter, placementRadiusM]);
 
   const fcDbuildMarkers = useMemo(() => ({
     type: 'FeatureCollection',
@@ -3308,7 +3375,7 @@ function MapLibreFlatMapView({
         );
       });
       map.on('mouseleave', 'crate-clusters-layer', () => {
-        if (!spawnPlacementActive) map.getCanvas().style.cursor = '';
+        if (!placementActive) map.getCanvas().style.cursor = '';
         hideHoverPopup();
       });
 
@@ -3386,7 +3453,7 @@ function MapLibreFlatMapView({
         showHoverPopup(event.lngLat, `<div style="font-size:11px;font-weight:600;">${label}${suffix}</div>`);
       });
       map.on('mouseleave', 'dbuild-markers-layer', () => {
-        if (!spawnPlacementActive) map.getCanvas().style.cursor = '';
+        if (!placementActive) map.getCanvas().style.cursor = '';
         hideHoverPopup();
       });
 
@@ -3749,14 +3816,14 @@ function MapLibreFlatMapView({
     if (!map) return;
 
     const handleSpawnClick = (event) => {
-      if (!spawnPlacementActive || !onSpawnPlace) return;
+      if (!placementActive || !onPlacementPlace) return;
       const { lat, lng } = event.lngLat || {};
       if (Number.isFinite(lat) && Number.isFinite(lng)) {
-        onSpawnPlace({ lat, lon: lng });
+        onPlacementPlace({ lat, lon: lng });
       }
     };
 
-    if (spawnPlacementActive) {
+    if (placementActive) {
       map.on('click', handleSpawnClick);
       map.getCanvas().style.cursor = 'crosshair';
     }
@@ -3767,7 +3834,7 @@ function MapLibreFlatMapView({
         map.getCanvas().style.cursor = '';
       }
     };
-  }, [spawnPlacementActive, onSpawnPlace]);
+  }, [placementActive, onPlacementPlace]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -3953,6 +4020,9 @@ export default function FrontlineMap({ airportsData }) {
   const [spawnOptions, setSpawnOptions] = useState({ infantry: [], crate: [] });
   // spawnMode: { airportId, type: 'inf_spawn'|'crate_spawn', keyword, label } | null
   const [spawnMode, setSpawnMode] = useState(null);
+  // retrieveMode: { ppId, quantity } | null
+  const [retrieveMode, setRetrieveMode] = useState(null);
+  const [ppRetrieveDraftQty, setPpRetrieveDraftQty] = useState(1);
   const [webSpawnMarkers, setWebSpawnMarkers] = useState([]);
   const [dbuildCatalog, setDbuildCatalog] = useState([]);
   const [dbuildPlacements, setDbuildPlacements] = useState([]);
@@ -4755,12 +4825,20 @@ export default function FrontlineMap({ airportsData }) {
     return airport?.coordinates || null;
   }, [spawnMode, airportsById]);
 
-  const mapMaxZoom = (spawnMode || selectedAirportId) ? MAP_ZOOM_AIRPORT_MAX : MAP_ZOOM_DEFAULT_MAX;
+  const retrievePpCenter = useMemo(() => {
+    if (!retrieveMode) return null;
+    const pp = productionPoints.find((entry) => entry.id === retrieveMode.ppId);
+    return pp?.coordinates || null;
+  }, [retrieveMode, productionPoints]);
 
-  const tacticalFocusCoordinates = spawnAirportCenter || selectedDcsarFocus || focusedZone?.coordinates || null;
+  const mapMaxZoom = (spawnMode || retrieveMode || selectedAirportId) ? MAP_ZOOM_AIRPORT_MAX : MAP_ZOOM_DEFAULT_MAX;
+
+  const tacticalFocusCoordinates = spawnAirportCenter || retrievePpCenter || selectedDcsarFocus || focusedZone?.coordinates || null;
   const tacticalFocusTargetKey = spawnMode
     ? `spawn:${spawnMode.airportId}`
-    : (selectedDcsarId || selectedZoneId || null);
+    : retrieveMode
+      ? `retrieve:${retrieveMode.ppId}`
+      : (selectedDcsarId || selectedZoneId || null);
 
   const handleScaleChange = (scale) => {
     if (!isDesktopDevice) return;
@@ -5354,6 +5432,7 @@ export default function FrontlineMap({ airportsData }) {
     setSelectedZoneId(null);
     setSelectedZoneDetailsId(null);
     setSelectedProductionPointId(null);
+    setRetrieveMode(null);
   }, []);
 
   const handleToggleAirportRoutePriority = useCallback(async (airportId) => {
@@ -5391,6 +5470,7 @@ export default function FrontlineMap({ airportsData }) {
     setSelectedZoneId(null);
     setSelectedZoneDetailsId(null);
     setSpawnMode(null);
+    setRetrieveMode(null);
   }, []);
 
   // Keep zone / production-point / airport selection mutually exclusive (panels share the bottom-left slot).
@@ -5427,6 +5507,7 @@ export default function FrontlineMap({ airportsData }) {
       quantity: 1,
     });
     setSelectedProductionPointId(null);
+    setRetrieveMode(null);
   }, []);
 
   const handleSetSpawnQuantity = useCallback((quantity) => {
@@ -5437,6 +5518,64 @@ export default function FrontlineMap({ airportsData }) {
   const handleCancelSpawnMode = useCallback(() => {
     setSpawnMode(null);
   }, []);
+
+  const handleEnterRetrieveMode = useCallback((ppId, quantity = 1) => {
+    const pp = productionPoints.find((entry) => entry.id === ppId);
+    const nextQty = clampRetrieveQuantity(quantity, pp?.stock);
+    setRetrieveMode({ ppId: String(ppId), quantity: nextQty });
+    setPpRetrieveDraftQty(nextQty);
+    setSelectedProductionPointId(String(ppId));
+    setSpawnMode(null);
+    setSelectedAirportId(null);
+  }, [productionPoints]);
+
+  const handleSetRetrieveQuantity = useCallback((quantity) => {
+    setRetrieveMode((current) => {
+      if (!current) return current;
+      const pp = productionPoints.find((entry) => entry.id === current.ppId);
+      const nextQty = clampRetrieveQuantity(quantity, pp?.stock);
+      setPpRetrieveDraftQty(nextQty);
+      return { ...current, quantity: nextQty };
+    });
+  }, [productionPoints]);
+
+  const handleCancelRetrieveMode = useCallback(() => {
+    setRetrieveMode(null);
+  }, []);
+
+  const handleRetrievePlace = useCallback(async ({ lat, lon }) => {
+    if (!retrieveMode) return;
+    const { ppId } = retrieveMode;
+    const pp = productionPoints.find((entry) => entry.id === ppId);
+    const quantity = clampRetrieveQuantity(retrieveMode.quantity, pp?.stock);
+    const ppCoords = pp?.coordinates;
+    if (ppCoords && Number.isFinite(ppCoords.lat) && Number.isFinite(ppCoords.lon)) {
+      const distanceM = haversineMeters(ppCoords.lat, ppCoords.lon, lat, lon);
+      if (distanceM > PP_RETRIEVE_RADIUS_M) {
+        setCommandToast({
+          ok: false,
+          message: `Placement out of range (${Math.round(distanceM)} m). Max ${PP_RETRIEVE_RADIUS_M} m from production point center.`,
+          balance: null,
+          ts: Date.now(),
+        });
+        return;
+      }
+    }
+
+    setSubmittingCommand(true);
+    try {
+      const response = await retrieveProductionPointCrates(ppId, lat, lon, quantity);
+      if (response?.commandId) {
+        pendingCommandIdsRef.current.add(response.commandId);
+      }
+      setRetrieveMode(null);
+    } catch (error) {
+      console.error('Failed to submit retrieve command:', error);
+      setCommandToast({ ok: false, message: error.message || 'Failed to send retrieve order.', balance: null, ts: Date.now() });
+    } finally {
+      setSubmittingCommand(false);
+    }
+  }, [retrieveMode, productionPoints]);
 
   const handleSpawnPlace = useCallback(async ({ lat, lon }) => {
     if (!spawnMode) return;
@@ -5491,7 +5630,7 @@ export default function FrontlineMap({ airportsData }) {
     [selectedDbuildPlacementId, dbuildPlacements]
   );
 
-  const mapContextMenuEnabled = isAuthenticated && !spawnMode;
+  const mapContextMenuEnabled = isAuthenticated && !spawnMode && !retrieveMode;
 
   useEffect(() => {
     if (!mapContextMenu) return undefined;
@@ -5569,6 +5708,7 @@ export default function FrontlineMap({ airportsData }) {
     setSelectedAirportId(null);
     setSelectedProductionPointId(null);
     setSpawnMode(null);
+    setRetrieveMode(null);
     setMapContextMenu(null);
   }, []);
 
@@ -5580,6 +5720,31 @@ export default function FrontlineMap({ airportsData }) {
     Number(selectedProductionPoint.red_units || 0) === 0 &&
     Number(selectedProductionPoint.level || 0) < Number(selectedProductionPoint.max_level || 1)
   );
+
+  const canRetrieveSelectedPp = Boolean(
+    selectedProductionPoint &&
+    selectedProductionPoint.built &&
+    selectedProductionPoint.owner === 'BLUE' &&
+    Number(selectedProductionPoint.stock || 0) > 0
+  );
+
+  const maxRetrieveQuantity = Math.max(1, Math.floor(Number(selectedProductionPoint?.stock) || 0));
+
+  const panelRetrieveQuantity = retrieveMode?.ppId === selectedProductionPoint?.id
+    ? (retrieveMode.quantity || 1)
+    : ppRetrieveDraftQty;
+
+  const retrieveBannerMaxQuantity = useMemo(() => {
+    if (!retrieveMode) return 1;
+    const pp = productionPoints.find((entry) => entry.id === retrieveMode.ppId);
+    return Math.max(1, Math.floor(Number(pp?.stock) || 0));
+  }, [retrieveMode, productionPoints]);
+
+  useEffect(() => {
+    if (!selectedProductionPoint) return;
+    const max = Math.max(1, Math.floor(Number(selectedProductionPoint.stock) || 0));
+    setPpRetrieveDraftQty((current) => clampRetrieveQuantity(current, max));
+  }, [selectedProductionPoint?.id, selectedProductionPoint?.stock]);
 
   return (
     <div className="h-full overflow-hidden bg-yt-bg-primary p-3">
@@ -5639,6 +5804,9 @@ export default function FrontlineMap({ airportsData }) {
                       spawnPlacementActive={Boolean(spawnMode)}
                       onSpawnPlace={handleSpawnPlace}
                       spawnAirportCenter={spawnAirportCenter}
+                      retrievePlacementActive={Boolean(retrieveMode)}
+                      onRetrievePlace={handleRetrievePlace}
+                      retrievePpCenter={retrievePpCenter}
                       crateClusters={crateClusters}
                       mapMaxZoom={mapMaxZoom}
                       dbuildMapMarkers={dbuildMapMarkers}
@@ -5681,6 +5849,9 @@ export default function FrontlineMap({ airportsData }) {
                       spawnPlacementActive={Boolean(spawnMode)}
                       onSpawnPlace={handleSpawnPlace}
                       spawnAirportCenter={spawnAirportCenter}
+                      retrievePlacementActive={Boolean(retrieveMode)}
+                      onRetrievePlace={handleRetrievePlace}
+                      retrievePpCenter={retrievePpCenter}
                       crateClusters={crateClusters}
                       mapMaxZoom={mapMaxZoom}
                       dbuildMapMarkers={dbuildMapMarkers}
@@ -5935,6 +6106,32 @@ export default function FrontlineMap({ airportsData }) {
                 </div>
               )}
 
+              {retrieveMode && (
+                <div className="absolute left-1/2 top-4 z-[1100] -translate-x-1/2 rounded-lg border border-blue-400/60 bg-[#0f1528f2] px-4 py-2 text-center shadow-2xl backdrop-blur">
+                  <div className="text-sm font-semibold text-blue-200">
+                    Place {retrieveMode.quantity || 1}x production crate{retrieveMode.quantity > 1 ? 's' : ''} within {PP_RETRIEVE_RADIUS_M} m of the production point
+                  </div>
+                  <div className="mt-2 w-56">
+                    <RetrieveQuantitySlider
+                      tone="banner"
+                      value={retrieveMode.quantity || 1}
+                      max={retrieveBannerMaxQuantity}
+                      onChange={handleSetRetrieveQuantity}
+                    />
+                  </div>
+                  <div className="mt-1 text-[11px] text-blue-100/80">
+                    {submittingCommand ? 'Sending...' : 'Click the highlighted area on the map'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCancelRetrieveMode}
+                    className="mt-1 rounded border border-blue-400/60 px-2 py-0.5 text-[11px] font-semibold text-blue-200 hover:bg-blue-400/15"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+
               {spawnMode && (
                 <div className="absolute left-1/2 top-4 z-[1100] -translate-x-1/2 rounded-lg border border-amber-400/60 bg-[#1a1505f2] px-4 py-2 text-center shadow-2xl backdrop-blur">
                   <div className="text-sm font-semibold text-amber-200">
@@ -6084,11 +6281,11 @@ export default function FrontlineMap({ airportsData }) {
                 <div className="absolute left-4 bottom-4 z-[1000] w-[320px] rounded-xl border border-yt-border bg-[#101827f2] p-3 shadow-2xl backdrop-blur">
                   <div className="mb-2 flex items-center justify-between">
                     <div className="text-sm font-semibold text-yt-text-primary">
-                      {selectedProductionPoint.zone_name}
+                      {formatProductionPointPanelLabel(selectedProductionPoint)}
                     </div>
                     <button
                       type="button"
-                      onClick={() => setSelectedProductionPointId(null)}
+                      onClick={() => { setSelectedProductionPointId(null); setRetrieveMode(null); }}
                       className="text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
                     >
                       Close
@@ -6143,6 +6340,34 @@ export default function FrontlineMap({ airportsData }) {
                       </div>
                     )}
                   </div>
+                  {canRetrieveSelectedPp && (
+                    <div className="mt-3 border-t border-yt-border/60 pt-3">
+                      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">
+                        Retrieve crates
+                      </div>
+                      <RetrieveQuantitySlider
+                        value={panelRetrieveQuantity}
+                        max={maxRetrieveQuantity}
+                        disabled={!isAuthenticated}
+                        onChange={(quantity) => {
+                          if (retrieveMode?.ppId === selectedProductionPoint.id) {
+                            handleSetRetrieveQuantity(quantity);
+                            return;
+                          }
+                          setPpRetrieveDraftQty(clampRetrieveQuantity(quantity, maxRetrieveQuantity));
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleEnterRetrieveMode(selectedProductionPoint.id, panelRetrieveQuantity)}
+                        disabled={!isAuthenticated || Boolean(retrieveMode)}
+                        className="mt-2 w-full rounded border border-emerald-500/50 bg-emerald-500/15 px-2.5 py-1.5 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+                        title={!isAuthenticated ? 'Login required' : 'Place retrieve marker on map (500 m range)'}
+                      >
+                        {retrieveMode?.ppId === selectedProductionPoint.id ? 'Click map to place...' : 'Retrieve'}
+                      </button>
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => handleRequestUpgrade(selectedProductionPoint.id)}
@@ -6170,7 +6395,7 @@ export default function FrontlineMap({ airportsData }) {
                     </div>
                     <button
                       type="button"
-                      onClick={() => { setSelectedAirportId(null); setSpawnMode(null); }}
+                      onClick={() => { setSelectedAirportId(null); setSpawnMode(null); setRetrieveMode(null); }}
                       className="text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
                     >
                       Close

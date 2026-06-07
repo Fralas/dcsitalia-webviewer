@@ -151,6 +151,7 @@ const DBUILD_SITES_FILE = process.env.DBUILD_SITES_FILE
 
 // Max placement distance from airport center (matches DMAS blue_airbase_radius_m).
 const AIRPORT_SPAWN_RADIUS_M = Number.parseInt(process.env.AIRPORT_SPAWN_RADIUS_M, 10) || 2500;
+const PP_RETRIEVE_RADIUS_M = Number.parseInt(process.env.PP_RETRIEVE_RADIUS_M, 10) || 500;
 const SPAWN_QUANTITY_MAX = 5;
 const SPAWN_OFFSET_METERS = 2;
 const SPAWN_OFFSET_BEARING_DEG = 90;
@@ -552,9 +553,18 @@ function formatSpawnKeywordLabel(keyword) {
   return SPAWN_FEED_LABELS[value] || (value.charAt(0) + value.slice(1).toLowerCase());
 }
 
+function formatProductionPointNumber(rawId) {
+  const id = String(rawId || '').trim();
+  const match = id.match(/^PP[_\s-]*0*(\d+)$/i);
+  return match ? match[1].padStart(2, '0') : null;
+}
+
 function getProductionPointDisplayName(ppId) {
   const pp = productionPoints.find((entry) => entry.id === ppId);
-  return pp?.zone_name || pp?.id || ppId || 'Production Point';
+  const raw = pp?.zone_name || pp?.id || ppId;
+  const num = formatProductionPointNumber(raw);
+  if (num) return `Production Point ${num}`;
+  return raw || 'Production Point';
 }
 
 function getDbuildCatalogEntry(buildType) {
@@ -684,6 +694,46 @@ function buildWebCommandFeedEvent(command, stored) {
     };
   }
 
+  if (cmdType === 'pp_retrieve') {
+    const ppName = getProductionPointDisplayName(command.production_point_id);
+    const qty = clampSpawnQuantity(command.quantity);
+    const qtyLabel = qty > 1 ? `${qty}x ` : '';
+
+    if (stored.ok) {
+      return {
+        type: 'dcore.pp_retrieve.completed',
+        title: 'Production Point retrieve',
+        message: `${actor} retrieved ${qtyLabel}crates from ${ppName}`,
+        actor: command.requested_by_id || '',
+        metadata: {
+          command_id: stored.id,
+          production_point_id: command.production_point_id,
+          airport_id: null,
+          keyword: null,
+          quantity: qty,
+          spawn_type: null,
+          ok: true,
+        },
+      };
+    }
+
+    return {
+      type: 'dcore.pp_retrieve.failed',
+      title: 'Production Point retrieve failed',
+      message: `${actor} could not retrieve crates from ${ppName}: ${stored.message || 'unknown error'}`,
+      actor: command.requested_by_id || '',
+      metadata: {
+        command_id: stored.id,
+        production_point_id: command.production_point_id,
+        airport_id: null,
+        keyword: null,
+        quantity: qty,
+        spawn_type: null,
+        ok: false,
+      },
+    };
+  }
+
   if (cmdType === 'dbuild_confirm') {
     const buildType = command.build_type || command.keyword;
     const catalog = getDbuildCatalogEntry(buildType);
@@ -765,7 +815,7 @@ function buildWebCommandFeedEvent(command, stored) {
 function maybePushWebCommandFeedEvent(command, stored) {
   if (!command || !stored?.id) return;
   const cmdType = stored.type || command.type;
-  if (!['pp_upgrade', 'inf_spawn', 'crate_spawn', 'dbuild_confirm'].includes(cmdType)) return;
+  if (!['pp_upgrade', 'pp_retrieve', 'inf_spawn', 'crate_spawn', 'dbuild_confirm'].includes(cmdType)) return;
   if (webCommandFeedEmittedIds.has(stored.id)) return;
 
   const event = buildWebCommandFeedEvent(command, stored);
@@ -1213,6 +1263,22 @@ function validateAirportSpawnDistance(airport, lat, lon) {
   return { ok: true, distanceM };
 }
 
+function validateProductionPointRetrieveDistance(pp, lat, lon) {
+  const ppLat = Number(pp?.coordinates?.lat);
+  const ppLon = Number(pp?.coordinates?.lon);
+  if (!Number.isFinite(ppLat) || !Number.isFinite(ppLon)) {
+    return { ok: false, error: 'Production point coordinates missing' };
+  }
+  const distanceM = haversineMeters(ppLat, ppLon, lat, lon);
+  if (distanceM > PP_RETRIEVE_RADIUS_M) {
+    return {
+      ok: false,
+      error: `Placement must be within ${PP_RETRIEVE_RADIUS_M} m of the production point center (${Math.round(distanceM)} m away).`,
+    };
+  }
+  return { ok: true, distanceM };
+}
+
 function syncDbuildSitesFromFile() {
   try {
     if (!fs.existsSync(DBUILD_SITES_FILE)) return;
@@ -1334,7 +1400,9 @@ function syncWebCommandResultsFromFile() {
         balance: stored.balance,
         keyword: command ? command.keyword : null,
         requested_by_id: command ? command.requested_by_id : null,
-        production_point_id: command && command.type === 'pp_upgrade' ? command.production_point_id : null,
+        production_point_id: command && (command.type === 'pp_upgrade' || command.type === 'pp_retrieve')
+          ? command.production_point_id
+          : null,
         airport_id: command ? command.airport_id : null,
       });
 
@@ -2622,6 +2690,65 @@ app.post('/api/production-points/:id/upgrade', (req, res) => {
     keyword: null,
     lat: pp.coordinates.lat,
     lon: pp.coordinates.lon,
+    requested_by: actor.name,
+    requested_by_id: actor.id,
+    ts: Date.now(),
+  });
+
+  respondQueued(res, command);
+});
+
+/**
+ * POST /api/production-points/:id/retrieve - Retrieve production crates in-game (RETRIEVE).
+ */
+app.post('/api/production-points/:id/retrieve', (req, res) => {
+  const actor = getSessionActor(req);
+  if (!actor) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const ppId = String(req.params.id || '').trim();
+  const pp = productionPoints.find((entry) => entry.id === ppId);
+  if (!pp) {
+    return res.status(404).json({ error: 'Production point not found' });
+  }
+  if (!pp.coordinates || !Number.isFinite(pp.coordinates.lat) || !Number.isFinite(pp.coordinates.lon)) {
+    return res.status(400).json({ error: 'Production point has no known position' });
+  }
+  if (!pp.built) {
+    return res.status(400).json({ error: 'Production point is not built yet' });
+  }
+  if (String(pp.owner || '').toUpperCase() !== 'BLUE') {
+    return res.status(403).json({ error: 'Production point is not BLUE-controlled' });
+  }
+
+  const stock = Math.max(0, Math.floor(Number(pp.stock) || 0));
+  if (stock <= 0) {
+    return res.status(400).json({ error: 'Production point stock is empty' });
+  }
+
+  const lat = Number(req.body?.lat);
+  const lon = Number(req.body?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return res.status(400).json({ error: 'lat and lon are required' });
+  }
+
+  const distanceCheck = validateProductionPointRetrieveDistance(pp, lat, lon);
+  if (!distanceCheck.ok) {
+    return res.status(400).json({ error: distanceCheck.error });
+  }
+
+  const quantity = Math.min(stock, clampSpawnQuantity(req.body?.quantity));
+
+  const command = enqueueWebCommand({
+    id: randomUUID(),
+    type: 'pp_retrieve',
+    production_point_id: ppId,
+    airport_id: null,
+    keyword: null,
+    lat,
+    lon,
+    quantity,
     requested_by: actor.name,
     requested_by_id: actor.id,
     ts: Date.now(),
