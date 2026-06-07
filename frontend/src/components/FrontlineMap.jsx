@@ -12,7 +12,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import c130ModelUrl from '../assets/3D/yc-130prototype_of_c-130.glb';
 import ch47ModelUrl from '../assets/3D/ch47.glb';
 import t72ModelUrl from '../assets/3D/t90.glb';
-import { Ambulance, Anchor, Blend, Box, Boxes, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChessRook, Clock3, Factory, Forklift, Hammer, MapPin, PersonStanding, Satellite, TowerControl } from 'lucide-react';
+import { Ambulance, Anchor, Blend, Box, Boxes, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChessRook, Clock3, Factory, Forklift, Hammer, MapPin, PersonStanding, Satellite, TowerControl, X } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
@@ -1409,6 +1409,20 @@ function formatProductionPointPanelLabel(pp) {
 function clampRetrieveQuantity(quantity, maxStock) {
   const max = Math.max(1, Math.floor(Number(maxStock)) || 1);
   return Math.max(1, Math.min(max, Math.floor(Number(quantity)) || 1));
+}
+
+function PanelCloseButton({ onClick, className = '' }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Close"
+      title="Close"
+      className={`inline-flex shrink-0 items-center justify-center rounded border border-yt-border p-1.5 text-yt-text-secondary transition-colors hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary ${className}`}
+    >
+      <X className="h-4 w-4" strokeWidth={2.5} />
+    </button>
+  );
 }
 
 function RetrieveQuantitySlider({ value, max, onChange, disabled = false, tone = 'panel' }) {
@@ -6203,13 +6217,7 @@ export default function FrontlineMap({ airportsData }) {
                     <div className="text-sm font-semibold text-yt-text-primary">
                       {selectedDbuildPlacement.catalog?.label || selectedDbuildPlacement.build_type}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedDbuildPlacementId(null)}
-                      className="text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
-                    >
-                      Close
-                    </button>
+                    <PanelCloseButton onClick={() => setSelectedDbuildPlacementId(null)} />
                   </div>
                   <div className="mb-2 text-[11px] uppercase tracking-[0.08em] text-yt-text-secondary">
                     Status: {selectedDbuildPlacement.status || 'draft'}
@@ -6297,13 +6305,7 @@ export default function FrontlineMap({ airportsData }) {
                     <div className="text-sm font-semibold text-yt-text-primary">
                       {formatProductionPointPanelLabel(selectedProductionPoint)}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => { setSelectedProductionPointId(null); setRetrieveMode(null); }}
-                      className="text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
-                    >
-                      Close
-                    </button>
+                    <PanelCloseButton onClick={() => { setSelectedProductionPointId(null); setRetrieveMode(null); }} />
                   </div>
                   <div className="space-y-1 text-[12px] text-yt-text-secondary">
                     <div className="flex items-center justify-between">
@@ -6407,13 +6409,7 @@ export default function FrontlineMap({ airportsData }) {
                     <div className="text-sm font-semibold text-yt-text-primary">
                       Spawn @ {selectedAirport.displayName || selectedAirport.name}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => { setSelectedAirportId(null); setSpawnMode(null); setRetrieveMode(null); }}
-                      className="text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
-                    >
-                      Close
-                    </button>
+                    <PanelCloseButton onClick={() => { setSelectedAirportId(null); setSpawnMode(null); setRetrieveMode(null); }} />
                   </div>
                   {!isAuthenticated ? (
                     <div className="rounded border border-dashed border-yt-border px-2 py-2 text-[11px] text-yt-text-secondary">
@@ -6502,13 +6498,7 @@ export default function FrontlineMap({ airportsData }) {
                     <div className="text-sm font-semibold text-yt-text-primary">
                       {selectedAirport.displayName || selectedAirport.name}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedAirportId(null)}
-                      className="text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
-                    >
-                      Close
-                    </button>
+                    <PanelCloseButton onClick={() => setSelectedAirportId(null)} />
                   </div>
                   {canManageLogisticsRouteVisibility && (
                     <div className="mb-2 flex items-center justify-between rounded border border-yt-border/70 bg-[#0c1320] px-2.5 py-1.5 text-[11px] text-yt-text-secondary">
@@ -6678,13 +6668,7 @@ export default function FrontlineMap({ airportsData }) {
                         >
                           {composingMission ? 'Creating...' : 'Create Mission'}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowLogisticsComposeWindow(false)}
-                          className="rounded border border-yt-border px-2 py-1 text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
-                        >
-                          Close
-                        </button>
+                        <PanelCloseButton onClick={() => setShowLogisticsComposeWindow(false)} />
                       </div>
                     </div>
 
@@ -6811,13 +6795,7 @@ export default function FrontlineMap({ airportsData }) {
                           {selectedAirport.displayName || selectedAirport.name}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowLogisticsRequestWindow(false)}
-                        className="rounded border border-yt-border px-2 py-1 text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
-                      >
-                        Close
-                      </button>
+                      <PanelCloseButton onClick={() => setShowLogisticsRequestWindow(false)} />
                     </div>
 
                     <div className="mb-2 text-[11px] text-yt-text-secondary">
@@ -6954,13 +6932,7 @@ export default function FrontlineMap({ airportsData }) {
                         {!user && selectedLogisticsMission.status === 'pending' && (
                           <span className="text-[10px] text-yt-text-secondary">Discord login required</span>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedLogisticsMission(null)}
-                          className="rounded border border-yt-border px-2 py-1 text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
-                        >
-                          Close
-                        </button>
+                        <PanelCloseButton onClick={() => setSelectedLogisticsMission(null)} />
                       </div>
                     </div>
 
@@ -7093,13 +7065,7 @@ export default function FrontlineMap({ airportsData }) {
                         >
                           {acceptingZoneOperationId === selectedZoneDetails.id ? 'Accepting...' : 'Accept'}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedZoneDetailsId(null)}
-                          className="rounded border border-yt-border px-2 py-1 text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
-                        >
-                          Close
-                        </button>
+                        <PanelCloseButton onClick={() => setSelectedZoneDetailsId(null)} />
                       </div>
                     </div>
 
@@ -7231,13 +7197,7 @@ export default function FrontlineMap({ airportsData }) {
                         {!user && selectedDcsarTask.status === 'pending' && (
                           <span className="text-[10px] text-yt-text-secondary">Discord login required</span>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedDcsarId(null)}
-                          className="rounded border border-yt-border px-2 py-1 text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
-                        >
-                          Close
-                        </button>
+                        <PanelCloseButton onClick={() => setSelectedDcsarId(null)} />
                       </div>
                     </div>
 
