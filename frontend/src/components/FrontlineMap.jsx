@@ -39,6 +39,8 @@ const MAPLIBRE_DBUILD_HAMMER_GREEN_IMAGE_ID = 'dbuild-hammer-green';
 const MAPLIBRE_DBUILD_ROOK_BLUE_IMAGE_ID = 'dbuild-rook-blue';
 const MAPLIBRE_CRATE_BOX_IMAGE_ID = 'crate-box-icon';
 const MAPLIBRE_CRATE_BOXES_IMAGE_ID = 'crate-boxes-icon';
+const MAPLIBRE_PP_FACTORY_WHITE_IMAGE_ID = 'pp-factory-white';
+const MAPLIBRE_PP_FACTORY_BLUE_IMAGE_ID = 'pp-factory-blue';
 const CRATE_CLUSTER_RADIUS_M = 20;
 const DBUILD_SITE_MATCH_RADIUS_M = 150;
 const MAPLIBRE_AIRPORT_ICON_SIZE = ['interpolate', ['linear'], ['zoom'], 5, 0.78, 8, 0.95, 10, 1.12];
@@ -485,7 +487,14 @@ const SPAWN_QUANTITY_MAX = 5;
 const SPAWN_OFFSET_METERS = 2;
 const SPAWN_OFFSET_BEARING_DEG = 90;
 const MAP_ZOOM_DEFAULT_MAX = 14;
-const MAP_ZOOM_SPAWN_MAX = 18;
+const MAP_ZOOM_AIRPORT_MAX = 18;
+const MAP_ZOOM_SPAWN_MAX = MAP_ZOOM_AIRPORT_MAX;
+const MAP_ICON_PP_SIZE = 26;
+const MAP_ICON_PP_FRAME = 36;
+const MAP_ICON_CRATE_SIZE = 22;
+const MAP_ICON_CRATE_FRAME = 28;
+const MAPLIBRE_PP_ICON_SIZE = 1.2;
+const MAPLIBRE_CRATE_ICON_SIZE = 1.02;
 
 const SPAWN_BANNER_DISPLAY_NAMES = {
   MANPAD: 'MANPAD',
@@ -937,7 +946,7 @@ function buildCrateSvgMarkup(kind) {
   const IconComponent = kind === 'boxes' ? Boxes : Box;
   return renderToStaticMarkup(
     <IconComponent
-      size={22}
+      size={24}
       color="#f59e0b"
       strokeWidth={2.3}
       style={{ filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))' }}
@@ -1004,22 +1013,78 @@ function createCrateClusterIcon(kind) {
   const html = renderToStaticMarkup(
     <div
       style={{
-        width: '24px',
-        height: '24px',
+        width: `${MAP_ICON_CRATE_FRAME}px`,
+        height: `${MAP_ICON_CRATE_FRAME}px`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
       }}
     >
-      <IconComponent size={20} color="#f59e0b" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))' }} />
+      <IconComponent size={MAP_ICON_CRATE_SIZE} color="#f59e0b" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))' }} />
     </div>
   );
 
+  const anchor = MAP_ICON_CRATE_FRAME / 2;
   return divIcon({
     html,
     className: 'crate-cluster-icon',
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
+    iconSize: [MAP_ICON_CRATE_FRAME, MAP_ICON_CRATE_FRAME],
+    iconAnchor: [anchor, anchor],
+  });
+}
+
+function buildProductionPointSvgMarkup(kind) {
+  const color = kind === 'pp-blue' ? '#3b82f6' : '#ffffff';
+  return renderToStaticMarkup(
+    <Factory
+      size={28}
+      color={color}
+      strokeWidth={2.3}
+      style={{ filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))' }}
+    />
+  );
+}
+
+async function ensureMapLibreProductionPointIconImages(map) {
+  const defs = [
+    { id: MAPLIBRE_PP_FACTORY_WHITE_IMAGE_ID, kind: 'pp-white' },
+    { id: MAPLIBRE_PP_FACTORY_BLUE_IMAGE_ID, kind: 'pp-blue' },
+  ];
+
+  for (const def of defs) {
+    if (map.hasImage(def.id)) continue;
+    const svg = buildProductionPointSvgMarkup(def.kind);
+    const image = await loadSvgAsImage(svg);
+    map.addImage(def.id, image, { pixelRatio: 2 });
+  }
+}
+
+function createProductionPointIcon(pp, selected = false) {
+  const color = getProductionPointFactoryColor(pp);
+  const upgrading = pp?.upgrading === true;
+  const html = renderToStaticMarkup(
+    <div
+      style={{
+        width: `${MAP_ICON_PP_FRAME}px`,
+        height: `${MAP_ICON_PP_FRAME}px`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: '999px',
+        border: selected || upgrading ? '2px solid #facc15' : 'none',
+        boxShadow: selected || upgrading ? '0 0 0 2px rgba(250, 204, 21, 0.35)' : 'none',
+      }}
+    >
+      <Factory size={MAP_ICON_PP_SIZE} color={color} strokeWidth={2.3} style={{ filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))' }} />
+    </div>
+  );
+
+  const anchor = MAP_ICON_PP_FRAME / 2;
+  return divIcon({
+    html,
+    className: 'production-point-icon',
+    iconSize: [MAP_ICON_PP_FRAME, MAP_ICON_PP_FRAME],
+    iconAnchor: [anchor, anchor],
   });
 }
 
@@ -1309,6 +1374,17 @@ function getProductionPointColor(owner) {
   return PRODUCTION_POINT_COLORS[String(owner || 'NEUTRAL').toUpperCase()] || PRODUCTION_POINT_COLORS.NEUTRAL;
 }
 
+function getProductionPointFactoryColor(pp) {
+  if (pp?.built && String(pp.owner || '').toUpperCase() === 'BLUE') {
+    return '#3b82f6';
+  }
+  return '#ffffff';
+}
+
+function getProductionPointFactoryKind(pp) {
+  return getProductionPointFactoryColor(pp) === '#3b82f6' ? 'pp-blue' : 'pp-white';
+}
+
 function getDbuildIconKind(status) {
   if (status === 'built') return 'rook-blue';
   if (status === 'draft') return 'hammer-white';
@@ -1418,8 +1494,8 @@ function clusterCratesWithinRadius(markers, radiusM = CRATE_CLUSTER_RADIUS_M) {
   return Array.from(groups.entries()).map(([root, group], index) => {
     const types = {};
     group.forEach((crate) => {
-      const typeName = crate.label || crate.keyword || crate.id || 'Crate';
-      types[typeName] = (types[typeName] || 0) + 1;
+      const category = String(crate.keyword || 'UNKNOWN').trim().toUpperCase() || 'UNKNOWN';
+      types[category] = (types[category] || 0) + 1;
     });
     const lat = group.reduce((sum, crate) => sum + crate.lat, 0) / group.length;
     const lon = group.reduce((sum, crate) => sum + crate.lon, 0) / group.length;
@@ -1778,27 +1854,19 @@ function FlatMapView({
             return null;
           }
           const isSelected = pp.id === selectedProductionPointId;
-          const color = getProductionPointColor(pp.owner);
           return (
-            <CircleMarker
+            <Marker
               key={`pp-${pp.id}`}
-              center={[pp.coordinates.lat, pp.coordinates.lon]}
-              radius={isSelected ? 11 : 8}
-              pathOptions={{
-                color: pp.upgrading ? '#facc15' : color,
-                fillColor: color,
-                fillOpacity: isSelected ? 0.92 : 0.7,
-                weight: pp.upgrading ? 3.5 : (isSelected ? 3 : 2),
-                dashArray: pp.upgrading ? '4,3' : undefined,
-              }}
+              position={[pp.coordinates.lat, pp.coordinates.lon]}
+              icon={createProductionPointIcon(pp, isSelected)}
               eventHandlers={{
                 click: () => onProductionPointSelect && onProductionPointSelect(pp.id),
               }}
             >
-              <Tooltip direction="top" offset={[0, -4]} opacity={0.95}>
+              <Tooltip direction="top" offset={[0, -12]} opacity={0.95}>
                 {`${pp.zone_name} • LV${pp.level}${pp.upgrading ? ' • UPGRADING' : ''}`}
               </Tooltip>
-            </CircleMarker>
+            </Marker>
           );
         })}
 
@@ -1927,6 +1995,7 @@ function MapLibreFlatMapView({
   mapContextMenuEnabled,
   onMapContextMenu,
   dbuildContextPoint,
+  mapMaxZoom,
 }) {
   const MIN_PITCH = 0;
   const MAX_PITCH = 85;
@@ -1942,7 +2011,7 @@ function MapLibreFlatMapView({
   const LOGISTICS_CH47_YAW_OFFSET_RAD = THREE.MathUtils.degToRad(70) + Math.PI;
   const LOGISTICS_CONVOY_YAW_OFFSET_RAD = 0;
   const MIN_SAFE_ZOOM = 5;
-  const effectiveMaxZoom = spawnPlacementActive ? MAP_ZOOM_SPAWN_MAX : 11.8;
+  const effectiveMaxZoom = mapMaxZoom || MAP_ZOOM_DEFAULT_MAX;
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const dcsarByIdRef = useRef(new Map());
@@ -2252,6 +2321,8 @@ function MapLibreFlatMapView({
           id: pp.id || pp.zone_name || '',
           name: pp.zone_name || pp.id || 'PP',
           owner,
+          built: pp.built ? 1 : 0,
+          factoryKind: getProductionPointFactoryKind(pp),
           level: Number(pp.level) || 0,
           upgrading: pp.upgrading ? 1 : 0,
           selected: pp.id === selectedProductionPointId ? 1 : 0,
@@ -2829,6 +2900,11 @@ function MapLibreFlatMapView({
       } catch (error) {
         console.error('Failed to initialize DBUILD/crate icon images:', error);
       }
+      try {
+        await ensureMapLibreProductionPointIconImages(map);
+      } catch (error) {
+        console.error('Failed to initialize production point icon images:', error);
+      }
 
       addGeoSource('grid-src', fcGrid);
       addGeoSource('logistics-src', fcLogistics);
@@ -3114,21 +3190,18 @@ function MapLibreFlatMapView({
 
       map.addLayer({
         id: 'production-points-layer',
-        type: 'circle',
+        type: 'symbol',
         source: 'production-points-src',
-        paint: {
-          'circle-radius': ['case', ['==', ['get', 'selected'], 1], 11, 8],
-          'circle-color': [
+        layout: {
+          'icon-image': [
             'match',
-            ['get', 'owner'],
-            'BLUE', '#3b82f6',
-            'RED', '#ef4444',
-            'CONTESTED', '#f97316',
-            '#e2e8f0',
+            ['get', 'factoryKind'],
+            'pp-blue', MAPLIBRE_PP_FACTORY_BLUE_IMAGE_ID,
+            MAPLIBRE_PP_FACTORY_WHITE_IMAGE_ID,
           ],
-          'circle-opacity': 0.78,
-          'circle-stroke-color': ['case', ['==', ['get', 'upgrading'], 1], '#facc15', '#ffffff'],
-          'circle-stroke-width': ['case', ['==', ['get', 'upgrading'], 1], 3, ['case', ['==', ['get', 'selected'], 1], 2.5, 1.5]],
+          'icon-size': MAPLIBRE_PP_ICON_SIZE,
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
         },
       });
 
@@ -3137,7 +3210,7 @@ function MapLibreFlatMapView({
         type: 'circle',
         source: 'production-points-src',
         paint: {
-          'circle-radius': 16,
+          'circle-radius': 20,
           'circle-color': '#000000',
           'circle-opacity': 0.001,
         },
@@ -3201,7 +3274,7 @@ function MapLibreFlatMapView({
             'boxes', MAPLIBRE_CRATE_BOXES_IMAGE_ID,
             MAPLIBRE_CRATE_BOX_IMAGE_ID,
           ],
-          'icon-size': 0.9,
+          'icon-size': MAPLIBRE_CRATE_ICON_SIZE,
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,
         },
@@ -4634,7 +4707,7 @@ export default function FrontlineMap({ airportsData }) {
     return airport?.coordinates || null;
   }, [spawnMode, airportsById]);
 
-  const mapMaxZoom = spawnMode ? MAP_ZOOM_SPAWN_MAX : MAP_ZOOM_DEFAULT_MAX;
+  const mapMaxZoom = (spawnMode || selectedAirportId) ? MAP_ZOOM_AIRPORT_MAX : MAP_ZOOM_DEFAULT_MAX;
 
   const tacticalFocusCoordinates = spawnAirportCenter || selectedDcsarFocus || focusedZone?.coordinates || null;
   const tacticalFocusTargetKey = spawnMode
@@ -5513,6 +5586,7 @@ export default function FrontlineMap({ airportsData }) {
                       onSpawnPlace={handleSpawnPlace}
                       spawnAirportCenter={spawnAirportCenter}
                       crateClusters={crateClusters}
+                      mapMaxZoom={mapMaxZoom}
                       dbuildMapMarkers={dbuildMapMarkers}
                       selectedDbuildPlacementId={selectedDbuildPlacementId}
                       onDbuildPlacementSelect={handleDbuildPlacementSelect}
