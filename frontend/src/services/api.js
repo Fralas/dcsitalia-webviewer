@@ -772,6 +772,36 @@ export async function spawnAirportCrate(airportId, keyword, lat, lon, quantity =
   });
 }
 
+export async function getDbuildCatalog() {
+  return fetchAPI('/dbuild/catalog');
+}
+
+export async function getDbuildPlacements() {
+  return fetchAPI('/dbuild/placements');
+}
+
+export async function createDbuildPlacement(buildType, lat, lon) {
+  return fetchAPI('/dbuild/placements', {
+    method: 'POST',
+    body: JSON.stringify({ build_type: buildType, lat, lon }),
+    credentials: 'include',
+  });
+}
+
+export async function confirmDbuildPlacement(placementId) {
+  return fetchAPI(`/dbuild/placements/${encodeURIComponent(placementId)}/confirm`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+}
+
+export async function cancelDbuildPlacement(placementId) {
+  return fetchAPI(`/dbuild/placements/${encodeURIComponent(placementId)}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+}
+
 export default {
   getServerTime,
   getAirports,
@@ -849,4 +879,9 @@ export default {
   requestProductionPointUpgrade,
   spawnAirportInfantry,
   spawnAirportCrate,
+  getDbuildCatalog,
+  getDbuildPlacements,
+  createDbuildPlacement,
+  confirmDbuildPlacement,
+  cancelDbuildPlacement,
 };

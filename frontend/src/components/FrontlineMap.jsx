@@ -12,13 +12,13 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import c130ModelUrl from '../assets/3D/yc-130prototype_of_c-130.glb';
 import ch47ModelUrl from '../assets/3D/ch47.glb';
 import t72ModelUrl from '../assets/3D/t90.glb';
-import { Ambulance, Anchor, Blend, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3, Factory, Forklift, MapPin, PersonStanding, Satellite, TowerControl } from 'lucide-react';
+import { Ambulance, Anchor, Blend, Box, Boxes, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChessRook, Clock3, Factory, Forklift, Hammer, MapPin, PersonStanding, Satellite, TowerControl } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
 import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
-import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, createOrder, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getLogisticsRouteVisibility, getMissions, getServerTime, setAirportLogisticsRoutePriority, getProductionPoints, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, spawnAirportInfantry, spawnAirportCrate } from '../services/api';
+import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getLogisticsRouteVisibility, getMissions, getServerTime, setAirportLogisticsRoutePriority, getProductionPoints, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, spawnAirportInfantry, spawnAirportCrate } from '../services/api';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
@@ -34,6 +34,13 @@ const MAPLIBRE_DCSAR_ICON_SIZE = ['interpolate', ['linear'], ['zoom'], 5, 1.15, 
 const MAPLIBRE_AIRPORT_ICON_TOWER_BLUE_IMAGE_ID = 'airport-tower-icon-blue';
 const MAPLIBRE_AIRPORT_ICON_TOWER_GREEN_IMAGE_ID = 'airport-tower-icon-green';
 const MAPLIBRE_AIRPORT_ICON_ANCHOR_IMAGE_ID = 'airport-anchor-icon';
+const MAPLIBRE_DBUILD_HAMMER_WHITE_IMAGE_ID = 'dbuild-hammer-white';
+const MAPLIBRE_DBUILD_HAMMER_GREEN_IMAGE_ID = 'dbuild-hammer-green';
+const MAPLIBRE_DBUILD_ROOK_BLUE_IMAGE_ID = 'dbuild-rook-blue';
+const MAPLIBRE_CRATE_BOX_IMAGE_ID = 'crate-box-icon';
+const MAPLIBRE_CRATE_BOXES_IMAGE_ID = 'crate-boxes-icon';
+const CRATE_CLUSTER_RADIUS_M = 20;
+const DBUILD_SITE_MATCH_RADIUS_M = 150;
 const MAPLIBRE_AIRPORT_ICON_SIZE = ['interpolate', ['linear'], ['zoom'], 5, 0.78, 8, 0.95, 10, 1.12];
 
 function isDesktopGlobeDevice() {
@@ -298,6 +305,7 @@ function getFeedTypeStyle(type) {
   if (type?.startsWith('user.')) return 'border-green-500/40 bg-green-500/10 text-green-200';
   if (type?.startsWith('dcore.pp_upgrade')) return 'border-blue-500/40 bg-blue-500/10 text-blue-200';
   if (type?.startsWith('dcore.spawn')) return 'border-amber-500/40 bg-amber-500/10 text-amber-200';
+  if (type?.startsWith('dcore.dbuild')) return 'border-violet-500/40 bg-violet-500/10 text-violet-200';
   return 'border-slate-500/40 bg-slate-500/10 text-slate-200';
 }
 
@@ -310,6 +318,7 @@ function getFeedTypeLabel(type) {
   if (type?.startsWith('user.')) return 'User';
   if (type?.startsWith('dcore.pp_upgrade')) return 'Production';
   if (type?.startsWith('dcore.spawn')) return 'Spawn';
+  if (type?.startsWith('dcore.dbuild')) return 'Build';
   return 'System';
 }
 
@@ -494,6 +503,84 @@ function formatSpawnBannerName(keyword) {
   const value = String(keyword || '').trim().toUpperCase();
   if (!value) return 'item';
   return SPAWN_BANNER_DISPLAY_NAMES[value] || (value.charAt(0) + value.slice(1).toLowerCase());
+}
+
+const DBUILD_CONTEXT_MENU_OFFSET_X = 16;
+const DBUILD_CONTEXT_MENU_OFFSET_Y = -12;
+const DBUILD_CONTEXT_HIGHLIGHT_RADIUS_M = 35;
+
+const DBUILD_CATALOG_FALLBACK = [
+  { id: 'mortar', label: 'Mortar' },
+  { id: 'ewr', label: 'EWR' },
+  { id: 'nasams', label: 'NASAMS' },
+  { id: 'rapier', label: 'Rapier' },
+  { id: 'farp', label: 'FARP' },
+];
+
+function DbuildMapContextMenu({
+  menu,
+  collapsed,
+  onToggleCollapsed,
+  catalog,
+  onSelect,
+}) {
+  if (!menu) return null;
+
+  const entries = catalog.length > 0 ? catalog : DBUILD_CATALOG_FALLBACK;
+
+  return (
+    <div
+      className="absolute z-[1200]"
+      style={{ left: menu.x, top: menu.y }}
+      onClick={(event) => event.stopPropagation()}
+      onContextMenu={(event) => event.preventDefault()}
+    >
+      <div
+        className={`rounded-xl border border-yt-border bg-[#151925f2] shadow-2xl backdrop-blur transition-all duration-[360ms] ease-in-out ${
+          collapsed ? 'w-[46px] p-1.5' : 'w-[228px] p-2'
+        }`}
+      >
+        <div
+          className={`overflow-hidden transition-[max-height,opacity,transform,margin-bottom] duration-[360ms] ease-in-out ${
+            collapsed
+              ? 'mb-0 max-h-0 -translate-y-1 opacity-0 pointer-events-none'
+              : 'mb-2 max-h-80 translate-y-0 opacity-100'
+          }`}
+          aria-hidden={collapsed}
+        >
+          <div className="mb-1.5 px-1 text-[11px] uppercase tracking-[0.18em] text-yt-text-secondary">
+            DBUILD
+          </div>
+          <div className="flex flex-col gap-1">
+            {entries.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                onClick={() => onSelect(entry.id)}
+                className="flex w-full items-center justify-between rounded-md border border-yt-border bg-yt-bg-tertiary/60 px-2 py-1.5 text-left text-[12px] font-semibold text-yt-text-primary transition-colors hover:border-yt-accent/50 hover:bg-yt-accent/10"
+              >
+                <span>{entry.label || entry.id}</span>
+                {Number.isFinite(entry.estimated_fp_cost) && (
+                  <span className="text-[10px] font-semibold text-yt-text-secondary">
+                    {entry.estimated_fp_cost} fp
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          className="flex w-full items-center justify-center rounded-md border border-yt-border bg-yt-bg-tertiary/60 p-2 text-yt-text-secondary transition-colors hover:text-yt-text-primary"
+          aria-label={collapsed ? 'Open DBUILD menu' : 'Close DBUILD menu'}
+          title={collapsed ? 'Open DBUILD menu' : 'Close DBUILD menu'}
+        >
+          {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 const SPAWN_MENU_SECTIONS = [
@@ -828,6 +915,114 @@ async function ensureMapLibreAirportIconImages(map) {
   }
 }
 
+function buildDbuildSvgMarkup(kind) {
+  const defs = {
+    'hammer-white': { Icon: Hammer, color: '#ffffff' },
+    'hammer-green': { Icon: Hammer, color: '#22c55e' },
+    'rook-blue': { Icon: ChessRook, color: '#3b82f6' },
+  };
+  const def = defs[kind] || defs['hammer-white'];
+  const IconComponent = def.Icon;
+  return renderToStaticMarkup(
+    <IconComponent
+      size={24}
+      color={def.color}
+      strokeWidth={2.3}
+      style={{ filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))' }}
+    />
+  );
+}
+
+function buildCrateSvgMarkup(kind) {
+  const IconComponent = kind === 'boxes' ? Boxes : Box;
+  return renderToStaticMarkup(
+    <IconComponent
+      size={22}
+      color="#f59e0b"
+      strokeWidth={2.3}
+      style={{ filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))' }}
+    />
+  );
+}
+
+async function ensureMapLibreDbuildAndCrateIconImages(map) {
+  const dbuildDefs = [
+    { id: MAPLIBRE_DBUILD_HAMMER_WHITE_IMAGE_ID, kind: 'hammer-white' },
+    { id: MAPLIBRE_DBUILD_HAMMER_GREEN_IMAGE_ID, kind: 'hammer-green' },
+    { id: MAPLIBRE_DBUILD_ROOK_BLUE_IMAGE_ID, kind: 'rook-blue' },
+  ];
+  const crateDefs = [
+    { id: MAPLIBRE_CRATE_BOX_IMAGE_ID, kind: 'box' },
+    { id: MAPLIBRE_CRATE_BOXES_IMAGE_ID, kind: 'boxes' },
+  ];
+
+  for (const def of [...dbuildDefs, ...crateDefs]) {
+    if (map.hasImage(def.id)) continue;
+    const svg = def.kind === 'box' || def.kind === 'boxes'
+      ? buildCrateSvgMarkup(def.kind)
+      : buildDbuildSvgMarkup(def.kind);
+    const image = await loadSvgAsImage(svg);
+    map.addImage(def.id, image, { pixelRatio: 2 });
+  }
+}
+
+function createDbuildMapIcon(kind, selected = false) {
+  const defs = {
+    'hammer-white': { Icon: Hammer, color: '#ffffff' },
+    'hammer-green': { Icon: Hammer, color: '#22c55e' },
+    'rook-blue': { Icon: ChessRook, color: '#3b82f6' },
+  };
+  const def = defs[kind] || defs['hammer-white'];
+  const IconComponent = def.Icon;
+  const html = renderToStaticMarkup(
+    <div
+      style={{
+        width: '28px',
+        height: '28px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: '999px',
+        border: selected ? '2px solid #facc15' : 'none',
+        boxShadow: selected ? '0 0 0 2px rgba(250, 204, 21, 0.35)' : 'none',
+      }}
+    >
+      <IconComponent size={22} color={def.color} strokeWidth={2.3} style={{ filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))' }} />
+    </div>
+  );
+
+  return divIcon({
+    html,
+    className: 'dbuild-map-icon',
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+  });
+}
+
+function createCrateClusterIcon(kind) {
+  const IconComponent = kind === 'boxes' ? Boxes : Box;
+  const html = renderToStaticMarkup(
+    <div
+      style={{
+        width: '24px',
+        height: '24px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <IconComponent size={20} color="#f59e0b" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))' }} />
+    </div>
+  );
+
+  return divIcon({
+    html,
+    className: 'crate-cluster-icon',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+}
+
 function getItemQuantity(item) {
   const orderQty = Number(item.order_quantity_needed || 0);
   const orderIsoUnits = Number(item.order_iso_units || 0);
@@ -1074,6 +1269,22 @@ function FlatMapZoomWatcher({ onZoomChange }) {
 }
 
 // Captures map clicks while a web spawn is being placed (click-to-place flow).
+function FlatMapContextMenuHandler({ enabled, onContextMenu }) {
+  useMapEvents({
+    contextmenu(event) {
+      if (!enabled || !onContextMenu) return;
+      event.originalEvent.preventDefault();
+      onContextMenu({
+        lat: event.latlng.lat,
+        lon: event.latlng.lng,
+        clientX: event.originalEvent.clientX,
+        clientY: event.originalEvent.clientY,
+      });
+    },
+  });
+  return null;
+}
+
 function FlatMapSpawnClickHandler({ active, onPlace }) {
   useMapEvents({
     click: (event) => {
@@ -1096,6 +1307,145 @@ const PRODUCTION_POINT_COLORS = {
 
 function getProductionPointColor(owner) {
   return PRODUCTION_POINT_COLORS[String(owner || 'NEUTRAL').toUpperCase()] || PRODUCTION_POINT_COLORS.NEUTRAL;
+}
+
+function getDbuildIconKind(status) {
+  if (status === 'built') return 'rook-blue';
+  if (status === 'draft') return 'hammer-white';
+  return 'hammer-green';
+}
+
+function findNearestDbuildSite(sites, lat, lon, buildType, maxDistanceM = DBUILD_SITE_MATCH_RADIUS_M) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  let best = null;
+  let bestDistance = maxDistanceM;
+  (sites || []).forEach((site) => {
+    if (buildType && site.type !== buildType) return;
+    const siteLat = Number(site.lat);
+    const siteLon = Number(site.lon);
+    if (!Number.isFinite(siteLat) || !Number.isFinite(siteLon)) return;
+    const distanceM = haversineMeters(lat, lon, siteLat, siteLon);
+    if (distanceM <= bestDistance) {
+      bestDistance = distanceM;
+      best = site;
+    }
+  });
+  return best;
+}
+
+function buildDbuildMapMarkers(placements, sites, catalog) {
+  const markers = [];
+  const matchedSiteKeys = new Set();
+  const catalogById = new Map((catalog || []).map((entry) => [entry.id, entry]));
+
+  (placements || []).forEach((placement) => {
+    if (!Number.isFinite(placement?.lat) || !Number.isFinite(placement?.lon)) return;
+    if (placement.status === 'cancelled' || placement.status === 'failed') return;
+
+    const label = placement.catalog?.label || catalogById.get(placement.build_type)?.label || placement.build_type || 'Build';
+    markers.push({
+      id: `placement-${placement.id}`,
+      lat: placement.lat,
+      lon: placement.lon,
+      kind: getDbuildIconKind(placement.status),
+      label,
+      status: placement.status || 'draft',
+      placementId: placement.id,
+      selectable: true,
+    });
+
+    const liveSite = placement.live || findNearestDbuildSite(sites, placement.lat, placement.lon, placement.build_type);
+    if (liveSite?.type && liveSite?.site_id) {
+      matchedSiteKeys.add(`${liveSite.type}:${liveSite.site_id}`);
+    }
+  });
+
+  (sites || []).forEach((site) => {
+    if (!Number.isFinite(site?.lat) || !Number.isFinite(site?.lon)) return;
+    const key = `${site.type}:${site.site_id}`;
+    if (matchedSiteKeys.has(key)) return;
+
+    const catalogEntry = catalogById.get(site.type);
+    const label = catalogEntry?.label || site.structure_name || site.type || 'Build';
+    markers.push({
+      id: `site-${key}`,
+      lat: site.lat,
+      lon: site.lon,
+      kind: getDbuildIconKind(site.built ? 'built' : 'active'),
+      label,
+      status: site.built ? 'built' : 'active',
+      placementId: null,
+      selectable: false,
+      structureName: site.structure_name || null,
+    });
+  });
+
+  return markers;
+}
+
+function clusterCratesWithinRadius(markers, radiusM = CRATE_CLUSTER_RADIUS_M) {
+  const valid = (markers || []).filter((marker) => Number.isFinite(marker?.lat) && Number.isFinite(marker?.lon));
+  const count = valid.length;
+  if (count === 0) return [];
+
+  const parent = Array.from({ length: count }, (_, index) => index);
+  const find = (index) => {
+    let current = index;
+    while (parent[current] !== current) {
+      parent[current] = parent[parent[current]];
+      current = parent[current];
+    }
+    return current;
+  };
+  const union = (left, right) => {
+    parent[find(left)] = find(right);
+  };
+
+  for (let i = 0; i < count; i += 1) {
+    for (let j = i + 1; j < count; j += 1) {
+      const distanceM = haversineMeters(valid[i].lat, valid[i].lon, valid[j].lat, valid[j].lon);
+      if (distanceM <= radiusM) union(i, j);
+    }
+  }
+
+  const groups = new Map();
+  valid.forEach((marker, index) => {
+    const root = find(index);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root).push(marker);
+  });
+
+  return Array.from(groups.entries()).map(([root, group], index) => {
+    const types = {};
+    group.forEach((crate) => {
+      const typeName = crate.label || crate.keyword || crate.id || 'Crate';
+      types[typeName] = (types[typeName] || 0) + 1;
+    });
+    const lat = group.reduce((sum, crate) => sum + crate.lat, 0) / group.length;
+    const lon = group.reduce((sum, crate) => sum + crate.lon, 0) / group.length;
+    return {
+      id: `crate-cluster-${root}-${index}`,
+      lat,
+      lon,
+      count: group.length,
+      kind: group.length === 1 ? 'box' : 'boxes',
+      types,
+    };
+  });
+}
+
+function formatCrateTypesText(types) {
+  return Object.entries(types || {})
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([typeName, qty]) => `${typeName}: ${qty}`)
+    .join('\n');
+}
+
+function formatCrateTypesHtml(types) {
+  return Object.entries(types || {})
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([typeName, qty]) => `<div>${typeName}: ${qty}</div>`)
+    .join('');
 }
 
 function FlatMapView({
@@ -1130,8 +1480,14 @@ function FlatMapView({
   spawnPlacementActive,
   onSpawnPlace,
   spawnAirportCenter,
-  webSpawnMarkers,
+  crateClusters,
   mapMaxZoom,
+  dbuildMapMarkers,
+  selectedDbuildPlacementId,
+  onDbuildPlacementSelect,
+  mapContextMenuEnabled,
+  onMapContextMenu,
+  dbuildContextPoint,
 }) {
   const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
   const activeBasemap = BASEMAP_CONFIG[basemapMode] || BASEMAP_CONFIG[BASEMAP_MODE_DARK];
@@ -1460,27 +1816,72 @@ function FlatMapView({
           />
         )}
 
-        {(webSpawnMarkers || []).map((marker) => {
-          if (!Number.isFinite(marker?.lat) || !Number.isFinite(marker?.lon)) return null;
-          return (
-            <CircleMarker
-              key={`web-spawn-${marker.id}`}
-              center={[marker.lat, marker.lon]}
-              radius={7}
+        {dbuildContextPoint && Number.isFinite(dbuildContextPoint.lat) && Number.isFinite(dbuildContextPoint.lon) && (
+          <>
+            <Circle
+              center={[dbuildContextPoint.lat, dbuildContextPoint.lon]}
+              radius={DBUILD_CONTEXT_HIGHLIGHT_RADIUS_M}
               pathOptions={{
-                color: '#f59e0b',
-                fillColor: '#f59e0b',
-                fillOpacity: 0.85,
+                color: '#facc15',
+                fillColor: '#facc15',
+                fillOpacity: 0.1,
                 weight: 2,
+                dashArray: '6,6',
               }}
+            />
+            <CircleMarker
+              center={[dbuildContextPoint.lat, dbuildContextPoint.lon]}
+              radius={9}
+              pathOptions={{
+                color: '#facc15',
+                fillColor: '#facc15',
+                fillOpacity: 0.92,
+                weight: 3,
+              }}
+            />
+          </>
+        )}
+
+        {(crateClusters || []).map((cluster) => {
+          if (!Number.isFinite(cluster?.lat) || !Number.isFinite(cluster?.lon)) return null;
+          return (
+            <Marker
+              key={`crate-cluster-${cluster.id}`}
+              position={[cluster.lat, cluster.lon]}
+              icon={createCrateClusterIcon(cluster.kind)}
             >
-              <Tooltip direction="top" offset={[0, -4]} opacity={0.95}>
-                {marker.label || marker.keyword || marker.id}
+              <Popup>
+                <div className="text-xs font-semibold whitespace-pre-line">
+                  {formatCrateTypesText(cluster.types)}
+                </div>
+              </Popup>
+              <Tooltip direction="top" offset={[0, -10]} opacity={0.95}>
+                {cluster.count === 1 ? '1 crate' : `${cluster.count} crates`}
               </Tooltip>
-            </CircleMarker>
+            </Marker>
           );
         })}
 
+        {(dbuildMapMarkers || []).map((marker) => {
+          if (!Number.isFinite(marker?.lat) || !Number.isFinite(marker?.lon)) return null;
+          const selected = marker.placementId && selectedDbuildPlacementId === marker.placementId;
+          return (
+            <Marker
+              key={`dbuild-marker-${marker.id}`}
+              position={[marker.lat, marker.lon]}
+              icon={createDbuildMapIcon(marker.kind, selected)}
+              eventHandlers={marker.selectable && marker.placementId ? {
+                click: () => onDbuildPlacementSelect && onDbuildPlacementSelect(marker.placementId),
+              } : undefined}
+            >
+              <Tooltip direction="top" offset={[0, -12]} opacity={0.95}>
+                {marker.structureName ? `${marker.label} (${marker.structureName})` : `${marker.label} • ${marker.status}`}
+              </Tooltip>
+            </Marker>
+          );
+        })}
+
+        <FlatMapContextMenuHandler enabled={mapContextMenuEnabled} onContextMenu={onMapContextMenu} />
         <FlatMapSpawnClickHandler active={spawnPlacementActive} onPlace={onSpawnPlace} />
       </MapContainer>
     </div>
@@ -1519,7 +1920,13 @@ function MapLibreFlatMapView({
   spawnPlacementActive,
   onSpawnPlace,
   spawnAirportCenter,
-  webSpawnMarkers,
+  crateClusters,
+  dbuildMapMarkers,
+  selectedDbuildPlacementId,
+  onDbuildPlacementSelect,
+  mapContextMenuEnabled,
+  onMapContextMenu,
+  dbuildContextPoint,
 }) {
   const MIN_PITCH = 0;
   const MAX_PITCH = 85;
@@ -1853,23 +2260,26 @@ function MapLibreFlatMapView({
     }),
   }), [productionPoints, showProductionPoints, selectedProductionPointId]);
 
-  const fcWebSpawnMarkers = useMemo(() => ({
+  const fcCrateClusters = useMemo(() => ({
     type: 'FeatureCollection',
-    features: (webSpawnMarkers || []).flatMap((marker) => {
-      if (!Number.isFinite(marker?.lat) || !Number.isFinite(marker?.lon)) return [];
+    features: (crateClusters || []).flatMap((cluster) => {
+      if (!Number.isFinite(cluster?.lat) || !Number.isFinite(cluster?.lon)) return [];
       return [{
         type: 'Feature',
         geometry: {
           type: 'Point',
-          coordinates: [marker.lon, marker.lat],
+          coordinates: [cluster.lon, cluster.lat],
         },
         properties: {
-          id: marker.id || '',
-          label: marker.label || marker.keyword || marker.id || 'Crate',
+          id: cluster.id || '',
+          kind: cluster.kind || 'box',
+          count: cluster.count || 1,
+          typesHtml: formatCrateTypesHtml(cluster.types),
+          typesText: formatCrateTypesText(cluster.types),
         },
       }];
     }),
-  }), [webSpawnMarkers]);
+  }), [crateClusters]);
 
   const fcSpawnRadius = useMemo(() => {
     if (!spawnPlacementActive || !spawnAirportCenter) {
@@ -1885,6 +2295,57 @@ function MapLibreFlatMapView({
       features: [circlePolygon(lat, lon, AIRPORT_SPAWN_RADIUS_M)],
     };
   }, [spawnPlacementActive, spawnAirportCenter]);
+
+  const fcDbuildMarkers = useMemo(() => ({
+    type: 'FeatureCollection',
+    features: (dbuildMapMarkers || []).flatMap((marker) => {
+      if (!Number.isFinite(marker?.lat) || !Number.isFinite(marker?.lon)) return [];
+      return [{
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [marker.lon, marker.lat],
+        },
+        properties: {
+          id: marker.id || '',
+          placementId: marker.placementId || '',
+          label: marker.label || 'Build',
+          status: marker.status || 'draft',
+          kind: marker.kind || 'hammer-white',
+          selectable: marker.selectable ? 1 : 0,
+          selected: marker.placementId && marker.placementId === selectedDbuildPlacementId ? 1 : 0,
+          structureName: marker.structureName || '',
+        },
+      }];
+    }),
+  }), [dbuildMapMarkers, selectedDbuildPlacementId]);
+
+  const fcDbuildContextPoint = useMemo(() => {
+    if (!dbuildContextPoint || !Number.isFinite(dbuildContextPoint.lat) || !Number.isFinite(dbuildContextPoint.lon)) {
+      return { type: 'FeatureCollection', features: [] };
+    }
+    return {
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [dbuildContextPoint.lon, dbuildContextPoint.lat],
+        },
+        properties: { id: 'dbuild-context-point' },
+      }],
+    };
+  }, [dbuildContextPoint]);
+
+  const fcDbuildContextRing = useMemo(() => {
+    if (!dbuildContextPoint || !Number.isFinite(dbuildContextPoint.lat) || !Number.isFinite(dbuildContextPoint.lon)) {
+      return { type: 'FeatureCollection', features: [] };
+    }
+    return {
+      type: 'FeatureCollection',
+      features: [circlePolygon(dbuildContextPoint.lat, dbuildContextPoint.lon, DBUILD_CONTEXT_HIGHLIGHT_RADIUS_M)],
+    };
+  }, [dbuildContextPoint]);
 
   const disposeThreeNode = useCallback((node) => {
     if (!node) return;
@@ -2363,6 +2824,11 @@ function MapLibreFlatMapView({
       } catch (error) {
         console.error('Failed to initialize airport icon image:', error);
       }
+      try {
+        await ensureMapLibreDbuildAndCrateIconImages(map);
+      } catch (error) {
+        console.error('Failed to initialize DBUILD/crate icon images:', error);
+      }
 
       addGeoSource('grid-src', fcGrid);
       addGeoSource('logistics-src', fcLogistics);
@@ -2699,7 +3165,7 @@ function MapLibreFlatMapView({
         hideHoverPopup();
       });
 
-      addGeoSource('web-spawn-markers-src', fcWebSpawnMarkers);
+      addGeoSource('crate-clusters-src', fcCrateClusters);
       addGeoSource('spawn-radius-src', fcSpawnRadius);
 
       map.addLayer({
@@ -2725,25 +3191,117 @@ function MapLibreFlatMapView({
       });
 
       map.addLayer({
-        id: 'web-spawn-markers-layer',
-        type: 'circle',
-        source: 'web-spawn-markers-src',
-        paint: {
-          'circle-radius': 7,
-          'circle-color': '#f59e0b',
-          'circle-opacity': 0.85,
-          'circle-stroke-color': '#ffffff',
-          'circle-stroke-width': 1.5,
+        id: 'crate-clusters-layer',
+        type: 'symbol',
+        source: 'crate-clusters-src',
+        layout: {
+          'icon-image': [
+            'match',
+            ['get', 'kind'],
+            'boxes', MAPLIBRE_CRATE_BOXES_IMAGE_ID,
+            MAPLIBRE_CRATE_BOX_IMAGE_ID,
+          ],
+          'icon-size': 0.9,
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
         },
       });
 
-      map.on('mousemove', 'web-spawn-markers-layer', (event) => {
+      map.on('click', 'crate-clusters-layer', (event) => {
+        const feature = event?.features?.[0];
+        const typesHtml = feature?.properties?.typesHtml || '';
+        if (typesHtml) {
+          showHoverPopup(event.lngLat, `<div style="font-size:11px;font-weight:600;white-space:pre-line;">${typesHtml}</div>`);
+        }
+      });
+      map.on('mousemove', 'crate-clusters-layer', (event) => {
         map.getCanvas().style.cursor = 'pointer';
         const feature = event?.features?.[0];
-        const label = feature?.properties?.label || 'Crate';
-        showHoverPopup(event.lngLat, `<div style="font-size:11px;font-weight:600;">${label}</div>`);
+        const count = Number(feature?.properties?.count) || 1;
+        showHoverPopup(
+          event.lngLat,
+          `<div style="font-size:11px;font-weight:600;">${count === 1 ? '1 crate' : `${count} crates`}</div>`
+        );
       });
-      map.on('mouseleave', 'web-spawn-markers-layer', () => {
+      map.on('mouseleave', 'crate-clusters-layer', () => {
+        if (!spawnPlacementActive) map.getCanvas().style.cursor = '';
+        hideHoverPopup();
+      });
+
+      addGeoSource('dbuild-context-ring-src', fcDbuildContextRing);
+      addGeoSource('dbuild-context-point-src', fcDbuildContextPoint);
+      addGeoSource('dbuild-markers-src', fcDbuildMarkers);
+
+      map.addLayer({
+        id: 'dbuild-context-ring-fill-layer',
+        type: 'fill',
+        source: 'dbuild-context-ring-src',
+        paint: {
+          'fill-color': '#facc15',
+          'fill-opacity': 0.1,
+        },
+      });
+      map.addLayer({
+        id: 'dbuild-context-ring-line-layer',
+        type: 'line',
+        source: 'dbuild-context-ring-src',
+        paint: {
+          'line-color': '#facc15',
+          'line-width': 2,
+          'line-dasharray': [2, 2],
+          'line-opacity': 0.9,
+        },
+      });
+      map.addLayer({
+        id: 'dbuild-context-point-layer',
+        type: 'circle',
+        source: 'dbuild-context-point-src',
+        paint: {
+          'circle-radius': 9,
+          'circle-color': '#facc15',
+          'circle-opacity': 0.92,
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 2,
+        },
+      });
+
+      map.addLayer({
+        id: 'dbuild-markers-layer',
+        type: 'symbol',
+        source: 'dbuild-markers-src',
+        layout: {
+          'icon-image': [
+            'match',
+            ['get', 'kind'],
+            'rook-blue', MAPLIBRE_DBUILD_ROOK_BLUE_IMAGE_ID,
+            'hammer-green', MAPLIBRE_DBUILD_HAMMER_GREEN_IMAGE_ID,
+            MAPLIBRE_DBUILD_HAMMER_WHITE_IMAGE_ID,
+          ],
+          'icon-size': 0.95,
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+        },
+        paint: {
+          'icon-opacity': 1,
+        },
+      });
+
+      map.on('click', 'dbuild-markers-layer', (event) => {
+        const feature = event?.features?.[0];
+        const placementId = feature?.properties?.placementId;
+        const selectable = Number(feature?.properties?.selectable) === 1;
+        if (selectable && placementId && onDbuildPlacementSelect) onDbuildPlacementSelect(placementId);
+      });
+      map.on('mousemove', 'dbuild-markers-layer', (event) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const feature = event?.features?.[0];
+        const label = feature?.properties?.label || 'Build';
+        const status = feature?.properties?.status || 'draft';
+        const structureName = feature?.properties?.structureName || '';
+        const suffix = structureName ? ` (${structureName})` : ` • ${status}`;
+        showHoverPopup(event.lngLat, `<div style="font-size:11px;font-weight:600;">${label}${suffix}</div>`);
+      });
+      map.on('mouseleave', 'dbuild-markers-layer', () => {
         if (!spawnPlacementActive) map.getCanvas().style.cursor = '';
         hideHoverPopup();
       });
@@ -3020,9 +3578,9 @@ function MapLibreFlatMapView({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    const source = map.getSource('web-spawn-markers-src');
-    if (source?.setData) source.setData(fcWebSpawnMarkers);
-  }, [fcWebSpawnMarkers]);
+    const source = map.getSource('crate-clusters-src');
+    if (source?.setData) source.setData(fcCrateClusters);
+  }, [fcCrateClusters]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -3033,9 +3591,52 @@ function MapLibreFlatMapView({
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const source = map.getSource('dbuild-markers-src');
+    if (source?.setData) source.setData(fcDbuildMarkers);
+  }, [fcDbuildMarkers]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const ringSource = map.getSource('dbuild-context-ring-src');
+    if (ringSource?.setData) ringSource.setData(fcDbuildContextRing);
+    const pointSource = map.getSource('dbuild-context-point-src');
+    if (pointSource?.setData) pointSource.setData(fcDbuildContextPoint);
+  }, [fcDbuildContextRing, fcDbuildContextPoint]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     if (!map) return;
     map.setMaxZoom(effectiveMaxZoom);
   }, [effectiveMaxZoom]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const handleContextMenu = (event) => {
+      if (!mapContextMenuEnabled || !onMapContextMenu) return;
+      event.preventDefault();
+      const { lat, lng } = event.lngLat || {};
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      const rect = map.getContainer().getBoundingClientRect();
+      onMapContextMenu({
+        lat,
+        lon: lng,
+        clientX: rect.left + event.point.x,
+        clientY: rect.top + event.point.y,
+      });
+    };
+
+    if (mapContextMenuEnabled) {
+      map.on('contextmenu', handleContextMenu);
+    }
+
+    return () => {
+      map.off('contextmenu', handleContextMenu);
+    };
+  }, [mapContextMenuEnabled, onMapContextMenu]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -3247,6 +3848,14 @@ export default function FrontlineMap({ airportsData }) {
   // spawnMode: { airportId, type: 'inf_spawn'|'crate_spawn', keyword, label } | null
   const [spawnMode, setSpawnMode] = useState(null);
   const [webSpawnMarkers, setWebSpawnMarkers] = useState([]);
+  const [dbuildCatalog, setDbuildCatalog] = useState([]);
+  const [dbuildPlacements, setDbuildPlacements] = useState([]);
+  const [dbuildSites, setDbuildSites] = useState([]);
+  const [selectedDbuildPlacementId, setSelectedDbuildPlacementId] = useState(null);
+  const [mapContextMenu, setMapContextMenu] = useState(null);
+  const [dbuildMenuCollapsed, setDbuildMenuCollapsed] = useState(false);
+  const [confirmingDbuildId, setConfirmingDbuildId] = useState(null);
+  const mapSectionRef = useRef(null);
   const [submittingCommand, setSubmittingCommand] = useState(false);
   const [upgradingPpId, setUpgradingPpId] = useState(null);
   const [commandToast, setCommandToast] = useState(null);
@@ -3438,7 +4047,7 @@ export default function FrontlineMap({ airportsData }) {
   // Initial load of Production Points + spawn catalog (DCORE bridge)
   useEffect(() => {
     let cancelled = false;
-    Promise.allSettled([getProductionPoints(), getSpawnOptions(), getWebSpawnMarkers()]).then(([ppResult, optionsResult, markersResult]) => {
+    Promise.allSettled([getProductionPoints(), getSpawnOptions(), getWebSpawnMarkers(), getDbuildCatalog(), getDbuildPlacements()]).then(([ppResult, optionsResult, markersResult, dbuildCatalogResult, dbuildPlacementsResult]) => {
       if (cancelled) return;
       if (ppResult.status === 'fulfilled') {
         const list = ppResult.value?.productionPoints || ppResult.value;
@@ -3453,6 +4062,16 @@ export default function FrontlineMap({ airportsData }) {
       if (markersResult.status === 'fulfilled' && markersResult.value) {
         const list = markersResult.value?.markers || markersResult.value;
         if (Array.isArray(list)) setWebSpawnMarkers(list);
+      }
+      if (dbuildCatalogResult.status === 'fulfilled' && dbuildCatalogResult.value) {
+        const list = dbuildCatalogResult.value?.types || dbuildCatalogResult.value;
+        if (Array.isArray(list)) setDbuildCatalog(list);
+      }
+      if (dbuildPlacementsResult.status === 'fulfilled' && dbuildPlacementsResult.value) {
+        const list = dbuildPlacementsResult.value?.placements || dbuildPlacementsResult.value;
+        if (Array.isArray(list)) setDbuildPlacements(list);
+        const sites = dbuildPlacementsResult.value?.sites;
+        if (Array.isArray(sites)) setDbuildSites(sites);
       }
     });
     return () => {
@@ -3472,13 +4091,25 @@ export default function FrontlineMap({ airportsData }) {
       if (Array.isArray(list)) setWebSpawnMarkers(list);
     });
 
+    const unsubscribeDbuildPlacements = socketService.on('dbuild-placements:updated', (data) => {
+      const list = data?.placements || data;
+      if (Array.isArray(list)) setDbuildPlacements(list);
+      if (Array.isArray(data?.sites)) setDbuildSites(data.sites);
+    });
+
+    const unsubscribeDbuildSites = socketService.on('dbuild-sites:updated', (data) => {
+      if (Array.isArray(data?.sites)) setDbuildSites(data.sites);
+      if (Array.isArray(data?.placements)) setDbuildPlacements(data.placements);
+    });
+
     const unsubscribeResult = socketService.on('web-command:result', (data) => {
       if (!data || !data.id) return;
       if (!pendingCommandIdsRef.current.has(data.id)) return;
       pendingCommandIdsRef.current.delete(data.id);
 
       const isSpawn = data.type === 'inf_spawn' || data.type === 'crate_spawn';
-      if (isSpawn && data.ok === true) return;
+      const isDbuild = data.type === 'dbuild_confirm';
+      if ((isSpawn || isDbuild) && data.ok === true) return;
 
       if (commandToastTimerRef.current) {
         clearTimeout(commandToastTimerRef.current);
@@ -3495,6 +4126,8 @@ export default function FrontlineMap({ airportsData }) {
     return () => {
       unsubscribePp && unsubscribePp();
       unsubscribeMarkers && unsubscribeMarkers();
+      unsubscribeDbuildPlacements && unsubscribeDbuildPlacements();
+      unsubscribeDbuildSites && unsubscribeDbuildSites();
       unsubscribeResult && unsubscribeResult();
       if (commandToastTimerRef.current) {
         clearTimeout(commandToastTimerRef.current);
@@ -4716,6 +5349,102 @@ export default function FrontlineMap({ airportsData }) {
     }
   }, [spawnMode, airportsById]);
 
+  const dbuildMapMarkers = useMemo(
+    () => buildDbuildMapMarkers(dbuildPlacements, dbuildSites, dbuildCatalog),
+    [dbuildPlacements, dbuildSites, dbuildCatalog]
+  );
+
+  const crateClusters = useMemo(
+    () => clusterCratesWithinRadius(webSpawnMarkers, CRATE_CLUSTER_RADIUS_M),
+    [webSpawnMarkers]
+  );
+
+  const selectedDbuildPlacement = useMemo(
+    () => (selectedDbuildPlacementId ? dbuildPlacements.find((entry) => entry.id === selectedDbuildPlacementId) || null : null),
+    [selectedDbuildPlacementId, dbuildPlacements]
+  );
+
+  const mapContextMenuEnabled = isAuthenticated && !spawnMode;
+
+  useEffect(() => {
+    if (!mapContextMenu) return undefined;
+    const closeMenu = () => setMapContextMenu(null);
+    window.addEventListener('click', closeMenu);
+    return () => {
+      window.removeEventListener('click', closeMenu);
+    };
+  }, [mapContextMenu]);
+
+  const handleMapContextMenu = useCallback((payload) => {
+    if (!mapContextMenuEnabled || !mapSectionRef.current) return;
+    const rect = mapSectionRef.current.getBoundingClientRect();
+    setMapContextMenu({
+      lat: payload.lat,
+      lon: payload.lon,
+      x: payload.clientX - rect.left + DBUILD_CONTEXT_MENU_OFFSET_X,
+      y: payload.clientY - rect.top + DBUILD_CONTEXT_MENU_OFFSET_Y,
+    });
+    setDbuildMenuCollapsed(false);
+    setSelectedDbuildPlacementId(null);
+  }, [mapContextMenuEnabled]);
+
+  const dbuildContextPoint = mapContextMenu
+    ? { lat: mapContextMenu.lat, lon: mapContextMenu.lon }
+    : null;
+
+  const handleCreateDbuildDraft = useCallback(async (buildType) => {
+    if (!mapContextMenu || !buildType) return;
+    setMapContextMenu(null);
+    try {
+      const response = await createDbuildPlacement(buildType, mapContextMenu.lat, mapContextMenu.lon);
+      const placement = response?.placement;
+      if (placement?.id) {
+        setSelectedDbuildPlacementId(placement.id);
+        setSpawnMode(null);
+      }
+    } catch (error) {
+      console.error('Failed to create DBUILD draft:', error);
+      setCommandToast({ ok: false, message: error.message || 'Failed to place build draft.', balance: null, ts: Date.now() });
+    }
+  }, [mapContextMenu]);
+
+  const handleConfirmDbuildPlacement = useCallback(async (placementId) => {
+    if (!placementId) return;
+    setConfirmingDbuildId(placementId);
+    try {
+      const response = await confirmDbuildPlacement(placementId);
+      if (response?.commandId) {
+        pendingCommandIdsRef.current.add(response.commandId);
+      }
+    } catch (error) {
+      console.error('Failed to confirm DBUILD placement:', error);
+      setCommandToast({ ok: false, message: error.message || 'Failed to confirm build placement.', balance: null, ts: Date.now() });
+    } finally {
+      setConfirmingDbuildId(null);
+    }
+  }, []);
+
+  const handleCancelDbuildDraft = useCallback(async (placementId) => {
+    if (!placementId) return;
+    try {
+      await cancelDbuildPlacement(placementId);
+      if (selectedDbuildPlacementId === placementId) {
+        setSelectedDbuildPlacementId(null);
+      }
+    } catch (error) {
+      console.error('Failed to cancel DBUILD draft:', error);
+      setCommandToast({ ok: false, message: error.message || 'Failed to cancel build draft.', balance: null, ts: Date.now() });
+    }
+  }, [selectedDbuildPlacementId]);
+
+  const handleDbuildPlacementSelect = useCallback((placementId) => {
+    setSelectedDbuildPlacementId(placementId);
+    setSelectedAirportId(null);
+    setSelectedProductionPointId(null);
+    setSpawnMode(null);
+    setMapContextMenu(null);
+  }, []);
+
   const canUpgradeSelectedPp = Boolean(
     selectedProductionPoint &&
     selectedProductionPoint.built &&
@@ -4731,6 +5460,7 @@ export default function FrontlineMap({ airportsData }) {
         <div className="min-h-0 h-full">
           <section className="relative flex h-full min-h-[320px] min-w-0 flex-col overflow-hidden rounded-2xl border border-yt-border bg-yt-bg-secondary/75 backdrop-blur">
             <div
+              ref={mapSectionRef}
               className={`relative min-h-0 flex-1 transition-[filter] duration-300 ${
                 isPreLaunchCountdownActive ? 'pointer-events-none select-none blur-[8px]' : ''
               }`}
@@ -4782,7 +5512,13 @@ export default function FrontlineMap({ airportsData }) {
                       spawnPlacementActive={Boolean(spawnMode)}
                       onSpawnPlace={handleSpawnPlace}
                       spawnAirportCenter={spawnAirportCenter}
-                      webSpawnMarkers={webSpawnMarkers}
+                      crateClusters={crateClusters}
+                      dbuildMapMarkers={dbuildMapMarkers}
+                      selectedDbuildPlacementId={selectedDbuildPlacementId}
+                      onDbuildPlacementSelect={handleDbuildPlacementSelect}
+                      mapContextMenuEnabled={mapContextMenuEnabled}
+                      onMapContextMenu={handleMapContextMenu}
+                      dbuildContextPoint={dbuildContextPoint}
                     />
                   ) : (
                     <FlatMapView
@@ -4817,8 +5553,14 @@ export default function FrontlineMap({ airportsData }) {
                       spawnPlacementActive={Boolean(spawnMode)}
                       onSpawnPlace={handleSpawnPlace}
                       spawnAirportCenter={spawnAirportCenter}
-                      webSpawnMarkers={webSpawnMarkers}
+                      crateClusters={crateClusters}
                       mapMaxZoom={mapMaxZoom}
+                      dbuildMapMarkers={dbuildMapMarkers}
+                      selectedDbuildPlacementId={selectedDbuildPlacementId}
+                      onDbuildPlacementSelect={handleDbuildPlacementSelect}
+                      mapContextMenuEnabled={mapContextMenuEnabled}
+                      onMapContextMenu={handleMapContextMenu}
+                      dbuildContextPoint={dbuildContextPoint}
                     />
                   )}
                 </div>
@@ -5105,6 +5847,93 @@ export default function FrontlineMap({ airportsData }) {
                   >
                     Cancel
                   </button>
+                </div>
+              )}
+
+              <DbuildMapContextMenu
+                menu={mapContextMenu}
+                collapsed={dbuildMenuCollapsed}
+                onToggleCollapsed={() => setDbuildMenuCollapsed((value) => !value)}
+                catalog={dbuildCatalog}
+                onSelect={handleCreateDbuildDraft}
+              />
+
+              {selectedDbuildPlacement && (
+                <div className="absolute right-4 top-20 z-[1000] w-[330px] rounded-xl border border-yt-border bg-[#151925f2] p-3 shadow-2xl backdrop-blur">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="text-sm font-semibold text-yt-text-primary">
+                      {selectedDbuildPlacement.catalog?.label || selectedDbuildPlacement.build_type}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDbuildPlacementId(null)}
+                      className="text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <div className="mb-2 text-[11px] uppercase tracking-[0.08em] text-yt-text-secondary">
+                    Status: {selectedDbuildPlacement.status || 'draft'}
+                  </div>
+                  <div className="space-y-1 rounded border border-yt-border bg-yt-bg-tertiary/40 p-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">
+                      Crate requirements
+                    </div>
+                    {(selectedDbuildPlacement.category_order || Object.keys(selectedDbuildPlacement.catalog?.required_categories || {})).map((category) => {
+                      const required = Number(selectedDbuildPlacement.catalog?.required_categories?.[category]) || 0;
+                      const have = Number(selectedDbuildPlacement.live?.category_counts?.[category]) || 0;
+                      return (
+                        <div key={category} className="flex items-center justify-between text-[12px] text-yt-text-primary">
+                          <span>{category}</span>
+                          <span className={have >= required ? 'text-green-300' : 'text-yt-text-primary'}>
+                            {have}/{required}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    <div className="mt-1 text-[10px] text-yt-text-secondary">
+                      Estimated crate cost: {selectedDbuildPlacement.estimated_fp_cost || 0} fp
+                    </div>
+                    {selectedDbuildPlacement.catalog?.placement_notes && (
+                      <div className="mt-1 text-[10px] text-amber-200/80">
+                        {selectedDbuildPlacement.catalog.placement_notes}
+                      </div>
+                    )}
+                    {selectedDbuildPlacement.catalog?.build_radius_m && (
+                      <div className="text-[10px] text-yt-text-secondary">
+                        Deliver crates within {selectedDbuildPlacement.catalog.build_radius_m} m after confirmation.
+                      </div>
+                    )}
+                  </div>
+                  {selectedDbuildPlacement.status === 'draft' && (
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleConfirmDbuildPlacement(selectedDbuildPlacement.id)}
+                        disabled={!isAuthenticated || confirmingDbuildId === selectedDbuildPlacement.id}
+                        className="flex-1 rounded border border-yt-accent/50 bg-yt-accent/15 px-2.5 py-1.5 text-xs font-semibold text-yt-text-primary hover:bg-yt-accent/25 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {confirmingDbuildId === selectedDbuildPlacement.id ? 'Confirming...' : 'Conferma'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCancelDbuildDraft(selectedDbuildPlacement.id)}
+                        className="rounded border border-yt-border px-2.5 py-1.5 text-xs font-semibold text-yt-text-secondary hover:bg-yt-bg-tertiary/50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                  {selectedDbuildPlacement.status !== 'draft' && selectedDbuildPlacement.live?.structure_name && (
+                    <div className="mt-2 text-[11px] text-green-200">
+                      Built: {selectedDbuildPlacement.live.structure_name}
+                    </div>
+                  )}
+                  {selectedDbuildPlacement.error && (
+                    <div className="mt-2 text-[11px] text-red-300">
+                      {selectedDbuildPlacement.error}
+                    </div>
+                  )}
                 </div>
               )}
 

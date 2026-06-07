@@ -32,6 +32,7 @@ import * as luaZoneSync from './services/luaZoneSync.js';
 import * as activeUsers from './services/activeUsers.js';
 import * as userProfiles from './services/userProfiles.js';
 import * as feedService from './services/feed.js';
+import * as dbuildPlacementsService from './services/dbuildPlacements.js';
 import * as convoysService from './services/convoys.js';
 import * as changelogsService from './services/changelogs.js';
 import * as changelogTranslator from './services/changelogTranslator.js';
@@ -144,6 +145,10 @@ const WEB_SPAWN_MARKERS_FILE = process.env.WEB_SPAWN_MARKERS_FILE
   ? path.resolve(process.env.WEB_SPAWN_MARKERS_FILE)
   : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DBRIDGE\\Export_WebSpawn_Markers.json';
 
+const DBUILD_SITES_FILE = process.env.DBUILD_SITES_FILE
+  ? path.resolve(process.env.DBUILD_SITES_FILE)
+  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DBRIDGE\\Export_DBUILD_Sites.json';
+
 // Max placement distance from airport center (matches DMAS blue_airbase_radius_m).
 const AIRPORT_SPAWN_RADIUS_M = Number.parseInt(process.env.AIRPORT_SPAWN_RADIUS_M, 10) || 2500;
 const SPAWN_QUANTITY_MAX = 5;
@@ -172,6 +177,65 @@ const WEB_CRATE_OPTIONS = [
 ];
 const WEB_INFANTRY_KEYWORDS = new Set(WEB_INFANTRY_OPTIONS.map((o) => o.keyword));
 const WEB_CRATE_KEYWORDS = new Set(WEB_CRATE_OPTIONS.map((o) => o.keyword));
+
+const DBUILD_CRATE_FP_COST = 5;
+const DBUILD_MATCH_RADIUS_M = 150;
+
+const DBUILD_CATALOG = [
+  {
+    id: 'mortar',
+    label: 'Mortar',
+    keyword: 'MORTAR',
+    section: 'defence',
+    required_categories: { AMMO: 2 },
+    category_order: ['AMMO'],
+    dismantle_supported: true,
+    build_radius_m: 80,
+  },
+  {
+    id: 'ewr',
+    label: 'EWR',
+    keyword: 'EWR',
+    section: 'defence',
+    required_categories: { AMMO: 3, FUEL: 2, BUILD: 5 },
+    category_order: ['AMMO', 'FUEL', 'BUILD'],
+    dismantle_supported: false,
+    build_radius_m: 80,
+  },
+  {
+    id: 'nasams',
+    label: 'NASAMS',
+    keyword: 'NASAMS',
+    section: 'defence',
+    required_categories: { AMMO: 3, BUILD: 3, FUEL: 2 },
+    category_order: ['AMMO', 'BUILD', 'FUEL'],
+    dismantle_supported: true,
+    build_radius_m: 80,
+  },
+  {
+    id: 'rapier',
+    label: 'Rapier',
+    keyword: 'RAPIER',
+    section: 'defence',
+    required_categories: { AMMO: 2, BUILD: 1 },
+    category_order: ['AMMO', 'BUILD'],
+    dismantle_supported: true,
+    build_radius_m: 80,
+  },
+  {
+    id: 'farp',
+    label: 'FARP',
+    keyword: 'FARP',
+    section: 'logistics',
+    required_categories: { AMMO: 3, FUEL: 2, BUILD: 3 },
+    category_order: ['AMMO', 'FUEL', 'BUILD'],
+    dismantle_supported: true,
+    build_radius_m: 80,
+    placement_notes: 'Min 250 m from other FARPs and 5 NM from airbases.',
+  },
+];
+
+const DBUILD_TYPE_IDS = new Set(DBUILD_CATALOG.map((entry) => entry.id));
 
 // CSV Directory - configurable via environment variable
 const CSV_DIR = process.env.CSV_DIR
@@ -271,6 +335,8 @@ let webCommandResultSignature = '';
 let webCommandFeedEmittedIds = new Set(); // command id -> feed already written
 let webSpawnMarkersSyncSignature = '';
 let webSpawnMarkers = [];
+let dbuildSitesSyncSignature = '';
+let dbuildSites = [];
 let zoneOperationsById = new Map();
 let hiddenLogisticsRouteAirportIds = new Set();
 const ZONE_OPERATION_TTL_MS = 45 * 60 * 1000;
@@ -491,6 +557,73 @@ function getProductionPointDisplayName(ppId) {
   return pp?.zone_name || pp?.id || ppId || 'Production Point';
 }
 
+function getDbuildCatalogEntry(buildType) {
+  return DBUILD_CATALOG.find((entry) => entry.id === buildType) || null;
+}
+
+function estimateDbuildFpCost(requiredCategories) {
+  if (!requiredCategories || typeof requiredCategories !== 'object') return 0;
+  return Object.values(requiredCategories).reduce((sum, count) => {
+    const qty = Number(count) || 0;
+    return sum + (qty * DBUILD_CRATE_FP_COST);
+  }, 0);
+}
+
+function findNearestDbuildSite(lat, lon, buildType, maxDistanceM = DBUILD_MATCH_RADIUS_M) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  let best = null;
+  let bestDistance = maxDistanceM;
+  dbuildSites.forEach((site) => {
+    if (buildType && site.type !== buildType) return;
+    const siteLat = Number(site.lat);
+    const siteLon = Number(site.lon);
+    if (!Number.isFinite(siteLat) || !Number.isFinite(siteLon)) return;
+    const distanceM = haversineMeters(lat, lon, siteLat, siteLon);
+    if (distanceM <= bestDistance) {
+      bestDistance = distanceM;
+      best = site;
+    }
+  });
+  return best;
+}
+
+function enrichDbuildPlacements(placements) {
+  return placements.map((placement) => {
+    const catalog = getDbuildCatalogEntry(placement.build_type);
+    const required = catalog?.required_categories || {};
+    const categoryOrder = catalog?.category_order || Object.keys(required);
+    const estimatedFpCost = estimateDbuildFpCost(required);
+
+    if (placement.status === 'draft' || placement.status === 'cancelled' || placement.status === 'failed') {
+      return {
+        ...placement,
+        catalog,
+        estimated_fp_cost: estimatedFpCost,
+        category_order: categoryOrder,
+        live: null,
+      };
+    }
+
+    const live = findNearestDbuildSite(placement.lat, placement.lon, placement.build_type);
+    let status = placement.status;
+    if (live) {
+      status = live.built ? 'built' : 'active';
+    } else if (status === 'confirmed') {
+      status = 'confirmed';
+    }
+
+    return {
+      ...placement,
+      catalog,
+      estimated_fp_cost: estimatedFpCost,
+      category_order: categoryOrder,
+      live,
+      status,
+      game_site_id: live?.site_id || placement.game_site_id || null,
+    };
+  });
+}
+
 function bootstrapWebCommandFeedDedup() {
   feedService.getFeedEvents(1000).forEach((event) => {
     const commandId = event?.metadata?.command_id;
@@ -551,6 +684,40 @@ function buildWebCommandFeedEvent(command, stored) {
     };
   }
 
+  if (cmdType === 'dbuild_confirm') {
+    const buildType = command.build_type || command.keyword;
+    const catalog = getDbuildCatalogEntry(buildType);
+    const label = catalog?.label || buildType || 'build';
+
+    if (stored.ok) {
+      return {
+        type: 'dcore.dbuild.confirmed',
+        title: 'DBUILD placement confirmed',
+        message: `${actor} confirmed ${label} construction on the map`,
+        actor: command.requested_by_id || '',
+        metadata: {
+          command_id: stored.id,
+          build_type: buildType,
+          placement_id: command.placement_id || null,
+          ok: true,
+        },
+      };
+    }
+
+    return {
+      type: 'dcore.dbuild.failed',
+      title: 'DBUILD placement failed',
+      message: `${actor} could not confirm ${label}: ${stored.message || 'unknown error'}`,
+      actor: command.requested_by_id || '',
+      metadata: {
+        command_id: stored.id,
+        build_type: buildType,
+        placement_id: command.placement_id || null,
+        ok: false,
+      },
+    };
+  }
+
   if (cmdType === 'inf_spawn' || cmdType === 'crate_spawn') {
     const airportName = getAirportDisplayName(command.airport_id);
     const keyword = formatSpawnKeywordLabel(command.keyword);
@@ -598,7 +765,7 @@ function buildWebCommandFeedEvent(command, stored) {
 function maybePushWebCommandFeedEvent(command, stored) {
   if (!command || !stored?.id) return;
   const cmdType = stored.type || command.type;
-  if (!['pp_upgrade', 'inf_spawn', 'crate_spawn'].includes(cmdType)) return;
+  if (!['pp_upgrade', 'inf_spawn', 'crate_spawn', 'dbuild_confirm'].includes(cmdType)) return;
   if (webCommandFeedEmittedIds.has(stored.id)) return;
 
   const event = buildWebCommandFeedEvent(command, stored);
@@ -1046,6 +1213,46 @@ function validateAirportSpawnDistance(airport, lat, lon) {
   return { ok: true, distanceM };
 }
 
+function syncDbuildSitesFromFile() {
+  try {
+    if (!fs.existsSync(DBUILD_SITES_FILE)) return;
+
+    const raw = fs.readFileSync(DBUILD_SITES_FILE, 'utf8');
+    if (!raw || raw.trim() === '') return;
+    if (raw === dbuildSitesSyncSignature) return;
+    dbuildSitesSyncSignature = raw;
+
+    const parsed = JSON.parse(raw);
+    const incoming = Array.isArray(parsed?.sites) ? parsed.sites : [];
+    dbuildSites = incoming
+      .map((entry) => {
+        const lat = Number(entry?.lat);
+        const lon = Number(entry?.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+        return {
+          type: String(entry?.type || '').trim().toLowerCase() || null,
+          site_id: String(entry?.site_id || '').trim() || null,
+          lat,
+          lon,
+          built: entry?.built === true,
+          category_counts: entry?.category_counts && typeof entry.category_counts === 'object' ? entry.category_counts : {},
+          required_categories: entry?.required_categories && typeof entry.required_categories === 'object' ? entry.required_categories : {},
+          crate_count: Number(entry?.crate_count) || 0,
+          required_crates: Number(entry?.required_crates) || 0,
+          structure_name: entry?.structure_name ? String(entry.structure_name) : null,
+        };
+      })
+      .filter((entry) => entry && entry.type);
+
+    io.emit('dbuild-sites:updated', {
+      sites: dbuildSites,
+      placements: enrichDbuildPlacements(dbuildPlacementsService.getPlacements()),
+    });
+  } catch (error) {
+    console.error('Failed DBUILD sites sync from file:', error.message);
+  }
+}
+
 function syncWebSpawnMarkersFromFile() {
   try {
     if (!fs.existsSync(WEB_SPAWN_MARKERS_FILE)) return;
@@ -1133,6 +1340,18 @@ function syncWebCommandResultsFromFile() {
 
       if (command) {
         maybePushWebCommandFeedEvent(command, stored);
+        if (command.type === 'dbuild_confirm' && command.placement_id) {
+          if (!stored.ok) {
+            dbuildPlacementsService.updatePlacement(command.placement_id, {
+              status: 'failed',
+              error: stored.message || 'Confirmation failed in-game',
+            });
+          }
+          io.emit('dbuild-placements:updated', {
+            placements: enrichDbuildPlacements(dbuildPlacementsService.getPlacements()),
+            sites: dbuildSites,
+          });
+        }
       }
     });
 
@@ -2473,6 +2692,169 @@ app.post('/api/airports/:id/spawn-infantry', (req, res) => {
  */
 app.post('/api/airports/:id/spawn-crate', (req, res) => {
   handleSpawnRequest(req, res, 'crate_spawn');
+});
+
+/**
+ * GET /api/dbuild/catalog - DBUILD construction types and crate requirements.
+ */
+app.get('/api/dbuild/catalog', (req, res) => {
+  res.json({
+    types: DBUILD_CATALOG.map((entry) => ({
+      ...entry,
+      estimated_fp_cost: estimateDbuildFpCost(entry.required_categories),
+    })),
+  });
+});
+
+/**
+ * GET /api/dbuild/placements - Web draft/confirmed build placements.
+ */
+app.get('/api/dbuild/placements', (req, res) => {
+  res.json({
+    placements: enrichDbuildPlacements(dbuildPlacementsService.getPlacements()),
+    sites: dbuildSites,
+  });
+});
+
+/**
+ * GET /api/dbuild/sites - Live in-game DBUILD sites from DCORE export.
+ */
+app.get('/api/dbuild/sites', (req, res) => {
+  res.json({ sites: dbuildSites });
+});
+
+/**
+ * POST /api/dbuild/placements - Create a draft placement (right-click on map).
+ */
+app.post('/api/dbuild/placements', (req, res) => {
+  const actor = getSessionActor(req);
+  if (!actor) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const buildType = String(req.body?.build_type || '').trim().toLowerCase();
+  const lat = Number(req.body?.lat);
+  const lon = Number(req.body?.lon);
+  if (!DBUILD_TYPE_IDS.has(buildType)) {
+    return res.status(400).json({ error: 'Invalid build type' });
+  }
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return res.status(400).json({ error: 'Valid lat/lon are required' });
+  }
+
+  const placement = dbuildPlacementsService.createPlacement({
+    id: randomUUID(),
+    build_type: buildType,
+    lat,
+    lon,
+    status: 'draft',
+    requested_by: actor.name,
+    requested_by_id: actor.id,
+    command_id: null,
+    game_site_id: null,
+    error: null,
+    created_at: Date.now(),
+    confirmed_at: null,
+  });
+
+  const payload = enrichDbuildPlacements([placement])[0];
+  io.emit('dbuild-placements:updated', {
+    placements: enrichDbuildPlacements(dbuildPlacementsService.getPlacements()),
+    sites: dbuildSites,
+    latest: payload,
+  });
+
+  pushFeedEvent({
+    type: 'dcore.dbuild.draft',
+    title: 'DBUILD draft placed',
+    message: `${actor.name} drafted ${payload.catalog?.label || buildType} on the map`,
+    actor: actor.id,
+    metadata: {
+      placement_id: placement.id,
+      build_type: buildType,
+    },
+  });
+
+  res.json({ success: true, placement: payload });
+});
+
+/**
+ * POST /api/dbuild/placements/:id/confirm - Confirm draft and enable in-game construction.
+ */
+app.post('/api/dbuild/placements/:id/confirm', (req, res) => {
+  const actor = getSessionActor(req);
+  if (!actor) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const placementId = String(req.params.id || '').trim();
+  const placement = dbuildPlacementsService.getPlacementById(placementId);
+  if (!placement) {
+    return res.status(404).json({ error: 'Placement not found' });
+  }
+  if (placement.status !== 'draft') {
+    return res.status(400).json({ error: 'Only draft placements can be confirmed' });
+  }
+
+  const command = enqueueWebCommand({
+    id: randomUUID(),
+    type: 'dbuild_confirm',
+    production_point_id: null,
+    airport_id: null,
+    keyword: null,
+    build_type: placement.build_type,
+    placement_id: placement.id,
+    lat: placement.lat,
+    lon: placement.lon,
+    requested_by: actor.name,
+    requested_by_id: actor.id,
+    ts: Date.now(),
+  });
+
+  const updated = dbuildPlacementsService.updatePlacement(placementId, {
+    status: 'confirmed',
+    command_id: command.id,
+    confirmed_at: Date.now(),
+    error: null,
+  });
+
+  io.emit('dbuild-placements:updated', {
+    placements: enrichDbuildPlacements(dbuildPlacementsService.getPlacements()),
+    sites: dbuildSites,
+    latest: enrichDbuildPlacements([updated])[0],
+  });
+
+  respondQueued(res, {
+    ...command,
+    placement: enrichDbuildPlacements([updated])[0],
+  });
+});
+
+/**
+ * DELETE /api/dbuild/placements/:id - Cancel a draft placement.
+ */
+app.delete('/api/dbuild/placements/:id', (req, res) => {
+  const actor = getSessionActor(req);
+  if (!actor) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const placementId = String(req.params.id || '').trim();
+  const placement = dbuildPlacementsService.getPlacementById(placementId);
+  if (!placement) {
+    return res.status(404).json({ error: 'Placement not found' });
+  }
+  if (placement.status !== 'draft') {
+    return res.status(400).json({ error: 'Only draft placements can be cancelled' });
+  }
+
+  dbuildPlacementsService.deletePlacement(placementId);
+  io.emit('dbuild-placements:updated', {
+    placements: enrichDbuildPlacements(dbuildPlacementsService.getPlacements()),
+    sites: dbuildSites,
+  });
+
+  res.json({ success: true });
 });
 
 // ==================== DATA ROUTES ====================
@@ -3929,6 +4311,14 @@ io.on('connection', (socket) => {
   socket.emit('web-spawn-markers:updated', {
     markers: webSpawnMarkers,
   });
+  socket.emit('dbuild-placements:updated', {
+    placements: enrichDbuildPlacements(dbuildPlacementsService.getPlacements()),
+    sites: dbuildSites,
+  });
+  socket.emit('dbuild-sites:updated', {
+    sites: dbuildSites,
+    placements: enrichDbuildPlacements(dbuildPlacementsService.getPlacements()),
+  });
 
   socket.on('disconnect', () => {
     console.log('🔌 Client disconnected:', socket.id);
@@ -4113,6 +4503,11 @@ setInterval(() => {
   syncWebSpawnMarkersFromFile();
 }, 2000);
 
+// Poll DBUILD sites exported by DCORE
+setInterval(() => {
+  syncDbuildSitesFromFile();
+}, 2000);
+
 // ==================== START SERVER ====================
 
 // Load airbase status first
@@ -4148,6 +4543,7 @@ loadWebCommandsQueue();
 syncProductionPointsFromFile();
 syncWebCommandResultsFromFile();
 syncWebSpawnMarkersFromFile();
+syncDbuildSitesFromFile();
 
 httpServer.listen(PORT, () => {
   const activeAirports = airbaseStatusManager.getActiveAirports();
