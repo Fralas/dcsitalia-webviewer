@@ -740,6 +740,24 @@ export async function getSpawnOptions() {
   return fetchAPI('/spawn-options');
 }
 
+export async function getTankerOptions() {
+  return fetchAPI('/tanker/options');
+}
+
+export async function spawnTanker(keyword, wp1Lat, wp1Lon, wp2Lat, wp2Lon) {
+  return fetchAPI('/tanker/spawn', {
+    method: 'POST',
+    body: JSON.stringify({
+      keyword,
+      wp1_lat: wp1Lat,
+      wp1_lon: wp1Lon,
+      wp2_lat: wp2Lat,
+      wp2_lon: wp2Lon,
+    }),
+    credentials: 'include',
+  });
+}
+
 /**
  * Request a Production Point upgrade in-game.
  */
@@ -887,9 +905,11 @@ export default {
   getProductionPoints,
   getWebSpawnMarkers,
   getSpawnOptions,
+  getTankerOptions,
   requestProductionPointUpgrade,
   spawnAirportInfantry,
   spawnAirportCrate,
+  spawnTanker,
   getDbuildCatalog,
   getDbuildPlacements,
   createDbuildPlacement,

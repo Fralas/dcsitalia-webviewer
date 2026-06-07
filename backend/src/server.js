@@ -179,6 +179,31 @@ const WEB_CRATE_OPTIONS = [
 const WEB_INFANTRY_KEYWORDS = new Set(WEB_INFANTRY_OPTIONS.map((o) => o.keyword));
 const WEB_CRATE_KEYWORDS = new Set(WEB_CRATE_OPTIONS.map((o) => o.keyword));
 
+const TANKER_MIN_DIST_NM = 45;
+const WEB_TANKER_OPTIONS = [
+  {
+    keyword: 'BOOM',
+    label: 'BOOM',
+    min_dist_nm: TANKER_MIN_DIST_NM,
+    altitude_ft: 23000,
+    speed_kt: 420,
+    platform: 'KC-135 Shell',
+    tacan: '16Y',
+    freq_mhz: 315,
+  },
+  {
+    keyword: 'BASKET',
+    label: 'BASKET',
+    min_dist_nm: TANKER_MIN_DIST_NM,
+    altitude_ft: 21000,
+    speed_kt: 380,
+    platform: 'KC-135Mprs Texaco',
+    tacan: '18Y',
+    freq_mhz: 310,
+  },
+];
+const WEB_TANKER_KEYWORDS = new Set(WEB_TANKER_OPTIONS.map((o) => o.keyword));
+
 const DBUILD_CRATE_FP_COST = 5;
 const DBUILD_MATCH_RADIUS_M = 150;
 
@@ -788,6 +813,35 @@ function buildWebCommandFeedEvent(command, stored) {
     };
   }
 
+  if (cmdType === 'tanker_spawn') {
+    const keyword = formatSpawnKeywordLabel(command.keyword);
+    if (stored.ok) {
+      return {
+        type: 'dcore.tanker.completed',
+        title: 'Tanker spawned',
+        message: `${actor} spawned ${keyword} tanker on the map`,
+        actor: command.requested_by_id || '',
+        metadata: {
+          command_id: stored.id,
+          keyword: command.keyword,
+          ok: true,
+        },
+      };
+    }
+
+    return {
+      type: 'dcore.tanker.failed',
+      title: 'Tanker spawn failed',
+      message: `${actor} failed to spawn ${keyword} tanker: ${stored.message || 'unknown error'}`,
+      actor: command.requested_by_id || '',
+      metadata: {
+        command_id: stored.id,
+        keyword: command.keyword,
+        ok: false,
+      },
+    };
+  }
+
   if (cmdType === 'inf_spawn' || cmdType === 'crate_spawn') {
     const airportName = getAirportDisplayName(command.airport_id);
     const keyword = formatSpawnKeywordLabel(command.keyword);
@@ -835,7 +889,7 @@ function buildWebCommandFeedEvent(command, stored) {
 function maybePushWebCommandFeedEvent(command, stored) {
   if (!command || !stored?.id) return;
   const cmdType = stored.type || command.type;
-  if (!['pp_upgrade', 'pp_retrieve', 'inf_spawn', 'crate_spawn', 'dbuild_confirm'].includes(cmdType)) return;
+  if (!['pp_upgrade', 'pp_retrieve', 'inf_spawn', 'crate_spawn', 'dbuild_confirm', 'tanker_spawn'].includes(cmdType)) return;
   if (webCommandFeedEmittedIds.has(stored.id)) return;
 
   const event = buildWebCommandFeedEvent(command, stored);
@@ -1226,6 +1280,22 @@ function haversineMeters(lat1, lon1, lat2, lon2) {
     Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return earthRadiusM * c;
+}
+
+function haversineNm(lat1, lon1, lat2, lon2) {
+  return haversineMeters(lat1, lon1, lat2, lon2) / 1852;
+}
+
+function validateTankerWaypointDistance(wp1Lat, wp1Lon, wp2Lat, wp2Lon, minDistNm = TANKER_MIN_DIST_NM) {
+  const distanceNm = haversineNm(wp1Lat, wp1Lon, wp2Lat, wp2Lon);
+  if (distanceNm < minDistNm) {
+    return {
+      ok: false,
+      error: `WP2 too close: minimum distance is ${minDistNm} NM (current ${distanceNm.toFixed(1)} NM)`,
+      distanceNm,
+    };
+  }
+  return { ok: true, distanceNm };
 }
 
 function clampSpawnQuantity(raw) {
@@ -2650,6 +2720,13 @@ app.get('/api/spawn-options', (req, res) => {
 });
 
 /**
+ * GET /api/tanker/options - Tanker types spawnable via web (BOOM / BASKET).
+ */
+app.get('/api/tanker/options', (req, res) => {
+  res.json({ tankers: WEB_TANKER_OPTIONS });
+});
+
+/**
  * GET /api/production-points - Current Production Points state exported by DCORE.
  */
 app.get('/api/production-points', (req, res) => {
@@ -2848,6 +2925,51 @@ app.post('/api/airports/:id/spawn-infantry', (req, res) => {
  */
 app.post('/api/airports/:id/spawn-crate', (req, res) => {
   handleSpawnRequest(req, res, 'crate_spawn');
+});
+
+/**
+ * POST /api/tanker/spawn - Body { keyword: BOOM|BASKET, wp1_lat, wp1_lon, wp2_lat, wp2_lon }
+ */
+app.post('/api/tanker/spawn', (req, res) => {
+  const actor = getSessionActor(req);
+  if (!actor) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const keyword = String(req.body?.keyword || '').trim().toUpperCase();
+  if (!WEB_TANKER_KEYWORDS.has(keyword)) {
+    return res.status(400).json({ error: 'Invalid tanker keyword (BOOM or BASKET)' });
+  }
+
+  const wp1Lat = Number(req.body?.wp1_lat ?? req.body?.lat);
+  const wp1Lon = Number(req.body?.wp1_lon ?? req.body?.lon);
+  const wp2Lat = Number(req.body?.wp2_lat ?? req.body?.lat2);
+  const wp2Lon = Number(req.body?.wp2_lon ?? req.body?.lon2);
+  if (![wp1Lat, wp1Lon, wp2Lat, wp2Lon].every(Number.isFinite)) {
+    return res.status(400).json({ error: 'Valid wp1_lat, wp1_lon, wp2_lat, wp2_lon are required' });
+  }
+
+  const distanceCheck = validateTankerWaypointDistance(wp1Lat, wp1Lon, wp2Lat, wp2Lon);
+  if (!distanceCheck.ok) {
+    return res.status(400).json({ error: distanceCheck.error });
+  }
+
+  const command = enqueueWebCommand({
+    id: randomUUID(),
+    type: 'tanker_spawn',
+    production_point_id: null,
+    airport_id: null,
+    keyword,
+    lat: wp1Lat,
+    lon: wp1Lon,
+    lat2: wp2Lat,
+    lon2: wp2Lon,
+    requested_by: actor.name,
+    requested_by_id: actor.id,
+    ts: Date.now(),
+  });
+
+  respondQueued(res, command);
 });
 
 /**

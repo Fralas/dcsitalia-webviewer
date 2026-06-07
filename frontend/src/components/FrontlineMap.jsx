@@ -12,13 +12,13 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import c130ModelUrl from '../assets/3D/yc-130prototype_of_c-130.glb';
 import ch47ModelUrl from '../assets/3D/ch47.glb';
 import t72ModelUrl from '../assets/3D/t90.glb';
-import { Ambulance, Anchor, Blend, Box, Boxes, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChessRook, Clock3, Factory, Forklift, Hammer, MapPin, PersonStanding, Satellite, TowerControl, X } from 'lucide-react';
+import { Ambulance, Anchor, Blend, Box, Boxes, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChessRook, Clock3, Factory, Forklift, Fuel, Hammer, MapPin, PersonStanding, Satellite, TowerControl, X } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
 import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
-import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getLogisticsRouteVisibility, getMissions, getServerTime, setAirportLogisticsRoutePriority, getProductionPoints, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate } from '../services/api';
+import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getLogisticsRouteVisibility, getMissions, getServerTime, getTankerOptions, setAirportLogisticsRoutePriority, getProductionPoints, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate, spawnTanker } from '../services/api';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
@@ -518,6 +518,13 @@ function formatSpawnBannerName(keyword) {
 const DBUILD_CONTEXT_MENU_OFFSET_X = 16;
 const DBUILD_CONTEXT_MENU_OFFSET_Y = -12;
 const DBUILD_CONTEXT_HIGHLIGHT_RADIUS_M = 35;
+const TANKER_MIN_DIST_NM = 45;
+const TANKER_EXCLUSION_RADIUS_M = TANKER_MIN_DIST_NM * 1852;
+
+const TANKER_OPTIONS_FALLBACK = [
+  { keyword: 'BOOM', label: 'BOOM', min_dist_nm: TANKER_MIN_DIST_NM },
+  { keyword: 'BASKET', label: 'BASKET', min_dist_nm: TANKER_MIN_DIST_NM },
+];
 
 const DBUILD_CATALOG_FALLBACK = [
   { id: 'mortar', label: 'Mortar' },
@@ -527,16 +534,22 @@ const DBUILD_CATALOG_FALLBACK = [
   { id: 'farp', label: 'FARP' },
 ];
 
-function DbuildMapContextMenu({
+function MapActionContextMenu({
   menu,
   collapsed,
   onToggleCollapsed,
+  activePanel,
+  onSetActivePanel,
   catalog,
-  onSelect,
+  tankerOptions,
+  onSelectDbuild,
+  onSelectTanker,
 }) {
   if (!menu) return null;
 
   const entries = catalog.length > 0 ? catalog : DBUILD_CATALOG_FALLBACK;
+  const tankers = tankerOptions.length > 0 ? tankerOptions : TANKER_OPTIONS_FALLBACK;
+  const panel = activePanel || 'root';
 
   return (
     <div
@@ -554,37 +567,98 @@ function DbuildMapContextMenu({
           className={`overflow-hidden transition-[max-height,opacity,transform,margin-bottom] duration-[360ms] ease-in-out ${
             collapsed
               ? 'mb-0 max-h-0 -translate-y-1 opacity-0 pointer-events-none'
-              : 'mb-2 max-h-80 translate-y-0 opacity-100'
+              : 'mb-2 max-h-96 translate-y-0 opacity-100'
           }`}
           aria-hidden={collapsed}
         >
-          <div className="mb-1.5 px-1 text-[11px] uppercase tracking-[0.18em] text-yt-text-secondary">
-            DBUILD
-          </div>
-          <div className="flex flex-col gap-1">
-            {entries.map((entry) => (
+          {panel !== 'root' && (
+            <button
+              type="button"
+              onClick={() => onSetActivePanel('root')}
+              className="mb-1.5 flex w-full items-center gap-1 rounded-md px-1 py-1 text-[11px] font-semibold text-yt-text-secondary transition-colors hover:text-yt-text-primary"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+              Back
+            </button>
+          )}
+
+          {panel === 'root' && (
+            <div className="flex flex-col gap-1">
               <button
-                key={entry.id}
                 type="button"
-                onClick={() => onSelect(entry.id)}
-                className="flex w-full items-center justify-between rounded-md border border-yt-border bg-yt-bg-tertiary/60 px-2 py-1.5 text-left text-[12px] font-semibold text-yt-text-primary transition-colors hover:border-yt-accent/50 hover:bg-yt-accent/10"
+                onClick={() => onSetActivePanel('dbuild')}
+                className="flex w-full items-center gap-2 rounded-md border border-yt-border bg-yt-bg-tertiary/60 px-2 py-2 text-left text-[12px] font-semibold text-yt-text-primary transition-colors hover:border-yt-accent/50 hover:bg-yt-accent/10"
               >
-                <span>{entry.label || entry.id}</span>
-                {Number.isFinite(entry.estimated_fp_cost) && (
-                  <span className="text-[10px] font-semibold text-yt-text-secondary">
-                    {entry.estimated_fp_cost} fp
-                  </span>
-                )}
+                <Hammer className="h-4 w-4 shrink-0 text-amber-200" />
+                <span>DBUILD</span>
               </button>
-            ))}
-          </div>
+              <button
+                type="button"
+                onClick={() => onSetActivePanel('tanker')}
+                className="flex w-full items-center gap-2 rounded-md border border-yt-border bg-yt-bg-tertiary/60 px-2 py-2 text-left text-[12px] font-semibold text-yt-text-primary transition-colors hover:border-cyan-400/50 hover:bg-cyan-400/10"
+              >
+                <Fuel className="h-4 w-4 shrink-0 text-cyan-300" />
+                <span>Tanker</span>
+              </button>
+            </div>
+          )}
+
+          {panel === 'dbuild' && (
+            <>
+              <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] uppercase tracking-[0.18em] text-yt-text-secondary">
+                <Hammer className="h-3.5 w-3.5 text-amber-200" />
+                DBUILD
+              </div>
+              <div className="flex flex-col gap-1">
+                {entries.map((entry) => (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    onClick={() => onSelectDbuild(entry.id)}
+                    className="flex w-full items-center justify-between rounded-md border border-yt-border bg-yt-bg-tertiary/60 px-2 py-1.5 text-left text-[12px] font-semibold text-yt-text-primary transition-colors hover:border-yt-accent/50 hover:bg-yt-accent/10"
+                  >
+                    <span>{entry.label || entry.id}</span>
+                    {Number.isFinite(entry.estimated_fp_cost) && (
+                      <span className="text-[10px] font-semibold text-yt-text-secondary">
+                        {entry.estimated_fp_cost} fp
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {panel === 'tanker' && (
+            <>
+              <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] uppercase tracking-[0.18em] text-yt-text-secondary">
+                <Fuel className="h-3.5 w-3.5 text-cyan-300" />
+                Tanker
+              </div>
+              <div className="flex flex-col gap-1">
+                {tankers.map((entry) => (
+                  <button
+                    key={entry.keyword}
+                    type="button"
+                    onClick={() => onSelectTanker(entry.keyword, entry.label || entry.keyword)}
+                    className="flex w-full flex-col rounded-md border border-yt-border bg-yt-bg-tertiary/60 px-2 py-1.5 text-left transition-colors hover:border-cyan-400/50 hover:bg-cyan-400/10"
+                  >
+                    <span className="text-[12px] font-semibold text-yt-text-primary">{entry.label || entry.keyword}</span>
+                    {entry.platform && (
+                      <span className="text-[10px] text-yt-text-secondary">{entry.platform}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
         <button
           type="button"
           onClick={onToggleCollapsed}
           className="flex w-full items-center justify-center rounded-md border border-yt-border bg-yt-bg-tertiary/60 p-2 text-yt-text-secondary transition-colors hover:text-yt-text-primary"
-          aria-label={collapsed ? 'Open DBUILD menu' : 'Close DBUILD menu'}
-          title={collapsed ? 'Open DBUILD menu' : 'Close DBUILD menu'}
+          aria-label={collapsed ? 'Open map actions menu' : 'Close map actions menu'}
+          title={collapsed ? 'Open map actions menu' : 'Close map actions menu'}
         >
           {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
         </button>
@@ -1670,14 +1744,19 @@ function FlatMapView({
   mapContextMenuEnabled,
   onMapContextMenu,
   dbuildContextPoint,
+  tankerPlacementActive,
+  onTankerPlace,
+  tankerWp1,
 }) {
   const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
   const activeBasemap = BASEMAP_CONFIG[basemapMode] || BASEMAP_CONFIG[BASEMAP_MODE_DARK];
   const effectiveMaxZoom = mapMaxZoom || MAP_ZOOM_DEFAULT_MAX;
-  const placementActive = spawnPlacementActive || retrievePlacementActive;
+  const placementActive = spawnPlacementActive || retrievePlacementActive || tankerPlacementActive;
   const placementCenter = spawnPlacementActive ? spawnAirportCenter : retrievePpCenter;
   const placementRadiusM = spawnPlacementActive ? AIRPORT_SPAWN_RADIUS_M : PP_RETRIEVE_RADIUS_M;
-  const onPlacementPlace = spawnPlacementActive ? onSpawnPlace : onRetrievePlace;
+  const onPlacementPlace = tankerPlacementActive
+    ? onTankerPlace
+    : (spawnPlacementActive ? onSpawnPlace : onRetrievePlace);
   const airportsById = useMemo(() => {
     const map = new Map();
     airportsData.forEach((airport) => map.set(airport.id, airport));
@@ -2020,6 +2099,32 @@ function FlatMapView({
           </>
         )}
 
+        {tankerWp1 && Number.isFinite(tankerWp1.lat) && Number.isFinite(tankerWp1.lon) && (
+          <>
+            <Circle
+              center={[tankerWp1.lat, tankerWp1.lon]}
+              radius={TANKER_EXCLUSION_RADIUS_M}
+              pathOptions={{
+                color: '#ef4444',
+                fillColor: '#ef4444',
+                fillOpacity: 0.12,
+                weight: 2,
+                dashArray: '8,8',
+              }}
+            />
+            <CircleMarker
+              center={[tankerWp1.lat, tankerWp1.lon]}
+              radius={10}
+              pathOptions={{
+                color: '#22d3ee',
+                fillColor: '#22d3ee',
+                fillOpacity: 0.95,
+                weight: 3,
+              }}
+            />
+          </>
+        )}
+
         {(crateClusters || []).map((cluster) => {
           if (!Number.isFinite(cluster?.lat) || !Number.isFinite(cluster?.lon)) return null;
           return (
@@ -2108,14 +2213,19 @@ function MapLibreFlatMapView({
   mapContextMenuEnabled,
   onMapContextMenu,
   dbuildContextPoint,
+  tankerPlacementActive,
+  onTankerPlace,
+  tankerWp1,
   mapMaxZoom,
 }) {
   const MIN_PITCH = 0;
   const MAX_PITCH = 85;
-  const placementActive = spawnPlacementActive || retrievePlacementActive;
+  const placementActive = spawnPlacementActive || retrievePlacementActive || tankerPlacementActive;
   const placementCenter = spawnPlacementActive ? spawnAirportCenter : retrievePpCenter;
   const placementRadiusM = spawnPlacementActive ? AIRPORT_SPAWN_RADIUS_M : PP_RETRIEVE_RADIUS_M;
-  const onPlacementPlace = spawnPlacementActive ? onSpawnPlace : onRetrievePlace;
+  const onPlacementPlace = tankerPlacementActive
+    ? onTankerPlace
+    : (spawnPlacementActive ? onSpawnPlace : onRetrievePlace);
   const ZONE_DOME_RADIUS_METERS = 3000;
   const LOGISTICS_ROUTE_RADIUS_METERS = 120;
   const LOGISTICS_C130_MODEL_SIZE_METERS = 110;
@@ -2534,6 +2644,33 @@ function MapLibreFlatMapView({
       features: [circlePolygon(dbuildContextPoint.lat, dbuildContextPoint.lon, DBUILD_CONTEXT_HIGHLIGHT_RADIUS_M)],
     };
   }, [dbuildContextPoint]);
+
+  const fcTankerWp1Point = useMemo(() => {
+    if (!tankerWp1 || !Number.isFinite(tankerWp1.lat) || !Number.isFinite(tankerWp1.lon)) {
+      return { type: 'FeatureCollection', features: [] };
+    }
+    return {
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [tankerWp1.lon, tankerWp1.lat],
+        },
+        properties: { id: 'tanker-wp1-point' },
+      }],
+    };
+  }, [tankerWp1]);
+
+  const fcTankerExclusionRing = useMemo(() => {
+    if (!tankerWp1 || !Number.isFinite(tankerWp1.lat) || !Number.isFinite(tankerWp1.lon)) {
+      return { type: 'FeatureCollection', features: [] };
+    }
+    return {
+      type: 'FeatureCollection',
+      features: [circlePolygon(tankerWp1.lat, tankerWp1.lon, TANKER_EXCLUSION_RADIUS_M)],
+    };
+  }, [tankerWp1]);
 
   const disposeThreeNode = useCallback((node) => {
     if (!node) return;
@@ -3420,6 +3557,8 @@ function MapLibreFlatMapView({
 
       addGeoSource('dbuild-context-ring-src', fcDbuildContextRing);
       addGeoSource('dbuild-context-point-src', fcDbuildContextPoint);
+      addGeoSource('tanker-exclusion-ring-src', fcTankerExclusionRing);
+      addGeoSource('tanker-wp1-point-src', fcTankerWp1Point);
       addGeoSource('dbuild-markers-src', fcDbuildMarkers);
 
       map.addLayer({
@@ -3450,6 +3589,39 @@ function MapLibreFlatMapView({
           'circle-radius': 9,
           'circle-color': '#facc15',
           'circle-opacity': 0.92,
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 2,
+        },
+      });
+
+      map.addLayer({
+        id: 'tanker-exclusion-ring-fill-layer',
+        type: 'fill',
+        source: 'tanker-exclusion-ring-src',
+        paint: {
+          'fill-color': '#ef4444',
+          'fill-opacity': 0.12,
+        },
+      });
+      map.addLayer({
+        id: 'tanker-exclusion-ring-line-layer',
+        type: 'line',
+        source: 'tanker-exclusion-ring-src',
+        paint: {
+          'line-color': '#ef4444',
+          'line-width': 2,
+          'line-dasharray': [2, 2],
+          'line-opacity': 0.9,
+        },
+      });
+      map.addLayer({
+        id: 'tanker-wp1-point-layer',
+        type: 'circle',
+        source: 'tanker-wp1-point-src',
+        paint: {
+          'circle-radius': 10,
+          'circle-color': '#22d3ee',
+          'circle-opacity': 0.95,
           'circle-stroke-color': '#ffffff',
           'circle-stroke-width': 2,
         },
@@ -3815,7 +3987,11 @@ function MapLibreFlatMapView({
     if (ringSource?.setData) ringSource.setData(fcDbuildContextRing);
     const pointSource = map.getSource('dbuild-context-point-src');
     if (pointSource?.setData) pointSource.setData(fcDbuildContextPoint);
-  }, [fcDbuildContextRing, fcDbuildContextPoint]);
+    const tankerRingSource = map.getSource('tanker-exclusion-ring-src');
+    if (tankerRingSource?.setData) tankerRingSource.setData(fcTankerExclusionRing);
+    const tankerPointSource = map.getSource('tanker-wp1-point-src');
+    if (tankerPointSource?.setData) tankerPointSource.setData(fcTankerWp1Point);
+  }, [fcDbuildContextRing, fcDbuildContextPoint, fcTankerExclusionRing, fcTankerWp1Point]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -4068,7 +4244,10 @@ export default function FrontlineMap({ airportsData }) {
   const [dbuildSites, setDbuildSites] = useState([]);
   const [selectedDbuildPlacementId, setSelectedDbuildPlacementId] = useState(null);
   const [mapContextMenu, setMapContextMenu] = useState(null);
+  const [contextMenuPanel, setContextMenuPanel] = useState('root');
   const [dbuildMenuCollapsed, setDbuildMenuCollapsed] = useState(false);
+  const [tankerOptions, setTankerOptions] = useState([]);
+  const [tankerMode, setTankerMode] = useState(null);
   const [confirmingDbuildId, setConfirmingDbuildId] = useState(null);
   const mapSectionRef = useRef(null);
   const [submittingCommand, setSubmittingCommand] = useState(false);
@@ -4282,7 +4461,7 @@ export default function FrontlineMap({ airportsData }) {
   // Initial load of Production Points + spawn catalog (DCORE bridge)
   useEffect(() => {
     let cancelled = false;
-    Promise.allSettled([getProductionPoints(), getSpawnOptions(), getWebSpawnMarkers(), getDbuildCatalog(), getDbuildPlacements()]).then(([ppResult, optionsResult, markersResult, dbuildCatalogResult, dbuildPlacementsResult]) => {
+    Promise.allSettled([getProductionPoints(), getSpawnOptions(), getTankerOptions(), getWebSpawnMarkers(), getDbuildCatalog(), getDbuildPlacements()]).then(([ppResult, optionsResult, tankerOptionsResult, markersResult, dbuildCatalogResult, dbuildPlacementsResult]) => {
       if (cancelled) return;
       if (ppResult.status === 'fulfilled') {
         const list = ppResult.value?.productionPoints || ppResult.value;
@@ -4293,6 +4472,10 @@ export default function FrontlineMap({ airportsData }) {
           infantry: Array.isArray(optionsResult.value.infantry) ? optionsResult.value.infantry : [],
           crate: Array.isArray(optionsResult.value.crate) ? optionsResult.value.crate : [],
         });
+      }
+      if (tankerOptionsResult.status === 'fulfilled' && tankerOptionsResult.value) {
+        const list = tankerOptionsResult.value?.tankers || tankerOptionsResult.value;
+        if (Array.isArray(list)) setTankerOptions(list);
       }
       if (markersResult.status === 'fulfilled' && markersResult.value) {
         const list = markersResult.value?.markers || markersResult.value;
@@ -4888,7 +5071,7 @@ export default function FrontlineMap({ airportsData }) {
     return pp?.coordinates || null;
   }, [retrieveMode, productionPoints]);
 
-  const mapMaxZoom = (spawnMode || retrieveMode || selectedAirportId) ? MAP_ZOOM_AIRPORT_MAX : MAP_ZOOM_DEFAULT_MAX;
+  const mapMaxZoom = (spawnMode || retrieveMode || tankerMode || selectedAirportId) ? MAP_ZOOM_AIRPORT_MAX : MAP_ZOOM_DEFAULT_MAX;
 
   const tacticalFocusCoordinates = spawnAirportCenter || retrievePpCenter || selectedDcsarFocus || focusedZone?.coordinates || null;
   const tacticalFocusTargetKey = spawnMode
@@ -5581,6 +5764,7 @@ export default function FrontlineMap({ airportsData }) {
     });
     setSelectedProductionPointId(null);
     setRetrieveMode(null);
+    setTankerMode(null);
   }, []);
 
   const handleSetSpawnQuantity = useCallback((quantity) => {
@@ -5592,6 +5776,70 @@ export default function FrontlineMap({ airportsData }) {
     setSpawnMode(null);
   }, []);
 
+  const handleCancelTankerMode = useCallback(() => {
+    setTankerMode(null);
+  }, []);
+
+  const handleStartTankerMode = useCallback((keyword, label) => {
+    if (!keyword) return;
+    setMapContextMenu(null);
+    setContextMenuPanel('root');
+    setTankerMode({
+      keyword: String(keyword).toUpperCase(),
+      label: label || keyword,
+      step: 'wp1',
+      wp1: null,
+    });
+    setSpawnMode(null);
+    setRetrieveMode(null);
+    setSelectedDbuildPlacementId(null);
+  }, []);
+
+  const handleTankerPlace = useCallback(async ({ lat, lon }) => {
+    if (!tankerMode) return;
+
+    if (tankerMode.step === 'wp1') {
+      setTankerMode((current) => (current ? {
+        ...current,
+        step: 'wp2',
+        wp1: { lat, lon },
+      } : current));
+      return;
+    }
+
+    if (!tankerMode.wp1) return;
+    const distanceNm = haversineNm(tankerMode.wp1.lat, tankerMode.wp1.lon, lat, lon);
+    const minDistNm = Number(tankerOptions.find((entry) => entry.keyword === tankerMode.keyword)?.min_dist_nm) || TANKER_MIN_DIST_NM;
+    if (distanceNm < minDistNm) {
+      showCommandToast({
+        ok: false,
+        message: `WP2 too close: minimum distance is ${minDistNm} NM (current ${distanceNm.toFixed(1)} NM). Place WP2 outside the red zone.`,
+        balance: null,
+      });
+      return;
+    }
+
+    setSubmittingCommand(true);
+    try {
+      const response = await spawnTanker(
+        tankerMode.keyword,
+        tankerMode.wp1.lat,
+        tankerMode.wp1.lon,
+        lat,
+        lon,
+      );
+      if (response?.commandId) {
+        pendingCommandIdsRef.current.add(response.commandId);
+      }
+      setTankerMode(null);
+    } catch (error) {
+      console.error('Failed to submit tanker spawn command:', error);
+      showCommandToast({ ok: false, message: error.message || 'Failed to send tanker spawn order.', balance: null });
+    } finally {
+      setSubmittingCommand(false);
+    }
+  }, [tankerMode, tankerOptions, showCommandToast]);
+
   const handleEnterRetrieveMode = useCallback((ppId, quantity = 1) => {
     const pp = productionPoints.find((entry) => entry.id === ppId);
     const nextQty = clampRetrieveQuantity(quantity, pp?.stock);
@@ -5600,6 +5848,7 @@ export default function FrontlineMap({ airportsData }) {
     setSelectedProductionPointId(String(ppId));
     setSpawnMode(null);
     setSelectedAirportId(null);
+    setTankerMode(null);
   }, [productionPoints]);
 
   const handleSetRetrieveQuantity = useCallback((quantity) => {
@@ -5700,7 +5949,7 @@ export default function FrontlineMap({ airportsData }) {
     [selectedDbuildPlacementId, dbuildPlacements]
   );
 
-  const mapContextMenuEnabled = isAuthenticated && !spawnMode && !retrieveMode;
+  const mapContextMenuEnabled = isAuthenticated && !spawnMode && !retrieveMode && !tankerMode;
 
   useEffect(() => {
     if (!mapContextMenu) return undefined;
@@ -5721,12 +5970,15 @@ export default function FrontlineMap({ airportsData }) {
       y: payload.clientY - rect.top + DBUILD_CONTEXT_MENU_OFFSET_Y,
     });
     setDbuildMenuCollapsed(false);
+    setContextMenuPanel('root');
     setSelectedDbuildPlacementId(null);
   }, [mapContextMenuEnabled]);
 
   const dbuildContextPoint = mapContextMenu
     ? { lat: mapContextMenu.lat, lon: mapContextMenu.lon }
     : null;
+
+  const tankerWp1 = tankerMode?.wp1 || null;
 
   const handleCreateDbuildDraft = useCallback(async (buildType) => {
     if (!mapContextMenu || !buildType) return;
@@ -5779,6 +6031,7 @@ export default function FrontlineMap({ airportsData }) {
     setSelectedProductionPointId(null);
     setSpawnMode(null);
     setRetrieveMode(null);
+    setTankerMode(null);
     setMapContextMenu(null);
   }, []);
 
@@ -5884,6 +6137,9 @@ export default function FrontlineMap({ airportsData }) {
                       mapContextMenuEnabled={mapContextMenuEnabled}
                       onMapContextMenu={handleMapContextMenu}
                       dbuildContextPoint={dbuildContextPoint}
+                      tankerPlacementActive={Boolean(tankerMode)}
+                      onTankerPlace={handleTankerPlace}
+                      tankerWp1={tankerWp1}
                     />
                   ) : (
                     <FlatMapView
@@ -5929,6 +6185,9 @@ export default function FrontlineMap({ airportsData }) {
                       mapContextMenuEnabled={mapContextMenuEnabled}
                       onMapContextMenu={handleMapContextMenu}
                       dbuildContextPoint={dbuildContextPoint}
+                      tankerPlacementActive={Boolean(tankerMode)}
+                      onTankerPlace={handleTankerPlace}
+                      tankerWp1={tankerWp1}
                     />
                   )}
                 </div>
@@ -6201,6 +6460,26 @@ export default function FrontlineMap({ airportsData }) {
                 </div>
               )}
 
+              {tankerMode && (
+                <div className="absolute left-1/2 top-4 z-[1100] -translate-x-1/2 rounded-lg border border-cyan-400/60 bg-[#05151af2] px-4 py-2 text-center shadow-2xl backdrop-blur">
+                  <div className="text-sm font-semibold text-cyan-200">
+                    {tankerMode.step === 'wp1'
+                      ? `Place ${tankerMode.label} WP1 on the map`
+                      : `Place ${tankerMode.label} WP2 outside the red zone (min ${TANKER_MIN_DIST_NM} NM from WP1)`}
+                  </div>
+                  <div className="mt-1 text-[11px] text-cyan-100/80">
+                    {submittingCommand ? 'Sending...' : (tankerMode.step === 'wp1' ? 'Click to set racetrack start' : 'Click outside the exclusion area')}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCancelTankerMode}
+                    className="mt-1 rounded border border-cyan-400/60 px-2 py-0.5 text-[11px] font-semibold text-cyan-200 hover:bg-cyan-400/15"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+
               {spawnMode && (
                 <div className="absolute left-1/2 top-4 z-[1100] -translate-x-1/2 rounded-lg border border-amber-400/60 bg-[#1a1505f2] px-4 py-2 text-center shadow-2xl backdrop-blur">
                   <div className="text-sm font-semibold text-amber-200">
@@ -6244,12 +6523,16 @@ export default function FrontlineMap({ airportsData }) {
                 </div>
               )}
 
-              <DbuildMapContextMenu
+              <MapActionContextMenu
                 menu={mapContextMenu}
                 collapsed={dbuildMenuCollapsed}
                 onToggleCollapsed={() => setDbuildMenuCollapsed((value) => !value)}
+                activePanel={contextMenuPanel}
+                onSetActivePanel={setContextMenuPanel}
                 catalog={dbuildCatalog}
-                onSelect={handleCreateDbuildDraft}
+                tankerOptions={tankerOptions}
+                onSelectDbuild={handleCreateDbuildDraft}
+                onSelectTanker={handleStartTankerMode}
               />
 
               {selectedDbuildPlacement && (
@@ -6452,7 +6735,7 @@ export default function FrontlineMap({ airportsData }) {
                     <div className="text-sm font-semibold text-yt-text-primary">
                       Spawn @ {selectedAirport.displayName || selectedAirport.name}
                     </div>
-                    <PanelCloseButton onClick={() => { setSelectedAirportId(null); setSpawnMode(null); setRetrieveMode(null); }} />
+                    <PanelCloseButton onClick={() => { setSelectedAirportId(null); setSpawnMode(null); setRetrieveMode(null); setTankerMode(null); }} />
                   </div>
                   {!isAuthenticated ? (
                     <div className="rounded border border-dashed border-yt-border px-2 py-2 text-[11px] text-yt-text-secondary">
