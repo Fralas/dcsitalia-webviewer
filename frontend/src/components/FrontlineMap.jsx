@@ -18,7 +18,7 @@ import airports from '../config/airports';
 import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
 import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
-import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getLogisticsRouteVisibility, getMissions, getServerTime, getTankerOptions, setAirportLogisticsRoutePriority, getProductionPoints, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate, spawnTanker } from '../services/api';
+import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getLogisticsRouteVisibility, getMissions, getServerTime, getTankerOptions, getTankerRoutes, setAirportLogisticsRoutePriority, getProductionPoints, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate, spawnTanker } from '../services/api';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
@@ -520,6 +520,69 @@ const DBUILD_CONTEXT_MENU_OFFSET_Y = -12;
 const DBUILD_CONTEXT_HIGHLIGHT_RADIUS_M = 35;
 const TANKER_MIN_DIST_NM = 45;
 const TANKER_EXCLUSION_RADIUS_M = TANKER_MIN_DIST_NM * 1852;
+const TANKER_ROUTE_COLOR = '#22d3ee';
+
+function formatTankerRouteLabel(route) {
+  if (!route) return 'Tanker';
+  const parts = [route.label || route.keyword || 'Tanker'];
+  if (route.platform) parts.push(route.platform);
+  if (route.tacan) parts.push(`TCN ${route.tacan}`);
+  if (Number.isFinite(route.altitude_ft)) parts.push(`${Math.round(route.altitude_ft)} ft`);
+  if (Number.isFinite(route.speed_kt)) parts.push(`${Math.round(route.speed_kt)} kts`);
+  if (Number.isFinite(route.distance_nm)) parts.push(`${route.distance_nm.toFixed(1)} NM`);
+  return parts.join(' • ');
+}
+
+function normalizeTankerLatLon(lat, lon) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  let nextLat = lat;
+  let nextLon = lon;
+  if (Math.abs(nextLat) <= Math.PI && Math.abs(nextLon) <= (2 * Math.PI)) {
+    nextLat = (nextLat * 180) / Math.PI;
+    nextLon = (nextLon * 180) / Math.PI;
+  }
+  return { lat: nextLat, lon: nextLon };
+}
+
+function buildTankerRouteFeatures(routes) {
+  const lineFeatures = [];
+  const pointFeatures = [];
+
+  (routes || []).forEach((route) => {
+    const wp1Raw = route?.wp1;
+    const wp2Raw = route?.wp2;
+    if (!wp1Raw || !wp2Raw) return;
+    const wp1 = normalizeTankerLatLon(Number(wp1Raw.lat), Number(wp1Raw.lon));
+    const wp2 = normalizeTankerLatLon(Number(wp2Raw.lat), Number(wp2Raw.lon));
+    if (!wp1 || !wp2) return;
+
+    lineFeatures.push({
+      type: 'Feature',
+      geometry: {
+        type: 'LineString',
+        coordinates: [[wp1.lon, wp1.lat], [wp2.lon, wp2.lat]],
+      },
+      properties: {
+        id: route.id || route.keyword || 'tanker',
+        label: formatTankerRouteLabel(route),
+        keyword: route.keyword || '',
+      },
+    });
+
+    pointFeatures.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [wp1.lon, wp1.lat] },
+      properties: { id: `${route.id || route.keyword}-wp1`, kind: 'wp1', label: `${route.keyword || 'Tanker'} WP1` },
+    });
+    pointFeatures.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [wp2.lon, wp2.lat] },
+      properties: { id: `${route.id || route.keyword}-wp2`, kind: 'wp2', label: `${route.keyword || 'Tanker'} WP2` },
+    });
+  });
+
+  return { lineFeatures, pointFeatures };
+}
 
 const TANKER_OPTIONS_FALLBACK = [
   { keyword: 'BOOM', label: 'BOOM', min_dist_nm: TANKER_MIN_DIST_NM },
@@ -1747,6 +1810,7 @@ function FlatMapView({
   tankerPlacementActive,
   onTankerPlace,
   tankerWp1,
+  tankerRoutes,
 }) {
   const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
   const activeBasemap = BASEMAP_CONFIG[basemapMode] || BASEMAP_CONFIG[BASEMAP_MODE_DARK];
@@ -2116,14 +2180,69 @@ function FlatMapView({
               center={[tankerWp1.lat, tankerWp1.lon]}
               radius={10}
               pathOptions={{
-                color: '#22d3ee',
-                fillColor: '#22d3ee',
+                color: TANKER_ROUTE_COLOR,
+                fillColor: TANKER_ROUTE_COLOR,
                 fillOpacity: 0.95,
                 weight: 3,
               }}
             />
           </>
         )}
+
+        {(tankerRoutes || []).map((route) => {
+          const wp1 = normalizeTankerLatLon(Number(route?.wp1?.lat), Number(route?.wp1?.lon));
+          const wp2 = normalizeTankerLatLon(Number(route?.wp2?.lat), Number(route?.wp2?.lon));
+          if (!wp1 || !wp2) return null;
+          const routeKey = route.id || route.keyword || `${wp1.lat},${wp1.lon}`;
+          return (
+            <>
+              <Polyline
+                key={`tanker-route-line-${routeKey}`}
+                positions={[[wp1.lat, wp1.lon], [wp2.lat, wp2.lon]]}
+                pathOptions={{
+                  color: TANKER_ROUTE_COLOR,
+                  weight: 3,
+                  opacity: 0.92,
+                  dashArray: '10,8',
+                }}
+              >
+                <Tooltip sticky opacity={0.95}>
+                  {formatTankerRouteLabel(route)}
+                </Tooltip>
+              </Polyline>
+              <CircleMarker
+                key={`tanker-route-wp1-${routeKey}`}
+                center={[wp1.lat, wp1.lon]}
+                radius={7}
+                pathOptions={{
+                  color: '#ffffff',
+                  fillColor: TANKER_ROUTE_COLOR,
+                  fillOpacity: 0.95,
+                  weight: 2,
+                }}
+              >
+                <Tooltip direction="top" offset={[0, -8]} opacity={0.95}>
+                  {`${route.keyword || 'Tanker'} WP1`}
+                </Tooltip>
+              </CircleMarker>
+              <CircleMarker
+                key={`tanker-route-wp2-${routeKey}`}
+                center={[wp2.lat, wp2.lon]}
+                radius={7}
+                pathOptions={{
+                  color: '#ffffff',
+                  fillColor: TANKER_ROUTE_COLOR,
+                  fillOpacity: 0.95,
+                  weight: 2,
+                }}
+              >
+                <Tooltip direction="top" offset={[0, -8]} opacity={0.95}>
+                  {`${route.keyword || 'Tanker'} WP2`}
+                </Tooltip>
+              </CircleMarker>
+            </>
+          );
+        })}
 
         {(crateClusters || []).map((cluster) => {
           if (!Number.isFinite(cluster?.lat) || !Number.isFinite(cluster?.lon)) return null;
@@ -2216,6 +2335,7 @@ function MapLibreFlatMapView({
   tankerPlacementActive,
   onTankerPlace,
   tankerWp1,
+  tankerRoutes,
   mapMaxZoom,
 }) {
   const MIN_PITCH = 0;
@@ -2671,6 +2791,16 @@ function MapLibreFlatMapView({
       features: [circlePolygon(tankerWp1.lat, tankerWp1.lon, TANKER_EXCLUSION_RADIUS_M)],
     };
   }, [tankerWp1]);
+
+  const fcTankerRoutes = useMemo(() => {
+    const { lineFeatures } = buildTankerRouteFeatures(tankerRoutes);
+    return { type: 'FeatureCollection', features: lineFeatures };
+  }, [tankerRoutes]);
+
+  const fcTankerRoutePoints = useMemo(() => {
+    const { pointFeatures } = buildTankerRouteFeatures(tankerRoutes);
+    return { type: 'FeatureCollection', features: pointFeatures };
+  }, [tankerRoutes]);
 
   const disposeThreeNode = useCallback((node) => {
     if (!node) return;
@@ -3559,6 +3689,8 @@ function MapLibreFlatMapView({
       addGeoSource('dbuild-context-point-src', fcDbuildContextPoint);
       addGeoSource('tanker-exclusion-ring-src', fcTankerExclusionRing);
       addGeoSource('tanker-wp1-point-src', fcTankerWp1Point);
+      addGeoSource('tanker-routes-src', fcTankerRoutes);
+      addGeoSource('tanker-route-points-src', fcTankerRoutePoints);
       addGeoSource('dbuild-markers-src', fcDbuildMarkers);
 
       map.addLayer({
@@ -3620,11 +3752,50 @@ function MapLibreFlatMapView({
         source: 'tanker-wp1-point-src',
         paint: {
           'circle-radius': 10,
-          'circle-color': '#22d3ee',
+          'circle-color': TANKER_ROUTE_COLOR,
           'circle-opacity': 0.95,
           'circle-stroke-color': '#ffffff',
           'circle-stroke-width': 2,
         },
+      });
+
+      map.addLayer({
+        id: 'tanker-routes-line-layer',
+        type: 'line',
+        source: 'tanker-routes-src',
+        layout: {
+          'line-cap': 'round',
+          'line-join': 'round',
+        },
+        paint: {
+          'line-color': TANKER_ROUTE_COLOR,
+          'line-width': 4,
+          'line-opacity': 0.95,
+          'line-dasharray': [2, 2],
+        },
+      });
+      map.addLayer({
+        id: 'tanker-route-points-layer',
+        type: 'circle',
+        source: 'tanker-route-points-src',
+        paint: {
+          'circle-radius': 7,
+          'circle-color': TANKER_ROUTE_COLOR,
+          'circle-opacity': 0.95,
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 2,
+        },
+      });
+
+      map.on('mousemove', 'tanker-routes-line-layer', (event) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const feature = event?.features?.[0];
+        const label = feature?.properties?.label || 'Tanker route';
+        showHoverPopup(event.lngLat, `<div style="font-size:11px;font-weight:600;">${label}</div>`);
+      });
+      map.on('mouseleave', 'tanker-routes-line-layer', () => {
+        if (!placementActive) map.getCanvas().style.cursor = '';
+        hideHoverPopup();
       });
 
       map.addLayer({
@@ -3982,6 +4153,28 @@ function MapLibreFlatMapView({
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map) return undefined;
+
+    const applyTankerRouteData = () => {
+      const routesSource = map.getSource('tanker-routes-src');
+      if (routesSource?.setData) routesSource.setData(fcTankerRoutes);
+      const pointsSource = map.getSource('tanker-route-points-src');
+      if (pointsSource?.setData) pointsSource.setData(fcTankerRoutePoints);
+    };
+
+    if (map.isStyleLoaded()) {
+      applyTankerRouteData();
+      return undefined;
+    }
+
+    map.once('load', applyTankerRouteData);
+    return () => {
+      map.off('load', applyTankerRouteData);
+    };
+  }, [fcTankerRoutes, fcTankerRoutePoints]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
     const ringSource = map.getSource('dbuild-context-ring-src');
     if (ringSource?.setData) ringSource.setData(fcDbuildContextRing);
@@ -4247,6 +4440,7 @@ export default function FrontlineMap({ airportsData }) {
   const [contextMenuPanel, setContextMenuPanel] = useState('root');
   const [dbuildMenuCollapsed, setDbuildMenuCollapsed] = useState(false);
   const [tankerOptions, setTankerOptions] = useState([]);
+  const [tankerRoutes, setTankerRoutes] = useState([]);
   const [tankerMode, setTankerMode] = useState(null);
   const [confirmingDbuildId, setConfirmingDbuildId] = useState(null);
   const mapSectionRef = useRef(null);
@@ -4461,7 +4655,7 @@ export default function FrontlineMap({ airportsData }) {
   // Initial load of Production Points + spawn catalog (DCORE bridge)
   useEffect(() => {
     let cancelled = false;
-    Promise.allSettled([getProductionPoints(), getSpawnOptions(), getTankerOptions(), getWebSpawnMarkers(), getDbuildCatalog(), getDbuildPlacements()]).then(([ppResult, optionsResult, tankerOptionsResult, markersResult, dbuildCatalogResult, dbuildPlacementsResult]) => {
+    Promise.allSettled([getProductionPoints(), getSpawnOptions(), getTankerOptions(), getTankerRoutes(), getWebSpawnMarkers(), getDbuildCatalog(), getDbuildPlacements()]).then(([ppResult, optionsResult, tankerOptionsResult, tankerRoutesResult, markersResult, dbuildCatalogResult, dbuildPlacementsResult]) => {
       if (cancelled) return;
       if (ppResult.status === 'fulfilled') {
         const list = ppResult.value?.productionPoints || ppResult.value;
@@ -4476,6 +4670,10 @@ export default function FrontlineMap({ airportsData }) {
       if (tankerOptionsResult.status === 'fulfilled' && tankerOptionsResult.value) {
         const list = tankerOptionsResult.value?.tankers || tankerOptionsResult.value;
         if (Array.isArray(list)) setTankerOptions(list);
+      }
+      if (tankerRoutesResult.status === 'fulfilled' && tankerRoutesResult.value) {
+        const list = tankerRoutesResult.value?.routes || tankerRoutesResult.value;
+        if (Array.isArray(list)) setTankerRoutes(list);
       }
       if (markersResult.status === 'fulfilled' && markersResult.value) {
         const list = markersResult.value?.markers || markersResult.value;
@@ -4509,6 +4707,11 @@ export default function FrontlineMap({ airportsData }) {
       if (Array.isArray(list)) setWebSpawnMarkers(list);
     });
 
+    const unsubscribeTankerRoutes = socketService.on('tanker-routes:updated', (data) => {
+      const list = data?.routes || data;
+      if (Array.isArray(list)) setTankerRoutes(list);
+    });
+
     const unsubscribeDbuildPlacements = socketService.on('dbuild-placements:updated', (data) => {
       const list = data?.placements || data;
       if (Array.isArray(list)) setDbuildPlacements(list);
@@ -4539,6 +4742,7 @@ export default function FrontlineMap({ airportsData }) {
     return () => {
       unsubscribePp && unsubscribePp();
       unsubscribeMarkers && unsubscribeMarkers();
+      unsubscribeTankerRoutes && unsubscribeTankerRoutes();
       unsubscribeDbuildPlacements && unsubscribeDbuildPlacements();
       unsubscribeDbuildSites && unsubscribeDbuildSites();
       unsubscribeResult && unsubscribeResult();
@@ -6140,6 +6344,7 @@ export default function FrontlineMap({ airportsData }) {
                       tankerPlacementActive={Boolean(tankerMode)}
                       onTankerPlace={handleTankerPlace}
                       tankerWp1={tankerWp1}
+                      tankerRoutes={tankerRoutes}
                     />
                   ) : (
                     <FlatMapView
@@ -6188,6 +6393,7 @@ export default function FrontlineMap({ airportsData }) {
                       tankerPlacementActive={Boolean(tankerMode)}
                       onTankerPlace={handleTankerPlace}
                       tankerWp1={tankerWp1}
+                      tankerRoutes={tankerRoutes}
                     />
                   )}
                 </div>

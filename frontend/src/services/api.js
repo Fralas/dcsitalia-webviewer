@@ -744,6 +744,10 @@ export async function getTankerOptions() {
   return fetchAPI('/tanker/options');
 }
 
+export async function getTankerRoutes() {
+  return fetchAPI('/tanker/routes');
+}
+
 export async function spawnTanker(keyword, wp1Lat, wp1Lon, wp2Lat, wp2Lon) {
   return fetchAPI('/tanker/spawn', {
     method: 'POST',
@@ -906,6 +910,7 @@ export default {
   getWebSpawnMarkers,
   getSpawnOptions,
   getTankerOptions,
+  getTankerRoutes,
   requestProductionPointUpgrade,
   spawnAirportInfantry,
   spawnAirportCrate,

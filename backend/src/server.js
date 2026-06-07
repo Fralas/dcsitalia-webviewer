@@ -149,6 +149,10 @@ const DBUILD_SITES_FILE = process.env.DBUILD_SITES_FILE
   ? path.resolve(process.env.DBUILD_SITES_FILE)
   : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DBRIDGE\\Export_DBUILD_Sites.json';
 
+const TANKER_ROUTES_FILE = process.env.TANKER_ROUTES_FILE
+  ? path.resolve(process.env.TANKER_ROUTES_FILE)
+  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DBRIDGE\\Export_Tanker_Routes.json';
+
 // Max placement distance from airport center (matches DMAS blue_airbase_radius_m).
 const AIRPORT_SPAWN_RADIUS_M = Number.parseInt(process.env.AIRPORT_SPAWN_RADIUS_M, 10) || 2500;
 const PP_RETRIEVE_RADIUS_M = Number.parseInt(process.env.PP_RETRIEVE_RADIUS_M, 10) || 500;
@@ -361,6 +365,8 @@ let webCommandResultSignature = '';
 let webCommandFeedEmittedIds = new Set(); // command id -> feed already written
 let webSpawnMarkersSyncSignature = '';
 let webSpawnMarkers = [];
+let tankerRoutesSyncSignature = '';
+let tankerRoutes = [];
 let dbuildSitesSyncSignature = '';
 let dbuildSites = [];
 let zoneOperationsById = new Map();
@@ -1447,6 +1453,54 @@ function syncWebSpawnMarkersFromFile() {
     });
   } catch (error) {
     console.error('Failed web spawn markers sync from file:', error.message);
+  }
+}
+
+function syncTankerRoutesFromFile() {
+  try {
+    if (!fs.existsSync(TANKER_ROUTES_FILE)) return;
+
+    const raw = fs.readFileSync(TANKER_ROUTES_FILE, 'utf8');
+    if (!raw || raw.trim() === '') return;
+
+    const parsed = JSON.parse(raw);
+    const incoming = Array.isArray(parsed?.routes) ? parsed.routes : [];
+    const nextRoutes = incoming
+      .map((entry) => {
+        const wp1Lat = Number(entry?.wp1?.lat ?? entry?.wp1_lat);
+        const wp1Lon = Number(entry?.wp1?.lon ?? entry?.wp1_lon);
+        const wp2Lat = Number(entry?.wp2?.lat ?? entry?.wp2_lat);
+        const wp2Lon = Number(entry?.wp2?.lon ?? entry?.wp2_lon);
+        if (![wp1Lat, wp1Lon, wp2Lat, wp2Lon].every(Number.isFinite)) return null;
+        return {
+          id: String(entry?.id || entry?.keyword || '').trim() || null,
+          keyword: String(entry?.keyword || '').trim().toUpperCase() || null,
+          label: String(entry?.label || '').trim() || null,
+          platform: String(entry?.platform || '').trim() || null,
+          tacan: String(entry?.tacan || '').trim() || null,
+          freq_mhz: Number.isFinite(Number(entry?.freq_mhz)) ? Number(entry.freq_mhz) : null,
+          altitude_ft: Number.isFinite(Number(entry?.altitude_ft)) ? Number(entry.altitude_ft) : null,
+          speed_kt: Number.isFinite(Number(entry?.speed_kt)) ? Number(entry.speed_kt) : null,
+          distance_nm: Number.isFinite(Number(entry?.distance_nm)) ? Number(entry.distance_nm) : null,
+          heading_deg: Number.isFinite(Number(entry?.heading_deg)) ? Number(entry.heading_deg) : null,
+          wp1: { lat: wp1Lat, lon: wp1Lon },
+          wp2: { lat: wp2Lat, lon: wp2Lon },
+        };
+      })
+      .filter((entry) => entry && entry.id);
+
+    const serialized = JSON.stringify(nextRoutes);
+    const prevSerialized = JSON.stringify(tankerRoutes);
+    if (raw === tankerRoutesSyncSignature && serialized === prevSerialized) return;
+
+    tankerRoutesSyncSignature = raw;
+    tankerRoutes = nextRoutes;
+
+    io.emit('tanker-routes:updated', {
+      routes: tankerRoutes,
+    });
+  } catch (error) {
+    console.error('Failed tanker routes sync from file:', error.message);
   }
 }
 
@@ -2724,6 +2778,13 @@ app.get('/api/spawn-options', (req, res) => {
  */
 app.get('/api/tanker/options', (req, res) => {
   res.json({ tankers: WEB_TANKER_OPTIONS });
+});
+
+/**
+ * GET /api/tanker/routes - Active tanker racetracks exported by DMAS.
+ */
+app.get('/api/tanker/routes', (req, res) => {
+  res.json({ routes: tankerRoutes });
 });
 
 /**
@@ -4589,6 +4650,9 @@ io.on('connection', (socket) => {
   socket.emit('web-spawn-markers:updated', {
     markers: webSpawnMarkers,
   });
+  socket.emit('tanker-routes:updated', {
+    routes: tankerRoutes,
+  });
   socket.emit('dbuild-placements:updated', {
     placements: enrichDbuildPlacements(dbuildPlacementsService.getPlacements()),
     sites: dbuildSites,
@@ -4781,6 +4845,11 @@ setInterval(() => {
   syncWebSpawnMarkersFromFile();
 }, 2000);
 
+// Poll active tanker racetracks exported by DMAS
+setInterval(() => {
+  syncTankerRoutesFromFile();
+}, 2000);
+
 // Poll DBUILD sites exported by DCORE
 setInterval(() => {
   syncDbuildSitesFromFile();
@@ -4821,6 +4890,7 @@ loadWebCommandsQueue();
 syncProductionPointsFromFile();
 syncWebCommandResultsFromFile();
 syncWebSpawnMarkersFromFile();
+syncTankerRoutesFromFile();
 syncDbuildSitesFromFile();
 
 httpServer.listen(PORT, () => {
