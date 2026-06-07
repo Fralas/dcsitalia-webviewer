@@ -646,6 +646,25 @@ function bootstrapWebCommandFeedDedup() {
   });
 }
 
+function formatWebCommandResultMessage(command, stored) {
+  const cmdType = stored?.type || command?.type;
+  const raw = String(stored?.message || '').trim();
+  if (cmdType === 'pp_retrieve' && stored?.ok === true) {
+    if (/^retrieved \d+/i.test(raw)) return raw;
+    const legacy = raw.match(/^retrieved_(\d+)_remaining_\d+$/i);
+    if (legacy) {
+      const count = Number(legacy[1]);
+      return count === 1 ? 'Retrieved 1 crate' : `Retrieved ${count} crates`;
+    }
+    const pp = productionPoints.find((entry) => entry.id === command?.production_point_id);
+    const qty = clampRetrieveQuantity(command?.quantity, pp?.stock);
+    if (qty > 0) {
+      return qty === 1 ? 'Retrieved 1 crate' : `Retrieved ${qty} crates`;
+    }
+  }
+  return raw;
+}
+
 function buildWebCommandFeedEvent(command, stored) {
   if (!command || !stored) return null;
 
@@ -1400,13 +1419,15 @@ function syncWebCommandResultsFromFile() {
       webCommandResultsById.set(id, stored);
 
       const command = webCommands.find((cmd) => cmd.id === id) || null;
+      const emitType = stored.type || (command ? command.type : '');
       io.emit('web-command:result', {
         id,
-        type: stored.type || (command ? command.type : ''),
+        type: emitType,
         ok: stored.ok,
-        message: stored.message,
-        balance: stored.balance,
+        message: formatWebCommandResultMessage(command, { ...stored, type: emitType }),
+        balance: (emitType === 'pp_retrieve' || emitType === 'pp_upgrade') ? null : stored.balance,
         keyword: command ? command.keyword : null,
+        quantity: command && emitType === 'pp_retrieve' ? command.quantity : null,
         requested_by_id: command ? command.requested_by_id : null,
         production_point_id: command && (command.type === 'pp_upgrade' || command.type === 'pp_retrieve')
           ? command.production_point_id
@@ -2636,7 +2657,7 @@ app.get('/api/production-points', (req, res) => {
 });
 
 /**
- * GET /api/web-spawn-markers - Live tracked crate positions from DMAS registry.
+ * GET /api/web-spawn-markers - Live tracked crate positions (airport spawns + production retrieves).
  */
 app.get('/api/web-spawn-markers', (req, res) => {
   res.json({ markers: webSpawnMarkers });

@@ -1537,6 +1537,31 @@ function buildDbuildMapMarkers(placements, sites, catalog) {
   return markers;
 }
 
+function formatWebCommandToastMessage(data) {
+  const raw = String(data?.message || '').trim();
+  if (data?.type === 'pp_retrieve' && data?.ok === true) {
+    if (/^retrieved \d+/i.test(raw)) return raw;
+    const legacy = raw.match(/^retrieved_(\d+)_remaining_\d+$/i);
+    if (legacy) {
+      const count = Number(legacy[1]);
+      return count === 1 ? 'Retrieved 1 crate' : `Retrieved ${count} crates`;
+    }
+    const qty = Number(data?.quantity);
+    if (Number.isFinite(qty) && qty > 0) {
+      return qty === 1 ? 'Retrieved 1 crate' : `Retrieved ${qty} crates`;
+    }
+  }
+  return raw || (data?.ok ? 'Command executed.' : 'Command failed.');
+}
+
+function shouldShowCommandToastBalance(data) {
+  if (data?.type === 'pp_retrieve' || data?.type === 'pp_upgrade') return false;
+  return Number.isFinite(Number(data?.balance));
+}
+
+const COMMAND_TOAST_VISIBLE_MS = 3000;
+const COMMAND_TOAST_FADE_MS = 300;
+
 function clusterCratesWithinRadius(markers, radiusM = CRATE_CLUSTER_RADIUS_M) {
   const valid = (markers || []).filter((marker) => Number.isFinite(marker?.lat) && Number.isFinite(marker?.lon));
   const count = valid.length;
@@ -4049,8 +4074,28 @@ export default function FrontlineMap({ airportsData }) {
   const [submittingCommand, setSubmittingCommand] = useState(false);
   const [upgradingPpId, setUpgradingPpId] = useState(null);
   const [commandToast, setCommandToast] = useState(null);
+  const [commandToastFading, setCommandToastFading] = useState(false);
   const pendingCommandIdsRef = useRef(new Set());
   const commandToastTimerRef = useRef(null);
+  const commandToastFadeTimerRef = useRef(null);
+
+  const showCommandToast = useCallback((toast) => {
+    if (commandToastTimerRef.current) {
+      clearTimeout(commandToastTimerRef.current);
+    }
+    if (commandToastFadeTimerRef.current) {
+      clearTimeout(commandToastFadeTimerRef.current);
+    }
+    setCommandToastFading(false);
+    setCommandToast({ ...toast, ts: Date.now() });
+    commandToastFadeTimerRef.current = setTimeout(() => {
+      setCommandToastFading(true);
+    }, COMMAND_TOAST_VISIBLE_MS);
+    commandToastTimerRef.current = setTimeout(() => {
+      setCommandToast(null);
+      setCommandToastFading(false);
+    }, COMMAND_TOAST_VISIBLE_MS + COMMAND_TOAST_FADE_MS);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -4301,16 +4346,11 @@ export default function FrontlineMap({ airportsData }) {
       const isDbuild = data.type === 'dbuild_confirm';
       if ((isSpawn || isDbuild) && data.ok === true) return;
 
-      if (commandToastTimerRef.current) {
-        clearTimeout(commandToastTimerRef.current);
-      }
-      setCommandToast({
+      showCommandToast({
         ok: data.ok === true,
-        message: data.message || (data.ok ? 'Command executed.' : 'Command failed.'),
-        balance: Number.isFinite(Number(data.balance)) ? Number(data.balance) : null,
-        ts: Date.now(),
+        message: formatWebCommandToastMessage(data),
+        balance: shouldShowCommandToastBalance(data) ? Number(data.balance) : null,
       });
-      commandToastTimerRef.current = setTimeout(() => setCommandToast(null), 8000);
     });
 
     return () => {
@@ -4322,8 +4362,11 @@ export default function FrontlineMap({ airportsData }) {
       if (commandToastTimerRef.current) {
         clearTimeout(commandToastTimerRef.current);
       }
+      if (commandToastFadeTimerRef.current) {
+        clearTimeout(commandToastFadeTimerRef.current);
+      }
     };
-  }, []);
+  }, [showCommandToast]);
 
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -5521,11 +5564,11 @@ export default function FrontlineMap({ airportsData }) {
       }
     } catch (error) {
       console.error('Failed to request PP upgrade:', error);
-      setCommandToast({ ok: false, message: error.message || 'Failed to request upgrade.', balance: null, ts: Date.now() });
+      showCommandToast({ ok: false, message: error.message || 'Failed to request upgrade.', balance: null });
     } finally {
       setUpgradingPpId(null);
     }
-  }, []);
+  }, [showCommandToast]);
 
   const handleEnterSpawnMode = useCallback((airportId, type, option) => {
     setSpawnMode({
@@ -5581,11 +5624,10 @@ export default function FrontlineMap({ airportsData }) {
     if (ppCoords && Number.isFinite(ppCoords.lat) && Number.isFinite(ppCoords.lon)) {
       const distanceM = haversineMeters(ppCoords.lat, ppCoords.lon, lat, lon);
       if (distanceM > PP_RETRIEVE_RADIUS_M) {
-        setCommandToast({
+        showCommandToast({
           ok: false,
           message: `Placement out of range (${Math.round(distanceM)} m). Max ${PP_RETRIEVE_RADIUS_M} m from production point center.`,
           balance: null,
-          ts: Date.now(),
         });
         return;
       }
@@ -5600,11 +5642,11 @@ export default function FrontlineMap({ airportsData }) {
       setRetrieveMode(null);
     } catch (error) {
       console.error('Failed to submit retrieve command:', error);
-      setCommandToast({ ok: false, message: error.message || 'Failed to send retrieve order.', balance: null, ts: Date.now() });
+      showCommandToast({ ok: false, message: error.message || 'Failed to send retrieve order.', balance: null });
     } finally {
       setSubmittingCommand(false);
     }
-  }, [retrieveMode, productionPoints]);
+  }, [retrieveMode, productionPoints, showCommandToast]);
 
   const handleSpawnPlace = useCallback(async ({ lat, lon }) => {
     if (!spawnMode) return;
@@ -5617,11 +5659,10 @@ export default function FrontlineMap({ airportsData }) {
       for (const position of placementPositions) {
         const distanceM = haversineMeters(airportCoords.lat, airportCoords.lon, position.lat, position.lon);
         if (distanceM > AIRPORT_SPAWN_RADIUS_M) {
-          setCommandToast({
+          showCommandToast({
             ok: false,
             message: `Placement out of range (${Math.round(distanceM)} m). Max ${AIRPORT_SPAWN_RADIUS_M / 1000} km from airport center.`,
             balance: null,
-            ts: Date.now(),
           });
           return;
         }
@@ -5638,11 +5679,11 @@ export default function FrontlineMap({ airportsData }) {
       setSpawnMode(null);
     } catch (error) {
       console.error('Failed to submit spawn command:', error);
-      setCommandToast({ ok: false, message: error.message || 'Failed to send spawn order.', balance: null, ts: Date.now() });
+      showCommandToast({ ok: false, message: error.message || 'Failed to send spawn order.', balance: null });
     } finally {
       setSubmittingCommand(false);
     }
-  }, [spawnMode, airportsById]);
+  }, [spawnMode, airportsById, showCommandToast]);
 
   const dbuildMapMarkers = useMemo(
     () => buildDbuildMapMarkers(dbuildPlacements, dbuildSites, dbuildCatalog),
@@ -5699,9 +5740,9 @@ export default function FrontlineMap({ airportsData }) {
       }
     } catch (error) {
       console.error('Failed to create DBUILD draft:', error);
-      setCommandToast({ ok: false, message: error.message || 'Failed to place build draft.', balance: null, ts: Date.now() });
+      showCommandToast({ ok: false, message: error.message || 'Failed to place build draft.', balance: null });
     }
-  }, [mapContextMenu]);
+  }, [mapContextMenu, showCommandToast]);
 
   const handleConfirmDbuildPlacement = useCallback(async (placementId) => {
     if (!placementId) return;
@@ -5713,11 +5754,11 @@ export default function FrontlineMap({ airportsData }) {
       }
     } catch (error) {
       console.error('Failed to confirm DBUILD placement:', error);
-      setCommandToast({ ok: false, message: error.message || 'Failed to confirm build placement.', balance: null, ts: Date.now() });
+      showCommandToast({ ok: false, message: error.message || 'Failed to confirm build placement.', balance: null });
     } finally {
       setConfirmingDbuildId(null);
     }
-  }, []);
+  }, [showCommandToast]);
 
   const handleCancelDbuildDraft = useCallback(async (placementId) => {
     if (!placementId) return;
@@ -5728,9 +5769,9 @@ export default function FrontlineMap({ airportsData }) {
       }
     } catch (error) {
       console.error('Failed to cancel DBUILD draft:', error);
-      setCommandToast({ ok: false, message: error.message || 'Failed to cancel build draft.', balance: null, ts: Date.now() });
+      showCommandToast({ ok: false, message: error.message || 'Failed to cancel build draft.', balance: null });
     }
-  }, [selectedDbuildPlacementId]);
+  }, [selectedDbuildPlacementId, showCommandToast]);
 
   const handleDbuildPlacementSelect = useCallback((placementId) => {
     setSelectedDbuildPlacementId(placementId);
@@ -6286,7 +6327,9 @@ export default function FrontlineMap({ airportsData }) {
 
               {commandToast && (
                 <div
-                  className={`absolute left-1/2 bottom-4 z-[1100] -translate-x-1/2 rounded-lg border px-4 py-2 text-sm font-semibold shadow-2xl backdrop-blur ${
+                  className={`absolute left-1/2 bottom-4 z-[1100] -translate-x-1/2 rounded-lg border px-4 py-2 text-sm font-semibold shadow-2xl backdrop-blur transition-opacity duration-300 ${
+                    commandToastFading ? 'opacity-0' : 'opacity-100'
+                  } ${
                     commandToast.ok
                       ? 'border-green-500/50 bg-[#0c1f14f2] text-green-200'
                       : 'border-red-500/50 bg-[#1f0c0cf2] text-red-200'
