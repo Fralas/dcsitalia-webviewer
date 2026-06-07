@@ -1385,6 +1385,17 @@ function getProductionPointFactoryKind(pp) {
   return getProductionPointFactoryColor(pp) === '#3b82f6' ? 'pp-blue' : 'pp-white';
 }
 
+function isProductionPointZone(zone, productionPoints = []) {
+  const id = String(zone?.id || '').trim();
+  const name = String(zone?.name || zone?.zone_name || '').trim();
+  const candidates = [id, name].filter(Boolean);
+  const ppIds = new Set(
+    (productionPoints || []).flatMap((pp) => [String(pp?.id || '').trim(), String(pp?.zone_name || '').trim()]).filter(Boolean)
+  );
+  if (candidates.some((value) => ppIds.has(value))) return true;
+  return candidates.some((value) => /^PP[_\s-]/i.test(value));
+}
+
 function getDbuildIconKind(status) {
   if (status === 'built') return 'rook-blue';
   if (status === 'draft') return 'hammer-white';
@@ -3643,9 +3654,31 @@ function MapLibreFlatMapView({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    const source = map.getSource('production-points-src');
-    if (source?.setData) source.setData(fcProductionPoints);
+    if (!map) return;
+    const visibility = showProductionPoints ? 'visible' : 'none';
+    if (map.getLayer('production-points-layer')) {
+      map.setLayoutProperty('production-points-layer', 'visibility', visibility);
+    }
+    if (map.getLayer('production-points-hit-layer')) {
+      map.setLayoutProperty('production-points-hit-layer', 'visibility', visibility);
+    }
+  }, [showProductionPoints]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const applyProductionPointData = () => {
+      const source = map.getSource('production-points-src');
+      if (source?.setData) source.setData(fcProductionPoints);
+    };
+    if (map.isStyleLoaded()) {
+      applyProductionPointData();
+      return undefined;
+    }
+    map.once('load', applyProductionPointData);
+    return () => {
+      map.off('load', applyProductionPointData);
+    };
   }, [fcProductionPoints]);
 
   useEffect(() => {
@@ -4620,6 +4653,11 @@ export default function FrontlineMap({ airportsData }) {
     });
   }, [validZones, combatMissionByZone, filters]);
 
+  const zonesForMap = useMemo(() => {
+    if (filters.showProductionPoints) return filteredZones;
+    return filteredZones.filter((zone) => !isProductionPointZone(zone, productionPoints));
+  }, [filteredZones, filters.showProductionPoints, productionPoints]);
+
   const filteredLogisticsMissions = useMemo(() => {
     return logisticsMissions.filter((mission) => {
       if (!mission?.airport_id || !mission?.source_airport_id) return false;
@@ -4653,7 +4691,7 @@ export default function FrontlineMap({ airportsData }) {
   }, [validAirports]);
 
   const globePoints = useMemo(() => {
-    const zonePoints = filters.showAto ? filteredZones.map((zone) => ({
+    const zonePoints = filters.showAto ? zonesForMap.map((zone) => ({
       lat: zone.coordinates.lat,
       lon: zone.coordinates.lon,
       size: zone.id === selectedZoneId ? 0.14 : zone.isActive ? 0.1 : 0.07,
@@ -4663,8 +4701,18 @@ export default function FrontlineMap({ airportsData }) {
       lon: airport.coordinates.lon,
       size: airport.isMainBase ? 0.11 : 0.08,
     })) : [];
-    return [...zonePoints, ...airportPoints];
-  }, [filteredZones, validAirports, selectedZoneId, filters.showAto, filters.showAirports]);
+    const productionPointMarkers = filters.showProductionPoints
+      ? (productionPoints || []).flatMap((pp) => {
+        if (!Number.isFinite(pp?.coordinates?.lat) || !Number.isFinite(pp?.coordinates?.lon)) return [];
+        return [{
+          lat: pp.coordinates.lat,
+          lon: pp.coordinates.lon,
+          size: pp.id === selectedProductionPointId ? 0.12 : 0.09,
+        }];
+      })
+      : [];
+    return [...zonePoints, ...airportPoints, ...productionPointMarkers];
+  }, [zonesForMap, validAirports, productionPoints, selectedZoneId, selectedProductionPointId, filters.showAto, filters.showAirports, filters.showProductionPoints]);
 
   const zoneTheaterCenter = useMemo(() => {
     if (validZones.length === 0) return null;
@@ -4998,6 +5046,12 @@ export default function FrontlineMap({ airportsData }) {
       setSelectedDcsarId(null);
     }
   }, [filters.showDcsar]);
+
+  useEffect(() => {
+    if (!filters.showProductionPoints) {
+      setSelectedProductionPointId(null);
+    }
+  }, [filters.showProductionPoints]);
 
   useEffect(() => {
     setZoneCoordinatesFormat('dms');
@@ -5554,7 +5608,7 @@ export default function FrontlineMap({ airportsData }) {
                 <div className="absolute inset-0">
                   {isMapLibreEngine ? (
                     <MapLibreFlatMapView
-                      zones={filteredZones}
+                      zones={zonesForMap}
                       airportsData={validAirports}
                       logisticsMissions={routeVisibleLogisticsMissions}
                       logisticsFrontlineAirportIds={logisticsFrontlineAirportIds}
@@ -5596,7 +5650,7 @@ export default function FrontlineMap({ airportsData }) {
                     />
                   ) : (
                     <FlatMapView
-                      zones={filteredZones}
+                      zones={zonesForMap}
                       airportsData={validAirports}
                       logisticsMissions={routeVisibleLogisticsMissions}
                       gridConnections={gridConnections}
@@ -6026,7 +6080,7 @@ export default function FrontlineMap({ airportsData }) {
                 </div>
               )}
 
-              {selectedProductionPoint && (
+              {filters.showProductionPoints && selectedProductionPoint && (
                 <div className="absolute left-4 bottom-4 z-[1000] w-[320px] rounded-xl border border-yt-border bg-[#101827f2] p-3 shadow-2xl backdrop-blur">
                   <div className="mb-2 flex items-center justify-between">
                     <div className="text-sm font-semibold text-yt-text-primary">
