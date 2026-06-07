@@ -5481,6 +5481,22 @@ export default function FrontlineMap({ airportsData }) {
     }
   }, [selectedZoneId]);
 
+  useEffect(() => {
+    if (retrieveMode) {
+      const activePp = productionPoints.find((entry) => entry.id === retrieveMode.ppId);
+      setPpRetrieveDraftQty(clampRetrieveQuantity(retrieveMode.quantity, activePp?.stock));
+      return;
+    }
+    if (!selectedProductionPointId) {
+      setPpRetrieveDraftQty(1);
+      return;
+    }
+    const pp = productionPoints.find((entry) => entry.id === selectedProductionPointId);
+    if (!pp) return;
+    const max = Math.max(1, Math.floor(Number(pp.stock) || 0));
+    setPpRetrieveDraftQty((current) => clampRetrieveQuantity(current, max));
+  }, [retrieveMode, selectedProductionPointId, productionPoints]);
+
   const handleRequestUpgrade = useCallback(async (ppId) => {
     if (!ppId) return;
     setUpgradingPpId(ppId);
@@ -5534,7 +5550,6 @@ export default function FrontlineMap({ airportsData }) {
       if (!current) return current;
       const pp = productionPoints.find((entry) => entry.id === current.ppId);
       const nextQty = clampRetrieveQuantity(quantity, pp?.stock);
-      setPpRetrieveDraftQty(nextQty);
       return { ...current, quantity: nextQty };
     });
   }, [productionPoints]);
@@ -5730,21 +5745,20 @@ export default function FrontlineMap({ airportsData }) {
 
   const maxRetrieveQuantity = Math.max(1, Math.floor(Number(selectedProductionPoint?.stock) || 0));
 
-  const panelRetrieveQuantity = retrieveMode?.ppId === selectedProductionPoint?.id
+  const panelRetrieveQuantity = (
+    retrieveMode &&
+    selectedProductionPoint &&
+    retrieveMode.ppId === selectedProductionPoint.id
+  )
     ? (retrieveMode.quantity || 1)
     : ppRetrieveDraftQty;
 
-  const retrieveBannerMaxQuantity = useMemo(() => {
-    if (!retrieveMode) return 1;
-    const pp = productionPoints.find((entry) => entry.id === retrieveMode.ppId);
-    return Math.max(1, Math.floor(Number(pp?.stock) || 0));
-  }, [retrieveMode, productionPoints]);
-
-  useEffect(() => {
-    if (!selectedProductionPoint) return;
-    const max = Math.max(1, Math.floor(Number(selectedProductionPoint.stock) || 0));
-    setPpRetrieveDraftQty((current) => clampRetrieveQuantity(current, max));
-  }, [selectedProductionPoint?.id, selectedProductionPoint?.stock]);
+  const retrieveBannerMaxQuantity = retrieveMode
+    ? Math.max(
+      1,
+      Math.floor(Number(productionPoints.find((entry) => entry.id === retrieveMode.ppId)?.stock) || 0)
+    )
+    : 1;
 
   return (
     <div className="h-full overflow-hidden bg-yt-bg-primary p-3">
@@ -6350,7 +6364,7 @@ export default function FrontlineMap({ airportsData }) {
                         max={maxRetrieveQuantity}
                         disabled={!isAuthenticated}
                         onChange={(quantity) => {
-                          if (retrieveMode?.ppId === selectedProductionPoint.id) {
+                          if (retrieveMode && retrieveMode.ppId === selectedProductionPoint.id) {
                             handleSetRetrieveQuantity(quantity);
                             return;
                           }
@@ -6364,7 +6378,7 @@ export default function FrontlineMap({ airportsData }) {
                         className="mt-2 w-full rounded border border-emerald-500/50 bg-emerald-500/15 px-2.5 py-1.5 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-50"
                         title={!isAuthenticated ? 'Login required' : 'Place retrieve marker on map (500 m range)'}
                       >
-                        {retrieveMode?.ppId === selectedProductionPoint.id ? 'Click map to place...' : 'Retrieve'}
+                        {retrieveMode && retrieveMode.ppId === selectedProductionPoint.id ? 'Click map to place...' : 'Retrieve'}
                       </button>
                     </div>
                   )}

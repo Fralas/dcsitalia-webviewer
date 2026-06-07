@@ -696,7 +696,8 @@ function buildWebCommandFeedEvent(command, stored) {
 
   if (cmdType === 'pp_retrieve') {
     const ppName = getProductionPointDisplayName(command.production_point_id);
-    const qty = clampSpawnQuantity(command.quantity);
+    const pp = productionPoints.find((entry) => entry.id === command.production_point_id);
+    const qty = clampRetrieveQuantity(command.quantity, pp?.stock);
     const qtyLabel = qty > 1 ? `${qty}x ` : '';
 
     if (stored.ok) {
@@ -1212,6 +1213,13 @@ function clampSpawnQuantity(raw) {
   const parsed = Math.floor(Number(raw));
   if (!Number.isFinite(parsed) || parsed < 1) return 1;
   return Math.min(SPAWN_QUANTITY_MAX, parsed);
+}
+
+function clampRetrieveQuantity(raw, maxStock) {
+  const max = Math.max(1, Math.floor(Number(maxStock)) || 1);
+  const parsed = Math.floor(Number(raw));
+  if (!Number.isFinite(parsed) || parsed < 1) return 1;
+  return Math.min(max, parsed);
 }
 
 function offsetLatLon(lat, lon, distanceM, bearingDeg) {
@@ -2738,7 +2746,7 @@ app.post('/api/production-points/:id/retrieve', (req, res) => {
     return res.status(400).json({ error: distanceCheck.error });
   }
 
-  const quantity = Math.min(stock, clampSpawnQuantity(req.body?.quantity));
+  const quantity = clampRetrieveQuantity(req.body?.quantity, stock);
 
   const command = enqueueWebCommand({
     id: randomUUID(),
