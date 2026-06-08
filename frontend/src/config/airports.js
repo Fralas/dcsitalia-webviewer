@@ -4,6 +4,7 @@
  *
  * isHeliport: true if this is a heliport/FOB (only helicopters can land)
  * isCarrier: true if this is a carrier (naval aviation base)
+ * isAlwaysActive: true if this airbase must remain blue/active regardless of status file
  * herculesBase: true if C-130 Hercules can spawn/operate from this base
  */
 
@@ -304,6 +305,7 @@ const airports = [
     displayName: 'Abu al-Duhur',
     icao: '',
     isMainBase: false,
+    isAlwaysActive: true,
     isHeliport: false,
     herculesBase: false,
     coordinates: { lat: 35.731462, lon: 37.118802 },
@@ -334,6 +336,7 @@ const airports = [
     displayName: 'Bassel Al-Assad',
     icao: '',
     isMainBase: false,
+    isAlwaysActive: true,
     isHeliport: false,
     herculesBase: true,
     coordinates: { lat: 35.411590, lon: 35.950033 },
@@ -604,6 +607,7 @@ const airports = [
     displayName: 'Tabqa',
     icao: '',
     isMainBase: false,
+    isAlwaysActive: true,
     isHeliport: false,
     herculesBase: false,
     coordinates: { lat: 35.755614, lon: 38.551251 },
@@ -637,7 +641,7 @@ const airports = [
     isHeliport: false,
     isCarrier: true,
     herculesBase: false,
-    coordinates: { lat: 35.435000, lon: 35.596667 },
+    coordinates: { lat: 35.986389, lon: 33.511389 },
   },
   {
     id: 'kharab-ishk',

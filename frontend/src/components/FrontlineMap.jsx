@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import createGlobe from 'cobe';
 import * as mgrs from 'mgrs';
-import { MapContainer, TileLayer, CircleMarker, Marker, Polyline, Popup, Tooltip, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Circle, CircleMarker, Marker, Polyline, Popup, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import { divIcon } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import maplibregl from 'maplibre-gl';
@@ -12,19 +12,39 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import c130ModelUrl from '../assets/3D/yc-130prototype_of_c-130.glb';
 import ch47ModelUrl from '../assets/3D/ch47.glb';
 import t72ModelUrl from '../assets/3D/t90.glb';
-import { ChevronLeft, ChevronRight, Clock3, MapPin, PersonStanding } from 'lucide-react';
+import kc135ModelUrl from '../assets/3D/kc-135_dcs_world.glb';
+import { Ambulance, Anchor, Blend, Box, Boxes, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChessRook, Clock3, Factory, Forklift, Fuel, Hammer, MapPin, PersonStanding, Satellite, TowerControl, X } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
 import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
 import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
-import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, createOrder, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getFeed, getFrontlineZones, getMissions, getServerTime } from '../services/api';
+import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getLogisticsRouteVisibility, getMissions, getServerTime, getTankerOptions, getTankerRoutes, setAirportLogisticsRoutePriority, getProductionPoints, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate, spawnTanker } from '../services/api';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
 const MAP_ENGINE = String(import.meta.env.VITE_MAP_ENGINE || 'leaflet').trim().toLowerCase();
+const LOGISTICS_ROUTE_TOGGLE_ROLE_ID = '1447684923518484500';
 const BASEMAP_MODE_DARK = 'dark';
 const BASEMAP_MODE_SATELLITE = 'satellite';
+const MAPLIBRE_NAV_CONTROL_POSITION = 'bottom-right';
+const MAPLIBRE_FOCUS_Y_OFFSET_PX = 132;
+const MAPLIBRE_DCSAR_ICON_PENDING_IMAGE_ID = 'dcsar-person-icon-pending';
+const MAPLIBRE_DCSAR_ICON_ACCEPTED_IMAGE_ID = 'dcsar-person-icon-accepted';
+const MAPLIBRE_DCSAR_ICON_SIZE = ['interpolate', ['linear'], ['zoom'], 5, 1.15, 8, 1.55, 10, 1.9];
+const MAPLIBRE_AIRPORT_ICON_TOWER_BLUE_IMAGE_ID = 'airport-tower-icon-blue';
+const MAPLIBRE_AIRPORT_ICON_TOWER_GREEN_IMAGE_ID = 'airport-tower-icon-green';
+const MAPLIBRE_AIRPORT_ICON_ANCHOR_IMAGE_ID = 'airport-anchor-icon';
+const MAPLIBRE_DBUILD_HAMMER_WHITE_IMAGE_ID = 'dbuild-hammer-white';
+const MAPLIBRE_DBUILD_HAMMER_GREEN_IMAGE_ID = 'dbuild-hammer-green';
+const MAPLIBRE_DBUILD_ROOK_BLUE_IMAGE_ID = 'dbuild-rook-blue';
+const MAPLIBRE_CRATE_BOX_IMAGE_ID = 'crate-box-icon';
+const MAPLIBRE_CRATE_BOXES_IMAGE_ID = 'crate-boxes-icon';
+const MAPLIBRE_PP_FACTORY_WHITE_IMAGE_ID = 'pp-factory-white';
+const MAPLIBRE_PP_FACTORY_BLUE_IMAGE_ID = 'pp-factory-blue';
+const CRATE_CLUSTER_RADIUS_M = 20;
+const DBUILD_SITE_MATCH_RADIUS_M = 150;
+const MAPLIBRE_AIRPORT_ICON_SIZE = ['interpolate', ['linear'], ['zoom'], 5, 0.78, 8, 0.95, 10, 1.12];
 
 function isDesktopGlobeDevice() {
   if (typeof window === 'undefined') return true;
@@ -165,6 +185,63 @@ function getZoneGridIndex(zone) {
   return value;
 }
 
+function isCyprusZone(zone) {
+  const source = String(zone?.id || zone?.name || '').toUpperCase();
+  return /(^|_)C\d{2}(?!\d)/.test(source);
+}
+
+function buildZoneGridKey(prefix, index) {
+  return `${prefix}${String(index).padStart(2, '0')}`;
+}
+
+function getZoneGridKey(zone) {
+  const index = getZoneGridIndex(zone);
+  if (index === null) return null;
+  const prefix = isCyprusZone(zone) ? 'C' : 'N';
+  return buildZoneGridKey(prefix, index);
+}
+
+function parseZoneGridKey(key) {
+  const match = String(key || '').match(/^([A-Z])(\d{2})$/);
+  if (!match) return null;
+  const index = Number.parseInt(match[2], 10);
+  if (!Number.isFinite(index) || index < 0 || index > 99) return null;
+  return { prefix: match[1], index };
+}
+
+function getNeighborZoneGridKeys(key) {
+  const parsed = parseZoneGridKey(key);
+  if (!parsed) return [];
+
+  const { prefix, index } = parsed;
+  const row = Math.floor(index / 10);
+  const col = index % 10;
+  const result = [];
+  if (row > 0) result.push(buildZoneGridKey(prefix, index - 10));
+  if (row < 9) result.push(buildZoneGridKey(prefix, index + 10));
+  if (col > 0) result.push(buildZoneGridKey(prefix, index - 1));
+  if (col < 9) result.push(buildZoneGridKey(prefix, index + 1));
+  return result;
+}
+
+function getRightZoneGridKey(key) {
+  const parsed = parseZoneGridKey(key);
+  if (!parsed) return null;
+  const { prefix, index } = parsed;
+  const col = index % 10;
+  if (col >= 9) return null;
+  return buildZoneGridKey(prefix, index + 1);
+}
+
+function getDownZoneGridKey(key) {
+  const parsed = parseZoneGridKey(key);
+  if (!parsed) return null;
+  const { prefix, index } = parsed;
+  const row = Math.floor(index / 10);
+  if (row >= 9) return null;
+  return buildZoneGridKey(prefix, index + 10);
+}
+
 function formatDms(value, positiveLabel, negativeLabel) {
   if (!Number.isFinite(value)) return '-';
   const abs = Math.abs(value);
@@ -229,6 +306,9 @@ function getFeedTypeStyle(type) {
   if (type?.startsWith('convoy.')) return 'border-yellow-500/40 bg-yellow-500/10 text-yellow-200';
   if (type?.startsWith('dcsar.')) return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
   if (type?.startsWith('user.')) return 'border-green-500/40 bg-green-500/10 text-green-200';
+  if (type?.startsWith('dcore.pp_upgrade') || type?.startsWith('dcore.pp_retrieve')) return 'border-blue-500/40 bg-blue-500/10 text-blue-200';
+  if (type?.startsWith('dcore.spawn')) return 'border-amber-500/40 bg-amber-500/10 text-amber-200';
+  if (type?.startsWith('dcore.dbuild')) return 'border-violet-500/40 bg-violet-500/10 text-violet-200';
   return 'border-slate-500/40 bg-slate-500/10 text-slate-200';
 }
 
@@ -239,6 +319,9 @@ function getFeedTypeLabel(type) {
   if (type?.startsWith('convoy.')) return 'Convoy';
   if (type?.startsWith('dcsar.')) return 'CSAR';
   if (type?.startsWith('user.')) return 'User';
+  if (type?.startsWith('dcore.pp_upgrade') || type?.startsWith('dcore.pp_retrieve')) return 'Production';
+  if (type?.startsWith('dcore.spawn')) return 'Spawn';
+  if (type?.startsWith('dcore.dbuild')) return 'Build';
   return 'System';
 }
 
@@ -400,6 +483,294 @@ function toLatLngPoint(position) {
   return [lat, lon];
 }
 
+const AIRPORT_SPAWN_RADIUS_M = 2500;
+const PP_RETRIEVE_RADIUS_M = 500;
+const SPAWN_QUANTITY_MAX = 5;
+const SPAWN_OFFSET_METERS = 2;
+const SPAWN_OFFSET_BEARING_DEG = 90;
+const MAP_ZOOM_DEFAULT_MAX = 14;
+const MAP_ZOOM_AIRPORT_MAX = 18;
+const MAP_ZOOM_SPAWN_MAX = MAP_ZOOM_AIRPORT_MAX;
+const MAP_ICON_PP_SIZE = 26;
+const MAP_ICON_PP_FRAME = 36;
+const MAP_ICON_CRATE_SIZE = 22;
+const MAP_ICON_CRATE_FRAME = 28;
+const MAPLIBRE_PP_ICON_SIZE = 1.2;
+const MAPLIBRE_CRATE_ICON_SIZE = 1.02;
+
+const SPAWN_BANNER_DISPLAY_NAMES = {
+  MANPAD: 'MANPAD',
+  SCOUT: 'Scout',
+  AMMO: 'Ammo',
+  FUEL: 'Fuel',
+  BUILD: 'Build',
+  HMMWV: 'HMMWV',
+  TOW: 'TOW',
+  L118: 'L118',
+  TACAN: 'TACAN',
+};
+
+function formatSpawnBannerName(keyword) {
+  const value = String(keyword || '').trim().toUpperCase();
+  if (!value) return 'item';
+  return SPAWN_BANNER_DISPLAY_NAMES[value] || (value.charAt(0) + value.slice(1).toLowerCase());
+}
+
+const DBUILD_CONTEXT_MENU_OFFSET_X = 16;
+const DBUILD_CONTEXT_MENU_OFFSET_Y = -12;
+const DBUILD_CONTEXT_HIGHLIGHT_RADIUS_M = 35;
+const TANKER_MIN_DIST_NM = 45;
+const TANKER_EXCLUSION_RADIUS_M = TANKER_MIN_DIST_NM * 1852;
+const TANKER_ROUTE_COLOR = '#22d3ee';
+const TANKER_ROUTE_ALTITUDE_FT = 150000;
+const TANKER_ROUTE_ALTITUDE_M = TANKER_ROUTE_ALTITUDE_FT * 0.3048;
+const TANKER_ROUTE_TUBE_RADIUS_M = 85;
+const TANKER_ROUTE_ENDPOINT_RADIUS_M = 180;
+const TANKER_ROUTE_ENDPOINT_COLOR = '#0b5568';
+const TANKER_KC135_ROUTE_CLEARANCE_M = TANKER_ROUTE_TUBE_RADIUS_M + 120;
+
+function formatTankerRouteLabel(route) {
+  if (!route) return 'Tanker';
+  const parts = [route.label || route.keyword || 'Tanker'];
+  if (route.platform) parts.push(route.platform);
+  if (route.tacan) parts.push(`TCN ${route.tacan}`);
+  if (Number.isFinite(route.altitude_ft)) parts.push(`${Math.round(route.altitude_ft)} ft`);
+  if (Number.isFinite(route.speed_kt)) parts.push(`${Math.round(route.speed_kt)} kts`);
+  if (Number.isFinite(route.distance_nm)) parts.push(`${route.distance_nm.toFixed(1)} NM`);
+  parts.push(`FL${Math.round(TANKER_ROUTE_ALTITUDE_FT / 100)}`);
+  return parts.join(' • ');
+}
+
+function normalizeTankerLatLon(lat, lon) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  let nextLat = lat;
+  let nextLon = lon;
+  if (Math.abs(nextLat) <= Math.PI && Math.abs(nextLon) <= (2 * Math.PI)) {
+    nextLat = (nextLat * 180) / Math.PI;
+    nextLon = (nextLon * 180) / Math.PI;
+  }
+  return { lat: nextLat, lon: nextLon };
+}
+
+function addTankerRouteEndpointCircle(group, map, lon, lat, altMeters) {
+  if (!group || !map) return null;
+  const merc = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], altMeters);
+  const scaleMerc = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], 0);
+  const radius = scaleMerc.meterInMercatorCoordinateUnits() * TANKER_ROUTE_ENDPOINT_RADIUS_M;
+  const geometry = new THREE.SphereGeometry(1, 20, 16);
+  const material = new THREE.MeshPhongMaterial({
+    color: TANKER_ROUTE_ENDPOINT_COLOR,
+    emissive: new THREE.Color(TANKER_ROUTE_ENDPOINT_COLOR),
+    emissiveIntensity: 0.06,
+    transparent: false,
+    opacity: 1,
+    depthTest: true,
+    depthWrite: true,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.position.set(merc.x, merc.y, merc.z);
+  mesh.scale.set(radius, radius, radius);
+  mesh.renderOrder = 10;
+  mesh.userData.disposeGeometry = true;
+  group.add(mesh);
+  return mesh;
+}
+
+function buildTankerRouteFeatures(routes) {
+  const lineFeatures = [];
+
+  (routes || []).forEach((route) => {
+    const wp1Raw = route?.wp1;
+    const wp2Raw = route?.wp2;
+    if (!wp1Raw || !wp2Raw) return;
+    const wp1 = normalizeTankerLatLon(Number(wp1Raw.lat), Number(wp1Raw.lon));
+    const wp2 = normalizeTankerLatLon(Number(wp2Raw.lat), Number(wp2Raw.lon));
+    if (!wp1 || !wp2) return;
+
+    lineFeatures.push({
+      type: 'Feature',
+      geometry: {
+        type: 'LineString',
+        coordinates: [[wp1.lon, wp1.lat], [wp2.lon, wp2.lat]],
+      },
+      properties: {
+        id: route.id || route.keyword || 'tanker',
+        label: formatTankerRouteLabel(route),
+        keyword: route.keyword || '',
+      },
+    });
+  });
+
+  return { lineFeatures };
+}
+
+const TANKER_OPTIONS_FALLBACK = [
+  { keyword: 'BOOM', label: 'BOOM', min_dist_nm: TANKER_MIN_DIST_NM },
+  { keyword: 'BASKET', label: 'BASKET', min_dist_nm: TANKER_MIN_DIST_NM },
+];
+
+const DBUILD_CATALOG_FALLBACK = [
+  { id: 'mortar', label: 'Mortar' },
+  { id: 'ewr', label: 'EWR' },
+  { id: 'nasams', label: 'NASAMS' },
+  { id: 'rapier', label: 'Rapier' },
+  { id: 'farp', label: 'FARP' },
+];
+
+function MapActionContextMenu({
+  menu,
+  collapsed,
+  onToggleCollapsed,
+  activePanel,
+  onSetActivePanel,
+  catalog,
+  tankerOptions,
+  onSelectDbuild,
+  onSelectTanker,
+}) {
+  if (!menu) return null;
+
+  const entries = catalog.length > 0 ? catalog : DBUILD_CATALOG_FALLBACK;
+  const tankers = tankerOptions.length > 0 ? tankerOptions : TANKER_OPTIONS_FALLBACK;
+  const panel = activePanel || 'root';
+
+  return (
+    <div
+      className="absolute z-[1200]"
+      style={{ left: menu.x, top: menu.y }}
+      onClick={(event) => event.stopPropagation()}
+      onContextMenu={(event) => event.preventDefault()}
+    >
+      <div
+        className={`rounded-xl border border-yt-border bg-[#151925f2] shadow-2xl backdrop-blur transition-all duration-[360ms] ease-in-out ${
+          collapsed ? 'w-[46px] p-1.5' : 'w-[228px] p-2'
+        }`}
+      >
+        <div
+          className={`overflow-hidden transition-[max-height,opacity,transform,margin-bottom] duration-[360ms] ease-in-out ${
+            collapsed
+              ? 'mb-0 max-h-0 -translate-y-1 opacity-0 pointer-events-none'
+              : 'mb-2 max-h-96 translate-y-0 opacity-100'
+          }`}
+          aria-hidden={collapsed}
+        >
+          {panel !== 'root' && (
+            <button
+              type="button"
+              onClick={() => onSetActivePanel('root')}
+              className="mb-1.5 flex w-full items-center gap-1 rounded-md px-1 py-1 text-[11px] font-semibold text-yt-text-secondary transition-colors hover:text-yt-text-primary"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+              Back
+            </button>
+          )}
+
+          {panel === 'root' && (
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={() => onSetActivePanel('dbuild')}
+                className="flex w-full items-center gap-2 rounded-md border border-yt-border bg-yt-bg-tertiary/60 px-2 py-2 text-left text-[12px] font-semibold text-yt-text-primary transition-colors hover:border-yt-accent/50 hover:bg-yt-accent/10"
+              >
+                <Hammer className="h-4 w-4 shrink-0 text-amber-200" />
+                <span>DBUILD</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onSetActivePanel('tanker')}
+                className="flex w-full items-center gap-2 rounded-md border border-yt-border bg-yt-bg-tertiary/60 px-2 py-2 text-left text-[12px] font-semibold text-yt-text-primary transition-colors hover:border-cyan-400/50 hover:bg-cyan-400/10"
+              >
+                <Fuel className="h-4 w-4 shrink-0 text-cyan-300" />
+                <span>Tanker</span>
+              </button>
+            </div>
+          )}
+
+          {panel === 'dbuild' && (
+            <>
+              <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] uppercase tracking-[0.18em] text-yt-text-secondary">
+                <Hammer className="h-3.5 w-3.5 text-amber-200" />
+                DBUILD
+              </div>
+              <div className="flex flex-col gap-1">
+                {entries.map((entry) => (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    onClick={() => onSelectDbuild(entry.id)}
+                    className="flex w-full items-center justify-between rounded-md border border-yt-border bg-yt-bg-tertiary/60 px-2 py-1.5 text-left text-[12px] font-semibold text-yt-text-primary transition-colors hover:border-yt-accent/50 hover:bg-yt-accent/10"
+                  >
+                    <span>{entry.label || entry.id}</span>
+                    {Number.isFinite(entry.estimated_fp_cost) && (
+                      <span className="text-[10px] font-semibold text-yt-text-secondary">
+                        {entry.estimated_fp_cost} fp
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {panel === 'tanker' && (
+            <>
+              <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] uppercase tracking-[0.18em] text-yt-text-secondary">
+                <Fuel className="h-3.5 w-3.5 text-cyan-300" />
+                Tanker
+              </div>
+              <div className="flex flex-col gap-1">
+                {tankers.map((entry) => (
+                  <button
+                    key={entry.keyword}
+                    type="button"
+                    onClick={() => onSelectTanker(entry.keyword, entry.label || entry.keyword)}
+                    className="flex w-full flex-col rounded-md border border-yt-border bg-yt-bg-tertiary/60 px-2 py-1.5 text-left transition-colors hover:border-cyan-400/50 hover:bg-cyan-400/10"
+                  >
+                    <span className="text-[12px] font-semibold text-yt-text-primary">{entry.label || entry.keyword}</span>
+                    {entry.platform && (
+                      <span className="text-[10px] text-yt-text-secondary">{entry.platform}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          className="flex w-full items-center justify-center rounded-md border border-yt-border bg-yt-bg-tertiary/60 p-2 text-yt-text-secondary transition-colors hover:text-yt-text-primary"
+          aria-label={collapsed ? 'Open map actions menu' : 'Close map actions menu'}
+          title={collapsed ? 'Open map actions menu' : 'Close map actions menu'}
+        >
+          {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const SPAWN_MENU_SECTIONS = [
+  {
+    id: 'infantry',
+    title: 'INFANTRY',
+    spawnType: 'inf_spawn',
+    keywords: ['MANPAD', 'SCOUT'],
+  },
+  {
+    id: 'build',
+    title: 'BUILD',
+    spawnType: 'crate_spawn',
+    keywords: ['AMMO', 'FUEL', 'BUILD'],
+  },
+  {
+    id: 'deployables',
+    title: 'DEPLOYABLES',
+    spawnType: 'crate_spawn',
+    keywords: ['HMMWV', 'TOW', 'L118', 'TACAN'],
+  },
+];
+
 function haversineNm(lat1, lon1, lat2, lon2) {
   const toRad = (deg) => (deg * Math.PI) / 180;
   const rKm = 6371;
@@ -412,6 +783,58 @@ function haversineNm(lat1, lon1, lat2, lon2) {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const km = rKm * c;
   return km / 1.852;
+}
+
+function haversineMeters(lat1, lon1, lat2, lon2) {
+  return haversineNm(lat1, lon1, lat2, lon2) * 1852;
+}
+
+function offsetLatLon(lat, lon, distanceM, bearingDeg) {
+  const earthRadiusM = 6371008.8;
+  const bearingRad = (bearingDeg * Math.PI) / 180;
+  const latRad = (lat * Math.PI) / 180;
+  const lonRad = (lon * Math.PI) / 180;
+  const angularDistance = distanceM / earthRadiusM;
+  const lat2 = Math.asin(
+    Math.sin(latRad) * Math.cos(angularDistance)
+    + Math.cos(latRad) * Math.sin(angularDistance) * Math.cos(bearingRad)
+  );
+  const lon2 = lonRad + Math.atan2(
+    Math.sin(bearingRad) * Math.sin(angularDistance) * Math.cos(latRad),
+    Math.cos(angularDistance) - Math.sin(latRad) * Math.sin(lat2)
+  );
+  return {
+    lat: (lat2 * 180) / Math.PI,
+    lon: (lon2 * 180) / Math.PI,
+  };
+}
+
+function buildSpawnPlacementPositions(lat, lon, quantity) {
+  const qty = Math.max(1, Math.min(SPAWN_QUANTITY_MAX, Math.floor(Number(quantity)) || 1));
+  return Array.from({ length: qty }, (_, index) => (
+    index === 0
+      ? { lat, lon }
+      : offsetLatLon(lat, lon, SPAWN_OFFSET_METERS * index, SPAWN_OFFSET_BEARING_DEG)
+  ));
+}
+
+function circlePolygon(lat, lon, radiusMeters, points = 64) {
+  const coords = [];
+  const earthRadius = 6371000;
+  const latRad = (lat * Math.PI) / 180;
+  for (let i = 0; i <= points; i += 1) {
+    const angle = (i / points) * 2 * Math.PI;
+    const dx = radiusMeters * Math.cos(angle);
+    const dy = radiusMeters * Math.sin(angle);
+    const newLat = lat + (dy / earthRadius) * (180 / Math.PI);
+    const newLon = lon + (dx / (earthRadius * Math.cos(latRad))) * (180 / Math.PI);
+    coords.push([newLon, newLat]);
+  }
+  return {
+    type: 'Feature',
+    geometry: { type: 'Polygon', coordinates: [coords] },
+    properties: {},
+  };
 }
 
 function interpolateLatLon(start, end, progress) {
@@ -563,81 +986,40 @@ function createDcsarIcon(color = '#f8fafc') {
   });
 }
 
-function ensureDcsarDomPulseStyles() {
-  if (typeof document === 'undefined') return;
-  let style = document.getElementById('dcsar-dom-pulse-style');
-  if (!style) {
-    style = document.createElement('style');
-    style.id = 'dcsar-dom-pulse-style';
-    document.head.appendChild(style);
-  }
-  style.textContent = `
-    @keyframes dcsarRingPulse {
-      0% { transform: translate(-50%, -50%) scale(0.12); opacity: 0.9; }
-      15% { transform: translate(-50%, -50%) scale(0.45); opacity: 0.82; }
-      60% { transform: translate(-50%, -50%) scale(2.6); opacity: 0.34; }
-      82% { transform: translate(-50%, -50%) scale(3.05); opacity: 0.12; }
-      100% { transform: translate(-50%, -50%) scale(3.35); opacity: 0; }
-    }
-  `;
+function createAirportMarkerIcon(isMainBase = false, isCarrier = false) {
+  const frameSize = isMainBase ? 30 : 27;
+  const iconSize = isMainBase ? 19 : 17;
+  const color = isMainBase ? '#22c55e' : '#3b82f6';
+  const IconComponent = isCarrier ? Anchor : TowerControl;
+  const html = renderToStaticMarkup(
+    <div
+      style={{
+        width: `${frameSize}px`,
+        height: `${frameSize}px`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        pointerEvents: 'none',
+        borderRadius: '999px',
+        background: 'rgba(15, 23, 42, 0.78)',
+        border: '1px solid rgba(148, 163, 184, 0.7)',
+        boxShadow: `0 0 0 1px rgba(30, 41, 59, 0.9), 0 0 8px ${isMainBase ? 'rgba(34, 197, 94, 0.4)' : 'rgba(59, 130, 246, 0.35)'}`,
+      }}
+    >
+      <IconComponent size={iconSize} color={color} strokeWidth={2.25} />
+    </div>
+  );
+
+  return divIcon({
+    html,
+    className: 'airport-marker-icon',
+    iconSize: [frameSize, frameSize],
+    iconAnchor: [frameSize / 2, frameSize / 2],
+  });
 }
 
-function createMapLibreDcsarDomMarker(isAccepted) {
-  const color = isAccepted ? '#22c55e' : '#f8fafc';
-
-  const root = document.createElement('div');
-  root.style.position = 'relative';
-  root.style.width = '60px';
-  root.style.height = '60px';
-  root.style.pointerEvents = 'auto';
-  root.style.cursor = 'pointer';
-
-  const ring = document.createElement('div');
-  ring.style.position = 'absolute';
-  ring.style.left = '50%';
-  ring.style.top = '50%';
-  ring.style.width = '30px';
-  ring.style.height = '30px';
-  ring.style.borderRadius = '9999px';
-  ring.style.border = `3px solid ${color}`;
-  ring.style.boxShadow = `0 0 10px ${color}66`;
-  ring.style.transform = 'translate(-50%, -50%)';
-  ring.style.transformOrigin = 'center center';
-  ring.style.willChange = 'transform, opacity';
-  if (typeof ring.animate === 'function') {
-    ring.animate(
-      [
-        { transform: 'translate(-50%, -50%) scale(0.65)', opacity: 0.92 },
-        { transform: 'translate(-50%, -50%) scale(0.95)', opacity: 0.86, offset: 0.18 },
-        { transform: 'translate(-50%, -50%) scale(1.35)', opacity: 0.32, offset: 0.65 },
-        { transform: 'translate(-50%, -50%) scale(1.55)', opacity: 0.1, offset: 0.85 },
-        { transform: 'translate(-50%, -50%) scale(1.7)', opacity: 0 },
-      ],
-      {
-        duration: 3375,
-        iterations: Infinity,
-        easing: 'ease-out',
-      }
-    );
-  } else {
-    ring.style.animation = 'dcsarRingPulse 3.375s ease-out infinite';
-  }
-  ring.style.pointerEvents = 'none';
-  root.appendChild(ring);
-
-  const iconWrap = document.createElement('div');
-  iconWrap.style.position = 'absolute';
-  iconWrap.style.left = '50%';
-  iconWrap.style.top = '50%';
-  iconWrap.style.transform = 'translate(-50%, -50%)';
-  iconWrap.style.width = '28px';
-  iconWrap.style.height = '28px';
-  iconWrap.style.display = 'flex';
-  iconWrap.style.alignItems = 'center';
-  iconWrap.style.justifyContent = 'center';
-  iconWrap.style.filter = 'drop-shadow(0 0 4px rgba(0,0,0,0.75))';
-  iconWrap.style.pointerEvents = 'none';
-  iconWrap.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 28 28">
+function buildDcsarPersonSvgMarkup(color = '#f8fafc') {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
     <g fill="none" stroke="${color}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="14" cy="5.5" r="2.2" />
       <path d="M14 8.8v7.2" />
@@ -646,9 +1028,222 @@ function createMapLibreDcsarDomMarker(isAccepted) {
       <path d="M16.7 26l-2.1-7.3" />
     </g>
   </svg>`;
-  root.appendChild(iconWrap);
+}
 
-  return root;
+function loadSvgAsImage(svgMarkup) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Failed to load SVG icon image'));
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`;
+  });
+}
+
+async function ensureMapLibreDcsarIconImages(map) {
+  const defs = [
+    { id: MAPLIBRE_DCSAR_ICON_PENDING_IMAGE_ID, color: '#f8fafc' },
+    { id: MAPLIBRE_DCSAR_ICON_ACCEPTED_IMAGE_ID, color: '#22c55e' },
+  ];
+
+  for (const def of defs) {
+    if (map.hasImage(def.id)) continue;
+    const svg = buildDcsarPersonSvgMarkup(def.color);
+    const image = await loadSvgAsImage(svg);
+    map.addImage(def.id, image, { pixelRatio: 2 });
+  }
+}
+
+function buildAirportSvgMarkup(icon = 'tower', color = '#3b82f6') {
+  const IconComponent = icon === 'anchor' ? Anchor : TowerControl;
+  return renderToStaticMarkup(
+    <IconComponent
+      size={30}
+      color={color}
+      strokeWidth={2.3}
+      style={{
+        filter: 'drop-shadow(0 0 2px rgba(15,23,42,0.9))',
+      }}
+    />
+  );
+}
+
+async function ensureMapLibreAirportIconImages(map) {
+  const defs = [
+    { id: MAPLIBRE_AIRPORT_ICON_TOWER_BLUE_IMAGE_ID, icon: 'tower', color: '#3b82f6' },
+    { id: MAPLIBRE_AIRPORT_ICON_TOWER_GREEN_IMAGE_ID, icon: 'tower', color: '#22c55e' },
+    { id: MAPLIBRE_AIRPORT_ICON_ANCHOR_IMAGE_ID, icon: 'anchor', color: '#3b82f6' },
+  ];
+
+  for (const def of defs) {
+    if (map.hasImage(def.id)) continue;
+    const svg = buildAirportSvgMarkup(def.icon, def.color);
+    const image = await loadSvgAsImage(svg);
+    map.addImage(def.id, image, { pixelRatio: 2 });
+  }
+}
+
+function buildDbuildSvgMarkup(kind) {
+  const defs = {
+    'hammer-white': { Icon: Hammer, color: '#ffffff' },
+    'hammer-green': { Icon: Hammer, color: '#22c55e' },
+    'rook-blue': { Icon: ChessRook, color: '#3b82f6' },
+  };
+  const def = defs[kind] || defs['hammer-white'];
+  const IconComponent = def.Icon;
+  return renderToStaticMarkup(
+    <IconComponent
+      size={24}
+      color={def.color}
+      strokeWidth={2.3}
+      style={{ filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))' }}
+    />
+  );
+}
+
+function buildCrateSvgMarkup(kind) {
+  const IconComponent = kind === 'boxes' ? Boxes : Box;
+  return renderToStaticMarkup(
+    <IconComponent
+      size={24}
+      color="#f59e0b"
+      strokeWidth={2.3}
+      style={{ filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))' }}
+    />
+  );
+}
+
+async function ensureMapLibreDbuildAndCrateIconImages(map) {
+  const dbuildDefs = [
+    { id: MAPLIBRE_DBUILD_HAMMER_WHITE_IMAGE_ID, kind: 'hammer-white' },
+    { id: MAPLIBRE_DBUILD_HAMMER_GREEN_IMAGE_ID, kind: 'hammer-green' },
+    { id: MAPLIBRE_DBUILD_ROOK_BLUE_IMAGE_ID, kind: 'rook-blue' },
+  ];
+  const crateDefs = [
+    { id: MAPLIBRE_CRATE_BOX_IMAGE_ID, kind: 'box' },
+    { id: MAPLIBRE_CRATE_BOXES_IMAGE_ID, kind: 'boxes' },
+  ];
+
+  for (const def of [...dbuildDefs, ...crateDefs]) {
+    if (map.hasImage(def.id)) continue;
+    const svg = def.kind === 'box' || def.kind === 'boxes'
+      ? buildCrateSvgMarkup(def.kind)
+      : buildDbuildSvgMarkup(def.kind);
+    const image = await loadSvgAsImage(svg);
+    map.addImage(def.id, image, { pixelRatio: 2 });
+  }
+}
+
+function createDbuildMapIcon(kind, selected = false) {
+  const defs = {
+    'hammer-white': { Icon: Hammer, color: '#ffffff' },
+    'hammer-green': { Icon: Hammer, color: '#22c55e' },
+    'rook-blue': { Icon: ChessRook, color: '#3b82f6' },
+  };
+  const def = defs[kind] || defs['hammer-white'];
+  const IconComponent = def.Icon;
+  const html = renderToStaticMarkup(
+    <div
+      style={{
+        width: '28px',
+        height: '28px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: '999px',
+        border: selected ? '2px solid #facc15' : 'none',
+        boxShadow: selected ? '0 0 0 2px rgba(250, 204, 21, 0.35)' : 'none',
+      }}
+    >
+      <IconComponent size={22} color={def.color} strokeWidth={2.3} style={{ filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))' }} />
+    </div>
+  );
+
+  return divIcon({
+    html,
+    className: 'dbuild-map-icon',
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+  });
+}
+
+function createCrateClusterIcon(kind) {
+  const IconComponent = kind === 'boxes' ? Boxes : Box;
+  const html = renderToStaticMarkup(
+    <div
+      style={{
+        width: `${MAP_ICON_CRATE_FRAME}px`,
+        height: `${MAP_ICON_CRATE_FRAME}px`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <IconComponent size={MAP_ICON_CRATE_SIZE} color="#f59e0b" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))' }} />
+    </div>
+  );
+
+  const anchor = MAP_ICON_CRATE_FRAME / 2;
+  return divIcon({
+    html,
+    className: 'crate-cluster-icon',
+    iconSize: [MAP_ICON_CRATE_FRAME, MAP_ICON_CRATE_FRAME],
+    iconAnchor: [anchor, anchor],
+  });
+}
+
+function buildProductionPointSvgMarkup(kind) {
+  const color = kind === 'pp-blue' ? '#3b82f6' : '#ffffff';
+  return renderToStaticMarkup(
+    <Factory
+      size={28}
+      color={color}
+      strokeWidth={2.3}
+      style={{ filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))' }}
+    />
+  );
+}
+
+async function ensureMapLibreProductionPointIconImages(map) {
+  const defs = [
+    { id: MAPLIBRE_PP_FACTORY_WHITE_IMAGE_ID, kind: 'pp-white' },
+    { id: MAPLIBRE_PP_FACTORY_BLUE_IMAGE_ID, kind: 'pp-blue' },
+  ];
+
+  for (const def of defs) {
+    if (map.hasImage(def.id)) continue;
+    const svg = buildProductionPointSvgMarkup(def.kind);
+    const image = await loadSvgAsImage(svg);
+    map.addImage(def.id, image, { pixelRatio: 2 });
+  }
+}
+
+function createProductionPointIcon(pp, selected = false) {
+  const color = getProductionPointFactoryColor(pp);
+  const upgrading = pp?.upgrading === true;
+  const html = renderToStaticMarkup(
+    <div
+      style={{
+        width: `${MAP_ICON_PP_FRAME}px`,
+        height: `${MAP_ICON_PP_FRAME}px`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: '999px',
+        border: selected || upgrading ? '2px solid #facc15' : 'none',
+        boxShadow: selected || upgrading ? '0 0 0 2px rgba(250, 204, 21, 0.35)' : 'none',
+      }}
+    >
+      <Factory size={MAP_ICON_PP_SIZE} color={color} strokeWidth={2.3} style={{ filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))' }} />
+    </div>
+  );
+
+  const anchor = MAP_ICON_PP_FRAME / 2;
+  return divIcon({
+    html,
+    className: 'production-point-icon',
+    iconSize: [MAP_ICON_PP_FRAME, MAP_ICON_PP_FRAME],
+    iconAnchor: [anchor, anchor],
+  });
 }
 
 function getItemQuantity(item) {
@@ -867,16 +1462,17 @@ function GlobeCanvas({ points, focusCoordinates, onScaleChange, mapMode, forcedS
   );
 }
 
-function FlatMapFocus({ center }) {
+function FlatMapFocus({ center, targetZoom }) {
   const map = useMap();
 
   useEffect(() => {
     if (!center) return;
-    map.setView([center.lat, center.lon], Math.max(map.getZoom(), 8), {
+    const zoom = Math.max(map.getZoom(), targetZoom || 8);
+    map.setView([center.lat, center.lon], zoom, {
       animate: true,
       duration: 0.7,
     });
-  }, [center, map]);
+  }, [center, map, targetZoom]);
 
   return null;
 }
@@ -893,6 +1489,299 @@ function FlatMapZoomWatcher({ onZoomChange }) {
   }, [map, onZoomChange]);
 
   return null;
+}
+
+// Captures map clicks while a web spawn is being placed (click-to-place flow).
+function FlatMapContextMenuHandler({ enabled, onContextMenu }) {
+  useMapEvents({
+    contextmenu(event) {
+      if (!enabled || !onContextMenu) return;
+      event.originalEvent.preventDefault();
+      onContextMenu({
+        lat: event.latlng.lat,
+        lon: event.latlng.lng,
+        clientX: event.originalEvent.clientX,
+        clientY: event.originalEvent.clientY,
+      });
+    },
+  });
+  return null;
+}
+
+function FlatMapSpawnClickHandler({ active, onPlace }) {
+  useMapEvents({
+    click: (event) => {
+      if (!active) return;
+      const { lat, lng } = event.latlng || {};
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        onPlace({ lat, lon: lng });
+      }
+    },
+  });
+  return null;
+}
+
+const PRODUCTION_POINT_COLORS = {
+  BLUE: '#3b82f6',
+  RED: '#ef4444',
+  CONTESTED: '#f97316',
+  NEUTRAL: '#e2e8f0',
+};
+
+function getProductionPointColor(owner) {
+  return PRODUCTION_POINT_COLORS[String(owner || 'NEUTRAL').toUpperCase()] || PRODUCTION_POINT_COLORS.NEUTRAL;
+}
+
+function getProductionPointFactoryColor(pp) {
+  if (pp?.built && String(pp.owner || '').toUpperCase() === 'BLUE') {
+    return '#3b82f6';
+  }
+  return '#ffffff';
+}
+
+function getProductionPointFactoryKind(pp) {
+  return getProductionPointFactoryColor(pp) === '#3b82f6' ? 'pp-blue' : 'pp-white';
+}
+
+function formatProductionPointNumber(rawId) {
+  const id = String(rawId || '').trim();
+  const match = id.match(/^PP[_\s-]*0*(\d+)$/i);
+  return match ? match[1].padStart(2, '0') : null;
+}
+
+function formatProductionPointHoverLabel(pp) {
+  const raw = typeof pp === 'string' ? pp : (pp?.zone_name || pp?.id);
+  const num = formatProductionPointNumber(raw);
+  if (num) return `Prod. Point ${num}`;
+  return String(raw || 'PP');
+}
+
+function formatProductionPointPanelLabel(pp) {
+  const raw = typeof pp === 'string' ? pp : (pp?.zone_name || pp?.id);
+  const num = formatProductionPointNumber(raw);
+  if (num) return `Production Point ${num}`;
+  return String(raw || 'Production Point');
+}
+
+function clampRetrieveQuantity(quantity, maxStock) {
+  const max = Math.max(1, Math.floor(Number(maxStock)) || 1);
+  return Math.max(1, Math.min(max, Math.floor(Number(quantity)) || 1));
+}
+
+function PanelCloseButton({ onClick, className = '' }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Close"
+      title="Close"
+      className={`inline-flex shrink-0 items-center justify-center rounded border border-yt-border p-1.5 text-yt-text-secondary transition-colors hover:bg-yt-bg-tertiary/50 hover:text-yt-text-primary ${className}`}
+    >
+      <X className="h-4 w-4" strokeWidth={2.5} />
+    </button>
+  );
+}
+
+function RetrieveQuantitySlider({ value, max, onChange, disabled = false, tone = 'panel' }) {
+  const safeMax = Math.max(1, Math.floor(Number(max)) || 1);
+  const safeValue = clampRetrieveQuantity(value, safeMax);
+  const accentClass = tone === 'banner' ? 'accent-blue-300' : 'accent-blue-400';
+  const labelClass = tone === 'banner' ? 'text-blue-100/80' : 'text-yt-text-secondary';
+  const valueClass = tone === 'banner' ? 'text-blue-100' : 'text-yt-text-primary';
+
+  return (
+    <div>
+      <div className={`flex items-center justify-between text-[11px] ${labelClass}`}>
+        <span>Quantity</span>
+        <span className={`font-semibold ${valueClass}`}>{safeValue} / {safeMax}</span>
+      </div>
+      <input
+        type="range"
+        min={1}
+        max={safeMax}
+        step={1}
+        value={safeValue}
+        onChange={(event) => onChange(Number(event.target.value))}
+        disabled={disabled}
+        className={`mt-1.5 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-yt-border/80 ${accentClass} disabled:cursor-not-allowed disabled:opacity-50`}
+      />
+    </div>
+  );
+}
+
+function isProductionPointZone(zone, productionPoints = []) {
+  const id = String(zone?.id || '').trim();
+  const name = String(zone?.name || zone?.zone_name || '').trim();
+  const candidates = [id, name].filter(Boolean);
+  const ppIds = new Set(
+    (productionPoints || []).flatMap((pp) => [String(pp?.id || '').trim(), String(pp?.zone_name || '').trim()]).filter(Boolean)
+  );
+  if (candidates.some((value) => ppIds.has(value))) return true;
+  return candidates.some((value) => /^PP[_\s-]/i.test(value));
+}
+
+function getDbuildIconKind(status) {
+  if (status === 'built') return 'rook-blue';
+  if (status === 'draft') return 'hammer-white';
+  return 'hammer-green';
+}
+
+function findNearestDbuildSite(sites, lat, lon, buildType, maxDistanceM = DBUILD_SITE_MATCH_RADIUS_M) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  let best = null;
+  let bestDistance = maxDistanceM;
+  (sites || []).forEach((site) => {
+    if (buildType && site.type !== buildType) return;
+    const siteLat = Number(site.lat);
+    const siteLon = Number(site.lon);
+    if (!Number.isFinite(siteLat) || !Number.isFinite(siteLon)) return;
+    const distanceM = haversineMeters(lat, lon, siteLat, siteLon);
+    if (distanceM <= bestDistance) {
+      bestDistance = distanceM;
+      best = site;
+    }
+  });
+  return best;
+}
+
+function buildDbuildMapMarkers(placements, sites, catalog) {
+  const markers = [];
+  const matchedSiteKeys = new Set();
+  const catalogById = new Map((catalog || []).map((entry) => [entry.id, entry]));
+
+  (placements || []).forEach((placement) => {
+    if (!Number.isFinite(placement?.lat) || !Number.isFinite(placement?.lon)) return;
+    if (placement.status === 'cancelled' || placement.status === 'failed') return;
+
+    const label = placement.catalog?.label || catalogById.get(placement.build_type)?.label || placement.build_type || 'Build';
+    markers.push({
+      id: `placement-${placement.id}`,
+      lat: placement.lat,
+      lon: placement.lon,
+      kind: getDbuildIconKind(placement.status),
+      label,
+      status: placement.status || 'draft',
+      placementId: placement.id,
+      selectable: true,
+    });
+
+    const liveSite = placement.live || findNearestDbuildSite(sites, placement.lat, placement.lon, placement.build_type);
+    if (liveSite?.type && liveSite?.site_id) {
+      matchedSiteKeys.add(`${liveSite.type}:${liveSite.site_id}`);
+    }
+  });
+
+  (sites || []).forEach((site) => {
+    if (!Number.isFinite(site?.lat) || !Number.isFinite(site?.lon)) return;
+    const key = `${site.type}:${site.site_id}`;
+    if (matchedSiteKeys.has(key)) return;
+
+    const catalogEntry = catalogById.get(site.type);
+    const label = catalogEntry?.label || site.structure_name || site.type || 'Build';
+    markers.push({
+      id: `site-${key}`,
+      lat: site.lat,
+      lon: site.lon,
+      kind: getDbuildIconKind(site.built ? 'built' : 'active'),
+      label,
+      status: site.built ? 'built' : 'active',
+      placementId: null,
+      selectable: false,
+      structureName: site.structure_name || null,
+    });
+  });
+
+  return markers;
+}
+
+function formatWebCommandToastMessage(data) {
+  const raw = String(data?.message || '').trim();
+  if (data?.type === 'pp_retrieve' && data?.ok === true) {
+    if (/^retrieved \d+/i.test(raw)) return raw;
+    const legacy = raw.match(/^retrieved_(\d+)_remaining_\d+$/i);
+    if (legacy) {
+      const count = Number(legacy[1]);
+      return count === 1 ? 'Retrieved 1 crate' : `Retrieved ${count} crates`;
+    }
+    const qty = Number(data?.quantity);
+    if (Number.isFinite(qty) && qty > 0) {
+      return qty === 1 ? 'Retrieved 1 crate' : `Retrieved ${qty} crates`;
+    }
+  }
+  return raw || (data?.ok ? 'Command executed.' : 'Command failed.');
+}
+
+function shouldShowCommandToastBalance(data) {
+  if (data?.type === 'pp_retrieve' || data?.type === 'pp_upgrade') return false;
+  return Number.isFinite(Number(data?.balance));
+}
+
+const COMMAND_TOAST_VISIBLE_MS = 3000;
+const COMMAND_TOAST_FADE_MS = 300;
+
+function clusterCratesWithinRadius(markers, radiusM = CRATE_CLUSTER_RADIUS_M) {
+  const valid = (markers || []).filter((marker) => Number.isFinite(marker?.lat) && Number.isFinite(marker?.lon));
+  const count = valid.length;
+  if (count === 0) return [];
+
+  const parent = Array.from({ length: count }, (_, index) => index);
+  const find = (index) => {
+    let current = index;
+    while (parent[current] !== current) {
+      parent[current] = parent[parent[current]];
+      current = parent[current];
+    }
+    return current;
+  };
+  const union = (left, right) => {
+    parent[find(left)] = find(right);
+  };
+
+  for (let i = 0; i < count; i += 1) {
+    for (let j = i + 1; j < count; j += 1) {
+      const distanceM = haversineMeters(valid[i].lat, valid[i].lon, valid[j].lat, valid[j].lon);
+      if (distanceM <= radiusM) union(i, j);
+    }
+  }
+
+  const groups = new Map();
+  valid.forEach((marker, index) => {
+    const root = find(index);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root).push(marker);
+  });
+
+  return Array.from(groups.entries()).map(([root, group], index) => {
+    const types = {};
+    group.forEach((crate) => {
+      const category = String(crate.keyword || 'UNKNOWN').trim().toUpperCase() || 'UNKNOWN';
+      types[category] = (types[category] || 0) + 1;
+    });
+    const lat = group.reduce((sum, crate) => sum + crate.lat, 0) / group.length;
+    const lon = group.reduce((sum, crate) => sum + crate.lon, 0) / group.length;
+    return {
+      id: `crate-cluster-${root}-${index}`,
+      lat,
+      lon,
+      count: group.length,
+      kind: group.length === 1 ? 'box' : 'boxes',
+      types,
+    };
+  });
+}
+
+function formatCrateTypesText(types) {
+  return Object.entries(types || {})
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([typeName, qty]) => `${typeName}: ${qty}`)
+    .join('\n');
+}
+
+function formatCrateTypesHtml(types) {
+  return Object.entries(types || {})
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([typeName, qty]) => `<div>${typeName}: ${qty}</div>`)
+    .join('');
 }
 
 function FlatMapView({
@@ -920,9 +1809,38 @@ function FlatMapView({
   animationTick,
   basemapMode,
   focusTargetKey,
+  productionPoints,
+  showProductionPoints,
+  selectedProductionPointId,
+  onProductionPointSelect,
+  spawnPlacementActive,
+  onSpawnPlace,
+  spawnAirportCenter,
+  retrievePlacementActive,
+  onRetrievePlace,
+  retrievePpCenter,
+  crateClusters,
+  mapMaxZoom,
+  dbuildMapMarkers,
+  selectedDbuildPlacementId,
+  onDbuildPlacementSelect,
+  mapContextMenuEnabled,
+  onMapContextMenu,
+  dbuildContextPoint,
+  tankerPlacementActive,
+  onTankerPlace,
+  tankerWp1,
+  tankerRoutes,
 }) {
   const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
   const activeBasemap = BASEMAP_CONFIG[basemapMode] || BASEMAP_CONFIG[BASEMAP_MODE_DARK];
+  const effectiveMaxZoom = mapMaxZoom || MAP_ZOOM_DEFAULT_MAX;
+  const placementActive = spawnPlacementActive || retrievePlacementActive || tankerPlacementActive;
+  const placementCenter = spawnPlacementActive ? spawnAirportCenter : retrievePpCenter;
+  const placementRadiusM = spawnPlacementActive ? AIRPORT_SPAWN_RADIUS_M : PP_RETRIEVE_RADIUS_M;
+  const onPlacementPlace = tankerPlacementActive
+    ? onTankerPlace
+    : (spawnPlacementActive ? onSpawnPlace : onRetrievePlace);
   const airportsById = useMemo(() => {
     const map = new Map();
     airportsData.forEach((airport) => map.set(airport.id, airport));
@@ -935,7 +1853,7 @@ function FlatMapView({
         center={[center.lat, center.lon]}
         zoom={7}
         minZoom={4}
-        maxZoom={14}
+        maxZoom={effectiveMaxZoom}
         style={{ height: '100%', width: '100%' }}
         scrollWheelZoom
       >
@@ -944,7 +1862,10 @@ function FlatMapView({
           url={activeBasemap.leafletUrl}
         />
         <FlatMapZoomWatcher onZoomChange={onZoomChange} />
-        <FlatMapFocus center={focusTargetKey ? focusCoordinates : null} />
+        <FlatMapFocus
+          center={focusTargetKey ? focusCoordinates : null}
+          targetZoom={placementActive ? 15 : undefined}
+        />
 
         {showAto && gridConnections.map((connection) => (
           <Polyline
@@ -1186,46 +2107,174 @@ function FlatMapView({
           return layers;
         })}
 
-        {showAirports && airportsData.flatMap((airport) => {
-          const center = [airport.coordinates.lat, airport.coordinates.lon];
-          const isMain = Boolean(airport.isMainBase);
-          const coreColor = isMain ? '#4ec5ff' : '#93c5fd';
-          const ringColor = isMain ? '#38bdf8' : '#60a5fa';
+        {showAirports && airportsData.map((airport) => (
+          <Marker
+            key={`airport-marker-${airport.id}`}
+            position={[airport.coordinates.lat, airport.coordinates.lon]}
+            icon={createAirportMarkerIcon(Boolean(airport.isMainBase), Boolean(airport.isCarrier))}
+            eventHandlers={{
+              click: () => onAirportClick && onAirportClick(airport.id),
+            }}
+          >
+            <Tooltip direction="top" offset={[0, -4]} opacity={0.95}>
+              {airport.displayName || airport.name || airport.id}
+            </Tooltip>
+          </Marker>
+        ))}
 
-          return [
-            <CircleMarker
-              key={`airport-glow-${airport.id}`}
-              center={center}
-              radius={isMain ? 11 : 9}
-              pathOptions={{
-                color: ringColor,
-                fillColor: ringColor,
-                fillOpacity: 0.16,
-                opacity: 0.55,
-                weight: 1.8,
-              }}
-              interactive={false}
-            />,
-            <CircleMarker
-              key={`airport-core-${airport.id}`}
-              center={center}
-              radius={isMain ? 7 : 5.5}
-              pathOptions={{
-                color: '#f8fafc',
-                fillColor: coreColor,
-                fillOpacity: 0.98,
-                weight: 2.3,
-              }}
+        {showProductionPoints && (productionPoints || []).map((pp) => {
+          if (!pp.coordinates || !Number.isFinite(pp.coordinates.lat) || !Number.isFinite(pp.coordinates.lon)) {
+            return null;
+          }
+          const isSelected = pp.id === selectedProductionPointId;
+          return (
+            <Marker
+              key={`pp-${pp.id}`}
+              position={[pp.coordinates.lat, pp.coordinates.lon]}
+              icon={createProductionPointIcon(pp, isSelected)}
               eventHandlers={{
-                click: () => onAirportClick && onAirportClick(airport.id),
+                click: () => onProductionPointSelect && onProductionPointSelect(pp.id),
               }}
             >
-              <Tooltip direction="top" offset={[0, -4]} opacity={0.95}>
-                {airport.displayName}
+              <Tooltip direction="top" offset={[0, -12]} opacity={0.95}>
+                {`${formatProductionPointHoverLabel(pp)} • LV${pp.level}${pp.upgrading ? ' • UPGRADING' : ''}`}
               </Tooltip>
-            </CircleMarker>,
-          ];
+            </Marker>
+          );
         })}
+
+        {placementActive && placementCenter && Number.isFinite(placementCenter.lat) && Number.isFinite(placementCenter.lon) && (
+          <Circle
+            center={[placementCenter.lat, placementCenter.lon]}
+            radius={placementRadiusM}
+            pathOptions={{
+              color: '#facc15',
+              fillColor: '#facc15',
+              fillOpacity: 0.06,
+              weight: 2,
+              dashArray: '6,6',
+            }}
+          />
+        )}
+
+        {dbuildContextPoint && Number.isFinite(dbuildContextPoint.lat) && Number.isFinite(dbuildContextPoint.lon) && (
+          <>
+            <Circle
+              center={[dbuildContextPoint.lat, dbuildContextPoint.lon]}
+              radius={DBUILD_CONTEXT_HIGHLIGHT_RADIUS_M}
+              pathOptions={{
+                color: '#facc15',
+                fillColor: '#facc15',
+                fillOpacity: 0.1,
+                weight: 2,
+                dashArray: '6,6',
+              }}
+            />
+            <CircleMarker
+              center={[dbuildContextPoint.lat, dbuildContextPoint.lon]}
+              radius={9}
+              pathOptions={{
+                color: '#facc15',
+                fillColor: '#facc15',
+                fillOpacity: 0.92,
+                weight: 3,
+              }}
+            />
+          </>
+        )}
+
+        {tankerWp1 && Number.isFinite(tankerWp1.lat) && Number.isFinite(tankerWp1.lon) && (
+          <>
+            <Circle
+              center={[tankerWp1.lat, tankerWp1.lon]}
+              radius={TANKER_EXCLUSION_RADIUS_M}
+              pathOptions={{
+                color: '#ef4444',
+                fillColor: '#ef4444',
+                fillOpacity: 0.12,
+                weight: 2,
+                dashArray: '8,8',
+              }}
+            />
+            <CircleMarker
+              center={[tankerWp1.lat, tankerWp1.lon]}
+              radius={10}
+              pathOptions={{
+                color: TANKER_ROUTE_COLOR,
+                fillColor: TANKER_ROUTE_COLOR,
+                fillOpacity: 0.95,
+                weight: 3,
+              }}
+            />
+          </>
+        )}
+
+        {(tankerRoutes || []).map((route) => {
+          const wp1 = normalizeTankerLatLon(Number(route?.wp1?.lat), Number(route?.wp1?.lon));
+          const wp2 = normalizeTankerLatLon(Number(route?.wp2?.lat), Number(route?.wp2?.lon));
+          if (!wp1 || !wp2) return null;
+          const routeKey = route.id || route.keyword || `${wp1.lat},${wp1.lon}`;
+          return (
+            <>
+              <Polyline
+                key={`tanker-route-line-${routeKey}`}
+                positions={[[wp1.lat, wp1.lon], [wp2.lat, wp2.lon]]}
+                pathOptions={{
+                  color: TANKER_ROUTE_COLOR,
+                  weight: 2,
+                  opacity: 0.35,
+                  dashArray: '10,8',
+                }}
+              >
+                <Tooltip sticky opacity={0.95}>
+                  {`${formatTankerRouteLabel(route)} (ground track)`}
+                </Tooltip>
+              </Polyline>
+            </>
+          );
+        })}
+
+        {(crateClusters || []).map((cluster) => {
+          if (!Number.isFinite(cluster?.lat) || !Number.isFinite(cluster?.lon)) return null;
+          return (
+            <Marker
+              key={`crate-cluster-${cluster.id}`}
+              position={[cluster.lat, cluster.lon]}
+              icon={createCrateClusterIcon(cluster.kind)}
+            >
+              <Popup>
+                <div className="text-xs font-semibold whitespace-pre-line">
+                  {formatCrateTypesText(cluster.types)}
+                </div>
+              </Popup>
+              <Tooltip direction="top" offset={[0, -10]} opacity={0.95}>
+                {cluster.count === 1 ? '1 crate' : `${cluster.count} crates`}
+              </Tooltip>
+            </Marker>
+          );
+        })}
+
+        {(dbuildMapMarkers || []).map((marker) => {
+          if (!Number.isFinite(marker?.lat) || !Number.isFinite(marker?.lon)) return null;
+          const selected = marker.placementId && selectedDbuildPlacementId === marker.placementId;
+          return (
+            <Marker
+              key={`dbuild-marker-${marker.id}`}
+              position={[marker.lat, marker.lon]}
+              icon={createDbuildMapIcon(marker.kind, selected)}
+              eventHandlers={marker.selectable && marker.placementId ? {
+                click: () => onDbuildPlacementSelect && onDbuildPlacementSelect(marker.placementId),
+              } : undefined}
+            >
+              <Tooltip direction="top" offset={[0, -12]} opacity={0.95}>
+                {marker.structureName ? `${marker.label} (${marker.structureName})` : `${marker.label} • ${marker.status}`}
+              </Tooltip>
+            </Marker>
+          );
+        })}
+
+        <FlatMapContextMenuHandler enabled={mapContextMenuEnabled} onContextMenu={onMapContextMenu} />
+        <FlatMapSpawnClickHandler active={placementActive} onPlace={onPlacementPlace} />
       </MapContainer>
     </div>
   );
@@ -1235,6 +2284,7 @@ function MapLibreFlatMapView({
   zones,
   airportsData,
   logisticsMissions,
+  logisticsFrontlineAirportIds,
   gridConnections,
   convoys,
   airliftPlayers,
@@ -1253,16 +2303,44 @@ function MapLibreFlatMapView({
   showDcsar,
   onDcsarHover,
   onDcsarSelect,
-  animationTick,
   basemapMode,
   focusTargetKey,
+  productionPoints,
+  showProductionPoints,
+  selectedProductionPointId,
+  onProductionPointSelect,
+  spawnPlacementActive,
+  onSpawnPlace,
+  spawnAirportCenter,
+  retrievePlacementActive,
+  onRetrievePlace,
+  retrievePpCenter,
+  crateClusters,
+  dbuildMapMarkers,
+  selectedDbuildPlacementId,
+  onDbuildPlacementSelect,
+  mapContextMenuEnabled,
+  onMapContextMenu,
+  dbuildContextPoint,
+  tankerPlacementActive,
+  onTankerPlace,
+  tankerWp1,
+  tankerRoutes,
+  mapMaxZoom,
 }) {
   const MIN_PITCH = 0;
   const MAX_PITCH = 85;
+  const placementActive = spawnPlacementActive || retrievePlacementActive || tankerPlacementActive;
+  const placementCenter = spawnPlacementActive ? spawnAirportCenter : retrievePpCenter;
+  const placementRadiusM = spawnPlacementActive ? AIRPORT_SPAWN_RADIUS_M : PP_RETRIEVE_RADIUS_M;
+  const onPlacementPlace = tankerPlacementActive
+    ? onTankerPlace
+    : (spawnPlacementActive ? onSpawnPlace : onRetrievePlace);
   const ZONE_DOME_RADIUS_METERS = 3000;
   const LOGISTICS_ROUTE_RADIUS_METERS = 120;
   const LOGISTICS_C130_MODEL_SIZE_METERS = 110;
   const LOGISTICS_CH47_MODEL_SIZE_METERS = 92;
+  const TANKER_KC135_MODEL_SIZE_METERS = 125;
   const LOGISTICS_CONVOY_MODEL_SIZE_METERS = 120;
   const AIRLIFT_C130_MODEL_SIZE_METERS = 92;
   const AIRLIFT_CH47_MODEL_SIZE_METERS = 78;
@@ -1271,10 +2349,9 @@ function MapLibreFlatMapView({
   const LOGISTICS_CH47_YAW_OFFSET_RAD = THREE.MathUtils.degToRad(70) + Math.PI;
   const LOGISTICS_CONVOY_YAW_OFFSET_RAD = 0;
   const MIN_SAFE_ZOOM = 5;
-  const MAX_SAFE_ZOOM = 11.8;
+  const effectiveMaxZoom = mapMaxZoom || MAP_ZOOM_DEFAULT_MAX;
   const containerRef = useRef(null);
   const mapRef = useRef(null);
-  const dcsarMarkersRef = useRef(new Map());
   const dcsarByIdRef = useRef(new Map());
   const domes3dRef = useRef({
     scene: null,
@@ -1286,6 +2363,7 @@ function MapLibreFlatMapView({
     routes: [],
     c130Template: null,
     ch47Template: null,
+    kc135Template: null,
     convoyTemplate: null,
     planeLoaderPromise: null,
   });
@@ -1502,18 +2580,21 @@ function MapLibreFlatMapView({
       type: 'FeatureCollection',
       features: !showDcsar ? [] : (dcsarPoints || []).flatMap((point) => {
         if (!Number.isFinite(point?.lat) || !Number.isFinite(point?.lon)) return [];
+        const id = String(point.id || '').trim();
+        if (!id) return [];
         const accepted = point.accepted ? 1 : 0;
 
-        dcsarByIdRef.current.set(String(point.id || ''), point);
+        dcsarByIdRef.current.set(id, point);
 
         return [{
+          id,
           type: 'Feature',
           geometry: {
             type: 'Point',
             coordinates: [point.lon, point.lat],
           },
           properties: {
-            id: point.id || '',
+            id,
             accepted,
           },
         }];
@@ -1558,19 +2639,155 @@ function MapLibreFlatMapView({
           id: airport.id || '',
           name: airport.displayName || airport.name || airport.id || '',
           main: airport.isMainBase ? 1 : 0,
+          carrier: airport.isCarrier ? 1 : 0,
         },
       }];
     }),
   }), [airportsData, showAirports]);
 
-  const layerCounts = useMemo(() => ({
-    zones: fcZones.features.length,
-    logistics: fcLogistics.features.length,
-    convoys: fcConvoyPoints.features.length,
-    airliftPlayers: fcAirliftPlayers.features.length,
-    dcsar: fcDcsarPoints.features.length,
-    airports: fcAirports.features.length,
-  }), [fcZones.features.length, fcLogistics.features.length, fcConvoyPoints.features.length, fcAirliftPlayers.features.length, fcDcsarPoints.features.length, fcAirports.features.length]);
+  const fcProductionPoints = useMemo(() => ({
+    type: 'FeatureCollection',
+    features: !showProductionPoints ? [] : (productionPoints || []).flatMap((pp) => {
+      if (!Number.isFinite(pp?.coordinates?.lat) || !Number.isFinite(pp?.coordinates?.lon)) return [];
+      const owner = String(pp.owner || 'NEUTRAL').toUpperCase();
+      return [{
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [pp.coordinates.lon, pp.coordinates.lat],
+        },
+        properties: {
+          id: pp.id || pp.zone_name || '',
+          name: formatProductionPointHoverLabel(pp),
+          owner,
+          built: pp.built ? 1 : 0,
+          factoryKind: getProductionPointFactoryKind(pp),
+          level: Number(pp.level) || 0,
+          upgrading: pp.upgrading ? 1 : 0,
+          selected: pp.id === selectedProductionPointId ? 1 : 0,
+        },
+      }];
+    }),
+  }), [productionPoints, showProductionPoints, selectedProductionPointId]);
+
+  const fcCrateClusters = useMemo(() => ({
+    type: 'FeatureCollection',
+    features: (crateClusters || []).flatMap((cluster) => {
+      if (!Number.isFinite(cluster?.lat) || !Number.isFinite(cluster?.lon)) return [];
+      return [{
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [cluster.lon, cluster.lat],
+        },
+        properties: {
+          id: cluster.id || '',
+          kind: cluster.kind || 'box',
+          count: cluster.count || 1,
+          typesHtml: formatCrateTypesHtml(cluster.types),
+          typesText: formatCrateTypesText(cluster.types),
+        },
+      }];
+    }),
+  }), [crateClusters]);
+
+  const fcSpawnRadius = useMemo(() => {
+    if (!placementActive || !placementCenter) {
+      return { type: 'FeatureCollection', features: [] };
+    }
+    const lat = Number(placementCenter.lat);
+    const lon = Number(placementCenter.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      return { type: 'FeatureCollection', features: [] };
+    }
+    return {
+      type: 'FeatureCollection',
+      features: [circlePolygon(lat, lon, placementRadiusM)],
+    };
+  }, [placementActive, placementCenter, placementRadiusM]);
+
+  const fcDbuildMarkers = useMemo(() => ({
+    type: 'FeatureCollection',
+    features: (dbuildMapMarkers || []).flatMap((marker) => {
+      if (!Number.isFinite(marker?.lat) || !Number.isFinite(marker?.lon)) return [];
+      return [{
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [marker.lon, marker.lat],
+        },
+        properties: {
+          id: marker.id || '',
+          placementId: marker.placementId || '',
+          label: marker.label || 'Build',
+          status: marker.status || 'draft',
+          kind: marker.kind || 'hammer-white',
+          selectable: marker.selectable ? 1 : 0,
+          selected: marker.placementId && marker.placementId === selectedDbuildPlacementId ? 1 : 0,
+          structureName: marker.structureName || '',
+        },
+      }];
+    }),
+  }), [dbuildMapMarkers, selectedDbuildPlacementId]);
+
+  const fcDbuildContextPoint = useMemo(() => {
+    if (!dbuildContextPoint || !Number.isFinite(dbuildContextPoint.lat) || !Number.isFinite(dbuildContextPoint.lon)) {
+      return { type: 'FeatureCollection', features: [] };
+    }
+    return {
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [dbuildContextPoint.lon, dbuildContextPoint.lat],
+        },
+        properties: { id: 'dbuild-context-point' },
+      }],
+    };
+  }, [dbuildContextPoint]);
+
+  const fcDbuildContextRing = useMemo(() => {
+    if (!dbuildContextPoint || !Number.isFinite(dbuildContextPoint.lat) || !Number.isFinite(dbuildContextPoint.lon)) {
+      return { type: 'FeatureCollection', features: [] };
+    }
+    return {
+      type: 'FeatureCollection',
+      features: [circlePolygon(dbuildContextPoint.lat, dbuildContextPoint.lon, DBUILD_CONTEXT_HIGHLIGHT_RADIUS_M)],
+    };
+  }, [dbuildContextPoint]);
+
+  const fcTankerWp1Point = useMemo(() => {
+    if (!tankerWp1 || !Number.isFinite(tankerWp1.lat) || !Number.isFinite(tankerWp1.lon)) {
+      return { type: 'FeatureCollection', features: [] };
+    }
+    return {
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [tankerWp1.lon, tankerWp1.lat],
+        },
+        properties: { id: 'tanker-wp1-point' },
+      }],
+    };
+  }, [tankerWp1]);
+
+  const fcTankerExclusionRing = useMemo(() => {
+    if (!tankerWp1 || !Number.isFinite(tankerWp1.lat) || !Number.isFinite(tankerWp1.lon)) {
+      return { type: 'FeatureCollection', features: [] };
+    }
+    return {
+      type: 'FeatureCollection',
+      features: [circlePolygon(tankerWp1.lat, tankerWp1.lon, TANKER_EXCLUSION_RADIUS_M)],
+    };
+  }, [tankerWp1]);
+
+  const fcTankerRoutes = useMemo(() => {
+    const { lineFeatures } = buildTankerRouteFeatures(tankerRoutes);
+    return { type: 'FeatureCollection', features: lineFeatures };
+  }, [tankerRoutes]);
 
   const disposeThreeNode = useCallback((node) => {
     if (!node) return;
@@ -1599,7 +2816,7 @@ function MapLibreFlatMapView({
     domes3dRef.current.domes = [];
     domes3dRef.current.routes = [];
 
-    if (!showAto && !showLogistics && !showConvoys && !showAirliftPlayers) {
+    if (!showAto && !showLogistics && !showConvoys && !showAirliftPlayers && !(tankerRoutes || []).length) {
       map.triggerRepaint();
       return;
     }
@@ -1677,6 +2894,7 @@ function MapLibreFlatMapView({
         const srcId = String(mission?.source_airport_id || '');
         const dstId = String(mission?.airport_id || '');
         if (!srcId || !dstId) return;
+        if (!(logisticsFrontlineAirportIds instanceof Set) || !logisticsFrontlineAirportIds.has(dstId)) return;
         const routeKey = `${srcId}->${dstId}`;
         const current = routesByKey.get(routeKey);
         if (!current) {
@@ -1962,8 +3180,128 @@ function MapLibreFlatMapView({
       });
     }
 
+    (tankerRoutes || []).forEach((route) => {
+      const wp1Raw = route?.wp1;
+      const wp2Raw = route?.wp2;
+      if (!wp1Raw || !wp2Raw) return;
+      const wp1 = normalizeTankerLatLon(Number(wp1Raw.lat), Number(wp1Raw.lon));
+      const wp2 = normalizeTankerLatLon(Number(wp2Raw.lat), Number(wp2Raw.lon));
+      if (!wp1 || !wp2) return;
+
+      const altMeters = TANKER_ROUTE_ALTITUDE_M;
+      const segments = 16;
+      const points = [];
+      for (let i = 0; i <= segments; i += 1) {
+        const t = i / segments;
+        const lat = wp1.lat + ((wp2.lat - wp1.lat) * t);
+        const lon = wp1.lon + ((wp2.lon - wp1.lon) * t);
+        const merc = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], altMeters);
+        points.push(new THREE.Vector3(merc.x, merc.y, merc.z));
+      }
+
+      const curve = new THREE.CatmullRomCurve3(points);
+      const midMerc = maplibregl.MercatorCoordinate.fromLngLat(
+        [(wp1.lon + wp2.lon) / 2, (wp1.lat + wp2.lat) / 2],
+        0
+      );
+      const tubeRadius = midMerc.meterInMercatorCoordinateUnits() * TANKER_ROUTE_TUBE_RADIUS_M;
+      const tubeGeometry = new THREE.TubeGeometry(curve, segments, tubeRadius, 8, false);
+      const routeColor = TANKER_ROUTE_COLOR;
+      const routeMaterial = new THREE.MeshPhongMaterial({
+        color: routeColor,
+        emissive: new THREE.Color(routeColor),
+        emissiveIntensity: 0.22,
+        transparent: true,
+        opacity: 0.88,
+        depthTest: true,
+        depthWrite: true,
+      });
+      const routeMesh = new THREE.Mesh(tubeGeometry, routeMaterial);
+      routeMesh.userData.disposeGeometry = true;
+      routeMesh.renderOrder = 9;
+      group.add(routeMesh);
+
+      addTankerRouteEndpointCircle(group, map, wp1.lon, wp1.lat, altMeters);
+      addTankerRouteEndpointCircle(group, map, wp2.lon, wp2.lat, altMeters);
+
+      const kc135Template = domes3dRef.current.kc135Template || domes3dRef.current.c130Template;
+      if (kc135Template) {
+        const planeRoot = kc135Template.clone(true);
+        const seed = hashString(String(route.id || route.keyword || `${wp1.lat},${wp1.lon}`));
+        const t = 0.2 + ((seed % 61) / 100);
+        const latAtT = wp1.lat + ((wp2.lat - wp1.lat) * t);
+        const lonAtT = wp1.lon + ((wp2.lon - wp1.lon) * t);
+        const planeAltMeters = altMeters + TANKER_KC135_ROUTE_CLEARANCE_M;
+        const planeMerc = maplibregl.MercatorCoordinate.fromLngLat([lonAtT, latAtT], planeAltMeters);
+        const routeBearingDeg = computeBearingDeg([wp1.lat, wp1.lon], [wp2.lat, wp2.lon]);
+        const headingYaw = THREE.MathUtils.degToRad(routeBearingDeg) + Math.PI;
+        const modelScale = midMerc.meterInMercatorCoordinateUnits() * TANKER_KC135_MODEL_SIZE_METERS;
+        const routeOpacity = 0.88;
+        const routeColorThree = new THREE.Color(routeColor);
+
+        planeRoot.position.set(planeMerc.x, planeMerc.y, planeMerc.z);
+        planeRoot.scale.set(modelScale, modelScale, modelScale);
+        const headingQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), headingYaw);
+        const levelQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0, 'XYZ'));
+        planeRoot.quaternion.copy(headingQuat).multiply(levelQuat);
+        planeRoot.renderOrder = 12;
+
+        planeRoot.traverse((child) => {
+          if (child?.isMesh) {
+            child.frustumCulled = false;
+            if (Array.isArray(child.material)) {
+              child.material = child.material.map((mat) => {
+                if (!mat) return mat;
+                const material = typeof mat.clone === 'function' ? mat.clone() : mat;
+                material.depthTest = true;
+                material.depthWrite = true;
+                material.toneMapped = false;
+                if (material.color) {
+                  material.color = routeColorThree.clone();
+                }
+                if (material.emissive) {
+                  material.emissive = routeColorThree.clone();
+                  material.emissiveIntensity = 0.14;
+                }
+                material.transparent = true;
+                material.opacity = routeOpacity;
+                material.needsUpdate = true;
+                return material;
+              });
+            } else if (child.material) {
+              if (typeof child.material.clone === 'function') {
+                const material = child.material.clone();
+                material.depthTest = true;
+                material.depthWrite = true;
+                material.toneMapped = false;
+                if (material.color) {
+                  material.color = routeColorThree.clone();
+                }
+                if (material.emissive) {
+                  material.emissive = routeColorThree.clone();
+                  material.emissiveIntensity = 0.14;
+                }
+                material.transparent = true;
+                material.opacity = routeOpacity;
+                material.needsUpdate = true;
+                child.material = material;
+              } else {
+                child.material.depthTest = true;
+                child.material.depthWrite = true;
+                child.material.toneMapped = false;
+                child.material.transparent = true;
+                child.material.opacity = routeOpacity;
+              }
+            }
+          }
+        });
+
+        group.add(planeRoot);
+      }
+    });
+
     map.triggerRepaint();
-  }, [zones, showAto, selectedZoneId, showLogistics, logisticsMissions, airportsById, showConvoys, convoys, showAirliftPlayers, airliftPlayers, disposeThreeNode]);
+  }, [zones, showAto, selectedZoneId, showLogistics, logisticsMissions, logisticsFrontlineAirportIds, airportsById, showConvoys, convoys, showAirliftPlayers, airliftPlayers, tankerRoutes, disposeThreeNode]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -1976,14 +3314,14 @@ function MapLibreFlatMapView({
       center: initialCamera ? [initialCamera.lng, initialCamera.lat] : [center.lon, center.lat],
       zoom: initialCamera ? initialCamera.zoom : 7,
       minZoom: MIN_SAFE_ZOOM,
-      maxZoom: MAX_SAFE_ZOOM,
+      maxZoom: effectiveMaxZoom,
       pitch: initialCamera ? initialCamera.pitch : 0,
       bearing: initialCamera ? initialCamera.bearing : 0,
       minPitch: MIN_PITCH,
       maxPitch: MAX_PITCH,
     });
     mapRef.current = map;
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), MAPLIBRE_NAV_CONTROL_POSITION);
     // Reduce zoom aggressiveness from fast wheel input to avoid unstable camera states.
     map.scrollZoom.setWheelZoomRate(1 / 1500);
     map.scrollZoom.setZoomRate(1 / 220);
@@ -2009,8 +3347,7 @@ function MapLibreFlatMapView({
       if (event?.originalEvent) markUserCameraInteraction();
     });
 
-    map.on('load', () => {
-      ensureDcsarDomPulseStyles();
+    map.on('load', async () => {
       popupRef.current = new maplibregl.Popup({
         closeButton: false,
         closeOnClick: false,
@@ -2039,6 +3376,27 @@ function MapLibreFlatMapView({
         map.addSource(id, { type: 'geojson', data });
       };
 
+      try {
+        await ensureMapLibreDcsarIconImages(map);
+      } catch (error) {
+        console.error('Failed to initialize DCSAR icon images:', error);
+      }
+      try {
+        await ensureMapLibreAirportIconImages(map);
+      } catch (error) {
+        console.error('Failed to initialize airport icon image:', error);
+      }
+      try {
+        await ensureMapLibreDbuildAndCrateIconImages(map);
+      } catch (error) {
+        console.error('Failed to initialize DBUILD/crate icon images:', error);
+      }
+      try {
+        await ensureMapLibreProductionPointIconImages(map);
+      } catch (error) {
+        console.error('Failed to initialize production point icon images:', error);
+      }
+
       addGeoSource('grid-src', fcGrid);
       addGeoSource('logistics-src', fcLogistics);
       addGeoSource('convoy-lines-src', fcConvoyLines);
@@ -2048,6 +3406,7 @@ function MapLibreFlatMapView({
       addGeoSource('dcsar-points-src', fcDcsarPoints);
       addGeoSource('zones-src', fcZones);
       addGeoSource('airports-src', fcAirports);
+      addGeoSource('production-points-src', fcProductionPoints);
 
       const domeLayer = {
         id: 'zone-domes-3d-layer',
@@ -2093,11 +3452,13 @@ function MapLibreFlatMapView({
               loader.loadAsync(c130ModelUrl),
               loader.loadAsync(ch47ModelUrl),
               loader.loadAsync(t72ModelUrl),
+              loader.loadAsync(kc135ModelUrl),
             ])
               .then((results) => {
                 const c130Result = results[0];
                 const ch47Result = results[1];
                 const t72Result = results[2];
+                const kc135Result = results[3];
                 if (c130Result.status === 'fulfilled') {
                   domes3dRef.current.c130Template = prepareTemplate(c130Result.value);
                 } else {
@@ -2113,6 +3474,11 @@ function MapLibreFlatMapView({
                 } else {
                   console.error('Failed to load T72 model:', t72Result.reason);
                 }
+                if (kc135Result.status === 'fulfilled') {
+                  domes3dRef.current.kc135Template = prepareTemplate(kc135Result.value);
+                } else {
+                  console.error('Failed to load KC-135 model:', kc135Result.reason);
+                }
                 rebuildThreeDomes();
                 map.triggerRepaint();
               })
@@ -2123,6 +3489,7 @@ function MapLibreFlatMapView({
             domes3dRef.current.c130Template
             || domes3dRef.current.ch47Template
             || domes3dRef.current.convoyTemplate
+            || domes3dRef.current.kc135Template
           ) {
             rebuildThreeDomes();
             map.triggerRepaint();
@@ -2136,18 +3503,9 @@ function MapLibreFlatMapView({
             : (args?.modelViewProjectionMatrix || args?.projectionMatrix || matrix);
           camera.projectionMatrix = new THREE.Matrix4().fromArray(projectionMatrix);
 
-          // Partial line-of-sight fade: domes outside the current view bearing fade out.
-          const center = map.getCenter();
-          const centerPoint = [center.lat, center.lng];
-          const viewBearing = (map.getBearing() + 360) % 360;
           domes.forEach((dome) => {
-            const bearingToDome = computeBearingDeg(centerPoint, [dome.lat, dome.lon]);
-            const delta = Math.abs((((bearingToDome - viewBearing) % 360) + 540) % 360 - 180);
-            let visibilityFactor = 1;
-            if (delta > 125) visibilityFactor = 0.1;
-            else if (delta > 100) visibilityFactor = 0.3;
-            dome.main.material.opacity = dome.mainBaseOpacity * visibilityFactor;
-            dome.glow.material.opacity = dome.glowBaseOpacity * visibilityFactor;
+            dome.main.material.opacity = dome.mainBaseOpacity;
+            dome.glow.material.opacity = dome.glowBaseOpacity;
           });
 
           renderer.resetState();
@@ -2247,6 +3605,45 @@ function MapLibreFlatMapView({
         },
       });
 
+      map.addLayer({
+        id: 'dcsar-icons-pending-layer',
+        type: 'symbol',
+        source: 'dcsar-points-src',
+        filter: ['!=', ['get', 'accepted'], 1],
+        layout: {
+          'icon-image': MAPLIBRE_DCSAR_ICON_PENDING_IMAGE_ID,
+          'icon-size': MAPLIBRE_DCSAR_ICON_SIZE,
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'map',
+          'icon-rotation-alignment': 'map',
+        },
+      });
+      map.addLayer({
+        id: 'dcsar-icons-accepted-layer',
+        type: 'symbol',
+        source: 'dcsar-points-src',
+        filter: ['==', ['get', 'accepted'], 1],
+        layout: {
+          'icon-image': MAPLIBRE_DCSAR_ICON_ACCEPTED_IMAGE_ID,
+          'icon-size': MAPLIBRE_DCSAR_ICON_SIZE,
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'map',
+          'icon-rotation-alignment': 'map',
+        },
+      });
+      map.addLayer({
+        id: 'dcsar-points-hit-layer',
+        type: 'circle',
+        source: 'dcsar-points-src',
+        paint: {
+          'circle-radius': 14,
+          'circle-color': '#000000',
+          'circle-opacity': 0.001,
+        },
+      });
+
 
 
       map.addLayer({
@@ -2266,22 +3663,281 @@ function MapLibreFlatMapView({
         source: 'airports-src',
         paint: {
           'circle-radius': ['case', ['==', ['get', 'main'], 1], 11, 9],
-          'circle-color': ['case', ['==', ['get', 'main'], 1], '#38bdf8', '#60a5fa'],
+          'circle-color': ['case', ['==', ['get', 'main'], 1], '#22c55e', '#60a5fa'],
           'circle-opacity': 0.16,
         },
       });
 
       map.addLayer({
         id: 'airports-core-layer',
-        type: 'circle',
+        type: 'symbol',
         source: 'airports-src',
-        paint: {
-          'circle-radius': ['case', ['==', ['get', 'main'], 1], 7, 5.5],
-          'circle-color': ['case', ['==', ['get', 'main'], 1], '#4ec5ff', '#93c5fd'],
-          'circle-stroke-color': '#f8fafc',
-          'circle-stroke-width': 2,
-          'circle-opacity': 0.98,
+        layout: {
+          'icon-image': [
+            'case',
+            ['==', ['get', 'carrier'], 1], MAPLIBRE_AIRPORT_ICON_ANCHOR_IMAGE_ID,
+            ['==', ['get', 'main'], 1], MAPLIBRE_AIRPORT_ICON_TOWER_GREEN_IMAGE_ID,
+            MAPLIBRE_AIRPORT_ICON_TOWER_BLUE_IMAGE_ID,
+          ],
+          'icon-size': MAPLIBRE_AIRPORT_ICON_SIZE,
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'map',
+          'icon-rotation-alignment': 'map',
         },
+      });
+
+      map.addLayer({
+        id: 'production-points-layer',
+        type: 'symbol',
+        source: 'production-points-src',
+        layout: {
+          'icon-image': [
+            'match',
+            ['get', 'factoryKind'],
+            'pp-blue', MAPLIBRE_PP_FACTORY_BLUE_IMAGE_ID,
+            MAPLIBRE_PP_FACTORY_WHITE_IMAGE_ID,
+          ],
+          'icon-size': MAPLIBRE_PP_ICON_SIZE,
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+        },
+      });
+
+      map.addLayer({
+        id: 'production-points-hit-layer',
+        type: 'circle',
+        source: 'production-points-src',
+        paint: {
+          'circle-radius': 20,
+          'circle-color': '#000000',
+          'circle-opacity': 0.001,
+        },
+      });
+
+      map.on('click', 'production-points-hit-layer', (event) => {
+        const feature = event?.features?.[0];
+        const ppId = feature?.properties?.id;
+        if (ppId && onProductionPointSelect) onProductionPointSelect(ppId);
+      });
+
+      map.on('mousemove', 'production-points-hit-layer', (event) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const feature = event?.features?.[0];
+        const name = feature?.properties?.name || feature?.properties?.id || 'PP';
+        const level = feature?.properties?.level ?? 0;
+        const upgrading = Number(feature?.properties?.upgrading) === 1;
+        showHoverPopup(
+          event.lngLat,
+          `<div style="font-size:11px;font-weight:600;">${name} • LV${level}${upgrading ? ' • UPGRADING' : ''}</div>`
+        );
+      });
+      map.on('mouseleave', 'production-points-hit-layer', () => {
+        map.getCanvas().style.cursor = '';
+        hideHoverPopup();
+      });
+
+      addGeoSource('crate-clusters-src', fcCrateClusters);
+      addGeoSource('spawn-radius-src', fcSpawnRadius);
+
+      map.addLayer({
+        id: 'spawn-radius-fill-layer',
+        type: 'fill',
+        source: 'spawn-radius-src',
+        paint: {
+          'fill-color': '#facc15',
+          'fill-opacity': 0.06,
+        },
+      });
+
+      map.addLayer({
+        id: 'spawn-radius-line-layer',
+        type: 'line',
+        source: 'spawn-radius-src',
+        paint: {
+          'line-color': '#facc15',
+          'line-width': 2,
+          'line-dasharray': [2, 2],
+          'line-opacity': 0.85,
+        },
+      });
+
+      map.addLayer({
+        id: 'crate-clusters-layer',
+        type: 'symbol',
+        source: 'crate-clusters-src',
+        layout: {
+          'icon-image': [
+            'match',
+            ['get', 'kind'],
+            'boxes', MAPLIBRE_CRATE_BOXES_IMAGE_ID,
+            MAPLIBRE_CRATE_BOX_IMAGE_ID,
+          ],
+          'icon-size': MAPLIBRE_CRATE_ICON_SIZE,
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+        },
+      });
+
+      map.on('click', 'crate-clusters-layer', (event) => {
+        const feature = event?.features?.[0];
+        const typesHtml = feature?.properties?.typesHtml || '';
+        if (typesHtml) {
+          showHoverPopup(event.lngLat, `<div style="font-size:11px;font-weight:600;white-space:pre-line;">${typesHtml}</div>`);
+        }
+      });
+      map.on('mousemove', 'crate-clusters-layer', (event) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const feature = event?.features?.[0];
+        const count = Number(feature?.properties?.count) || 1;
+        showHoverPopup(
+          event.lngLat,
+          `<div style="font-size:11px;font-weight:600;">${count === 1 ? '1 crate' : `${count} crates`}</div>`
+        );
+      });
+      map.on('mouseleave', 'crate-clusters-layer', () => {
+        if (!placementActive) map.getCanvas().style.cursor = '';
+        hideHoverPopup();
+      });
+
+      addGeoSource('dbuild-context-ring-src', fcDbuildContextRing);
+      addGeoSource('dbuild-context-point-src', fcDbuildContextPoint);
+      addGeoSource('tanker-exclusion-ring-src', fcTankerExclusionRing);
+      addGeoSource('tanker-wp1-point-src', fcTankerWp1Point);
+      addGeoSource('tanker-routes-src', fcTankerRoutes);
+      addGeoSource('dbuild-markers-src', fcDbuildMarkers);
+
+      map.addLayer({
+        id: 'dbuild-context-ring-fill-layer',
+        type: 'fill',
+        source: 'dbuild-context-ring-src',
+        paint: {
+          'fill-color': '#facc15',
+          'fill-opacity': 0.1,
+        },
+      });
+      map.addLayer({
+        id: 'dbuild-context-ring-line-layer',
+        type: 'line',
+        source: 'dbuild-context-ring-src',
+        paint: {
+          'line-color': '#facc15',
+          'line-width': 2,
+          'line-dasharray': [2, 2],
+          'line-opacity': 0.9,
+        },
+      });
+      map.addLayer({
+        id: 'dbuild-context-point-layer',
+        type: 'circle',
+        source: 'dbuild-context-point-src',
+        paint: {
+          'circle-radius': 9,
+          'circle-color': '#facc15',
+          'circle-opacity': 0.92,
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 2,
+        },
+      });
+
+      map.addLayer({
+        id: 'tanker-exclusion-ring-fill-layer',
+        type: 'fill',
+        source: 'tanker-exclusion-ring-src',
+        paint: {
+          'fill-color': '#ef4444',
+          'fill-opacity': 0.12,
+        },
+      });
+      map.addLayer({
+        id: 'tanker-exclusion-ring-line-layer',
+        type: 'line',
+        source: 'tanker-exclusion-ring-src',
+        paint: {
+          'line-color': '#ef4444',
+          'line-width': 2,
+          'line-dasharray': [2, 2],
+          'line-opacity': 0.9,
+        },
+      });
+      map.addLayer({
+        id: 'tanker-wp1-point-layer',
+        type: 'circle',
+        source: 'tanker-wp1-point-src',
+        paint: {
+          'circle-radius': 10,
+          'circle-color': TANKER_ROUTE_COLOR,
+          'circle-opacity': 0.95,
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 2,
+        },
+      });
+
+      map.addLayer({
+        id: 'tanker-routes-line-layer',
+        type: 'line',
+        source: 'tanker-routes-src',
+        layout: {
+          'line-cap': 'round',
+          'line-join': 'round',
+        },
+        paint: {
+          'line-color': TANKER_ROUTE_COLOR,
+          'line-width': 14,
+          'line-opacity': 0.001,
+        },
+      });
+
+      map.on('mousemove', 'tanker-routes-line-layer', (event) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const feature = event?.features?.[0];
+        const label = feature?.properties?.label || 'Tanker route';
+        showHoverPopup(event.lngLat, `<div style="font-size:11px;font-weight:600;">${label}</div>`);
+      });
+      map.on('mouseleave', 'tanker-routes-line-layer', () => {
+        if (!placementActive) map.getCanvas().style.cursor = '';
+        hideHoverPopup();
+      });
+
+      map.addLayer({
+        id: 'dbuild-markers-layer',
+        type: 'symbol',
+        source: 'dbuild-markers-src',
+        layout: {
+          'icon-image': [
+            'match',
+            ['get', 'kind'],
+            'rook-blue', MAPLIBRE_DBUILD_ROOK_BLUE_IMAGE_ID,
+            'hammer-green', MAPLIBRE_DBUILD_HAMMER_GREEN_IMAGE_ID,
+            MAPLIBRE_DBUILD_HAMMER_WHITE_IMAGE_ID,
+          ],
+          'icon-size': 0.95,
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+        },
+        paint: {
+          'icon-opacity': 1,
+        },
+      });
+
+      map.on('click', 'dbuild-markers-layer', (event) => {
+        const feature = event?.features?.[0];
+        const placementId = feature?.properties?.placementId;
+        const selectable = Number(feature?.properties?.selectable) === 1;
+        if (selectable && placementId && onDbuildPlacementSelect) onDbuildPlacementSelect(placementId);
+      });
+      map.on('mousemove', 'dbuild-markers-layer', (event) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const feature = event?.features?.[0];
+        const label = feature?.properties?.label || 'Build';
+        const status = feature?.properties?.status || 'draft';
+        const structureName = feature?.properties?.structureName || '';
+        const suffix = structureName ? ` (${structureName})` : ` • ${status}`;
+        showHoverPopup(event.lngLat, `<div style="font-size:11px;font-weight:600;">${label}${suffix}</div>`);
+      });
+      map.on('mouseleave', 'dbuild-markers-layer', () => {
+        if (!placementActive) map.getCanvas().style.cursor = '';
+        hideHoverPopup();
       });
 
       map.on('click', 'zones-hit-layer', (event) => {
@@ -2358,6 +4014,32 @@ function MapLibreFlatMapView({
         hideHoverPopup();
       });
 
+      map.on('click', 'dcsar-points-hit-layer', (event) => {
+        const feature = event?.features?.[0];
+        const dcsarId = String(feature?.properties?.id || '').trim();
+        if (!dcsarId || !onDcsarSelect) return;
+        const point = dcsarByIdRef.current.get(dcsarId);
+        if (point) onDcsarSelect(point);
+      });
+      map.on('mousemove', 'dcsar-points-hit-layer', (event) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const feature = event?.features?.[0];
+        const dcsarId = String(feature?.properties?.id || '').trim();
+        const accepted = Number(feature?.properties?.accepted) === 1;
+        if (onDcsarHover) onDcsarHover(dcsarId || null);
+        const label = dcsarId ? `CSAR ${dcsarId}` : 'CSAR';
+        const status = accepted ? 'Accepted' : 'Pending';
+        showHoverPopup(
+          event.lngLat,
+          `<div style="font-size:11px;font-weight:600;">${label}</div><div style="font-size:10px;opacity:0.9;">${status}</div>`
+        );
+      });
+      map.on('mouseleave', 'dcsar-points-hit-layer', () => {
+        map.getCanvas().style.cursor = '';
+        if (onDcsarHover) onDcsarHover(null);
+        hideHoverPopup();
+      });
+
       map.on('mousemove', 'logistics-hit-pending', () => {
         map.getCanvas().style.cursor = '';
       });
@@ -2395,7 +4077,7 @@ function MapLibreFlatMapView({
       map.on('zoom', () => {
         if (zoomGuardRef.current) return;
         const currentZoom = map.getZoom();
-        const clampedZoom = Math.max(MIN_SAFE_ZOOM, Math.min(MAX_SAFE_ZOOM, currentZoom));
+        const clampedZoom = Math.max(MIN_SAFE_ZOOM, Math.min(map.getMaxZoom(), currentZoom));
         if (Math.abs(clampedZoom - currentZoom) > 0.001) {
           zoomGuardRef.current = true;
           map.setZoom(clampedZoom);
@@ -2435,11 +4117,6 @@ function MapLibreFlatMapView({
 
     return () => {
       logMapDebug('map-unmount');
-      dcsarMarkersRef.current.forEach(({ marker, cleanup }) => {
-        if (typeof cleanup === 'function') cleanup();
-        marker.remove();
-      });
-      dcsarMarkersRef.current.clear();
       if (domes3dRef.current.group) {
         while (domes3dRef.current.group.children.length > 0) {
           const child = domes3dRef.current.group.children.pop();
@@ -2457,93 +4134,6 @@ function MapLibreFlatMapView({
       mapRef.current = null;
     };
   }, [style, logMapDebug, disposeThreeNode]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    if (!showDcsar) {
-      dcsarMarkersRef.current.forEach(({ marker, cleanup }) => {
-        if (typeof cleanup === 'function') cleanup();
-        marker.remove();
-      });
-      dcsarMarkersRef.current.clear();
-      return;
-    }
-
-    const nextIds = new Set();
-    (dcsarPoints || []).forEach((point) => {
-      const id = String(point?.id || '').trim();
-      const lat = Number(point?.lat);
-      const lon = Number(point?.lon);
-      if (!id || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
-      nextIds.add(id);
-
-      const isAccepted = point.status === 'accepted' || point.accepted === true;
-      const existing = dcsarMarkersRef.current.get(id);
-
-      if (existing) {
-        existing.marker.setLngLat([lon, lat]);
-        if (existing.accepted !== isAccepted) {
-          if (typeof existing.cleanup === 'function') existing.cleanup();
-          existing.marker.remove();
-          dcsarMarkersRef.current.delete(id);
-        } else {
-          existing.point = point;
-          return;
-        }
-      }
-
-      const element = createMapLibreDcsarDomMarker(isAccepted);
-      const marker = new maplibregl.Marker({
-        element,
-        anchor: 'bottom',
-        pitchAlignment: 'map',
-        rotationAlignment: 'map',
-        opacity: '1',
-        opacityWhenCovered: '1',
-      })
-        .setLngLat([lon, lat])
-        .addTo(map);
-
-      const entry = { marker, accepted: isAccepted, point, cleanup: null };
-
-      const onMouseEnter = () => {
-        map.getCanvas().style.cursor = 'pointer';
-        if (onDcsarHover) onDcsarHover(id);
-        if (popupRef.current) {
-          popupRef.current
-            .setLngLat([lon, lat])
-            .setHTML(`<div style="font-size:11px;font-weight:600;">CSAR ${id}</div>`)
-            .addTo(map);
-        }
-      };
-      const onMouseLeave = () => {
-        map.getCanvas().style.cursor = '';
-        if (onDcsarHover) onDcsarHover(null);
-        if (popupRef.current) popupRef.current.remove();
-      };
-      const onClick = () => {
-        if (onDcsarSelect) onDcsarSelect(entry.point);
-      };
-
-      element.addEventListener('mouseenter', onMouseEnter);
-      element.addEventListener('mouseleave', onMouseLeave);
-      element.addEventListener('click', onClick);
-      entry.cleanup = () => {
-        element.removeEventListener('mouseenter', onMouseEnter);
-        element.removeEventListener('mouseleave', onMouseLeave);
-        element.removeEventListener('click', onClick);
-      };
-      dcsarMarkersRef.current.set(id, entry);
-    });
-
-    dcsarMarkersRef.current.forEach((entry, id) => {
-      if (nextIds.has(id)) return;
-      if (typeof entry.cleanup === 'function') entry.cleanup();
-      entry.marker.remove();
-      dcsarMarkersRef.current.delete(id);
-    });
-  }, [dcsarPoints, showDcsar, onDcsarHover, onDcsarSelect]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -2615,6 +4205,147 @@ function MapLibreFlatMapView({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    const visibility = showProductionPoints ? 'visible' : 'none';
+    if (map.getLayer('production-points-layer')) {
+      map.setLayoutProperty('production-points-layer', 'visibility', visibility);
+    }
+    if (map.getLayer('production-points-hit-layer')) {
+      map.setLayoutProperty('production-points-hit-layer', 'visibility', visibility);
+    }
+  }, [showProductionPoints]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const applyProductionPointData = () => {
+      const source = map.getSource('production-points-src');
+      if (source?.setData) source.setData(fcProductionPoints);
+    };
+    if (map.isStyleLoaded()) {
+      applyProductionPointData();
+      return undefined;
+    }
+    map.once('load', applyProductionPointData);
+    return () => {
+      map.off('load', applyProductionPointData);
+    };
+  }, [fcProductionPoints]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const source = map.getSource('crate-clusters-src');
+    if (source?.setData) source.setData(fcCrateClusters);
+  }, [fcCrateClusters]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const source = map.getSource('spawn-radius-src');
+    if (source?.setData) source.setData(fcSpawnRadius);
+  }, [fcSpawnRadius]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const source = map.getSource('dbuild-markers-src');
+    if (source?.setData) source.setData(fcDbuildMarkers);
+  }, [fcDbuildMarkers]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return undefined;
+
+    const applyTankerRouteData = () => {
+      const routesSource = map.getSource('tanker-routes-src');
+      if (routesSource?.setData) routesSource.setData(fcTankerRoutes);
+    };
+
+    if (map.isStyleLoaded()) {
+      applyTankerRouteData();
+      return undefined;
+    }
+
+    map.once('load', applyTankerRouteData);
+    return () => {
+      map.off('load', applyTankerRouteData);
+    };
+  }, [fcTankerRoutes]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const ringSource = map.getSource('dbuild-context-ring-src');
+    if (ringSource?.setData) ringSource.setData(fcDbuildContextRing);
+    const pointSource = map.getSource('dbuild-context-point-src');
+    if (pointSource?.setData) pointSource.setData(fcDbuildContextPoint);
+    const tankerRingSource = map.getSource('tanker-exclusion-ring-src');
+    if (tankerRingSource?.setData) tankerRingSource.setData(fcTankerExclusionRing);
+    const tankerPointSource = map.getSource('tanker-wp1-point-src');
+    if (tankerPointSource?.setData) tankerPointSource.setData(fcTankerWp1Point);
+  }, [fcDbuildContextRing, fcDbuildContextPoint, fcTankerExclusionRing, fcTankerWp1Point]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.setMaxZoom(effectiveMaxZoom);
+  }, [effectiveMaxZoom]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const handleContextMenu = (event) => {
+      if (!mapContextMenuEnabled || !onMapContextMenu) return;
+      event.preventDefault();
+      const { lat, lng } = event.lngLat || {};
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      const rect = map.getContainer().getBoundingClientRect();
+      onMapContextMenu({
+        lat,
+        lon: lng,
+        clientX: rect.left + event.point.x,
+        clientY: rect.top + event.point.y,
+      });
+    };
+
+    if (mapContextMenuEnabled) {
+      map.on('contextmenu', handleContextMenu);
+    }
+
+    return () => {
+      map.off('contextmenu', handleContextMenu);
+    };
+  }, [mapContextMenuEnabled, onMapContextMenu]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const handleSpawnClick = (event) => {
+      if (!placementActive || !onPlacementPlace) return;
+      const { lat, lng } = event.lngLat || {};
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        onPlacementPlace({ lat, lon: lng });
+      }
+    };
+
+    if (placementActive) {
+      map.on('click', handleSpawnClick);
+      map.getCanvas().style.cursor = 'crosshair';
+    }
+
+    return () => {
+      map.off('click', handleSpawnClick);
+      if (map.getCanvas()) {
+        map.getCanvas().style.cursor = '';
+      }
+    };
+  }, [placementActive, onPlacementPlace]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
 
     const applyBasemapVisibility = () => {
       const darkVisible = basemapMode !== BASEMAP_MODE_SATELLITE;
@@ -2660,13 +4391,18 @@ function MapLibreFlatMapView({
       currentZoom: Number(map.getZoom().toFixed(3)),
     });
 
+    const focusZoom = String(focusTargetKey || '').startsWith('spawn:')
+      ? Math.min(effectiveMaxZoom, 15)
+      : Math.min(effectiveMaxZoom, map.getZoom() + 0.35);
+
     map.easeTo({
       center: [nextLon, nextLat],
-      zoom: Math.min(MAX_SAFE_ZOOM, map.getZoom() + 0.35),
+      offset: [0, MAPLIBRE_FOCUS_Y_OFFSET_PX],
+      zoom: focusZoom,
       duration: 950,
       easing: (t) => t * (2 - t),
     });
-  }, [focusTargetKey, focusCoordinates, logMapDebug]);
+  }, [focusTargetKey, focusCoordinates, effectiveMaxZoom, logMapDebug]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -2716,16 +4452,13 @@ function MapLibreFlatMapView({
   return (
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
-      <div className="pointer-events-none absolute left-2 top-2 rounded border border-yt-border bg-[#101827dd] px-2 py-1 text-[10px] text-yt-text-secondary">
-        <div>MapLibre</div>
-        <div>Z:{layerCounts.zones} L:{layerCounts.logistics} C:{layerCounts.convoys} P:{layerCounts.airliftPlayers} D:{layerCounts.dcsar} A:{layerCounts.airports}</div>
-      </div>
     </div>
   );
 }
 
 export default function FrontlineMap({ airportsData }) {
   const { user } = useUser();
+  const canManageLogisticsRouteVisibility = user?.canManageLogisticsRouteVisibility === true;
   const isMapLibreEngine = MAP_ENGINE === 'maplibre';
   const [isDesktopDevice, setIsDesktopDevice] = useState(() => isDesktopGlobeDevice());
   const [selectedZoneId, setSelectedZoneId] = useState(null);
@@ -2746,6 +4479,8 @@ export default function FrontlineMap({ airportsData }) {
   const [requestWeaponId, setRequestWeaponId] = useState('');
   const [requestQuantity, setRequestQuantity] = useState(0);
   const [requestingOrder, setRequestingOrder] = useState(false);
+  const [hiddenLogisticsRouteAirportIds, setHiddenLogisticsRouteAirportIds] = useState(new Set());
+  const [updatingRoutePriorityAirportId, setUpdatingRoutePriorityAirportId] = useState(null);
   const [acceptingZoneOperationId, setAcceptingZoneOperationId] = useState(null);
   const [acceptingMissionId, setAcceptingMissionId] = useState(null);
   const [acceptingDcsarId, setAcceptingDcsarId] = useState(null);
@@ -2779,11 +4514,79 @@ export default function FrontlineMap({ airportsData }) {
     showAto: true,
     showLogistics: true,
     showAirports: true,
-    showConvoys: true,
-    showAirliftPlayers: true,
+    showConvoys: false,
+    showAirliftPlayers: false,
     showDcsar: true,
+    showProductionPoints: true,
   });
   const mapModeRef = useRef(false);
+
+  // DCORE bridge state (Production Points + web-initiated spawns)
+  const [productionPoints, setProductionPoints] = useState([]);
+  const [selectedProductionPointId, setSelectedProductionPointId] = useState(null);
+  const [spawnOptions, setSpawnOptions] = useState({ infantry: [], crate: [] });
+  // spawnMode: { airportId, type: 'inf_spawn'|'crate_spawn', keyword, label } | null
+  const [spawnMode, setSpawnMode] = useState(null);
+  // retrieveMode: { ppId, quantity } | null
+  const [retrieveMode, setRetrieveMode] = useState(null);
+  const [ppRetrieveDraftQty, setPpRetrieveDraftQty] = useState(1);
+  const [webSpawnMarkers, setWebSpawnMarkers] = useState([]);
+  const [dbuildCatalog, setDbuildCatalog] = useState([]);
+  const [dbuildPlacements, setDbuildPlacements] = useState([]);
+  const [dbuildSites, setDbuildSites] = useState([]);
+  const [selectedDbuildPlacementId, setSelectedDbuildPlacementId] = useState(null);
+  const [mapContextMenu, setMapContextMenu] = useState(null);
+  const [contextMenuPanel, setContextMenuPanel] = useState('root');
+  const [dbuildMenuCollapsed, setDbuildMenuCollapsed] = useState(false);
+  const [tankerOptions, setTankerOptions] = useState([]);
+  const [tankerRoutes, setTankerRoutes] = useState([]);
+  const [tankerMode, setTankerMode] = useState(null);
+  const [confirmingDbuildId, setConfirmingDbuildId] = useState(null);
+  const mapSectionRef = useRef(null);
+  const [submittingCommand, setSubmittingCommand] = useState(false);
+  const [upgradingPpId, setUpgradingPpId] = useState(null);
+  const [commandToast, setCommandToast] = useState(null);
+  const [commandToastFading, setCommandToastFading] = useState(false);
+  const pendingCommandIdsRef = useRef(new Set());
+  const commandToastTimerRef = useRef(null);
+  const commandToastFadeTimerRef = useRef(null);
+
+  const showCommandToast = useCallback((toast) => {
+    if (commandToastTimerRef.current) {
+      clearTimeout(commandToastTimerRef.current);
+    }
+    if (commandToastFadeTimerRef.current) {
+      clearTimeout(commandToastFadeTimerRef.current);
+    }
+    setCommandToastFading(false);
+    setCommandToast({ ...toast, ts: Date.now() });
+    commandToastFadeTimerRef.current = setTimeout(() => {
+      setCommandToastFading(true);
+    }, COMMAND_TOAST_VISIBLE_MS);
+    commandToastTimerRef.current = setTimeout(() => {
+      setCommandToast(null);
+      setCommandToastFading(false);
+    }, COMMAND_TOAST_VISIBLE_MS + COMMAND_TOAST_FADE_MS);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadRouteVisibility = async () => {
+      try {
+        const payload = await getLogisticsRouteVisibility();
+        if (cancelled) return;
+        const ids = Array.isArray(payload?.hiddenAirportIds) ? payload.hiddenAirportIds : [];
+        setHiddenLogisticsRouteAirportIds(new Set(ids.map((entry) => String(entry))));
+      } catch (error) {
+        console.error('Failed to load logistics route visibility settings:', error);
+      }
+    };
+
+    loadRouteVisibility();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const updateDeviceMode = () => {
@@ -2803,8 +4606,8 @@ export default function FrontlineMap({ airportsData }) {
         showAto: true,
         showLogistics: true,
         showAirports: true,
-        showConvoys: true,
-        showAirliftPlayers: true,
+        showConvoys: false,
+        showAirliftPlayers: false,
         showDcsar: true,
       }));
     }
@@ -2931,6 +4734,11 @@ export default function FrontlineMap({ airportsData }) {
       }
     });
 
+    const unsubscribeRouteVisibility = socketService.on('logistics-route-visibility:updated', (data) => {
+      const ids = Array.isArray(data?.hiddenAirportIds) ? data.hiddenAirportIds : [];
+      setHiddenLogisticsRouteAirportIds(new Set(ids.map((entry) => String(entry))));
+    });
+
     return () => {
       unsubscribe && unsubscribe();
       unsubscribeMissions && unsubscribeMissions();
@@ -2939,8 +4747,112 @@ export default function FrontlineMap({ airportsData }) {
       unsubscribeConvoys && unsubscribeConvoys();
       unsubscribeAirliftPlayers && unsubscribeAirliftPlayers();
       unsubscribeDcsar && unsubscribeDcsar();
+      unsubscribeRouteVisibility && unsubscribeRouteVisibility();
     };
   }, []);
+
+  // Initial load of Production Points + spawn catalog (DCORE bridge)
+  useEffect(() => {
+    let cancelled = false;
+    Promise.allSettled([getProductionPoints(), getSpawnOptions(), getTankerOptions(), getTankerRoutes(), getWebSpawnMarkers(), getDbuildCatalog(), getDbuildPlacements()]).then(([ppResult, optionsResult, tankerOptionsResult, tankerRoutesResult, markersResult, dbuildCatalogResult, dbuildPlacementsResult]) => {
+      if (cancelled) return;
+      if (ppResult.status === 'fulfilled') {
+        const list = ppResult.value?.productionPoints || ppResult.value;
+        if (Array.isArray(list)) setProductionPoints(list);
+      }
+      if (optionsResult.status === 'fulfilled' && optionsResult.value) {
+        setSpawnOptions({
+          infantry: Array.isArray(optionsResult.value.infantry) ? optionsResult.value.infantry : [],
+          crate: Array.isArray(optionsResult.value.crate) ? optionsResult.value.crate : [],
+        });
+      }
+      if (tankerOptionsResult.status === 'fulfilled' && tankerOptionsResult.value) {
+        const list = tankerOptionsResult.value?.tankers || tankerOptionsResult.value;
+        if (Array.isArray(list)) setTankerOptions(list);
+      }
+      if (tankerRoutesResult.status === 'fulfilled' && tankerRoutesResult.value) {
+        const list = tankerRoutesResult.value?.routes || tankerRoutesResult.value;
+        if (Array.isArray(list)) setTankerRoutes(list);
+      }
+      if (markersResult.status === 'fulfilled' && markersResult.value) {
+        const list = markersResult.value?.markers || markersResult.value;
+        if (Array.isArray(list)) setWebSpawnMarkers(list);
+      }
+      if (dbuildCatalogResult.status === 'fulfilled' && dbuildCatalogResult.value) {
+        const list = dbuildCatalogResult.value?.types || dbuildCatalogResult.value;
+        if (Array.isArray(list)) setDbuildCatalog(list);
+      }
+      if (dbuildPlacementsResult.status === 'fulfilled' && dbuildPlacementsResult.value) {
+        const list = dbuildPlacementsResult.value?.placements || dbuildPlacementsResult.value;
+        if (Array.isArray(list)) setDbuildPlacements(list);
+        const sites = dbuildPlacementsResult.value?.sites;
+        if (Array.isArray(sites)) setDbuildSites(sites);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Socket subscriptions for Production Points + web command results
+  useEffect(() => {
+    const unsubscribePp = socketService.on('production-points:updated', (data) => {
+      const list = data?.productionPoints || data;
+      if (Array.isArray(list)) setProductionPoints(list);
+    });
+
+    const unsubscribeMarkers = socketService.on('web-spawn-markers:updated', (data) => {
+      const list = data?.markers || data;
+      if (Array.isArray(list)) setWebSpawnMarkers(list);
+    });
+
+    const unsubscribeTankerRoutes = socketService.on('tanker-routes:updated', (data) => {
+      const list = data?.routes || data;
+      if (Array.isArray(list)) setTankerRoutes(list);
+    });
+
+    const unsubscribeDbuildPlacements = socketService.on('dbuild-placements:updated', (data) => {
+      const list = data?.placements || data;
+      if (Array.isArray(list)) setDbuildPlacements(list);
+      if (Array.isArray(data?.sites)) setDbuildSites(data.sites);
+    });
+
+    const unsubscribeDbuildSites = socketService.on('dbuild-sites:updated', (data) => {
+      if (Array.isArray(data?.sites)) setDbuildSites(data.sites);
+      if (Array.isArray(data?.placements)) setDbuildPlacements(data.placements);
+    });
+
+    const unsubscribeResult = socketService.on('web-command:result', (data) => {
+      if (!data || !data.id) return;
+      if (!pendingCommandIdsRef.current.has(data.id)) return;
+      pendingCommandIdsRef.current.delete(data.id);
+
+      const isSpawn = data.type === 'inf_spawn' || data.type === 'crate_spawn';
+      const isDbuild = data.type === 'dbuild_confirm';
+      if ((isSpawn || isDbuild) && data.ok === true) return;
+
+      showCommandToast({
+        ok: data.ok === true,
+        message: formatWebCommandToastMessage(data),
+        balance: shouldShowCommandToastBalance(data) ? Number(data.balance) : null,
+      });
+    });
+
+    return () => {
+      unsubscribePp && unsubscribePp();
+      unsubscribeMarkers && unsubscribeMarkers();
+      unsubscribeTankerRoutes && unsubscribeTankerRoutes();
+      unsubscribeDbuildPlacements && unsubscribeDbuildPlacements();
+      unsubscribeDbuildSites && unsubscribeDbuildSites();
+      unsubscribeResult && unsubscribeResult();
+      if (commandToastTimerRef.current) {
+        clearTimeout(commandToastTimerRef.current);
+      }
+      if (commandToastFadeTimerRef.current) {
+        clearTimeout(commandToastFadeTimerRef.current);
+      }
+    };
+  }, [showCommandToast]);
 
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -3022,12 +4934,13 @@ export default function FrontlineMap({ airportsData }) {
   }, []);
 
   useEffect(() => {
+    if (isMapLibreEngine) return undefined;
     const interval = setInterval(() => {
       setAnimationTick(Date.now());
     }, 280);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isMapLibreEngine]);
 
   useEffect(() => {
     let isMounted = true;
@@ -3116,7 +5029,8 @@ export default function FrontlineMap({ airportsData }) {
   );
 
   const validAirports = useMemo(() => {
-    const airportsList = Array.isArray(airportsData) ? airportsData : airports;
+    const hasDynamicAirports = Array.isArray(airportsData) && airportsData.length > 0;
+    const airportsList = hasDynamicAirports ? airportsData : airports;
     return airportsList.filter((airport) => airport.coordinates && airport.isActive !== false);
   }, [airportsData]);
 
@@ -3130,36 +5044,97 @@ export default function FrontlineMap({ airportsData }) {
     return map;
   }, [combatMissions]);
 
-  const zoneByGridIndex = useMemo(() => {
+  const zoneByGridKey = useMemo(() => {
     const map = new Map();
     validZones.forEach((zone) => {
-      const index = getZoneGridIndex(zone);
-      if (index === null) return;
-      map.set(index, zone);
+      const key = getZoneGridKey(zone);
+      if (!key) return;
+      map.set(key, zone);
     });
     return map;
   }, [validZones]);
 
+  const logisticsFrontlineAirportIds = useMemo(() => {
+    const zoneByKey = new Map();
+    validZones.forEach((zone) => {
+      const key = getZoneGridKey(zone);
+      if (!key) return;
+      zoneByKey.set(key, zone);
+    });
+
+    const firstLineBlueZoneKeys = new Set();
+    zoneByKey.forEach((zone, key) => {
+      if (zone?.status !== 'BLUE') return;
+      const hasRedNeighbor = getNeighborZoneGridKeys(key).some((neighborKey) => zoneByKey.get(neighborKey)?.status === 'RED');
+      if (hasRedNeighbor) {
+        firstLineBlueZoneKeys.add(key);
+      }
+    });
+
+    const secondLineBlueZoneKeys = new Set();
+    zoneByKey.forEach((zone, key) => {
+      if (zone?.status !== 'BLUE') return;
+      if (firstLineBlueZoneKeys.has(key)) return;
+      const linkedToFirstLine = getNeighborZoneGridKeys(key).some((neighborKey) => firstLineBlueZoneKeys.has(neighborKey));
+      if (linkedToFirstLine) {
+        secondLineBlueZoneKeys.add(key);
+      }
+    });
+
+    const eligibleBlueZoneKeys = new Set([
+      ...Array.from(firstLineBlueZoneKeys),
+      ...Array.from(secondLineBlueZoneKeys),
+    ]);
+
+    const keyedZones = Array.from(zoneByKey.entries()).filter(([, zone]) => (
+      Number.isFinite(Number(zone?.coordinates?.lat)) && Number.isFinite(Number(zone?.coordinates?.lon))
+    ));
+    const eligibleAirportIds = new Set();
+
+    validAirports.forEach((airport) => {
+      const airportLat = Number(airport?.coordinates?.lat);
+      const airportLon = Number(airport?.coordinates?.lon);
+      if (!Number.isFinite(airportLat) || !Number.isFinite(airportLon)) return;
+
+      let nearestZoneKey = null;
+      let nearestDistanceNm = Number.POSITIVE_INFINITY;
+
+      keyedZones.forEach(([zoneKey, zone]) => {
+        const zoneLat = Number(zone.coordinates.lat);
+        const zoneLon = Number(zone.coordinates.lon);
+        const distanceNm = haversineNm(airportLat, airportLon, zoneLat, zoneLon);
+        if (distanceNm < nearestDistanceNm) {
+          nearestDistanceNm = distanceNm;
+          nearestZoneKey = zoneKey;
+        }
+      });
+
+      if (nearestZoneKey !== null && eligibleBlueZoneKeys.has(nearestZoneKey)) {
+        eligibleAirportIds.add(String(airport.id));
+      }
+    });
+
+    return eligibleAirportIds;
+  }, [validZones, validAirports]);
+
   const gridConnections = useMemo(() => {
-    const zoneByIndex = new Map();
+    const zoneByKey = new Map();
 
     validZones.forEach((zone) => {
-      const index = getZoneGridIndex(zone);
-      if (index === null || !zone?.coordinates) return;
-      zoneByIndex.set(index, zone);
+      const key = getZoneGridKey(zone);
+      if (!key || !zone?.coordinates) return;
+      zoneByKey.set(key, zone);
     });
 
     const links = [];
-    zoneByIndex.forEach((zone, index) => {
-      const row = Math.floor(index / 10);
-      const col = index % 10;
-      const rightIndex = col < 9 ? index + 1 : null;
-      const downIndex = row < 9 ? index + 10 : null;
+    zoneByKey.forEach((zone, key) => {
+      const rightKey = getRightZoneGridKey(key);
+      const downKey = getDownZoneGridKey(key);
 
-      if (rightIndex !== null && zoneByIndex.has(rightIndex)) {
-        const target = zoneByIndex.get(rightIndex);
+      if (rightKey !== null && zoneByKey.has(rightKey)) {
+        const target = zoneByKey.get(rightKey);
         links.push({
-          id: `grid-${index}-${rightIndex}`,
+          id: `grid-${key}-${rightKey}`,
           positions: [
             [zone.coordinates.lat, zone.coordinates.lon],
             [target.coordinates.lat, target.coordinates.lon],
@@ -3167,10 +5142,10 @@ export default function FrontlineMap({ airportsData }) {
         });
       }
 
-      if (downIndex !== null && zoneByIndex.has(downIndex)) {
-        const target = zoneByIndex.get(downIndex);
+      if (downKey !== null && zoneByKey.has(downKey)) {
+        const target = zoneByKey.get(downKey);
         links.push({
-          id: `grid-${index}-${downIndex}`,
+          id: `grid-${key}-${downKey}`,
           positions: [
             [zone.coordinates.lat, zone.coordinates.lon],
             [target.coordinates.lat, target.coordinates.lon],
@@ -3291,6 +5266,11 @@ export default function FrontlineMap({ airportsData }) {
     });
   }, [validZones, combatMissionByZone, filters]);
 
+  const zonesForMap = useMemo(() => {
+    if (filters.showProductionPoints) return filteredZones;
+    return filteredZones.filter((zone) => !isProductionPointZone(zone, productionPoints));
+  }, [filteredZones, filters.showProductionPoints, productionPoints]);
+
   const filteredLogisticsMissions = useMemo(() => {
     return logisticsMissions.filter((mission) => {
       if (!mission?.airport_id || !mission?.source_airport_id) return false;
@@ -3299,6 +5279,13 @@ export default function FrontlineMap({ airportsData }) {
       return true;
     });
   }, [logisticsMissions, filters.logisticsStatus]);
+
+  const routeVisibleLogisticsMissions = useMemo(() => {
+    if (hiddenLogisticsRouteAirportIds.size === 0) {
+      return filteredLogisticsMissions;
+    }
+    return filteredLogisticsMissions.filter((mission) => !hiddenLogisticsRouteAirportIds.has(String(mission.airport_id)));
+  }, [filteredLogisticsMissions, hiddenLogisticsRouteAirportIds]);
 
   const focusedZone = useMemo(
     () => (selectedZoneId ? filteredZones.find((zone) => zone.id === selectedZoneId) || validZones.find((zone) => zone.id === selectedZoneId) || null : null),
@@ -3316,49 +5303,8 @@ export default function FrontlineMap({ airportsData }) {
     return map;
   }, [validAirports]);
 
-  const overlayTagOptions = useMemo(
-    () => [
-      { label: 'All', value: 'all' },
-      { label: 'Red', value: 'RED' },
-      { label: 'Blue', value: 'BLUE' },
-      { label: 'Neutral', value: 'NEUTRAL' },
-      { label: 'Under Attack', value: 'UNDER_ATTACK' },
-    ],
-    []
-  );
-
-  const missionStatusOptions = useMemo(
-    () => [
-      { label: 'ATO Any', value: 'all' },
-      { label: 'Available', value: 'available' },
-      { label: 'Assigned', value: 'assigned' },
-    ],
-    []
-  );
-
-  const logisticsStatusOptions = useMemo(
-    () => [
-      { label: 'LOG Any', value: 'all' },
-      { label: 'Pending', value: 'pending' },
-      { label: 'Accepted', value: 'accepted' },
-    ],
-    []
-  );
-
-  const priorityOptions = useMemo(
-    () => [
-      { label: 'Any Priority', value: 'all' },
-      { label: 'P1', value: '1' },
-      { label: 'P2', value: '2' },
-      { label: 'P3', value: '3' },
-      { label: 'P4', value: '4' },
-      { label: 'P5', value: '5' },
-    ],
-    []
-  );
-
   const globePoints = useMemo(() => {
-    const zonePoints = filters.showAto ? filteredZones.map((zone) => ({
+    const zonePoints = filters.showAto ? zonesForMap.map((zone) => ({
       lat: zone.coordinates.lat,
       lon: zone.coordinates.lon,
       size: zone.id === selectedZoneId ? 0.14 : zone.isActive ? 0.1 : 0.07,
@@ -3368,8 +5314,18 @@ export default function FrontlineMap({ airportsData }) {
       lon: airport.coordinates.lon,
       size: airport.isMainBase ? 0.11 : 0.08,
     })) : [];
-    return [...zonePoints, ...airportPoints];
-  }, [filteredZones, validAirports, selectedZoneId, filters.showAto, filters.showAirports]);
+    const productionPointMarkers = filters.showProductionPoints
+      ? (productionPoints || []).flatMap((pp) => {
+        if (!Number.isFinite(pp?.coordinates?.lat) || !Number.isFinite(pp?.coordinates?.lon)) return [];
+        return [{
+          lat: pp.coordinates.lat,
+          lon: pp.coordinates.lon,
+          size: pp.id === selectedProductionPointId ? 0.12 : 0.09,
+        }];
+      })
+      : [];
+    return [...zonePoints, ...airportPoints, ...productionPointMarkers];
+  }, [zonesForMap, validAirports, productionPoints, selectedZoneId, selectedProductionPointId, filters.showAto, filters.showAirports, filters.showProductionPoints]);
 
   const zoneTheaterCenter = useMemo(() => {
     if (validZones.length === 0) return null;
@@ -3406,8 +5362,26 @@ export default function FrontlineMap({ airportsData }) {
   }, [selectedDcsarId, dcsarPoints]);
 
   const focusCoordinates = selectedDcsarFocus || focusedZone?.coordinates || zoneTheaterCenter || fallbackCenter || null;
-  const tacticalFocusCoordinates = selectedDcsarFocus || focusedZone?.coordinates || null;
-  const tacticalFocusTargetKey = selectedDcsarId || selectedZoneId || null;
+  const spawnAirportCenter = useMemo(() => {
+    if (!spawnMode) return null;
+    const airport = airportsById.get(spawnMode.airportId);
+    return airport?.coordinates || null;
+  }, [spawnMode, airportsById]);
+
+  const retrievePpCenter = useMemo(() => {
+    if (!retrieveMode) return null;
+    const pp = productionPoints.find((entry) => entry.id === retrieveMode.ppId);
+    return pp?.coordinates || null;
+  }, [retrieveMode, productionPoints]);
+
+  const mapMaxZoom = (spawnMode || retrieveMode || tankerMode || selectedAirportId) ? MAP_ZOOM_AIRPORT_MAX : MAP_ZOOM_DEFAULT_MAX;
+
+  const tacticalFocusCoordinates = spawnAirportCenter || retrievePpCenter || selectedDcsarFocus || focusedZone?.coordinates || null;
+  const tacticalFocusTargetKey = spawnMode
+    ? `spawn:${spawnMode.airportId}`
+    : retrieveMode
+      ? `retrieve:${retrieveMode.ppId}`
+      : (selectedDcsarId || selectedZoneId || null);
 
   const handleScaleChange = (scale) => {
     if (!isDesktopDevice) return;
@@ -3479,21 +5453,13 @@ export default function FrontlineMap({ airportsData }) {
     : [];
   const selectedZoneDetailsRedNeighbors = useMemo(() => {
     if (!selectedZoneDetails) return [];
-    const gridIndex = getZoneGridIndex(selectedZoneDetails);
-    if (gridIndex === null) return [];
+    const gridKey = getZoneGridKey(selectedZoneDetails);
+    if (!gridKey) return [];
 
-    const row = Math.floor(gridIndex / 10);
-    const col = gridIndex % 10;
-    const neighborIndexes = [];
-    if (row > 0) neighborIndexes.push(gridIndex - 10);
-    if (row < 9) neighborIndexes.push(gridIndex + 10);
-    if (col > 0) neighborIndexes.push(gridIndex - 1);
-    if (col < 9) neighborIndexes.push(gridIndex + 1);
-
-    return neighborIndexes
-      .map((index) => zoneByGridIndex.get(index))
+    return getNeighborZoneGridKeys(gridKey)
+      .map((key) => zoneByGridKey.get(key))
       .filter((zone) => zone && zone.status === 'RED');
-  }, [selectedZoneDetails, zoneByGridIndex]);
+  }, [selectedZoneDetails, zoneByGridKey]);
   const selectedZoneDetailsHasTasks = Array.isArray(selectedZoneDetails?.tasks) && selectedZoneDetails.tasks.length > 0;
   const selectedZoneDetailsAcceptedByOther = Boolean(
     selectedZoneDetails?.operation_assigned &&
@@ -3554,6 +5520,18 @@ export default function FrontlineMap({ airportsData }) {
     && selectedLargeContainerCount <= 2;
 
   const selectedAirport = selectedAirportId ? airportsById.get(selectedAirportId) : null;
+
+  const spawnOptionByKeyword = useMemo(() => {
+    const map = new Map();
+    (spawnOptions.infantry || []).forEach((option) => {
+      if (option?.keyword) map.set(option.keyword, option);
+    });
+    (spawnOptions.crate || []).forEach((option) => {
+      if (option?.keyword) map.set(option.keyword, option);
+    });
+    return map;
+  }, [spawnOptions]);
+  const selectedAirportRoutesHidden = selectedAirportId ? hiddenLogisticsRouteAirportIds.has(String(selectedAirportId)) : false;
   const selectedAirportRequestedWeaponIds = useMemo(() => {
     const set = new Set();
     airportLogistics.forEach((mission) => {
@@ -3689,6 +5667,12 @@ export default function FrontlineMap({ airportsData }) {
       setSelectedDcsarId(null);
     }
   }, [filters.showDcsar]);
+
+  useEffect(() => {
+    if (!filters.showProductionPoints) {
+      setSelectedProductionPointId(null);
+    }
+  }, [filters.showProductionPoints]);
 
   useEffect(() => {
     setZoneCoordinatesFormat('dms');
@@ -3984,12 +5968,416 @@ export default function FrontlineMap({ airportsData }) {
     }
   };
 
+  const handleAirportClick = useCallback((airportId) => {
+    if (!airportId) return;
+    const normalizedAirportId = String(airportId);
+    setSelectedAirportId(normalizedAirportId);
+    setSelectedZoneId(null);
+    setSelectedZoneDetailsId(null);
+    setSelectedProductionPointId(null);
+    setRetrieveMode(null);
+  }, []);
+
+  const handleToggleAirportRoutePriority = useCallback(async (airportId) => {
+    const normalizedAirportId = String(airportId || '').trim();
+    if (!normalizedAirportId) return;
+    if (!canManageLogisticsRouteVisibility) return;
+
+    const isCurrentlyHidden = hiddenLogisticsRouteAirportIds.has(normalizedAirportId);
+    const nextIsPriority = isCurrentlyHidden;
+
+    setUpdatingRoutePriorityAirportId(normalizedAirportId);
+    try {
+      const payload = await setAirportLogisticsRoutePriority(normalizedAirportId, nextIsPriority);
+      const ids = Array.isArray(payload?.hiddenAirportIds) ? payload.hiddenAirportIds : [];
+      setHiddenLogisticsRouteAirportIds(new Set(ids.map((entry) => String(entry))));
+    } catch (error) {
+      console.error('Failed to update airport route priority:', error);
+      alert(`Failed to update airport priority: ${error.message}`);
+    } finally {
+      setUpdatingRoutePriorityAirportId(null);
+    }
+  }, [canManageLogisticsRouteVisibility, hiddenLogisticsRouteAirportIds]);
+
+  // ===== DCORE bridge: Production Points + web spawns =====
+  const isAuthenticated = Boolean(user?.id);
+
+  const selectedProductionPoint = useMemo(
+    () => (selectedProductionPointId ? productionPoints.find((pp) => pp.id === selectedProductionPointId) || null : null),
+    [selectedProductionPointId, productionPoints]
+  );
+
+  const handleProductionPointSelect = useCallback((ppId) => {
+    setSelectedProductionPointId(ppId);
+    setSelectedAirportId(null);
+    setSelectedZoneId(null);
+    setSelectedZoneDetailsId(null);
+    setSpawnMode(null);
+    setRetrieveMode(null);
+  }, []);
+
+  // Keep zone / production-point / airport selection mutually exclusive (panels share the bottom-left slot).
+  useEffect(() => {
+    if (selectedZoneId) {
+      setSelectedProductionPointId(null);
+      setSelectedAirportId(null);
+    }
+  }, [selectedZoneId]);
+
+  useEffect(() => {
+    if (retrieveMode) {
+      const activePp = productionPoints.find((entry) => entry.id === retrieveMode.ppId);
+      setPpRetrieveDraftQty(clampRetrieveQuantity(retrieveMode.quantity, activePp?.stock));
+      return;
+    }
+    if (!selectedProductionPointId) {
+      setPpRetrieveDraftQty(1);
+      return;
+    }
+    const pp = productionPoints.find((entry) => entry.id === selectedProductionPointId);
+    if (!pp) return;
+    const max = Math.max(1, Math.floor(Number(pp.stock) || 0));
+    setPpRetrieveDraftQty((current) => clampRetrieveQuantity(current, max));
+  }, [retrieveMode, selectedProductionPointId, productionPoints]);
+
+  const handleRequestUpgrade = useCallback(async (ppId) => {
+    if (!ppId) return;
+    setUpgradingPpId(ppId);
+    try {
+      const response = await requestProductionPointUpgrade(ppId);
+      if (response?.commandId) {
+        pendingCommandIdsRef.current.add(response.commandId);
+      }
+    } catch (error) {
+      console.error('Failed to request PP upgrade:', error);
+      showCommandToast({ ok: false, message: error.message || 'Failed to request upgrade.', balance: null });
+    } finally {
+      setUpgradingPpId(null);
+    }
+  }, [showCommandToast]);
+
+  const handleEnterSpawnMode = useCallback((airportId, type, option) => {
+    setSpawnMode({
+      airportId: String(airportId),
+      type,
+      keyword: option.keyword,
+      label: option.keyword || option.label,
+      cost: option.cost,
+      quantity: 1,
+    });
+    setSelectedProductionPointId(null);
+    setRetrieveMode(null);
+    setTankerMode(null);
+  }, []);
+
+  const handleSetSpawnQuantity = useCallback((quantity) => {
+    const nextQty = Math.max(1, Math.min(SPAWN_QUANTITY_MAX, Math.floor(Number(quantity)) || 1));
+    setSpawnMode((current) => (current ? { ...current, quantity: nextQty } : current));
+  }, []);
+
+  const handleCancelSpawnMode = useCallback(() => {
+    setSpawnMode(null);
+  }, []);
+
+  const handleCancelTankerMode = useCallback(() => {
+    setTankerMode(null);
+  }, []);
+
+  const handleStartTankerMode = useCallback((keyword, label) => {
+    if (!keyword) return;
+    setMapContextMenu(null);
+    setContextMenuPanel('root');
+    setTankerMode({
+      keyword: String(keyword).toUpperCase(),
+      label: label || keyword,
+      step: 'wp1',
+      wp1: null,
+    });
+    setSpawnMode(null);
+    setRetrieveMode(null);
+    setSelectedDbuildPlacementId(null);
+  }, []);
+
+  const handleTankerPlace = useCallback(async ({ lat, lon }) => {
+    if (!tankerMode) return;
+
+    if (tankerMode.step === 'wp1') {
+      setTankerMode((current) => (current ? {
+        ...current,
+        step: 'wp2',
+        wp1: { lat, lon },
+      } : current));
+      return;
+    }
+
+    if (!tankerMode.wp1) return;
+    const distanceNm = haversineNm(tankerMode.wp1.lat, tankerMode.wp1.lon, lat, lon);
+    const minDistNm = Number(tankerOptions.find((entry) => entry.keyword === tankerMode.keyword)?.min_dist_nm) || TANKER_MIN_DIST_NM;
+    if (distanceNm < minDistNm) {
+      showCommandToast({
+        ok: false,
+        message: `WP2 too close: minimum distance is ${minDistNm} NM (current ${distanceNm.toFixed(1)} NM). Place WP2 outside the red zone.`,
+        balance: null,
+      });
+      return;
+    }
+
+    setSubmittingCommand(true);
+    try {
+      const response = await spawnTanker(
+        tankerMode.keyword,
+        tankerMode.wp1.lat,
+        tankerMode.wp1.lon,
+        lat,
+        lon,
+      );
+      if (response?.commandId) {
+        pendingCommandIdsRef.current.add(response.commandId);
+      }
+      setTankerMode(null);
+    } catch (error) {
+      console.error('Failed to submit tanker spawn command:', error);
+      showCommandToast({ ok: false, message: error.message || 'Failed to send tanker spawn order.', balance: null });
+    } finally {
+      setSubmittingCommand(false);
+    }
+  }, [tankerMode, tankerOptions, showCommandToast]);
+
+  const handleEnterRetrieveMode = useCallback((ppId, quantity = 1) => {
+    const pp = productionPoints.find((entry) => entry.id === ppId);
+    const nextQty = clampRetrieveQuantity(quantity, pp?.stock);
+    setRetrieveMode({ ppId: String(ppId), quantity: nextQty });
+    setPpRetrieveDraftQty(nextQty);
+    setSelectedProductionPointId(String(ppId));
+    setSpawnMode(null);
+    setSelectedAirportId(null);
+    setTankerMode(null);
+  }, [productionPoints]);
+
+  const handleSetRetrieveQuantity = useCallback((quantity) => {
+    setRetrieveMode((current) => {
+      if (!current) return current;
+      const pp = productionPoints.find((entry) => entry.id === current.ppId);
+      const nextQty = clampRetrieveQuantity(quantity, pp?.stock);
+      return { ...current, quantity: nextQty };
+    });
+  }, [productionPoints]);
+
+  const handleCancelRetrieveMode = useCallback(() => {
+    setRetrieveMode(null);
+  }, []);
+
+  const handleRetrievePlace = useCallback(async ({ lat, lon }) => {
+    if (!retrieveMode) return;
+    const { ppId } = retrieveMode;
+    const pp = productionPoints.find((entry) => entry.id === ppId);
+    const quantity = clampRetrieveQuantity(retrieveMode.quantity, pp?.stock);
+    const ppCoords = pp?.coordinates;
+    if (ppCoords && Number.isFinite(ppCoords.lat) && Number.isFinite(ppCoords.lon)) {
+      const distanceM = haversineMeters(ppCoords.lat, ppCoords.lon, lat, lon);
+      if (distanceM > PP_RETRIEVE_RADIUS_M) {
+        showCommandToast({
+          ok: false,
+          message: `Placement out of range (${Math.round(distanceM)} m). Max ${PP_RETRIEVE_RADIUS_M} m from production point center.`,
+          balance: null,
+        });
+        return;
+      }
+    }
+
+    setSubmittingCommand(true);
+    try {
+      const response = await retrieveProductionPointCrates(ppId, lat, lon, quantity);
+      if (response?.commandId) {
+        pendingCommandIdsRef.current.add(response.commandId);
+      }
+      setRetrieveMode(null);
+    } catch (error) {
+      console.error('Failed to submit retrieve command:', error);
+      showCommandToast({ ok: false, message: error.message || 'Failed to send retrieve order.', balance: null });
+    } finally {
+      setSubmittingCommand(false);
+    }
+  }, [retrieveMode, productionPoints, showCommandToast]);
+
+  const handleSpawnPlace = useCallback(async ({ lat, lon }) => {
+    if (!spawnMode) return;
+    const { airportId, type, keyword } = spawnMode;
+    const quantity = Math.max(1, Math.min(SPAWN_QUANTITY_MAX, Math.floor(Number(spawnMode.quantity)) || 1));
+    const airport = airportsById.get(airportId);
+    const airportCoords = airport?.coordinates;
+    const placementPositions = buildSpawnPlacementPositions(lat, lon, quantity);
+    if (airportCoords && Number.isFinite(airportCoords.lat) && Number.isFinite(airportCoords.lon)) {
+      for (const position of placementPositions) {
+        const distanceM = haversineMeters(airportCoords.lat, airportCoords.lon, position.lat, position.lon);
+        if (distanceM > AIRPORT_SPAWN_RADIUS_M) {
+          showCommandToast({
+            ok: false,
+            message: `Placement out of range (${Math.round(distanceM)} m). Max ${AIRPORT_SPAWN_RADIUS_M / 1000} km from airport center.`,
+            balance: null,
+          });
+          return;
+        }
+      }
+    }
+
+    setSubmittingCommand(true);
+    try {
+      const submit = type === 'inf_spawn' ? spawnAirportInfantry : spawnAirportCrate;
+      const response = await submit(airportId, keyword, lat, lon, quantity);
+      if (response?.commandId) {
+        pendingCommandIdsRef.current.add(response.commandId);
+      }
+      setSpawnMode(null);
+    } catch (error) {
+      console.error('Failed to submit spawn command:', error);
+      showCommandToast({ ok: false, message: error.message || 'Failed to send spawn order.', balance: null });
+    } finally {
+      setSubmittingCommand(false);
+    }
+  }, [spawnMode, airportsById, showCommandToast]);
+
+  const dbuildMapMarkers = useMemo(
+    () => buildDbuildMapMarkers(dbuildPlacements, dbuildSites, dbuildCatalog),
+    [dbuildPlacements, dbuildSites, dbuildCatalog]
+  );
+
+  const crateClusters = useMemo(
+    () => clusterCratesWithinRadius(webSpawnMarkers, CRATE_CLUSTER_RADIUS_M),
+    [webSpawnMarkers]
+  );
+
+  const selectedDbuildPlacement = useMemo(
+    () => (selectedDbuildPlacementId ? dbuildPlacements.find((entry) => entry.id === selectedDbuildPlacementId) || null : null),
+    [selectedDbuildPlacementId, dbuildPlacements]
+  );
+
+  const mapContextMenuEnabled = isAuthenticated && !spawnMode && !retrieveMode && !tankerMode;
+
+  useEffect(() => {
+    if (!mapContextMenu) return undefined;
+    const closeMenu = () => setMapContextMenu(null);
+    window.addEventListener('click', closeMenu);
+    return () => {
+      window.removeEventListener('click', closeMenu);
+    };
+  }, [mapContextMenu]);
+
+  const handleMapContextMenu = useCallback((payload) => {
+    if (!mapContextMenuEnabled || !mapSectionRef.current) return;
+    const rect = mapSectionRef.current.getBoundingClientRect();
+    setMapContextMenu({
+      lat: payload.lat,
+      lon: payload.lon,
+      x: payload.clientX - rect.left + DBUILD_CONTEXT_MENU_OFFSET_X,
+      y: payload.clientY - rect.top + DBUILD_CONTEXT_MENU_OFFSET_Y,
+    });
+    setDbuildMenuCollapsed(false);
+    setContextMenuPanel('root');
+    setSelectedDbuildPlacementId(null);
+  }, [mapContextMenuEnabled]);
+
+  const dbuildContextPoint = mapContextMenu
+    ? { lat: mapContextMenu.lat, lon: mapContextMenu.lon }
+    : null;
+
+  const tankerWp1 = tankerMode?.wp1 || null;
+
+  const handleCreateDbuildDraft = useCallback(async (buildType) => {
+    if (!mapContextMenu || !buildType) return;
+    setMapContextMenu(null);
+    try {
+      const response = await createDbuildPlacement(buildType, mapContextMenu.lat, mapContextMenu.lon);
+      const placement = response?.placement;
+      if (placement?.id) {
+        setSelectedDbuildPlacementId(placement.id);
+        setSpawnMode(null);
+      }
+    } catch (error) {
+      console.error('Failed to create DBUILD draft:', error);
+      showCommandToast({ ok: false, message: error.message || 'Failed to place build draft.', balance: null });
+    }
+  }, [mapContextMenu, showCommandToast]);
+
+  const handleConfirmDbuildPlacement = useCallback(async (placementId) => {
+    if (!placementId) return;
+    setConfirmingDbuildId(placementId);
+    try {
+      const response = await confirmDbuildPlacement(placementId);
+      if (response?.commandId) {
+        pendingCommandIdsRef.current.add(response.commandId);
+      }
+    } catch (error) {
+      console.error('Failed to confirm DBUILD placement:', error);
+      showCommandToast({ ok: false, message: error.message || 'Failed to confirm build placement.', balance: null });
+    } finally {
+      setConfirmingDbuildId(null);
+    }
+  }, [showCommandToast]);
+
+  const handleCancelDbuildDraft = useCallback(async (placementId) => {
+    if (!placementId) return;
+    try {
+      await cancelDbuildPlacement(placementId);
+      if (selectedDbuildPlacementId === placementId) {
+        setSelectedDbuildPlacementId(null);
+      }
+    } catch (error) {
+      console.error('Failed to cancel DBUILD draft:', error);
+      showCommandToast({ ok: false, message: error.message || 'Failed to cancel build draft.', balance: null });
+    }
+  }, [selectedDbuildPlacementId, showCommandToast]);
+
+  const handleDbuildPlacementSelect = useCallback((placementId) => {
+    setSelectedDbuildPlacementId(placementId);
+    setSelectedAirportId(null);
+    setSelectedProductionPointId(null);
+    setSpawnMode(null);
+    setRetrieveMode(null);
+    setTankerMode(null);
+    setMapContextMenu(null);
+  }, []);
+
+  const canUpgradeSelectedPp = Boolean(
+    selectedProductionPoint &&
+    selectedProductionPoint.built &&
+    !selectedProductionPoint.upgrading &&
+    selectedProductionPoint.owner === 'BLUE' &&
+    Number(selectedProductionPoint.red_units || 0) === 0 &&
+    Number(selectedProductionPoint.level || 0) < Number(selectedProductionPoint.max_level || 1)
+  );
+
+  const canRetrieveSelectedPp = Boolean(
+    selectedProductionPoint &&
+    selectedProductionPoint.built &&
+    selectedProductionPoint.owner === 'BLUE' &&
+    Number(selectedProductionPoint.stock || 0) > 0
+  );
+
+  const maxRetrieveQuantity = Math.max(1, Math.floor(Number(selectedProductionPoint?.stock) || 0));
+
+  const panelRetrieveQuantity = (
+    retrieveMode &&
+    selectedProductionPoint &&
+    retrieveMode.ppId === selectedProductionPoint.id
+  )
+    ? (retrieveMode.quantity || 1)
+    : ppRetrieveDraftQty;
+
+  const retrieveBannerMaxQuantity = retrieveMode
+    ? Math.max(
+      1,
+      Math.floor(Number(productionPoints.find((entry) => entry.id === retrieveMode.ppId)?.stock) || 0)
+    )
+    : 1;
+
   return (
     <div className="h-full overflow-hidden bg-yt-bg-primary p-3">
       <div className="h-full">
         <div className="min-h-0 h-full">
           <section className="relative flex h-full min-h-[320px] min-w-0 flex-col overflow-hidden rounded-2xl border border-yt-border bg-yt-bg-secondary/75 backdrop-blur">
             <div
+              ref={mapSectionRef}
               className={`relative min-h-0 flex-1 transition-[filter] duration-300 ${
                 isPreLaunchCountdownActive ? 'pointer-events-none select-none blur-[8px]' : ''
               }`}
@@ -4010,9 +6398,10 @@ export default function FrontlineMap({ airportsData }) {
                 <div className="absolute inset-0">
                   {isMapLibreEngine ? (
                     <MapLibreFlatMapView
-                      zones={filteredZones}
+                      zones={zonesForMap}
                       airportsData={validAirports}
-                      logisticsMissions={filteredLogisticsMissions}
+                      logisticsMissions={routeVisibleLogisticsMissions}
+                      logisticsFrontlineAirportIds={logisticsFrontlineAirportIds}
                       gridConnections={gridConnections}
                       convoys={convoyRenderData}
                       airliftPlayers={airliftPlayerRenderData}
@@ -4024,22 +6413,43 @@ export default function FrontlineMap({ airportsData }) {
                       onZoneHover={setHoveredZoneId}
                       onDcsarHover={setHoveredDcsarId}
                       onDcsarSelect={handleSelectDcsarTask}
-                      onAirportClick={setSelectedAirportId}
+                      onAirportClick={handleAirportClick}
                       showAto={filters.showAto}
                       showAirports={filters.showAirports}
                       showLogistics={filters.showLogistics}
                       showConvoys={filters.showConvoys}
                       showAirliftPlayers={filters.showAirliftPlayers}
                       showDcsar={filters.showDcsar}
-                      animationTick={animationTick}
                       basemapMode={basemapMode}
                       focusTargetKey={tacticalFocusTargetKey}
+                      productionPoints={productionPoints}
+                      showProductionPoints={filters.showProductionPoints}
+                      selectedProductionPointId={selectedProductionPointId}
+                      onProductionPointSelect={handleProductionPointSelect}
+                      spawnPlacementActive={Boolean(spawnMode)}
+                      onSpawnPlace={handleSpawnPlace}
+                      spawnAirportCenter={spawnAirportCenter}
+                      retrievePlacementActive={Boolean(retrieveMode)}
+                      onRetrievePlace={handleRetrievePlace}
+                      retrievePpCenter={retrievePpCenter}
+                      crateClusters={crateClusters}
+                      mapMaxZoom={mapMaxZoom}
+                      dbuildMapMarkers={dbuildMapMarkers}
+                      selectedDbuildPlacementId={selectedDbuildPlacementId}
+                      onDbuildPlacementSelect={handleDbuildPlacementSelect}
+                      mapContextMenuEnabled={mapContextMenuEnabled}
+                      onMapContextMenu={handleMapContextMenu}
+                      dbuildContextPoint={dbuildContextPoint}
+                      tankerPlacementActive={Boolean(tankerMode)}
+                      onTankerPlace={handleTankerPlace}
+                      tankerWp1={tankerWp1}
+                      tankerRoutes={tankerRoutes}
                     />
                   ) : (
                     <FlatMapView
-                      zones={filteredZones}
+                      zones={zonesForMap}
                       airportsData={validAirports}
-                      logisticsMissions={filteredLogisticsMissions}
+                      logisticsMissions={routeVisibleLogisticsMissions}
                       gridConnections={gridConnections}
                       convoys={convoyRenderData}
                       airliftPlayers={airliftPlayerRenderData}
@@ -4051,7 +6461,7 @@ export default function FrontlineMap({ airportsData }) {
                       onZoneHover={setHoveredZoneId}
                       onDcsarHover={setHoveredDcsarId}
                       onDcsarSelect={handleSelectDcsarTask}
-                      onAirportClick={setSelectedAirportId}
+                      onAirportClick={handleAirportClick}
                       showAto={filters.showAto}
                       showAirports={filters.showAirports}
                       showLogistics={filters.showLogistics}
@@ -4061,191 +6471,124 @@ export default function FrontlineMap({ airportsData }) {
                       animationTick={animationTick}
                       basemapMode={basemapMode}
                       focusTargetKey={tacticalFocusTargetKey}
+                      productionPoints={productionPoints}
+                      showProductionPoints={filters.showProductionPoints}
+                      selectedProductionPointId={selectedProductionPointId}
+                      onProductionPointSelect={handleProductionPointSelect}
+                      spawnPlacementActive={Boolean(spawnMode)}
+                      onSpawnPlace={handleSpawnPlace}
+                      spawnAirportCenter={spawnAirportCenter}
+                      retrievePlacementActive={Boolean(retrieveMode)}
+                      onRetrievePlace={handleRetrievePlace}
+                      retrievePpCenter={retrievePpCenter}
+                      crateClusters={crateClusters}
+                      mapMaxZoom={mapMaxZoom}
+                      dbuildMapMarkers={dbuildMapMarkers}
+                      selectedDbuildPlacementId={selectedDbuildPlacementId}
+                      onDbuildPlacementSelect={handleDbuildPlacementSelect}
+                      mapContextMenuEnabled={mapContextMenuEnabled}
+                      onMapContextMenu={handleMapContextMenu}
+                      dbuildContextPoint={dbuildContextPoint}
+                      tankerPlacementActive={Boolean(tankerMode)}
+                      onTankerPlace={handleTankerPlace}
+                      tankerWp1={tankerWp1}
+                      tankerRoutes={tankerRoutes}
                     />
                   )}
                 </div>
               )}
-              {isDesktopDevice && mapMode && (
-                <div className="pointer-events-none absolute inset-x-0 top-3 mx-auto w-fit rounded-full border border-yt-border/80 bg-yt-bg-secondary/90 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-yt-text-secondary">
-                  Tactical 2D Map (zoom threshold reached)
-                </div>
-              )}
-
               <div
-                className={`absolute left-3 top-3 z-[1000] rounded-xl border border-yt-border bg-[#151925f2] shadow-2xl backdrop-blur transition-all duration-200 ${
-                  overlayCollapsed ? 'w-[46px] p-1.5' : 'w-[320px] p-3'
+                className={`absolute left-3 top-3 z-[1000] rounded-xl border border-yt-border bg-[#151925f2] shadow-2xl backdrop-blur transition-all duration-[360ms] ease-in-out ${
+                  overlayCollapsed ? 'w-[46px] p-1.5' : 'w-[52px] p-1.5'
                 }`}
               >
-                <div className={`flex items-center ${overlayCollapsed ? 'justify-center' : 'mb-2 justify-between'}`}>
-                  {!overlayCollapsed && (
-                    <>
-                      <div className="text-[11px] uppercase tracking-[0.18em] text-yt-text-secondary">Overlays</div>
-                      <button
-                        type="button"
-                        className={`rounded px-2 py-1 text-[10px] font-semibold ${filters.showAirports ? 'bg-yt-accent/25 text-yt-text-primary' : 'bg-yt-bg-tertiary text-yt-text-secondary'}`}
-                        onClick={() => setFilters((current) => ({ ...current, showAirports: !current.showAirports }))}
-                      >
-                        Airports
-                      </button>
-                      <button
-                        type="button"
-                        className={`rounded px-2 py-1 text-[10px] font-semibold ${
-                          basemapMode === BASEMAP_MODE_SATELLITE
-                            ? 'bg-yt-accent/25 text-yt-text-primary'
-                            : 'bg-yt-bg-tertiary text-yt-text-secondary'
-                        }`}
-                        onClick={() => setBasemapMode((current) => (
-                          current === BASEMAP_MODE_SATELLITE ? BASEMAP_MODE_DARK : BASEMAP_MODE_SATELLITE
-                        ))}
-                      >
-                        Satellite
-                      </button>
-                    </>
-                  )}
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`flex flex-col gap-2 overflow-hidden transition-[max-height,opacity,transform,margin-bottom] duration-[360ms] ease-in-out ${
+                      overlayCollapsed
+                        ? 'mb-0 max-h-0 -translate-y-1 opacity-0 pointer-events-none'
+                        : 'mb-2 max-h-56 translate-y-0 opacity-100'
+                    }`}
+                    aria-hidden={overlayCollapsed}
+                  >
+                    <button
+                      type="button"
+                      aria-label="Toggle ATO overlays"
+                      title="ATO"
+                      onClick={() => setFilters((current) => ({ ...current, showAto: !current.showAto }))}
+                      className={`rounded-md border p-2 transition-colors ${
+                        filters.showAto
+                          ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
+                          : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
+                      }`}
+                    >
+                      <Blend className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Toggle Logistics overlays"
+                      title="Logistics"
+                      onClick={() => setFilters((current) => ({ ...current, showLogistics: !current.showLogistics }))}
+                      className={`rounded-md border p-2 transition-colors ${
+                        filters.showLogistics
+                          ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
+                          : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
+                      }`}
+                    >
+                      <Forklift className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Toggle CSAR overlays"
+                      title="CSAR"
+                      onClick={() => setFilters((current) => ({ ...current, showDcsar: !current.showDcsar }))}
+                      className={`rounded-md border p-2 transition-colors ${
+                        filters.showDcsar
+                          ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
+                          : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
+                      }`}
+                    >
+                      <Ambulance className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Toggle Production Points"
+                      title="Production Points"
+                      onClick={() => setFilters((current) => ({ ...current, showProductionPoints: !current.showProductionPoints }))}
+                      className={`rounded-md border p-2 transition-colors ${
+                        filters.showProductionPoints
+                          ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
+                          : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
+                      }`}
+                    >
+                      <Factory className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Toggle satellite basemap"
+                      title="Satellite"
+                      className={`rounded-md border p-2 transition-colors ${
+                        basemapMode === BASEMAP_MODE_SATELLITE
+                          ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
+                          : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
+                      }`}
+                      onClick={() => setBasemapMode((current) => (
+                        current === BASEMAP_MODE_SATELLITE ? BASEMAP_MODE_DARK : BASEMAP_MODE_SATELLITE
+                      ))}
+                    >
+                      <Satellite className="h-4 w-4" />
+                    </button>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setOverlayCollapsed((value) => !value)}
-                    className="rounded border border-yt-border bg-yt-bg-tertiary/60 p-1 text-yt-text-secondary transition-colors hover:text-yt-text-primary"
+                    className="rounded-md border border-yt-border bg-yt-bg-tertiary/60 p-2 text-yt-text-secondary transition-colors hover:text-yt-text-primary"
                     aria-label={overlayCollapsed ? 'Open overlays' : 'Close overlays'}
                     title={overlayCollapsed ? 'Open overlays' : 'Close overlays'}
                   >
-                    {overlayCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                    {overlayCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
                   </button>
                 </div>
-
-                {!overlayCollapsed && (
-                  <>
-                    <div className="mb-3 grid grid-cols-5 gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setFilters((current) => ({ ...current, showAto: !current.showAto }))}
-                        className={`rounded border px-2 py-1 text-[11px] font-semibold ${
-                          filters.showAto
-                            ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
-                            : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
-                        }`}
-                      >
-                        ATO
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFilters((current) => ({ ...current, showLogistics: !current.showLogistics }))}
-                        className={`rounded border px-2 py-1 text-[11px] font-semibold ${
-                          filters.showLogistics
-                            ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
-                            : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
-                        }`}
-                      >
-                        Logistics
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFilters((current) => ({ ...current, showConvoys: !current.showConvoys }))}
-                        className={`rounded border px-2 py-1 text-[11px] font-semibold ${
-                          filters.showConvoys
-                            ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
-                            : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
-                        }`}
-                      >
-                        Convoys
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFilters((current) => ({ ...current, showDcsar: !current.showDcsar }))}
-                        className={`rounded border px-2 py-1 text-[11px] font-semibold ${
-                          filters.showDcsar
-                            ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
-                            : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
-                        }`}
-                      >
-                        DCSAR
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFilters((current) => ({ ...current, showAirliftPlayers: !current.showAirliftPlayers }))}
-                        className={`rounded border px-2 py-1 text-[11px] font-semibold ${
-                          filters.showAirliftPlayers
-                            ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
-                            : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
-                        }`}
-                      >
-                        Airlift
-                      </button>
-                    </div>
-
-                    <div className="mb-2 flex flex-wrap gap-1.5">
-                      {overlayTagOptions.map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => setFilters((current) => ({ ...current, control: option.value }))}
-                          className={`rounded border px-2 py-1 text-[11px] ${
-                            filters.control === option.value
-                              ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
-                              : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="mb-2 grid grid-cols-2 gap-2">
-                      <select
-                        value={filters.atoMissionStatus}
-                        onChange={(event) => setFilters((current) => ({ ...current, atoMissionStatus: event.target.value }))}
-                        className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
-                      >
-                        {missionStatusOptions.map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
-                      <select
-                        value={filters.logisticsStatus}
-                        onChange={(event) => setFilters((current) => ({ ...current, logisticsStatus: event.target.value }))}
-                        className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
-                      >
-                        {logisticsStatusOptions.map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="mb-3 grid grid-cols-2 gap-3">
-                      <select
-                        value={filters.priority}
-                        onChange={(event) => setFilters((current) => ({ ...current, priority: event.target.value }))}
-                        className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
-                      >
-                        {priorityOptions.map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
-                      <select
-                        value={filters.task}
-                        onChange={(event) => setFilters((current) => ({ ...current, task: event.target.value }))}
-                        className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
-                      >
-                        <option value="all">Any Task</option>
-                        <option value="LOGISTICS">LOGISTICS</option>
-                        <option value="SEAD">SEAD</option>
-                        <option value="DEAD">DEAD</option>
-                        <option value="CAS">CAS</option>
-                      </select>
-                    </div>
-                    <div className="grid grid-cols-1 gap-3">
-                      <select
-                        value={filters.activity}
-                        onChange={(event) => setFilters((current) => ({ ...current, activity: event.target.value }))}
-                        className="rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1.5 text-xs text-yt-text-primary"
-                      >
-                        <option value="all">All Activity</option>
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                      </select>
-                    </div>
-                  </>
-                )}
               </div>
 
               <div
@@ -4396,20 +6739,416 @@ export default function FrontlineMap({ airportsData }) {
                 </div>
               )}
 
+              {retrieveMode && (
+                <div className="absolute left-1/2 top-4 z-[1100] -translate-x-1/2 rounded-lg border border-blue-400/60 bg-[#0f1528f2] px-4 py-2 text-center shadow-2xl backdrop-blur">
+                  <div className="text-sm font-semibold text-blue-200">
+                    Place {retrieveMode.quantity || 1}x production crate{retrieveMode.quantity > 1 ? 's' : ''} within {PP_RETRIEVE_RADIUS_M} m of the production point
+                  </div>
+                  <div className="mt-2 w-56">
+                    <RetrieveQuantitySlider
+                      tone="banner"
+                      value={retrieveMode.quantity || 1}
+                      max={retrieveBannerMaxQuantity}
+                      onChange={handleSetRetrieveQuantity}
+                    />
+                  </div>
+                  <div className="mt-1 text-[11px] text-blue-100/80">
+                    {submittingCommand ? 'Sending...' : 'Click the highlighted area on the map'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCancelRetrieveMode}
+                    className="mt-1 rounded border border-blue-400/60 px-2 py-0.5 text-[11px] font-semibold text-blue-200 hover:bg-blue-400/15"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+
+              {tankerMode && (
+                <div className="absolute left-1/2 top-4 z-[1100] -translate-x-1/2 rounded-lg border border-cyan-400/60 bg-[#05151af2] px-4 py-2 text-center shadow-2xl backdrop-blur">
+                  <div className="text-sm font-semibold text-cyan-200">
+                    {tankerMode.step === 'wp1'
+                      ? `Place ${tankerMode.label} WP1 on the map`
+                      : `Place ${tankerMode.label} WP2 outside the red zone (min ${TANKER_MIN_DIST_NM} NM from WP1)`}
+                  </div>
+                  <div className="mt-1 text-[11px] text-cyan-100/80">
+                    {submittingCommand ? 'Sending...' : (tankerMode.step === 'wp1' ? 'Click to set racetrack start' : 'Click outside the exclusion area')}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCancelTankerMode}
+                    className="mt-1 rounded border border-cyan-400/60 px-2 py-0.5 text-[11px] font-semibold text-cyan-200 hover:bg-cyan-400/15"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+
+              {spawnMode && (
+                <div className="absolute left-1/2 top-4 z-[1100] -translate-x-1/2 rounded-lg border border-amber-400/60 bg-[#1a1505f2] px-4 py-2 text-center shadow-2xl backdrop-blur">
+                  <div className="text-sm font-semibold text-amber-200">
+                    Place {spawnMode.quantity || 1}x {formatSpawnBannerName(spawnMode.label)} inside of the designated range
+                  </div>
+                  <div className="mt-2 flex items-center justify-center gap-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-100/70">Qty</span>
+                    {Array.from({ length: SPAWN_QUANTITY_MAX }, (_, index) => {
+                      const value = index + 1;
+                      const selected = (spawnMode.quantity || 1) === value;
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => handleSetSpawnQuantity(value)}
+                          className={`min-w-[28px] rounded border px-2 py-0.5 text-[11px] font-semibold ${
+                            selected
+                              ? 'border-amber-300 bg-amber-300/20 text-amber-100'
+                              : 'border-amber-400/40 text-amber-100/80 hover:bg-amber-400/10'
+                          }`}
+                        >
+                          {value}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-1 text-[11px] text-amber-100/80">
+                    Total {(spawnMode.cost || 0) * (spawnMode.quantity || 1)} fp
+                    {' • '}
+                    {SPAWN_OFFSET_METERS} m spacing
+                    {' • '}
+                    {submittingCommand ? 'Sending...' : 'Click the highlighted area on the map'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCancelSpawnMode}
+                    className="mt-1 rounded border border-amber-400/60 px-2 py-0.5 text-[11px] font-semibold text-amber-200 hover:bg-amber-400/15"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+
+              <MapActionContextMenu
+                menu={mapContextMenu}
+                collapsed={dbuildMenuCollapsed}
+                onToggleCollapsed={() => setDbuildMenuCollapsed((value) => !value)}
+                activePanel={contextMenuPanel}
+                onSetActivePanel={setContextMenuPanel}
+                catalog={dbuildCatalog}
+                tankerOptions={tankerOptions}
+                onSelectDbuild={handleCreateDbuildDraft}
+                onSelectTanker={handleStartTankerMode}
+              />
+
+              {selectedDbuildPlacement && (
+                <div className="absolute right-4 top-20 z-[1000] w-[330px] rounded-xl border border-yt-border bg-[#151925f2] p-3 shadow-2xl backdrop-blur">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="text-sm font-semibold text-yt-text-primary">
+                      {selectedDbuildPlacement.catalog?.label || selectedDbuildPlacement.build_type}
+                    </div>
+                    <PanelCloseButton onClick={() => setSelectedDbuildPlacementId(null)} />
+                  </div>
+                  <div className="mb-2 text-[11px] uppercase tracking-[0.08em] text-yt-text-secondary">
+                    Status: {selectedDbuildPlacement.status || 'draft'}
+                  </div>
+                  <div className="space-y-1 rounded border border-yt-border bg-yt-bg-tertiary/40 p-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">
+                      Crate requirements
+                    </div>
+                    {(selectedDbuildPlacement.category_order || Object.keys(selectedDbuildPlacement.catalog?.required_categories || {})).map((category) => {
+                      const required = Number(selectedDbuildPlacement.catalog?.required_categories?.[category]) || 0;
+                      const have = Number(selectedDbuildPlacement.live?.category_counts?.[category]) || 0;
+                      return (
+                        <div key={category} className="flex items-center justify-between text-[12px] text-yt-text-primary">
+                          <span>{category}</span>
+                          <span className={have >= required ? 'text-green-300' : 'text-yt-text-primary'}>
+                            {have}/{required}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    <div className="mt-1 text-[10px] text-yt-text-secondary">
+                      Estimated crate cost: {selectedDbuildPlacement.estimated_fp_cost || 0} fp
+                    </div>
+                    {selectedDbuildPlacement.catalog?.placement_notes && (
+                      <div className="mt-1 text-[10px] text-amber-200/80">
+                        {selectedDbuildPlacement.catalog.placement_notes}
+                      </div>
+                    )}
+                    {selectedDbuildPlacement.catalog?.build_radius_m && (
+                      <div className="text-[10px] text-yt-text-secondary">
+                        Deliver crates within {selectedDbuildPlacement.catalog.build_radius_m} m after confirmation.
+                      </div>
+                    )}
+                  </div>
+                  {selectedDbuildPlacement.status === 'draft' && (
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleConfirmDbuildPlacement(selectedDbuildPlacement.id)}
+                        disabled={!isAuthenticated || confirmingDbuildId === selectedDbuildPlacement.id}
+                        className="flex-1 rounded border border-yt-accent/50 bg-yt-accent/15 px-2.5 py-1.5 text-xs font-semibold text-yt-text-primary hover:bg-yt-accent/25 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {confirmingDbuildId === selectedDbuildPlacement.id ? 'Confirming...' : 'Conferma'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCancelDbuildDraft(selectedDbuildPlacement.id)}
+                        className="rounded border border-yt-border px-2.5 py-1.5 text-xs font-semibold text-yt-text-secondary hover:bg-yt-bg-tertiary/50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                  {selectedDbuildPlacement.status !== 'draft' && selectedDbuildPlacement.live?.structure_name && (
+                    <div className="mt-2 text-[11px] text-green-200">
+                      Built: {selectedDbuildPlacement.live.structure_name}
+                    </div>
+                  )}
+                  {selectedDbuildPlacement.error && (
+                    <div className="mt-2 text-[11px] text-red-300">
+                      {selectedDbuildPlacement.error}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {commandToast && (
+                <div
+                  className={`absolute left-1/2 bottom-4 z-[1100] -translate-x-1/2 rounded-lg border px-4 py-2 text-sm font-semibold shadow-2xl backdrop-blur transition-opacity duration-300 ${
+                    commandToastFading ? 'opacity-0' : 'opacity-100'
+                  } ${
+                    commandToast.ok
+                      ? 'border-green-500/50 bg-[#0c1f14f2] text-green-200'
+                      : 'border-red-500/50 bg-[#1f0c0cf2] text-red-200'
+                  }`}
+                >
+                  {commandToast.message}
+                  {Number.isFinite(commandToast.balance) && (
+                    <span className="ml-2 text-yt-text-secondary">(BLUE: {commandToast.balance} fp)</span>
+                  )}
+                </div>
+              )}
+
+              {filters.showProductionPoints && selectedProductionPoint && (
+                <div className="absolute left-4 bottom-4 z-[1000] w-[320px] rounded-xl border border-yt-border bg-[#101827f2] p-3 shadow-2xl backdrop-blur">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="text-sm font-semibold text-yt-text-primary">
+                      {formatProductionPointPanelLabel(selectedProductionPoint)}
+                    </div>
+                    <PanelCloseButton onClick={() => { setSelectedProductionPointId(null); setRetrieveMode(null); }} />
+                  </div>
+                  <div className="space-y-1 text-[12px] text-yt-text-secondary">
+                    <div className="flex items-center justify-between">
+                      <span>Owner</span>
+                      <span className="font-semibold" style={{ color: getProductionPointColor(selectedProductionPoint.owner) }}>
+                        {selectedProductionPoint.owner}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Level</span>
+                      <span className="font-semibold text-yt-text-primary">
+                        LV{selectedProductionPoint.level} / {selectedProductionPoint.max_level}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Status</span>
+                      <span className="font-semibold text-yt-text-primary">
+                        {selectedProductionPoint.built ? (selectedProductionPoint.upgrading ? 'Upgrading' : 'Built') : 'Building'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Stock</span>
+                      <span className="font-semibold text-yt-text-primary">
+                        {selectedProductionPoint.stock} / {selectedProductionPoint.max_stock}
+                      </span>
+                    </div>
+                    {Object.keys(selectedProductionPoint.required_categories || {}).length > 0 && (
+                      <div className="border-t border-yt-border/60 pt-1">
+                        <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">
+                          {selectedProductionPoint.upgrading ? 'Upgrade crates' : 'Build crates'}
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {Object.entries(selectedProductionPoint.required_categories).map(([cat, need]) => {
+                            const have = Number(selectedProductionPoint.build_counts?.[cat] || 0);
+                            const ok = have >= Number(need);
+                            return (
+                              <span
+                                key={cat}
+                                className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${
+                                  ok ? 'border-green-500/50 text-green-300' : 'border-yt-border text-yt-text-secondary'
+                                }`}
+                              >
+                                {cat} {have}/{need}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {canRetrieveSelectedPp && (
+                    <div className="mt-3 border-t border-yt-border/60 pt-3">
+                      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">
+                        Retrieve crates
+                      </div>
+                      <RetrieveQuantitySlider
+                        value={panelRetrieveQuantity}
+                        max={maxRetrieveQuantity}
+                        disabled={!isAuthenticated}
+                        onChange={(quantity) => {
+                          if (retrieveMode && retrieveMode.ppId === selectedProductionPoint.id) {
+                            handleSetRetrieveQuantity(quantity);
+                            return;
+                          }
+                          setPpRetrieveDraftQty(clampRetrieveQuantity(quantity, maxRetrieveQuantity));
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleEnterRetrieveMode(selectedProductionPoint.id, panelRetrieveQuantity)}
+                        disabled={!isAuthenticated || Boolean(retrieveMode)}
+                        className="mt-2 w-full rounded border border-emerald-500/50 bg-emerald-500/15 px-2.5 py-1.5 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+                        title={!isAuthenticated ? 'Login required' : 'Place retrieve marker on map (500 m range)'}
+                      >
+                        {retrieveMode && retrieveMode.ppId === selectedProductionPoint.id ? 'Click map to place...' : 'Retrieve'}
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleRequestUpgrade(selectedProductionPoint.id)}
+                    disabled={!isAuthenticated || !canUpgradeSelectedPp || upgradingPpId === selectedProductionPoint.id}
+                    className="mt-3 w-full rounded border border-blue-500/50 bg-blue-500/15 px-2.5 py-1.5 text-xs font-semibold text-blue-200 hover:bg-blue-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+                    title={!isAuthenticated ? 'Login required' : (!canUpgradeSelectedPp ? 'Upgrade not available' : 'Start upgrade')}
+                  >
+                    {selectedProductionPoint.upgrading
+                      ? 'Upgrade in progress...'
+                      : upgradingPpId === selectedProductionPoint.id
+                        ? 'Sending...'
+                        : 'Start Upgrade'}
+                  </button>
+                  {!isAuthenticated && (
+                    <div className="mt-1 text-center text-[10px] text-yt-text-secondary">Login to interact</div>
+                  )}
+                </div>
+              )}
+
+              {selectedAirport && (
+                <div className="absolute left-4 bottom-4 z-[1000] w-[320px] rounded-xl border border-yt-border bg-[#101827f2] p-3 shadow-2xl backdrop-blur">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="text-sm font-semibold text-yt-text-primary">
+                      Spawn @ {selectedAirport.displayName || selectedAirport.name}
+                    </div>
+                    <PanelCloseButton onClick={() => { setSelectedAirportId(null); setSpawnMode(null); setRetrieveMode(null); setTankerMode(null); }} />
+                  </div>
+                  {!isAuthenticated ? (
+                    <div className="rounded border border-dashed border-yt-border px-2 py-2 text-[11px] text-yt-text-secondary">
+                      Login to spawn units and crates.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {SPAWN_MENU_SECTIONS.map((section) => {
+                        const sectionOptions = section.keywords
+                          .map((keyword) => {
+                            const option = spawnOptionByKeyword.get(keyword);
+                            return option ? { keyword, option } : null;
+                          })
+                          .filter(Boolean);
+                        if (sectionOptions.length === 0) return null;
+
+                        return (
+                          <div key={section.id}>
+                            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-yt-text-secondary">
+                              {section.title}
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {sectionOptions.map(({ keyword, option }) => {
+                                const selected = spawnMode?.keyword === keyword && spawnMode?.type === section.spawnType;
+                                return (
+                                  <button
+                                    key={`${section.id}-${keyword}`}
+                                    type="button"
+                                    onClick={() => handleEnterSpawnMode(selectedAirport.id, section.spawnType, option)}
+                                    className={`rounded border px-2.5 py-1 text-[11px] font-semibold tracking-[0.02em] ${
+                                      selected
+                                        ? 'border-amber-400/70 bg-amber-400/15 text-amber-200'
+                                        : 'border-yt-border text-yt-text-primary hover:bg-yt-bg-tertiary/50'
+                                    }`}
+                                  >
+                                    {keyword}
+                                    <span className="ml-1 text-yt-text-secondary">({option.cost})</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {spawnMode && (
+                        <div className="rounded border border-amber-400/30 bg-amber-400/5 px-2 py-2">
+                          <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-200/90">
+                            Quantity (max {SPAWN_QUANTITY_MAX})
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {Array.from({ length: SPAWN_QUANTITY_MAX }, (_, index) => {
+                              const value = index + 1;
+                              const selected = (spawnMode.quantity || 1) === value;
+                              return (
+                                <button
+                                  key={value}
+                                  type="button"
+                                  onClick={() => handleSetSpawnQuantity(value)}
+                                  className={`min-w-[30px] rounded border px-2 py-1 text-[11px] font-semibold ${
+                                    selected
+                                      ? 'border-amber-400/70 bg-amber-400/15 text-amber-200'
+                                      : 'border-yt-border text-yt-text-primary hover:bg-yt-bg-tertiary/50'
+                                  }`}
+                                >
+                                  {value}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="mt-1.5 text-[10px] text-yt-text-secondary">
+                            {spawnMode.quantity || 1}× {spawnMode.label} • total {(spawnMode.cost || 0) * (spawnMode.quantity || 1)} fp • {SPAWN_OFFSET_METERS} m between items
+                          </div>
+                        </div>
+                      )}
+                      <div className="text-[10px] text-yt-text-secondary">
+                        Select an item, choose quantity, then click inside the airport on the map.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {filters.showLogistics && selectedAirport && (
                 <div className="absolute right-4 bottom-4 z-[1000] w-[430px] max-h-[62vh] overflow-y-auto rounded-xl border border-yt-border bg-[#101827f2] p-3 shadow-2xl backdrop-blur">
                   <div className="mb-2 flex items-center justify-between">
                     <div className="text-sm font-semibold text-yt-text-primary">
                       {selectedAirport.displayName || selectedAirport.name}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedAirportId(null)}
-                      className="text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
-                    >
-                      Close
-                    </button>
+                    <PanelCloseButton onClick={() => setSelectedAirportId(null)} />
                   </div>
+                  {canManageLogisticsRouteVisibility && (
+                    <div className="mb-2 flex items-center justify-between rounded border border-yt-border/70 bg-[#0c1320] px-2.5 py-1.5 text-[11px] text-yt-text-secondary">
+                      <div>
+                        Airport priority: <span className={`font-semibold ${selectedAirportRoutesHidden ? 'text-amber-300' : 'text-green-300'}`}>{selectedAirportRoutesHidden ? 'Not priority' : 'Priority'}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAirportRoutePriority(selectedAirport.id)}
+                        disabled={updatingRoutePriorityAirportId === String(selectedAirport.id)}
+                        className="rounded border border-yt-border px-2 py-0.5 font-semibold text-yt-text-primary hover:bg-yt-bg-tertiary/50"
+                        title={`Discord role ${LOGISTICS_ROUTE_TOGGLE_ROLE_ID}`}
+                      >
+                        {updatingRoutePriorityAirportId === String(selectedAirport.id)
+                          ? 'Saving...'
+                          : (selectedAirportRoutesHidden ? 'Set Priority' : 'Set Not Priority')}
+                      </button>
+                    </div>
+                  )}
 
                   {airportLogistics.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-yt-border px-3 py-3 text-xs text-yt-text-secondary">
@@ -4560,13 +7299,7 @@ export default function FrontlineMap({ airportsData }) {
                         >
                           {composingMission ? 'Creating...' : 'Create Mission'}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowLogisticsComposeWindow(false)}
-                          className="rounded border border-yt-border px-2 py-1 text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
-                        >
-                          Close
-                        </button>
+                        <PanelCloseButton onClick={() => setShowLogisticsComposeWindow(false)} />
                       </div>
                     </div>
 
@@ -4693,13 +7426,7 @@ export default function FrontlineMap({ airportsData }) {
                           {selectedAirport.displayName || selectedAirport.name}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowLogisticsRequestWindow(false)}
-                        className="rounded border border-yt-border px-2 py-1 text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
-                      >
-                        Close
-                      </button>
+                      <PanelCloseButton onClick={() => setShowLogisticsRequestWindow(false)} />
                     </div>
 
                     <div className="mb-2 text-[11px] text-yt-text-secondary">
@@ -4836,13 +7563,7 @@ export default function FrontlineMap({ airportsData }) {
                         {!user && selectedLogisticsMission.status === 'pending' && (
                           <span className="text-[10px] text-yt-text-secondary">Discord login required</span>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedLogisticsMission(null)}
-                          className="rounded border border-yt-border px-2 py-1 text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
-                        >
-                          Close
-                        </button>
+                        <PanelCloseButton onClick={() => setSelectedLogisticsMission(null)} />
                       </div>
                     </div>
 
@@ -4975,13 +7696,7 @@ export default function FrontlineMap({ airportsData }) {
                         >
                           {acceptingZoneOperationId === selectedZoneDetails.id ? 'Accepting...' : 'Accept'}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedZoneDetailsId(null)}
-                          className="rounded border border-yt-border px-2 py-1 text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
-                        >
-                          Close
-                        </button>
+                        <PanelCloseButton onClick={() => setSelectedZoneDetailsId(null)} />
                       </div>
                     </div>
 
@@ -5113,13 +7828,7 @@ export default function FrontlineMap({ airportsData }) {
                         {!user && selectedDcsarTask.status === 'pending' && (
                           <span className="text-[10px] text-yt-text-secondary">Discord login required</span>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedDcsarId(null)}
-                          className="rounded border border-yt-border px-2 py-1 text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
-                        >
-                          Close
-                        </button>
+                        <PanelCloseButton onClick={() => setSelectedDcsarId(null)} />
                       </div>
                     </div>
 

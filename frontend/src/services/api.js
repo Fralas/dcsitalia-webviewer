@@ -1,5 +1,15 @@
-const API_BASE = import.meta.env.VITE_API_URL
-  || (typeof window !== 'undefined' ? `${window.location.origin}/api` : '/api');
+/**
+ * Browser requests use same-origin /api so session cookies match auth checks
+ * (Vite dev proxy or reverse proxy). Server-side fallbacks use VITE_API_URL.
+ */
+export function resolveApiBase() {
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/api`;
+  }
+  return import.meta.env.VITE_API_URL || '/api';
+}
+
+const API_BASE = resolveApiBase();
 
 /**
  * Fetch wrapper with error handling
@@ -7,6 +17,7 @@ const API_BASE = import.meta.env.VITE_API_URL
 async function fetchAPI(endpoint, options = {}) {
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, {
+      credentials: 'include',
       ...options,
       headers: {
         'Content-Type': 'application/json',
@@ -16,7 +27,15 @@ async function fetchAPI(endpoint, options = {}) {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(error.error || `HTTP ${response.status}`);
+      const apiError = new Error(error.error || `HTTP ${response.status}`);
+      apiError.status = response.status;
+      apiError.endpoint = endpoint;
+
+      if (response.status === 401 && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth:unauthorized', { detail: { endpoint } }));
+      }
+
+      throw apiError;
     }
 
     return await response.json();
@@ -121,6 +140,26 @@ export async function createOrder(airportId, weaponId, quantity) {
   return fetchAPI(`/airports/${airportId}/create-order`, {
     method: 'POST',
     body: JSON.stringify({ weaponId, quantity }),
+  });
+}
+
+/**
+ * Get global logistics 3D route visibility settings.
+ */
+export async function getLogisticsRouteVisibility() {
+  return fetchAPI('/logistics-route-visibility', {
+    credentials: 'include',
+  });
+}
+
+/**
+ * Set airport logistics route priority.
+ */
+export async function setAirportLogisticsRoutePriority(airportId, isPriority) {
+  return fetchAPI(`/logistics-route-visibility/${encodeURIComponent(airportId)}`, {
+    method: 'POST',
+    body: JSON.stringify({ isPriority }),
+    credentials: 'include',
   });
 }
 
@@ -326,7 +365,9 @@ export async function getMockUsers() {
  * Get logged-in users (real users from Discord OAuth)
  */
 export async function getLoggedInUsers() {
-  return fetchAPI('/logged-in-users');
+  return fetchAPI('/logged-in-users', {
+    credentials: 'include',
+  });
 }
 
 /**
@@ -349,6 +390,559 @@ export async function saveUserProfile(profile) {
   });
 }
 
+/**
+ * Get achievements catalog
+ */
+export async function getAchievementsCatalog() {
+  return fetchAPI('/achievements/catalog');
+}
+
+/**
+ * Create a new achievement (wiki editor only)
+ */
+export async function createAchievement(payload) {
+  return fetchAPI('/achievements/catalog', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Update an existing achievement (wiki editor only)
+ */
+export async function updateAchievement(achievementId, payload) {
+  return fetchAPI(`/achievements/catalog/${encodeURIComponent(achievementId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload || {}),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Delete an existing achievement (wiki editor only)
+ */
+export async function deleteAchievement(achievementId) {
+  return fetchAPI(`/achievements/catalog/${encodeURIComponent(achievementId)}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+}
+
+/**
+ * Get assigned achievements for a user
+ */
+export async function getUserAchievements(userId) {
+  return fetchAPI(`/achievements/users/${encodeURIComponent(userId)}`, {
+    credentials: 'include',
+  });
+}
+
+/**
+ * Assign achievement to a user (wiki editor only)
+ */
+export async function assignAchievement(payload) {
+  return fetchAPI('/achievements/assign', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Get achievements leaderboard
+ */
+export async function getAchievementsLeaderboard(limit = 50) {
+  return fetchAPI(`/achievements/leaderboard?limit=${encodeURIComponent(limit)}`);
+}
+
+/**
+ * Get changelog posts
+ */
+export async function getChangelogs() {
+  return fetchAPI('/changelogs');
+}
+
+/**
+ * Get current user's changelog draft
+ */
+export async function getChangelogDraft() {
+  return fetchAPI('/changelogs/draft', {
+    credentials: 'include',
+  });
+}
+
+/**
+ * Save current user's changelog draft
+ */
+export async function saveChangelogDraft(draft) {
+  return fetchAPI('/changelogs/draft', {
+    method: 'PUT',
+    body: JSON.stringify(draft),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Delete current user's changelog draft
+ */
+export async function deleteChangelogDraft() {
+  return fetchAPI('/changelogs/draft', {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+}
+
+/**
+ * Upload changelog media
+ */
+export async function uploadChangelogMedia(payload) {
+  return fetchAPI('/changelogs/media', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Publish a changelog post
+ */
+export async function publishChangelog(draft) {
+  return fetchAPI('/changelogs', {
+    method: 'POST',
+    body: JSON.stringify(draft),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Auto translate changelog draft
+ */
+export async function translateChangelogDraft(draft, sourceLang = 'it', targetLang = 'en', overwrite = false) {
+  return fetchAPI('/changelogs/translate', {
+    method: 'POST',
+    body: JSON.stringify({ draft, sourceLang, targetLang, overwrite }),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Update a changelog post
+ */
+export async function updateChangelog(postId, draft) {
+  return fetchAPI(`/changelogs/${encodeURIComponent(postId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(draft),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Delete a changelog post
+ */
+export async function deleteChangelog(postId) {
+  return fetchAPI(`/changelogs/${encodeURIComponent(postId)}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+}
+
+/**
+ * Get all wiki pages
+ */
+export async function getWikiPages() {
+  return fetchAPI('/wiki/pages');
+}
+
+/**
+ * Get a specific wiki page
+ */
+export async function getWikiPage(pageId) {
+  return fetchAPI(`/wiki/pages/${encodeURIComponent(pageId)}`);
+}
+
+/**
+ * Create a new wiki page
+ */
+export async function createWikiPage(draft) {
+  return fetchAPI('/wiki/pages', {
+    method: 'POST',
+    body: JSON.stringify(draft),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Get current user's wiki draft for a page
+ */
+export async function getWikiDraft(pageId) {
+  return fetchAPI(`/wiki/drafts/${encodeURIComponent(pageId)}`, {
+    credentials: 'include',
+  });
+}
+
+/**
+ * Save current user's wiki draft for a page
+ */
+export async function saveWikiDraft(pageId, draft) {
+  return fetchAPI(`/wiki/drafts/${encodeURIComponent(pageId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(draft),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Delete current user's wiki draft for a page
+ */
+export async function deleteWikiDraft(pageId) {
+  return fetchAPI(`/wiki/drafts/${encodeURIComponent(pageId)}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+}
+
+/**
+ * Update/publish wiki page
+ */
+export async function updateWikiPage(pageId, draft) {
+  return fetchAPI(`/wiki/pages/${encodeURIComponent(pageId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(draft),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Upload wiki media
+ */
+export async function uploadWikiMedia(payload) {
+  return fetchAPI('/wiki/media', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Get LIDC templates and units catalog
+ */
+export async function getLidcTemplates() {
+  return fetchAPI('/lidc/templates');
+}
+
+/**
+ * Get historical Discord users for LIDC invites
+ */
+export async function getLidcUsers() {
+  return fetchAPI('/lidc/users', {
+    credentials: 'include',
+  });
+}
+
+/**
+ * Get current user LIDC state (squadron membership + pending invites)
+ */
+export async function getLidcMe() {
+  return fetchAPI('/lidc/me', {
+    credentials: 'include',
+  });
+}
+
+/**
+ * Create a new LIDC squadron
+ */
+export async function createLidcSquadron(payload) {
+  return fetchAPI('/lidc/squadrons', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Get a single LIDC squadron by id
+ */
+export async function getLidcSquadron(squadronId) {
+  return fetchAPI(`/lidc/squadrons/${encodeURIComponent(squadronId)}`, {
+    credentials: 'include',
+  });
+}
+
+/**
+ * Assign (or clear) pilot for one squadron airframe
+ */
+export async function assignLidcAirframePilot(squadronId, airframeId, pilotUserId = null) {
+  return fetchAPI(
+    `/lidc/squadrons/${encodeURIComponent(squadronId)}/airframes/${encodeURIComponent(airframeId)}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ pilotUserId }),
+      credentials: 'include',
+    },
+  );
+}
+
+/**
+ * Promote/demote squadron member role
+ */
+export async function updateLidcMemberRole(squadronId, memberUserId, role) {
+  return fetchAPI(
+    `/lidc/squadrons/${encodeURIComponent(squadronId)}/members/${encodeURIComponent(memberUserId)}/role`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+      credentials: 'include',
+    },
+  );
+}
+
+/**
+ * Leave a LIDC squadron as the current user
+ */
+export async function leaveLidcSquadron(squadronId) {
+  return fetchAPI(`/lidc/squadrons/${encodeURIComponent(squadronId)}/leave`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+}
+
+/**
+ * Delete a LIDC squadron as the current user (owner only)
+ */
+export async function deleteLidcSquadron(squadronId) {
+  return fetchAPI(`/lidc/squadrons/${encodeURIComponent(squadronId)}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+}
+
+/**
+ * Update LIDC templates catalog (wiki editor only)
+ */
+export async function updateLidcTemplates(payload) {
+  return fetchAPI('/lidc/templates', {
+    method: 'PUT',
+    body: JSON.stringify(payload || {}),
+    credentials: 'include',
+  });
+}
+
+// ==================== DCORE bridge (web -> game) ====================
+
+/**
+ * Get current Production Points state exported by DCORE.
+ */
+export async function getProductionPoints() {
+  return fetchAPI('/production-points');
+}
+
+/**
+ * Get live tracked crate positions exported by DMAS (until moved/activated in-game).
+ */
+export async function getWebSpawnMarkers() {
+  return fetchAPI('/web-spawn-markers');
+}
+
+/**
+ * Get the catalog of web-initiated spawns (infantry + crate keywords/costs).
+ */
+export async function getSpawnOptions() {
+  return fetchAPI('/spawn-options');
+}
+
+export async function getTankerOptions() {
+  return fetchAPI('/tanker/options');
+}
+
+export async function getTankerRoutes() {
+  return fetchAPI('/tanker/routes');
+}
+
+export async function spawnTanker(keyword, wp1Lat, wp1Lon, wp2Lat, wp2Lon) {
+  return fetchAPI('/tanker/spawn', {
+    method: 'POST',
+    body: JSON.stringify({
+      keyword,
+      wp1_lat: wp1Lat,
+      wp1_lon: wp1Lon,
+      wp2_lat: wp2Lat,
+      wp2_lon: wp2Lon,
+    }),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Request a Production Point upgrade in-game.
+ */
+export async function requestProductionPointUpgrade(productionPointId) {
+  return fetchAPI(`/production-points/${encodeURIComponent(productionPointId)}/upgrade`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+}
+
+/**
+ * Retrieve production crates (RETRIEVE) at a clicked point within 500 m of the PP center.
+ */
+export async function retrieveProductionPointCrates(productionPointId, lat, lon, quantity = 1) {
+  return fetchAPI(`/production-points/${encodeURIComponent(productionPointId)}/retrieve`, {
+    method: 'POST',
+    body: JSON.stringify({ lat, lon, quantity }),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Spawn infantry (INF MANPAD / INF SCOUT) at a clicked point inside a BLUE airport.
+ */
+export async function spawnAirportInfantry(airportId, keyword, lat, lon, quantity = 1) {
+  return fetchAPI(`/airports/${encodeURIComponent(airportId)}/spawn-infantry`, {
+    method: 'POST',
+    body: JSON.stringify({ keyword, lat, lon, quantity }),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Spawn a crate (CRATE BUILD/AMMO/FUEL, slingload HMMWV/L118/...) at a clicked point inside a BLUE airport.
+ */
+export async function spawnAirportCrate(airportId, keyword, lat, lon, quantity = 1) {
+  return fetchAPI(`/airports/${encodeURIComponent(airportId)}/spawn-crate`, {
+    method: 'POST',
+    body: JSON.stringify({ keyword, lat, lon, quantity }),
+    credentials: 'include',
+  });
+}
+
+export async function getDbuildCatalog() {
+  return fetchAPI('/dbuild/catalog');
+}
+
+export async function getDbuildPlacements() {
+  return fetchAPI('/dbuild/placements');
+}
+
+export async function createDbuildPlacement(buildType, lat, lon) {
+  return fetchAPI('/dbuild/placements', {
+    method: 'POST',
+    body: JSON.stringify({ build_type: buildType, lat, lon }),
+    credentials: 'include',
+  });
+}
+
+export async function confirmDbuildPlacement(placementId) {
+  return fetchAPI(`/dbuild/placements/${encodeURIComponent(placementId)}/confirm`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+}
+
+export async function cancelDbuildPlacement(placementId) {
+  return fetchAPI(`/dbuild/placements/${encodeURIComponent(placementId)}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+}
+
+export async function getAirportCharts(airportId) {
+  return fetchAPI(`/airports/${encodeURIComponent(airportId)}/charts`);
+}
+
+export async function getAtcBoard(airportId = 'aleppo') {
+  return fetchAPI(`/atc/board?airportId=${encodeURIComponent(airportId)}`);
+}
+
+export async function getAtcHistory({ airportId, stripId, limit } = {}) {
+  const params = new URLSearchParams();
+  if (airportId) params.set('airportId', airportId);
+  if (stripId) params.set('stripId', stripId);
+  if (limit) params.set('limit', String(limit));
+  const qs = params.toString();
+  return fetchAPI(`/atc/history${qs ? `?${qs}` : ''}`);
+}
+
+export async function setAtcBoardSettings(airportId, manualSort) {
+  return fetchAPI('/atc/board/settings', {
+    method: 'POST',
+    body: JSON.stringify({ airportId, manualSort }),
+    credentials: 'include',
+  });
+}
+
+export async function setAtcRunwayConfig(airportId, config) {
+  return fetchAPI('/atc/board/runway', {
+    method: 'POST',
+    body: JSON.stringify({ airportId, ...config }),
+    credentials: 'include',
+  });
+}
+
+export async function createAtcStrip(payload) {
+  return fetchAPI('/atc/strips', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    credentials: 'include',
+  });
+}
+
+export async function patchAtcStrip(stripId, payload) {
+  return fetchAPI(`/atc/strips/${encodeURIComponent(stripId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+    credentials: 'include',
+  });
+}
+
+export async function moveAtcStrip(stripId, payload) {
+  return fetchAPI(`/atc/strips/${encodeURIComponent(stripId)}/move`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    credentials: 'include',
+  });
+}
+
+export async function coordinateAtcStrip(stripId, payload) {
+  return fetchAPI(`/atc/strips/${encodeURIComponent(stripId)}/coordination`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    credentials: 'include',
+  });
+}
+
+export async function deleteAtcStrip(stripId, airportId, role) {
+  return fetchAPI(`/atc/strips/${encodeURIComponent(stripId)}?airportId=${encodeURIComponent(airportId)}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ airportId, role }),
+    credentials: 'include',
+  });
+}
+
+export async function claimAtcRole(airportId, role) {
+  return fetchAPI('/atc/role/claim', {
+    method: 'POST',
+    body: JSON.stringify({ airportId, role }),
+    credentials: 'include',
+  });
+}
+
+export async function releaseAtcRole(airportId, role) {
+  return fetchAPI('/atc/role/release', {
+    method: 'POST',
+    body: JSON.stringify({ airportId, role }),
+    credentials: 'include',
+  });
+}
+
+export async function cancelAtcHandoff(stripId, { airportId, role, targetBay }) {
+  return fetchAPI(`/atc/strips/${encodeURIComponent(stripId)}/cancel-handoff`, {
+    method: 'POST',
+    body: JSON.stringify({ airportId, role, targetBay }),
+    credentials: 'include',
+  });
+}
+
 export default {
   getServerTime,
   getAirports,
@@ -361,6 +955,8 @@ export default {
   completeMission,
   cancelMission,
   createOrder,
+  getLogisticsRouteVisibility,
+  setAirportLogisticsRoutePriority,
   getStats,
   debugGenerateOrders,
   debugClearOrders,
@@ -384,4 +980,65 @@ export default {
   postConvoyEvent,
   getUserProfile,
   saveUserProfile,
+  getAchievementsCatalog,
+  createAchievement,
+  updateAchievement,
+  deleteAchievement,
+  getUserAchievements,
+  assignAchievement,
+  getAchievementsLeaderboard,
+  getChangelogs,
+  getChangelogDraft,
+  saveChangelogDraft,
+  deleteChangelogDraft,
+  uploadChangelogMedia,
+  publishChangelog,
+  translateChangelogDraft,
+  updateChangelog,
+  deleteChangelog,
+  getWikiPages,
+  getWikiPage,
+  createWikiPage,
+  getWikiDraft,
+  saveWikiDraft,
+  deleteWikiDraft,
+  updateWikiPage,
+  uploadWikiMedia,
+  getLidcTemplates,
+  getLidcMe,
+  getLidcUsers,
+  createLidcSquadron,
+  getLidcSquadron,
+  assignLidcAirframePilot,
+  updateLidcMemberRole,
+  leaveLidcSquadron,
+  deleteLidcSquadron,
+  updateLidcTemplates,
+  getProductionPoints,
+  getWebSpawnMarkers,
+  getSpawnOptions,
+  getTankerOptions,
+  getTankerRoutes,
+  requestProductionPointUpgrade,
+  spawnAirportInfantry,
+  spawnAirportCrate,
+  spawnTanker,
+  getDbuildCatalog,
+  getDbuildPlacements,
+  createDbuildPlacement,
+  confirmDbuildPlacement,
+  cancelDbuildPlacement,
+  getAirportCharts,
+  getAtcBoard,
+  getAtcHistory,
+  setAtcBoardSettings,
+  setAtcRunwayConfig,
+  createAtcStrip,
+  patchAtcStrip,
+  moveAtcStrip,
+  coordinateAtcStrip,
+  deleteAtcStrip,
+  claimAtcRole,
+  releaseAtcRole,
+  cancelAtcHandoff,
 };

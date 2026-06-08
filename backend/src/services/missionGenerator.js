@@ -18,6 +18,9 @@ const PRIORITY_RANK = {
   medium: 2,
   ok: 3,
 };
+const MAX_CARRIER_SOURCE_DISTANCE_KM = 50;
+const KM_PER_NM = 1.852;
+const MAX_CARRIER_SOURCE_DISTANCE_NM = MAX_CARRIER_SOURCE_DISTANCE_KM / KM_PER_NM;
 
 function getPriorityRank(priority) {
   return PRIORITY_RANK[priority] ?? PRIORITY_RANK.ok;
@@ -180,6 +183,9 @@ export function checkAndGenerateMissions(recipientAirportId, recipientWeapons, a
           expiryHours: missionRules.mission.missionExpiry,
         };
         const missionId = historicalData.createMission(mission);
+        if (!missionId) {
+          continue;
+        }
         console.log(`Generated ${String(mission.priority || 'MEDIUM').toUpperCase()} mission ${missionId}`);
         console.log(`   Route: ${group.source_airport_name} -> ${recipientAirport.displayName} (${group.distance_nm}nm)`);
         console.log(`   Orders: 1 (load ${(mission.totalIsoUnits || 0).toFixed(2)}/${maxLoadUnits})`);
@@ -241,6 +247,10 @@ export function findBestSourceAirport({ recipientAirport, weaponId, quantityNeed
     // 2. Must have enough to cover the order
     if (currentQty >= minDonorQty && (currentQty - quantityNeeded) >= 0) {
       const distance = calculateDistance(airport.coordinates, recipientAirport.coordinates);
+      // Carrier can be source only for short routes (<= 50 km).
+      if (airport.isCarrier === true && distance > MAX_CARRIER_SOURCE_DISTANCE_NM) {
+        return;
+      }
 
       potentialDonors.push({
         airport,

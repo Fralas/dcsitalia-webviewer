@@ -64,6 +64,24 @@ export async function getDiscordUser(accessToken) {
 }
 
 /**
+ * Get Discord guild member (requires Bot token with guild member read permissions)
+ */
+export async function getGuildMember(guildId, userId, botToken) {
+  const response = await fetch(`${DISCORD_API_ENDPOINT}/guilds/${encodeURIComponent(guildId)}/members/${encodeURIComponent(userId)}`, {
+    headers: {
+      Authorization: `Bot ${botToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to get Discord guild member: ${error}`);
+  }
+
+  return await response.json();
+}
+
+/**
  * Revoke Discord token
  */
 export async function revokeToken(token, clientId, clientSecret) {

@@ -19,6 +19,16 @@ function normalizeAirbaseName(name) {
 }
 
 /**
+ * Check if an airport is forced active regardless of status file.
+ * Main base, carriers and explicitly flagged always-active airbases are forced active.
+ * @param {Object} airport - Airport config/data object
+ * @returns {boolean}
+ */
+export function isAirportAlwaysActive(airport) {
+  return Boolean(airport?.isMainBase || airport?.isCarrier || airport?.isAlwaysActive);
+}
+
+/**
  * Update the airbase status (called when lua file changes)
  * @param {Object} newStatus - New status object from lua file
  */
@@ -75,8 +85,8 @@ export function getActiveAirports() {
   }
 
   return airports.filter(airport => {
-    // Main base is always active
-    if (airport.isMainBase) {
+    // Main base, carriers and forced-active airbases are always active
+    if (isAirportAlwaysActive(airport)) {
       return true;
     }
 
@@ -100,6 +110,7 @@ export default {
   updateAirbaseStatus,
   getAirbaseStatus,
   isAirbaseActive,
+  isAirportAlwaysActive,
   getActiveAirports,
   getActiveAirportById,
 };

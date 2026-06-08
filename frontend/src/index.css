@@ -22,6 +22,16 @@ body {
   min-height: 100vh;
 }
 
+.app-shell {
+  transition: filter 280ms ease, transform 280ms ease, opacity 280ms ease;
+}
+
+body.wiki-showroom-open .app-shell {
+  filter: blur(8px);
+  transform: scale(0.992);
+  opacity: 0.72;
+}
+
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;

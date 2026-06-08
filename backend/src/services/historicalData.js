@@ -3,6 +3,7 @@ import path from 'path';
 import { isImportantWeapon, getPriority } from '../config/rules.config.js';
 import { getAirportById } from '../config/airports.config.js';
 import { calculateTotalWeight } from '../config/weaponWeights.config.js';
+import { calculateDistance } from '../utils/distanceCalculator.js';
 
 const DATA_DIR = './data/historical';
 const SNAPSHOTS_FILE = path.join(DATA_DIR, 'snapshots.json');
@@ -19,6 +20,9 @@ let snapshotsWriteTimer = null;
 let missionsWriteTimer = null;
 let snapshotsDirty = false;
 let missionsDirty = false;
+const MAX_CARRIER_SOURCE_DISTANCE_KM = 50;
+const KM_PER_NM = 1.852;
+const MAX_CARRIER_SOURCE_DISTANCE_NM = MAX_CARRIER_SOURCE_DISTANCE_KM / KM_PER_NM;
 
 function ensureStorage() {
   if (!fs.existsSync(DATA_DIR)) {
@@ -278,11 +282,28 @@ export function createMission(paramsOrAirportId, weaponId, quantityNeeded, curre
     ? params.totalIsoUnits
     : orders.reduce((sum, order) => sum + (order.iso_units || 0), 0);
 
+  const destinationAirport = getAirportById(params.airportId);
+  const sourceAirport = getAirportById(params.sourceAirportId);
+  const providedDistanceNm = Number(params.distance);
+  const computedDistanceNm = (
+    sourceAirport?.coordinates
+    && destinationAirport?.coordinates
+    && Number.isFinite(sourceAirport.coordinates.lat)
+    && Number.isFinite(sourceAirport.coordinates.lon)
+    && Number.isFinite(destinationAirport.coordinates.lat)
+    && Number.isFinite(destinationAirport.coordinates.lon)
+  ) ? calculateDistance(sourceAirport.coordinates, destinationAirport.coordinates) : null;
+  const effectiveDistanceNm = Number.isFinite(providedDistanceNm) ? providedDistanceNm : computedDistanceNm;
+
+  if (sourceAirport?.isCarrier === true && Number.isFinite(effectiveDistanceNm) && effectiveDistanceNm > MAX_CARRIER_SOURCE_DISTANCE_NM) {
+    return null;
+  }
+
   const mission = {
     id: missionId,
     airport_id: params.airportId, // Destination (recipient)
     source_airport_id: params.sourceAirportId, // Source (donor or main base)
-    distance_nm: params.distance, // Distance in nautical miles
+    distance_nm: Number.isFinite(effectiveDistanceNm) ? effectiveDistanceNm : null, // Distance in nautical miles
     orders,
     total_weight_lbs: totalWeightLbs, // Total cargo weight in pounds
     total_iso_units: totalIsoUnits,
@@ -497,6 +518,31 @@ export function expireCarrierDestinationMissions() {
   return expiredCount;
 }
 
+/**
+ * Expire active logistics missions where source is carrier and route exceeds max range.
+ */
+export function expireCarrierSourceMissionsBeyondDistance() {
+  let expiredCount = 0;
+
+  missionsCache.forEach((mission) => {
+    if (mission.status !== 'pending' && mission.status !== 'accepted') return;
+    const sourceAirport = getAirportById(mission.source_airport_id);
+    if (!sourceAirport?.isCarrier) return;
+    const distanceNm = Number(mission.distance_nm);
+    if (!Number.isFinite(distanceNm) || distanceNm <= MAX_CARRIER_SOURCE_DISTANCE_NM) return;
+
+    mission.status = 'expired';
+    removeActiveIndex(mission);
+    expiredCount++;
+  });
+
+  if (expiredCount > 0) {
+    scheduleMissionsWrite();
+  }
+
+  return expiredCount;
+}
+
 export default {
   saveSnapshot,
   getHistory,
@@ -512,5 +558,6 @@ export default {
   cleanupExpiredMissions,
   expirePendingMissionsOlderThan,
   expireCarrierDestinationMissions,
+  expireCarrierSourceMissionsBeyondDistance,
   clearAllMissions,
 };
