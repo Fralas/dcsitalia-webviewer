@@ -554,7 +554,14 @@ export default {
       onlyGroundCreate: 'Only GROUND can create new strips',
     },
     coord: { title: 'Pending coordination' },
-    history: { title: 'Action history', empty: 'No actions yet' },
+    history: {
+      title: 'Action history',
+      empty: 'No actions yet',
+      filterLabel: 'Filter by role',
+      filterAll: 'All',
+      filterGround: 'Ground',
+      filterTower: 'Tower',
+    },
     actions: {
       acceptToc: 'AOC',
       rejectToc: 'Reject',

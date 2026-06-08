@@ -740,47 +740,11 @@ export default function AtcStripPage() {
 
         </div>
 
-        <aside className="atc-sidebar">
-
-          <AtcHistoryPanel entries={history} filterCallsign={search} />
-
-          {tocQueue.length > 0 && (
-
-            <div className="atc-queue-panel">
-
-              <div className="atc-queue-panel__title">{t('atc.queue.title')} ({tocQueue.length})</div>
-
-              <ol className="atc-queue-panel__list">
-
-                {tocQueue.map((stripId, index) => {
-
-                  const strip = strips.find((s) => s.id === stripId);
-
-                  if (!strip) return null;
-
-                  return (
-
-                    <li key={stripId}>
-
-                      <span className="atc-queue-panel__pos">{index + 1}</span>
-
-                      <span>{strip.callsign}</span>
-
-                    </li>
-
-                  );
-
-                })}
-
-              </ol>
-
-            </div>
-
-          )}
-
-        </aside>
-
       </div>
+
+
+
+      <AtcHistoryPanel entries={history} filterCallsign={search} />
 
 
 

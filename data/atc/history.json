@@ -555,6 +555,30 @@
         },
         "role": "GROUND"
       }
+    },
+    {
+      "id": "d963dac3-6d49-4bb9-9933-bee92b0ba823",
+      "timestamp": 1780912624360,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_4",
+      "action": "MOVE",
+      "fromBay": "g_stand",
+      "toBay": "g_active",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "DCORE01"
+    },
+    {
+      "id": "627d6b36-334d-4cb0-bab6-b7a295b41188",
+      "timestamp": 1780912625291,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_4",
+      "action": "MOVE",
+      "fromBay": "g_active",
+      "toBay": "g_stand",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "DCORE01"
     }
   ]
 }

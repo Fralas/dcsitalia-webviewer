@@ -554,7 +554,14 @@ export default {
       onlyGroundCreate: 'Solo GROUND può creare nuove strip',
     },
     coord: { title: 'Coordinamenti in attesa' },
-    history: { title: 'Storico azioni', empty: 'Nessuna azione registrata' },
+    history: {
+      title: 'Storico azioni',
+      empty: 'Nessuna azione registrata',
+      filterLabel: 'Filtra per ruolo',
+      filterAll: 'Tutte',
+      filterGround: 'Ground',
+      filterTower: 'Tower',
+    },
     actions: {
       acceptToc: 'AOC',
       rejectToc: 'Rifiuta',
