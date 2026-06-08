@@ -9,7 +9,6 @@ import {
   Factory,
   Gamepad2,
   Handshake,
-  Helicopter,
   Layers3,
   Loader2,
   MapPin,
@@ -59,49 +58,6 @@ import shipImg from '../../img/wiki/veh/SHIP.png';
 import towImg from '../../img/wiki/veh/TOW.png';
 import { useUser } from '../contexts/UserContext';
 import * as api from '../services/api';
-
-const GAMEPLAY_FEATURES = [
-  {
-    id: 'dmas',
-    iconKey: 'mappin',
-    title: { en: 'DMAS - Mark Action System', it: 'DMAS - Sistema Mark Action' },
-    description: {
-      en: 'F10 marker command system to spawn assets, request support, and drive operations.',
-      it: 'Sistema comandi via marker F10 per spawn asset, supporto e controllo operativo.',
-    },
-    Icon: MapPin,
-  },
-  {
-    id: 'dmap-zones',
-    iconKey: 'waypoints',
-    title: { en: 'DMAP (Zones) - Dynamic Mapping Core', it: 'DMAP (Zone) - Dynamic Mapping Core' },
-    description: {
-      en: 'Dynamic map logic: active/passive zones, front links, and capture progression.',
-      it: 'Logica mappa dinamica: zone attive/passive, linee fronte e progressione conquista.',
-    },
-    Icon: Waypoints,
-  },
-  {
-    id: 'dfow',
-    iconKey: 'scaneye',
-    title: { en: 'DFOW - Dynamic Fog Of War', it: 'DFOW - Dynamic Fog Of War' },
-    description: {
-      en: 'Recon-driven map visibility: enemy contacts appear only when detected by scouts.',
-      it: 'Visibilita mappa guidata da recon: contatti nemici visibili solo se rilevati.',
-    },
-    Icon: ScanEye,
-  },
-  {
-    id: 'dcsar',
-    iconKey: 'helicopter',
-    title: { en: 'DCSAR - Combat Search And Rescue', it: 'DCSAR - Combat Search And Rescue' },
-    description: {
-      en: 'Recover downed pilots and deliver them to BLUE airbases to earn campaign rewards.',
-      it: 'Recupera piloti eiettati e consegnali a basi BLUE per ottenere ricompense.',
-    },
-    Icon: Helicopter,
-  },
-];
 
 function normalizeGameplayIconKey(iconKey) {
   return String(iconKey || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -881,22 +837,8 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
   }, [vehicleGroups, selectedVehicleCategoryKey]);
 
   const gameplayItems = useMemo(() => {
-    const featureById = new Map(GAMEPLAY_FEATURES.map((feature) => [feature.id, feature]));
-
-    const baseItems = GAMEPLAY_FEATURES.map((feature) => {
-      const page = wikiPagesById[feature.id];
-      const Icon = resolveGameplayIcon(page?.iconKey, feature.Icon);
-      return {
-        ...feature,
-        iconKey: normalizeGameplayIconKey(page?.iconKey || feature.iconKey || ''),
-        Icon,
-        title: localizeText(page?.title, language) || localizeText(feature.title, language),
-        description: localizeText(page?.summary, language) || localizeText(feature.description, language),
-      };
-    });
-
-    const customItems = Object.values(wikiPagesById)
-      .filter((page) => page?.id && !featureById.has(page.id))
+    return Object.values(wikiPagesById)
+      .filter((page) => page?.id)
       .sort((a, b) => (Number(b?.updatedAt) || 0) - (Number(a?.updatedAt) || 0))
       .map((page) => ({
         id: page.id,
@@ -905,8 +847,6 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
         description: localizeText(page.summary, language) || ui.customWikiArticle,
         Icon: resolveGameplayIcon(page.iconKey, Layers3),
       }));
-
-    return [...baseItems, ...customItems];
   }, [wikiPagesById, language, ui.customWikiArticle]);
 
   const selectedGameplayFeature = useMemo(() => {
@@ -919,20 +859,10 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
   const selectedGameplayPage = useMemo(() => {
     if (!selectedGameplayFeature) return null;
     const page = wikiPagesById[selectedGameplayFeature.id];
-    if (page) {
-      return {
-        ...page,
-        iconKey: normalizeGameplayIconKey(page.iconKey || selectedGameplayFeature.iconKey || 'layers3'),
-      };
-    }
+    if (!page) return null;
     return {
-      id: selectedGameplayFeature.id,
-      iconKey: normalizeGameplayIconKey(selectedGameplayFeature.iconKey || 'layers3'),
-      title: selectedGameplayFeature.title,
-      summary: selectedGameplayFeature.description,
-      content: `## ${selectedGameplayFeature.title}\n\n${selectedGameplayFeature.description}`,
-      updatedAt: null,
-      updatedBy: null,
+      ...page,
+      iconKey: normalizeGameplayIconKey(page.iconKey || selectedGameplayFeature.iconKey || 'layers3'),
     };
   }, [selectedGameplayFeature, wikiPagesById]);
 

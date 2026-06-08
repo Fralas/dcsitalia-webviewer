@@ -1,0 +1,3794 @@
+[
+  {
+    "airport_id": "aleppo",
+    "timestamp": 1780689398548,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_154",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AIM_7",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.CBU_97",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.nurs.HYDRA_70_M229",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_65F",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Igla_1E",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 100
+      }
+    ]
+  },
+  {
+    "airport_id": "hama",
+    "timestamp": 1780689398549,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 144
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 168
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 125
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 148
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 12
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 135
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 134
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 77
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 121
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 181
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 155
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 143
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.bombs.CBU_97",
+        "quantity": 1
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 126
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 70
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 76
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 146
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 94
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 150
+      }
+    ]
+  },
+  {
+    "airport_id": "deir-ez-zor",
+    "timestamp": 1780689398559,
+    "weapons": []
+  },
+  {
+    "airport_id": "rene-mouawad",
+    "timestamp": 1780689398563,
+    "weapons": []
+  },
+  {
+    "airport_id": "al-qusayr",
+    "timestamp": 1780689398568,
+    "weapons": []
+  },
+  {
+    "airport_id": "shayrat",
+    "timestamp": 1780689398572,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 90
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 48
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 480
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 60
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 88
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 60
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 188
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 120
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 26
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 89
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 43
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 46
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 44
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 58
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 443
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 48
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 60
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 450
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 36
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 96
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 410
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 30
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 29
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 72
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 84
+      }
+    ]
+  },
+  {
+    "airport_id": "wujah-al-hajar",
+    "timestamp": 1780689398573,
+    "weapons": []
+  },
+  {
+    "airport_id": "abu-al-duhur",
+    "timestamp": 1780689398577,
+    "weapons": []
+  },
+  {
+    "airport_id": "bassel-al-assad",
+    "timestamp": 1780689398581,
+    "weapons": []
+  },
+  {
+    "airport_id": "tabqa",
+    "timestamp": 1780689398585,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_154",
+        "quantity": 92
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 88
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 21
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 28
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 93
+      },
+      {
+        "item": "weapons.missiles.AIM_7",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.CBU_97",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 80
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 52
+      },
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 92
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 76
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 4
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 92
+      },
+      {
+        "item": "weapons.nurs.HYDRA_70_M229",
+        "quantity": 2000
+      },
+      {
+        "item": "weapons.missiles.AGM_65F",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 2000
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 1900
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 79
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Igla_1E",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 100
+      }
+    ]
+  },
+  {
+    "airport_id": "carrier-1",
+    "timestamp": 1780689398587,
+    "weapons": []
+  },
+  {
+    "airport_id": "aleppo",
+    "timestamp": 1780689848584,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_154",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AIM_7",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.CBU_97",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.nurs.HYDRA_70_M229",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_65F",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Igla_1E",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 100
+      }
+    ]
+  },
+  {
+    "airport_id": "hama",
+    "timestamp": 1780689848584,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 144
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 164
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 125
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 148
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 135
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 108
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 51
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 113
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 181
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 146
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 155
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 143
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.bombs.CBU_97",
+        "quantity": 1
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 70
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 126
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 76
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 94
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 150
+      }
+    ]
+  },
+  {
+    "airport_id": "deir-ez-zor",
+    "timestamp": 1780689848584,
+    "weapons": []
+  },
+  {
+    "airport_id": "rene-mouawad",
+    "timestamp": 1780689848584,
+    "weapons": []
+  },
+  {
+    "airport_id": "al-qusayr",
+    "timestamp": 1780689848585,
+    "weapons": []
+  },
+  {
+    "airport_id": "tiyas",
+    "timestamp": 1780689848585,
+    "weapons": [
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 2
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 4
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 30
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 20
+      }
+    ]
+  },
+  {
+    "airport_id": "palmyra",
+    "timestamp": 1780689848590,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 29
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 119
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 24
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 54
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 54
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 106
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 145
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 8
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 21
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 7
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 214
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 214
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 61
+      }
+    ]
+  },
+  {
+    "airport_id": "shayrat",
+    "timestamp": 1780689848593,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 141
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 30
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 654
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 103
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 128
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 104
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 276
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 168
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 58
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 133
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 3
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 75
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 80
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 547
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 88
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 79
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 589
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 584
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 23
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 59
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 59
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 108
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 60
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 122
+      }
+    ]
+  },
+  {
+    "airport_id": "an-nasiriyah",
+    "timestamp": 1780689848594,
+    "weapons": []
+  },
+  {
+    "airport_id": "sayqal",
+    "timestamp": 1780689848599,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 108
+      },
+      {
+        "item": "weapons.missiles.AGM_154",
+        "quantity": 2
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 58
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 640
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 69
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 104
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 80
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 212
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 160
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 29
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 115
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 36
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 92
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 42
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 586
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 64
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 78
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 380
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 38
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 12
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 480
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 78
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 157
+      }
+    ]
+  },
+  {
+    "airport_id": "at-tanf",
+    "timestamp": 1780689848601,
+    "weapons": []
+  },
+  {
+    "airport_id": "rayak",
+    "timestamp": 1780689848602,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 60
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 6
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 310
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 42
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 72
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 39
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 128
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 68
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 73
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 20
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 22
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 64
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 26
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 307
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 12
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 32
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 19
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 300
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 126
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 220
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 12
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 212
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 52
+      }
+    ]
+  },
+  {
+    "airport_id": "al-dumayr",
+    "timestamp": 1780689848604,
+    "weapons": []
+  },
+  {
+    "airport_id": "mezzeh",
+    "timestamp": 1780689848609,
+    "weapons": [
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 30
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 28
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 1
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 2
+      }
+    ]
+  },
+  {
+    "airport_id": "damascus",
+    "timestamp": 1780689848613,
+    "weapons": [
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 94
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 5
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 44
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 1
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 4
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 34
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 79
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 2
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 80
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 212
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 268
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 58
+      }
+    ]
+  },
+  {
+    "airport_id": "h4",
+    "timestamp": 1780689848616,
+    "weapons": [
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 40
+      }
+    ]
+  },
+  {
+    "airport_id": "marj-ruhayyil",
+    "timestamp": 1780689848620,
+    "weapons": []
+  },
+  {
+    "airport_id": "khalkhalah",
+    "timestamp": 1780689848625,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 90
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 52
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 450
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 60
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 48
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 56
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 60
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 192
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 120
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 30
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 60
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 49
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 42
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 36
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 39
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 450
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 48
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 60
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 30
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 450
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 88
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 450
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 30
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 96
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 90
+      }
+    ]
+  },
+  {
+    "airport_id": "tha-lah",
+    "timestamp": 1780689848626,
+    "weapons": []
+  },
+  {
+    "airport_id": "abu-al-duhur",
+    "timestamp": 1780689848630,
+    "weapons": []
+  },
+  {
+    "airport_id": "bassel-al-assad",
+    "timestamp": 1780689848630,
+    "weapons": []
+  },
+  {
+    "airport_id": "tabqa",
+    "timestamp": 1780689848630,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_154",
+        "quantity": 92
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 76
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 28
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 81
+      },
+      {
+        "item": "weapons.missiles.AIM_7",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.CBU_97",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 80
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 98
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 92
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 44
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 86
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 78
+      },
+      {
+        "item": "weapons.nurs.HYDRA_70_M229",
+        "quantity": 2000
+      },
+      {
+        "item": "weapons.missiles.AGM_65F",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 2000
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 1900
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 82
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 65
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Igla_1E",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 100
+      }
+    ]
+  },
+  {
+    "airport_id": "carrier-1",
+    "timestamp": 1780689848630,
+    "weapons": []
+  },
+  {
+    "airport_id": "marj-as-sultan-north",
+    "timestamp": 1780689848630,
+    "weapons": []
+  },
+  {
+    "airport_id": "marj-as-sultan-south",
+    "timestamp": 1780689848632,
+    "weapons": []
+  },
+  {
+    "airport_id": "aleppo",
+    "timestamp": 1780690022325,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_154",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AIM_7",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.CBU_97",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.nurs.HYDRA_70_M229",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_65F",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Igla_1E",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 100
+      }
+    ]
+  },
+  {
+    "airport_id": "hama",
+    "timestamp": 1780690022325,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 144
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 164
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 125
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 148
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 135
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 108
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 51
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 113
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 181
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 146
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 155
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 143
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.bombs.CBU_97",
+        "quantity": 1
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 70
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 126
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 76
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 94
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 150
+      }
+    ]
+  },
+  {
+    "airport_id": "deir-ez-zor",
+    "timestamp": 1780690022325,
+    "weapons": []
+  },
+  {
+    "airport_id": "rene-mouawad",
+    "timestamp": 1780690022325,
+    "weapons": []
+  },
+  {
+    "airport_id": "al-qusayr",
+    "timestamp": 1780690022326,
+    "weapons": []
+  },
+  {
+    "airport_id": "tiyas",
+    "timestamp": 1780690022326,
+    "weapons": [
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 2
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 4
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 30
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 20
+      }
+    ]
+  },
+  {
+    "airport_id": "palmyra",
+    "timestamp": 1780690022327,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 29
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 119
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 24
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 54
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 54
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 106
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 145
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 8
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 21
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 7
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 214
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 214
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 61
+      }
+    ]
+  },
+  {
+    "airport_id": "shayrat",
+    "timestamp": 1780690022327,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 141
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 30
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 654
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 103
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 128
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 104
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 276
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 168
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 58
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 133
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 3
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 75
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 80
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 547
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 88
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 79
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 589
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 584
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 23
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 59
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 59
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 108
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 60
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 122
+      }
+    ]
+  },
+  {
+    "airport_id": "an-nasiriyah",
+    "timestamp": 1780690022327,
+    "weapons": []
+  },
+  {
+    "airport_id": "sayqal",
+    "timestamp": 1780690022327,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 108
+      },
+      {
+        "item": "weapons.missiles.AGM_154",
+        "quantity": 2
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 58
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 640
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 69
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 104
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 80
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 212
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 160
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 29
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 115
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 36
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 92
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 42
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 586
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 64
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 78
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 380
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 38
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 12
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 480
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 78
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 157
+      }
+    ]
+  },
+  {
+    "airport_id": "at-tanf",
+    "timestamp": 1780690022328,
+    "weapons": []
+  },
+  {
+    "airport_id": "rayak",
+    "timestamp": 1780690022328,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 60
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 6
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 310
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 42
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 72
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 39
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 128
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 68
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 73
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 20
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 22
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 64
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 26
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 307
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 12
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 32
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 19
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 300
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 126
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 220
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 12
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 212
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 52
+      }
+    ]
+  },
+  {
+    "airport_id": "al-dumayr",
+    "timestamp": 1780690022328,
+    "weapons": []
+  },
+  {
+    "airport_id": "mezzeh",
+    "timestamp": 1780690022329,
+    "weapons": [
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 30
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 28
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 1
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 2
+      }
+    ]
+  },
+  {
+    "airport_id": "damascus",
+    "timestamp": 1780690022329,
+    "weapons": [
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 94
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 5
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 44
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 1
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 4
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 34
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 79
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 2
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 80
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 212
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 268
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 58
+      }
+    ]
+  },
+  {
+    "airport_id": "h4",
+    "timestamp": 1780690022330,
+    "weapons": [
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 40
+      }
+    ]
+  },
+  {
+    "airport_id": "marj-ruhayyil",
+    "timestamp": 1780690022330,
+    "weapons": []
+  },
+  {
+    "airport_id": "khalkhalah",
+    "timestamp": 1780690022330,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 90
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 52
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 450
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 60
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 48
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 56
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 60
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 192
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 120
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 30
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 60
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 49
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 42
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 36
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 39
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 450
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 48
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 60
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 30
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 450
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 88
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 450
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 30
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 96
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 90
+      }
+    ]
+  },
+  {
+    "airport_id": "abu-al-duhur",
+    "timestamp": 1780690022330,
+    "weapons": []
+  },
+  {
+    "airport_id": "bassel-al-assad",
+    "timestamp": 1780690022331,
+    "weapons": []
+  },
+  {
+    "airport_id": "tabqa",
+    "timestamp": 1780690022331,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_154",
+        "quantity": 92
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 76
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 28
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 81
+      },
+      {
+        "item": "weapons.missiles.AIM_7",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.CBU_97",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 80
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 98
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 92
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 44
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 86
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 78
+      },
+      {
+        "item": "weapons.nurs.HYDRA_70_M229",
+        "quantity": 2000
+      },
+      {
+        "item": "weapons.missiles.AGM_65F",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 2000
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 1900
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 82
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 65
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Igla_1E",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 100
+      }
+    ]
+  },
+  {
+    "airport_id": "carrier-1",
+    "timestamp": 1780690022331,
+    "weapons": []
+  },
+  {
+    "airport_id": "marj-as-sultan-north",
+    "timestamp": 1780690022331,
+    "weapons": []
+  },
+  {
+    "airport_id": "marj-as-sultan-south",
+    "timestamp": 1780690022331,
+    "weapons": []
+  },
+  {
+    "airport_id": "aleppo",
+    "timestamp": 1780690322353,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_154",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AIM_7",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.CBU_97",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.nurs.HYDRA_70_M229",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_65F",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Igla_1E",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 100
+      }
+    ]
+  },
+  {
+    "airport_id": "hama",
+    "timestamp": 1780690322353,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 144
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 164
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 125
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 148
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 135
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 108
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 51
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 113
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 181
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 146
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 155
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 143
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.bombs.CBU_97",
+        "quantity": 1
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 70
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 126
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 76
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 150
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 94
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 150
+      }
+    ]
+  },
+  {
+    "airport_id": "deir-ez-zor",
+    "timestamp": 1780690322354,
+    "weapons": []
+  },
+  {
+    "airport_id": "rene-mouawad",
+    "timestamp": 1780690322354,
+    "weapons": []
+  },
+  {
+    "airport_id": "al-qusayr",
+    "timestamp": 1780690322354,
+    "weapons": []
+  },
+  {
+    "airport_id": "tiyas",
+    "timestamp": 1780690322354,
+    "weapons": [
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 2
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 4
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 30
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 20
+      }
+    ]
+  },
+  {
+    "airport_id": "palmyra",
+    "timestamp": 1780690322355,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 29
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 119
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 24
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 54
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 54
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 106
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 145
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 8
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 21
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 7
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 214
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 214
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 14
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 61
+      }
+    ]
+  },
+  {
+    "airport_id": "shayrat",
+    "timestamp": 1780690322355,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 141
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 30
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 654
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 103
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 128
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 104
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 276
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 168
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 58
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 133
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 3
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 75
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 80
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 547
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 88
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 79
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 589
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 584
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 23
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 59
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 59
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 108
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 60
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 122
+      }
+    ]
+  },
+  {
+    "airport_id": "an-nasiriyah",
+    "timestamp": 1780690322355,
+    "weapons": []
+  },
+  {
+    "airport_id": "sayqal",
+    "timestamp": 1780690322355,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 108
+      },
+      {
+        "item": "weapons.missiles.AGM_154",
+        "quantity": 2
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 58
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 640
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 69
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 104
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 80
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 212
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 160
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 29
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 115
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 34
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 92
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 42
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 586
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 64
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 78
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 380
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 38
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 12
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 480
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 78
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 157
+      }
+    ]
+  },
+  {
+    "airport_id": "at-tanf",
+    "timestamp": 1780690322356,
+    "weapons": []
+  },
+  {
+    "airport_id": "rayak",
+    "timestamp": 1780690322356,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 60
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 6
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 310
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 42
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 72
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 39
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 128
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 68
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 73
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 20
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 22
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 64
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 26
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 307
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 12
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 32
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 19
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 300
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 126
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 220
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 12
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 212
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 52
+      }
+    ]
+  },
+  {
+    "airport_id": "al-dumayr",
+    "timestamp": 1780690322356,
+    "weapons": []
+  },
+  {
+    "airport_id": "mezzeh",
+    "timestamp": 1780690322356,
+    "weapons": [
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 30
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 28
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 1
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 2
+      }
+    ]
+  },
+  {
+    "airport_id": "damascus",
+    "timestamp": 1780690322356,
+    "weapons": [
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 94
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 5
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 44
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 1
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 4
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 34
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 79
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 2
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 80
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 212
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 268
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 58
+      }
+    ]
+  },
+  {
+    "airport_id": "h4",
+    "timestamp": 1780690322357,
+    "weapons": [
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 40
+      }
+    ]
+  },
+  {
+    "airport_id": "marj-ruhayyil",
+    "timestamp": 1780690322357,
+    "weapons": []
+  },
+  {
+    "airport_id": "khalkhalah",
+    "timestamp": 1780690322358,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 90
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 52
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 450
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 60
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 48
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 56
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 60
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 192
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 120
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 30
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 60
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 49
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 42
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 36
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 39
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 450
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 48
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 60
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 30
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 450
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 88
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 450
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 30
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 96
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 90
+      }
+    ]
+  },
+  {
+    "airport_id": "abu-al-duhur",
+    "timestamp": 1780690322358,
+    "weapons": []
+  },
+  {
+    "airport_id": "bassel-al-assad",
+    "timestamp": 1780690322358,
+    "weapons": []
+  },
+  {
+    "airport_id": "tabqa",
+    "timestamp": 1780690322359,
+    "weapons": [
+      {
+        "item": "weapons.missiles.AGM_154",
+        "quantity": 92
+      },
+      {
+        "item": "weapons.bombs.GBU_38",
+        "quantity": 76
+      },
+      {
+        "item": "weapons.missiles.P_60",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Vikhr_M",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_31_V_3B",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGR_20A",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Ataka_9M120",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.CBU_105",
+        "quantity": 28
+      },
+      {
+        "item": "weapons.bombs.GBU_12",
+        "quantity": 81
+      },
+      {
+        "item": "weapons.missiles.AIM_7",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.CBU_97",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_114",
+        "quantity": 80
+      },
+      {
+        "item": "weapons.missiles.AGM_65D",
+        "quantity": 40
+      },
+      {
+        "item": "weapons.missiles.AGM_65H",
+        "quantity": 98
+      },
+      {
+        "item": "weapons.bombs.GBU_54_V_1B",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGM_114K",
+        "quantity": 92
+      },
+      {
+        "item": "weapons.missiles.ADM_141A",
+        "quantity": 44
+      },
+      {
+        "item": "weapons.missiles.AIM_120C",
+        "quantity": 86
+      },
+      {
+        "item": "weapons.missiles.AIM_9X",
+        "quantity": 78
+      },
+      {
+        "item": "weapons.nurs.HYDRA_70_M229",
+        "quantity": 2000
+      },
+      {
+        "item": "weapons.missiles.AGM_65F",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.nurs.C_13",
+        "quantity": 2000
+      },
+      {
+        "item": "weapons.missiles.OH58D_FIM_92",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.nurs.C_8OFP2",
+        "quantity": 1900
+      },
+      {
+        "item": "weapons.missiles.AGM_88",
+        "quantity": 82
+      },
+      {
+        "item": "weapons.missiles.AIM_54C_Mk60",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.AGR_20_M282",
+        "quantity": 65
+      },
+      {
+        "item": "weapons.bombs.Mk_82",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.GBU_24",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.missiles.Igla_1E",
+        "quantity": 100
+      },
+      {
+        "item": "weapons.bombs.Mk_84",
+        "quantity": 100
+      }
+    ]
+  },
+  {
+    "airport_id": "carrier-1",
+    "timestamp": 1780690322359,
+    "weapons": []
+  },
+  {
+    "airport_id": "marj-as-sultan-north",
+    "timestamp": 1780690322359,
+    "weapons": []
+  },
+  {
+    "airport_id": "marj-as-sultan-south",
+    "timestamp": 1780690322359,
+    "weapons": []
+  }
+]

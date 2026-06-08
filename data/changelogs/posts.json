@@ -304,5 +304,278 @@
     },
     "createdAt": 1776779211810,
     "updatedAt": 1776779211810
+  },
+  {
+    "id": "changelog_1777339338527_d78e927b",
+    "title": "DCS Frontline - V2.7.5",
+    "titleEn": "DCS Frontline - V2.7.5",
+    "rows": [
+      {
+        "id": "row_1777339088656",
+        "tag": "NEW",
+        "text": "Creazione della nuova sezione WIKI",
+        "textEn": "WIKI Section implemented"
+      },
+      {
+        "id": "row_1777339168291_81b82",
+        "tag": "NEW",
+        "text": "Creazione della sezione GUIDE nella wiki",
+        "textEn": "GUIDE Section implemented in the wiki"
+      },
+      {
+        "id": "row_1777339186511_1d91f",
+        "tag": "NEW",
+        "text": "Creazione della sezione VEICOLI nella wiki",
+        "textEn": "VEHICLE Section implemented in the wiki"
+      },
+      {
+        "id": "row_1777339221766_e1800",
+        "tag": "UPD",
+        "text": "Traduzione EN/IT automatica per le pagine del sito",
+        "textEn": "Auto translation EN/IT on the whole website"
+      },
+      {
+        "id": "row_1777339291876_a5bdc",
+        "tag": "FIX",
+        "text": "Numerosi FIX dell'UI",
+        "textEn": "Various UI fixes"
+      },
+      {
+        "id": "row_1777339317471_5ddf7",
+        "tag": "NEW",
+        "text": "Aggiunto ruolo \"Contributor\" e \"Editor\" per la wiki",
+        "textEn": "Added \"Contributor\" and \"Editor\" role for the wiki"
+      },
+      {
+        "id": "row_1777339396021_6b09d",
+        "tag": "WIP",
+        "text": "Nuova sezione \"Profilo personale\"",
+        "textEn": "New \"Personal profile\" section"
+      }
+    ],
+    "attachments": [],
+    "contributorIds": [
+      "675706661570347041"
+    ],
+    "author": {
+      "id": "675706661570347041",
+      "name": "Fralas"
+    },
+    "createdAt": 1777339338527,
+    "updatedAt": 1777339377999
+  },
+  {
+    "id": "changelog_1777403883342_c2cc0f17",
+    "title": "HIDC Dynamic Campaign Server - V2.7.0 Hotfix 05",
+    "titleEn": "HIDC Dynamic Campaign Server - V2.7.0 Hotfix 05",
+    "rows": [
+      {
+        "id": "row_1777339088656",
+        "tag": "FIX",
+        "text": "Sistemato un bug che permetteva ai convogli nemici di sparire dopo essere stati colpiti",
+        "textEn": "Fixed a bug where enemy ground convoys would randomly disappear after getting hit"
+      },
+      {
+        "id": "row_1777403666544_6e851",
+        "tag": "FIX",
+        "text": "Aggiunto possibile fix per un bug che non permetteva di scaricare le supply degli AI heli supply negli aeroporti blu",
+        "textEn": "Fixed a bug that would not allow AI heli supply to be unloaded in blue airfields"
+      },
+      {
+        "id": "row_1777403822669_96672",
+        "tag": "WIP",
+        "text": "Orario di start missione dinamico",
+        "textEn": "Dynamic mission start time"
+      }
+    ],
+    "attachments": [],
+    "contributorIds": [
+      "675706661570347041",
+      "153370631772045313"
+    ],
+    "author": {
+      "id": "675706661570347041",
+      "name": "Fralas"
+    },
+    "createdAt": 1777403883342,
+    "updatedAt": 1777403898270
+  },
+  {
+    "id": "changelog_1778328940946_0023a244",
+    "title": "HIDC Dynamic Campaign Server - V2.8.0",
+    "titleEn": "HIDC Dynamic Campaign Server - V2.8.0",
+    "rows": [
+      {
+        "id": "row_1777339088656",
+        "tag": "NEW",
+        "text": "Rework dei production point, adesso sarà necessario costruirli",
+        "textEn": "Production point rework, they need to be built!"
+      },
+      {
+        "id": "row_1777403666544_6e851",
+        "tag": "NEW",
+        "text": "Aggiunta la possibilità di costruire dei TACAN portabili, trasportabili e posizionabili tramite aviotrasporto.",
+        "textEn": "Added the ability to build portable, transportable, and airlifted TACANs."
+      },
+      {
+        "id": "row_1777403822669_96672",
+        "tag": "NEW",
+        "text": "Le unità red adesso fanno \"Cashback\", i red ottengono punti parziali indietro per le unita che sopravvivono e riatterrano.",
+        "textEn": "Red units now get \"Cashback\", reds get partial points back for units that survive and land again."
+      },
+      {
+        "id": "row_1778195931623_99814",
+        "tag": "NEW",
+        "text": "Aggiunto nuovo unità aviotrasporto nemico: Adesso il nemico può ripopolare le zone neutrali utilizzando elicotteri per il trasporto di truppe",
+        "textEn": "Added new enemy airlift unit: Enemy can now repopulate neutral zones using troop transport helicopters"
+      },
+      {
+        "id": "row_1778195968619_5d441",
+        "tag": "UPD",
+        "text": "Ottimizzazione del DCORE sotto molte funzioni già presenti",
+        "textEn": "DCORE Optimization"
+      },
+      {
+        "id": "row_1778195989384_c9679",
+        "tag": "FIX",
+        "text": "Vari fix sui comportamenti unità red",
+        "textEn": "Various red units behaviour fixes"
+      },
+      {
+        "id": "row_1778196015453_cbbd8",
+        "tag": "NEW",
+        "text": "Aggiunto nuovo template \"Syria Center\" alla rotazione dei template.",
+        "textEn": "Added new \"Syria Center\" to the template rotation"
+      },
+      {
+        "id": "row_1778196076493_7a933",
+        "tag": "NEW",
+        "text": "Piazzamento dinamico delle FARP da parte degli utenti",
+        "textEn": "Dynamic FARP placement, user can choose where to build a FARP"
+      },
+      {
+        "id": "row_1778197122427_5049e",
+        "tag": "NEW",
+        "text": "Pagina profilo personale, contenente storico encomi",
+        "textEn": "Personal profile page, listing all obtained commendations"
+      },
+      {
+        "id": "row_1778253964957_a79a7",
+        "tag": "NEW",
+        "text": "Piazzamento dinamico di siti EWR da parte degli utenti",
+        "textEn": "Dynamic EWR placement, user can choose where to build a EWR"
+      },
+      {
+        "id": "row_1778254126066_d5245",
+        "tag": "WIP",
+        "text": "Low Intensity Dynamic Campaign - L.I.D.C",
+        "textEn": "Low Intensity Dynamic Campaign - L.I.D.C"
+      },
+      {
+        "id": "row_1778347715223_fabe0",
+        "tag": "UPD",
+        "text": "Aggiornamento lista armamenti dei convogli di resupply",
+        "textEn": "Armaments List update"
+      }
+    ],
+    "attachments": [],
+    "contributorIds": [
+      "675706661570347041",
+      "714087060343881778"
+    ],
+    "author": {
+      "id": "675706661570347041",
+      "name": "Fralas"
+    },
+    "createdAt": 1778328940946,
+    "updatedAt": 1778347771013
+  },
+  {
+    "id": "changelog_1778691204528_602ec950",
+    "title": "HIDC Dynamic Campaign Server - V2.8.1",
+    "titleEn": "HIDC Dynamic Campaign Server - V2.8.1",
+    "rows": [
+      {
+        "id": "row_1778690779807",
+        "tag": "NEW",
+        "text": "Aggiunta possibilità di costruire sistemi RAPIER tramite DBUILD: \"RAPIER BUILD\"\n![rapier_build.gif](/api/changelogs/media/media_1778691252775_80978cfe73.gif)",
+        "textEn": "Added the ability to build RAPIER sites with DBUILD: \"RAPIER BUILD\"\n![rapier_build.gif](/api/changelogs/media/media_1778691252775_80978cfe73.gif)"
+      },
+      {
+        "id": "row_1778690831733_bbf4d",
+        "tag": "NEW",
+        "text": "I production point adesso creano 3 crate trasportabili a riavvio, se portati in un aeroporto blu danno punti e armamento aggiuntivo\n![stockretrieve.gif](/api/changelogs/media/media_1778691262030_009a778930.gif)",
+        "textEn": "Production points now create 3 transportable crates per restart, bring them to a blue airfield to earn points and weapons\n![stockretrieve.gif](/api/changelogs/media/media_1778691262030_009a778930.gif)"
+      },
+      {
+        "id": "row_1778690958802_691b4",
+        "tag": "NEW",
+        "text": "Aggiunto nuovo marker \"ICBM Launch\" per segnalare la presenza di lanciatori ICBM nemici",
+        "textEn": "Added new  \"ICBM Launch\" marker to report the presence of enemy ICBM launchers"
+      },
+      {
+        "id": "row_1778691035134_90c13",
+        "tag": "FIX",
+        "text": "La artiglieria nemica non targetta più le zone 00-09",
+        "textEn": "Enemy artillery no longer targets zones 00-09"
+      },
+      {
+        "id": "row_1778691071063_99900",
+        "tag": "FIX",
+        "text": "Le farp costruire dai player adesso dispongono di tutti i pod o misc necessari per alcuni velivoli",
+        "textEn": "Misc and other pods are now available in user built FARPs"
+      },
+      {
+        "id": "row_1778691122096_632eb",
+        "tag": "UPD",
+        "text": "Diminuito il costo delle casse del DBUILD da 20 a 5 FP",
+        "textEn": "Reduced the cost of DBUILD crates from 20 to 5 FP"
+      },
+      {
+        "id": "row_1778694248389_dccda",
+        "tag": "NEW",
+        "text": "Aggiunta possibilità di costruire sistemi RAPIER tramite DBUILD: \"NASAMS BUILD\" - Può essere smantellato con \"NASAMS DISMANTLE\"",
+        "textEn": "Added the ability to build NASAMS sites with DBUILD: \"NASAMS BUILD\" - Can be dismantled with \"NASAMS DISMANTLE\""
+      },
+      {
+        "id": "row_1778694274209_1bed1",
+        "tag": "NEW",
+        "text": "Aggiunta possibilità di costruire MORTAI tramite DBUILD: \"MORTAR BUILD\" - Può essere smantellato con \"MORTAR DISMANTLE\"",
+        "textEn": "Added the ability to build MORTAR sites with DBUILD: \"MORTAR BUILD\" - Can be dismantled with \"MORTAR DISMANTLE\""
+      }
+    ],
+    "attachments": [
+      {
+        "id": "media_1778691191525_f25ad47d69",
+        "url": "/api/changelogs/media/media_1778691191525_f25ad47d69.gif",
+        "type": "image",
+        "mimeType": "image/gif",
+        "fileName": "tacan.gif"
+      },
+      {
+        "id": "media_1778691252775_80978cfe73",
+        "url": "/api/changelogs/media/media_1778691252775_80978cfe73.gif",
+        "type": "image",
+        "mimeType": "image/gif",
+        "fileName": "rapier_build.gif"
+      },
+      {
+        "id": "media_1778691262030_009a778930",
+        "url": "/api/changelogs/media/media_1778691262030_009a778930.gif",
+        "type": "image",
+        "mimeType": "image/gif",
+        "fileName": "stockretrieve.gif"
+      }
+    ],
+    "contributorIds": [
+      "675706661570347041",
+      "714087060343881778"
+    ],
+    "author": {
+      "id": "675706661570347041",
+      "name": "Fralas"
+    },
+    "createdAt": 1778691204528,
+    "updatedAt": 1778694486364
   }
 ]
