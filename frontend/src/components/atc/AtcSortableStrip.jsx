@@ -16,7 +16,7 @@ export default function AtcSortableStrip({
   readOnly,
   sectorReadOnly,
 }) {
-  const editable = !readOnly && !sectorReadOnly && canEditStrip(strip, operatorRole);
+  const editable = !readOnly && canEditStrip(strip, operatorRole);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: strip.id,
     data: { strip, categoryId: getStripCategory(strip) },

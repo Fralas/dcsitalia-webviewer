@@ -586,11 +586,11 @@
   display: grid;
   grid-template-columns: 88px minmax(0, 1fr);
   gap: 0.4rem;
-  align-items: start;
+  align-items: stretch;
   border: 1px solid #243446;
   border-radius: 6px;
   background: #0f1721;
-  min-height: 88px;
+  min-height: 96px;
 }
 
 .atc-category-row--alert {
@@ -637,15 +637,18 @@
   flex-direction: row;
   flex-wrap: nowrap;
   gap: 0.35rem;
-  padding: 0.35rem;
+  padding: 0.55rem 0.5rem;
   align-items: flex-start;
   overflow-x: auto;
   overflow-y: hidden;
-  min-height: 82px;
+  min-height: 90px;
+  flex: 1;
 }
 
 .atc-category-drop {
-  min-height: 88px;
+  min-height: 96px;
+  padding: 3px 0;
+  margin: 2px 0;
   border-radius: 6px;
   transition: background 0.15s;
 }
@@ -713,7 +716,8 @@
 
 .atc-runway__surface {
   position: relative;
-  min-height: 88px;
+  min-height: 96px;
+  padding: 6px 0;
   border: 2px solid #475569;
   border-radius: 4px;
   background: linear-gradient(180deg, #1e293b 0%, #334155 50%, #1e293b 100%);

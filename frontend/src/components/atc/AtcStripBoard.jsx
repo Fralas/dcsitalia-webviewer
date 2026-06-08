@@ -1,17 +1,17 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import {
   DndContext,
   DragOverlay,
   PointerSensor,
   useSensor,
   useSensors,
-  closestCenter,
   useDroppable,
 } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import AtcStripCard from './AtcStripCard';
 import AtcSortableStrip from './AtcSortableStrip';
 import AtcRunwayPanel from './AtcRunwayPanel';
+import { atcBoardCollisionDetection } from './atcBoardCollision';
 import {
   ATC_BAYS,
   OWNER_ROLE,
@@ -19,6 +19,7 @@ import {
   TOWER_CATEGORY_ORDER,
   GROUND_CATEGORY_ORDER,
   groupStripsByCategory,
+  getStripCategory,
   canEditStrip,
   isCategoryDropAllowed,
   getTargetBayForCategory,
@@ -27,8 +28,7 @@ import {
   isHandoffToTower,
   isPendingGroundCoordination,
   isPendingTowerCoordination,
-} from './atcStripModel';
-import { t } from '../../utils/locale';
+} from './atcStripModel';import { t } from '../../utils/locale';
 
 function categoryDropId(categoryId) {
   return `cat_${categoryId}`;
@@ -37,6 +37,16 @@ function categoryDropId(categoryId) {
 function parseCategoryDropId(id) {
   if (typeof id !== 'string' || !id.startsWith('cat_')) return null;
   return id.slice(4);
+}
+
+function resolveDropCategory(over, strips) {
+  const fromId = parseCategoryDropId(over.id);
+  if (fromId) return fromId;
+  const fromData = over.data?.current?.categoryId;
+  if (fromData) return fromData;
+  const overStrip = strips.find((s) => s.id === over.id);
+  if (overStrip) return getStripCategory(overStrip);
+  return null;
 }
 
 const TOWER_DROP_CATEGORIES = [...TOWER_CATEGORY_ORDER, STRIP_CATEGORY.RUNWAY];
@@ -128,10 +138,10 @@ export default function AtcStripBoard({
   readOnly = false,
 }) {
   const grouped = useMemo(() => groupStripsByCategory(strips), [strips]);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const activeStrip = strips.find((s) => s.id === activeDragId);
 
-  const handleDragEnd = (event) => {
+  const handleDragEnd = useCallback((event) => {
     const { active, over } = event;
     setActiveDragId?.(null);
     if (!over || readOnly) return;
@@ -139,7 +149,7 @@ export default function AtcStripBoard({
     const strip = strips.find((s) => s.id === active.id);
     if (!strip || !canEditStrip(strip, operatorRole)) return;
 
-    const categoryId = parseCategoryDropId(over.id) || over.data?.current?.categoryId;
+    const categoryId = resolveDropCategory(over, strips);
     if (!categoryId) return;
 
     if (!isCategoryDropAllowed(categoryId, operatorRole)) return;
@@ -177,8 +187,7 @@ export default function AtcStripBoard({
     if (sameBay && sameState) return;
 
     onMoveStrip?.(strip, targetBay, { operationalState });
-  };
-
+  }, [strips, readOnly, operatorRole, onCancelHandoff, onMoveStrip, setActiveDragId]);
   if (!operatorRole) return null;
 
   const renderCategory = (categoryId, sectorRole) => {
@@ -211,7 +220,7 @@ export default function AtcStripBoard({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={atcBoardCollisionDetection}
       onDragStart={(e) => {
         const strip = strips.find((s) => s.id === e.active.id);
         if (!readOnly && strip && canEditStrip(strip, operatorRole)) {

@@ -165,6 +165,7 @@ export function canEditStrip(strip, role) {
   if (role === OWNER_ROLE.TOWER) {
     if (isHandoffToTower(strip)) return true;
     if (isHandoffToGround(strip)) return false;
+    if (strip.bayId === ATC_BAYS.G_HP && strip.ownerRole === OWNER_ROLE.TOWER) return true;
     if (strip.bayId === ATC_BAYS.G_HP) return false;
     return (strip.bayId?.startsWith('t_') && strip.bayId !== ATC_BAYS.T_HANDOFF)
       || strip.bayId === ATC_BAYS.ARCHIVE;
@@ -312,8 +313,7 @@ export function isCategoryDropAllowed(categoryId, role) {
   if (!role) return false;
   if (categoryId === STRIP_CATEGORY.HP) return true;
   if (role === OWNER_ROLE.GROUND) {
-    return GROUND_CATEGORY_ORDER.includes(categoryId) || categoryId === STRIP_CATEGORY.INACTIVE
-      || TOWER_DROP_CATEGORIES.includes(categoryId);
+    return GROUND_CATEGORY_ORDER.includes(categoryId) || categoryId === STRIP_CATEGORY.INACTIVE;
   }
   if (role === OWNER_ROLE.TOWER) {
     return TOWER_DROP_CATEGORIES.includes(categoryId);

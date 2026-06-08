@@ -96,8 +96,6 @@ export default function AtcStripPage() {
 
   const [activeDragId, setActiveDragId] = useState(null);
 
-  const [toast, setToast] = useState('');
-
   const [chartsOpen, setChartsOpen] = useState(false);
 
   const [chartsWidth, setChartsWidth] = useState(420);
@@ -132,7 +130,11 @@ export default function AtcStripPage() {
 
     if (!payload) return;
 
-    setStrips(payload.strips || []);
+    const nextStrips = payload.strips || [];
+
+    stripsSnapshotRef.current = nextStrips;
+
+    setStrips(nextStrips);
 
     setNextActions(payload.nextActions || {});
 
@@ -147,6 +149,14 @@ export default function AtcStripPage() {
     if (payload.runwayConfig) setRunwayConfig({ ...defaultRunwayConfig(), ...payload.runwayConfig });
 
   }, []);
+
+
+
+  const applyMutationResult = useCallback((result) => {
+
+    if (result?.strips) applyBoardPayload(result);
+
+  }, [applyBoardPayload]);
 
 
 
@@ -229,14 +239,6 @@ export default function AtcStripPage() {
       stripsSnapshotRef.current = nextStrips;
 
       applyBoardPayload(payload);
-
-      if (payload?.lastAction && !['INITIAL', 'CLAIM_ROLE', 'RELEASE_ROLE'].includes(payload.lastAction)) {
-
-        setToast(t('atc.toast.updated'));
-
-        window.setTimeout(() => setToast(''), 2500);
-
-      }
 
     });
 
@@ -394,11 +396,15 @@ export default function AtcStripPage() {
 
       if (editingStrip?.id) {
 
-        await api.patchAtcStrip(editingStrip.id, { ...form, airportId, role: claimedRole });
+        const result = await api.patchAtcStrip(editingStrip.id, { ...form, airportId, role: claimedRole });
+
+        applyMutationResult(result);
 
       } else {
 
-        await api.createAtcStrip({ ...form, airportId, role: claimedRole });
+        const result = await api.createAtcStrip({ ...form, airportId, role: claimedRole });
+
+        applyMutationResult(result);
 
       }
 
@@ -422,7 +428,9 @@ export default function AtcStripPage() {
 
     try {
 
-      await api.moveAtcStrip(strip.id, { airportId, action, role: claimedRole });
+      const result = await api.moveAtcStrip(strip.id, { airportId, action, role: claimedRole });
+
+      applyMutationResult(result);
 
       setSelectedId(strip.id);
 
@@ -442,7 +450,9 @@ export default function AtcStripPage() {
 
     try {
 
-      await api.moveAtcStrip(strip.id, { airportId, bayId, role: claimedRole, operationalState });
+      const result = await api.moveAtcStrip(strip.id, { airportId, bayId, role: claimedRole, operationalState });
+
+      applyMutationResult(result);
 
     } catch (err) {
 
@@ -482,7 +492,9 @@ export default function AtcStripPage() {
 
     try {
 
-      await api.cancelAtcHandoff(strip.id, { airportId, role: claimedRole, targetBay });
+      const result = await api.cancelAtcHandoff(strip.id, { airportId, role: claimedRole, targetBay });
+
+      applyMutationResult(result);
 
       setSelectedId(null);
 
@@ -502,7 +514,9 @@ export default function AtcStripPage() {
 
     try {
 
-      await api.coordinateAtcStrip(strip.id, { airportId, accept, role: claimedRole });
+      const result = await api.coordinateAtcStrip(strip.id, { airportId, accept, role: claimedRole });
+
+      applyMutationResult(result);
 
     } catch (err) {
 
@@ -526,7 +540,9 @@ export default function AtcStripPage() {
 
     try {
 
-      await api.deleteAtcStrip(selectedId, airportId, claimedRole);
+      const result = await api.deleteAtcStrip(selectedId, airportId, claimedRole);
+
+      applyMutationResult(result);
 
       setSelectedId(null);
 
@@ -745,10 +761,6 @@ export default function AtcStripPage() {
 
 
       {error && <div className="atc-banner atc-banner--error">{error}</div>}
-
-      {toast && <div className="atc-banner atc-banner--toast">{toast}</div>}
-
-
 
       {!claimedRole && (
 

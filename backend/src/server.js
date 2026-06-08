@@ -4631,6 +4631,7 @@ function emitAtcUpdated(airportId, payload, lastAction) {
     airportId,
     strips: payload.strips,
     manualSort: payload.manualSort,
+    runwayConfig: payload.runwayConfig,
     recentHistory: payload.recentHistory,
     nextActions: payload.nextActions,
     roleSlots: payload.roleSlots,

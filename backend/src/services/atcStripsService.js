@@ -196,7 +196,7 @@ function assertTargetBayForRole(targetBayId, role) {
   if (targetBayId === ATC_BAYS.T_HANDOFF && role === OWNER_ROLE.TOWER) return null;
 
   if (role === OWNER_ROLE.GROUND) {
-    if (isGroundStorageBay(targetBayId) || isTowerBay(targetBayId)) return null;
+    if (isGroundStorageBay(targetBayId)) return null;
     return { error: 'TARGET_BAY_NOT_ALLOWED', status: 403 };
   }
 

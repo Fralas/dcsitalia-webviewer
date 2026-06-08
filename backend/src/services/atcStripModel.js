@@ -163,6 +163,40 @@ export function findFlowIndex(direction, bayId) {
   return flow.findIndex((step) => step.bay === bayId);
 }
 
+function findFlowStepIndex(strip, flow) {
+  if (strip.bayId === ATC_BAYS.G_HP) {
+    if (strip.handoffActive && isHandoffToGround(strip)) {
+      return flow.findIndex((s) => s.handoffToGround);
+    }
+    if (strip.handoffActive && isHandoffToTower(strip)) {
+      return flow.findIndex((s) => s.handoff);
+    }
+    if (
+      !strip.handoffActive
+      && strip.ownerRole === OWNER_ROLE.TOWER
+      && (strip.coordinationStatus === COORDINATION_STATUS.ACCEPTED || strip.operationalState === 'tower_active')
+    ) {
+      return flow.findIndex((s) => s.action === ENAV_ACTIONS.AOC);
+    }
+    if (strip.operationalState === 'holding') {
+      return flow.findIndex((s) => s.action === ENAV_ACTIONS.HP);
+    }
+    if (strip.operationalState === 'pending_tower') {
+      return flow.findIndex((s) => s.handoff);
+    }
+    if (strip.operationalState === 'pending_ground') {
+      return flow.findIndex((s) => s.handoffToGround);
+    }
+  }
+
+  if (strip.bayId === ATC_BAYS.T_ACTIVE) {
+    const byState = flow.findIndex((s) => s.bay === ATC_BAYS.T_ACTIVE && s.state === strip.operationalState);
+    if (byState >= 0) return byState;
+  }
+
+  return flow.findIndex((step) => step.bay === strip.bayId);
+}
+
 export function isGroundStorageBay(bayId) {
   return GROUND_BAY_IDS.has(bayId) && bayId !== ATC_BAYS.G_HANDOFF;
 }
@@ -191,7 +225,7 @@ export function enterHandoffQueue(strip, fromBay = strip.bayId) {
       handoffActive: true,
       handoffTarget: HANDOFF_TARGET.TOWER,
       handoffFromBay: fromBay,
-      ownerRole: OWNER_ROLE.TOWER,
+      ownerRole: OWNER_ROLE.GROUND,
       flags: { ...strip.flags, highlighted: true, unread: true },
     },
     fromBay: strip.bayId,
@@ -308,14 +342,17 @@ export function getNextStep(strip) {
     return flow.find((step) => step.bay === ATC_BAYS.T_AIRBORNE) || null;
   }
 
-  const idx = findFlowIndex(direction, strip.bayId);
+  const idx = findFlowStepIndex(strip, flow);
   if (idx < 0 || idx >= flow.length - 1) return null;
   return flow[idx + 1];
 }
 
 export function isBayTransitionAllowed(strip, targetBayId, role) {
   if (targetBayId === ATC_BAYS.G_HANDOFF) {
-    return role === OWNER_ROLE.GROUND && strip.bayId === ATC_BAYS.G_HP && !isHandoffToGround(strip);
+    return role === OWNER_ROLE.GROUND
+      && strip.bayId === ATC_BAYS.G_HP
+      && !isHandoffToGround(strip)
+      && !isHandoffToTower(strip);
   }
 
   if (targetBayId === ATC_BAYS.T_HANDOFF) {
@@ -333,7 +370,7 @@ export function isBayTransitionAllowed(strip, targetBayId, role) {
   }
 
   if (role === OWNER_ROLE.GROUND && strip.bayId === ATC_BAYS.G_HP && isTowerBay(targetBayId)) {
-    return true;
+    return false;
   }
 
   if (
@@ -345,6 +382,16 @@ export function isBayTransitionAllowed(strip, targetBayId, role) {
   }
 
   if (role === OWNER_ROLE.GROUND && isGroundStorageBay(strip.bayId) && isGroundStorageBay(targetBayId)) {
+    return true;
+  }
+
+  if (
+    role === OWNER_ROLE.TOWER
+    && strip.bayId === ATC_BAYS.G_HP
+    && strip.ownerRole === OWNER_ROLE.TOWER
+    && !strip.handoffActive
+    && isTowerBay(targetBayId)
+  ) {
     return true;
   }
 
@@ -365,19 +412,12 @@ export function completeTowerHandoffAccept(strip, targetBayId, options = {}) {
     return { ok: false, error: 'NO_PENDING_COORDINATION' };
   }
 
-  const flow = getFlowForDirection(strip.direction);
-  const step = flow.find((s) => s.bay === targetBayId);
-  let operationalState = step?.state || 'tower_active';
-  if (targetBayId === ATC_BAYS.T_ACTIVE && options.operationalState) {
-    operationalState = options.operationalState;
-  }
-
   return {
     ok: true,
     strip: {
       ...strip,
-      bayId: targetBayId,
-      operationalState,
+      bayId: ATC_BAYS.G_HP,
+      operationalState: 'tower_active',
       coordinationStatus: COORDINATION_STATUS.ACCEPTED,
       handoffActive: false,
       handoffTarget: null,
@@ -387,7 +427,7 @@ export function completeTowerHandoffAccept(strip, targetBayId, options = {}) {
       flags: { ...strip.flags, unread: false, highlighted: false },
     },
     fromBay: strip.bayId,
-    toBay: targetBayId,
+    toBay: ATC_BAYS.G_HP,
     action: ENAV_ACTIONS.AOC,
     dequeue: true,
   };
@@ -468,7 +508,12 @@ export function applyAction(strip, actionCode) {
 
 export function applyMove(strip, targetBayId, role, options = {}) {
   if (targetBayId === ATC_BAYS.G_HANDOFF) {
-    if (role !== OWNER_ROLE.GROUND || strip.bayId !== ATC_BAYS.G_HP || isHandoffToGround(strip)) {
+    if (
+      role !== OWNER_ROLE.GROUND
+      || strip.bayId !== ATC_BAYS.G_HP
+      || isHandoffToGround(strip)
+      || isHandoffToTower(strip)
+    ) {
       return { ok: false, error: 'INVALID_BAY_TRANSITION' };
     }
     return enterHandoffQueue(strip, strip.bayId);
@@ -479,15 +524,6 @@ export function applyMove(strip, targetBayId, role, options = {}) {
       return { ok: false, error: 'INVALID_BAY_TRANSITION' };
     }
     return enterGroundHandoffQueue(strip, strip.bayId);
-  }
-
-  if (
-    !strip.handoffActive
-    && role === OWNER_ROLE.GROUND
-    && strip.bayId === ATC_BAYS.G_HP
-    && isTowerBay(targetBayId)
-  ) {
-    return enterHandoffQueue(strip, strip.bayId);
   }
 
   if (
@@ -553,6 +589,7 @@ export function canEditStrip(strip, role) {
   if (role === OWNER_ROLE.TOWER) {
     if (isHandoffToTower(strip)) return true;
     if (isHandoffToGround(strip)) return false;
+    if (strip.bayId === ATC_BAYS.G_HP && strip.ownerRole === OWNER_ROLE.TOWER) return true;
     if (strip.bayId === ATC_BAYS.G_HP) return false;
     if (isTowerBay(strip.bayId) && strip.bayId !== ATC_BAYS.T_HANDOFF) return true;
     if (strip.bayId === ATC_BAYS.ARCHIVE) return true;
@@ -602,7 +639,7 @@ export function acceptCoordination(strip) {
     return { ok: false, error: 'NO_PENDING_COORDINATION' };
   }
 
-  const targetBay = ATC_BAYS.T_ACTIVE;
+  const targetBay = ATC_BAYS.G_HP;
   return {
     ok: true,
     strip: {
