@@ -196,12 +196,12 @@ function assertTargetBayForRole(targetBayId, role) {
   if (targetBayId === ATC_BAYS.T_HANDOFF && role === OWNER_ROLE.TOWER) return null;
 
   if (role === OWNER_ROLE.GROUND) {
-    if (isGroundStorageBay(targetBayId)) return null;
+    if (isGroundStorageBay(targetBayId) || isTowerBay(targetBayId)) return null;
     return { error: 'TARGET_BAY_NOT_ALLOWED', status: 403 };
   }
 
   if (role === OWNER_ROLE.TOWER) {
-    if (isTowerBay(targetBayId)) return null;
+    if (isTowerBay(targetBayId) || targetBayId === ATC_BAYS.G_HP) return null;
     return { error: 'TARGET_BAY_NOT_ALLOWED', status: 403 };
   }
 
@@ -485,7 +485,7 @@ export function moveStrip(airportId, stripId, { bayId, position, action, role, o
   appendHistory({
     airportId,
     stripId,
-    action: action || 'MOVE',
+    action: result.action || action || 'MOVE',
     fromBay: result.fromBay,
     toBay: result.toBay,
     role: role || null,

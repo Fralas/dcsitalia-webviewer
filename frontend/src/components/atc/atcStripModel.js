@@ -123,7 +123,7 @@ export function groupStripsForFullBoard(strips = []) {
   grouped[ATC_BAYS.T_HANDOFF] = [];
 
   strips.forEach((strip) => {
-    if (isHandoffToTower(strip) && strip.bayId === ATC_BAYS.T_PENDING) {
+    if (isHandoffToTower(strip) && strip.bayId === ATC_BAYS.G_HP) {
       grouped[ATC_BAYS.G_HANDOFF].push(strip);
     }
     if (isHandoffToGround(strip) && strip.bayId === ATC_BAYS.G_HP) {
@@ -253,8 +253,7 @@ export function getStripCategory(strip) {
   if (!strip) return null;
   if (strip.bayId === ATC_BAYS.ARCHIVE) return null;
 
-  if (isHandoffToTower(strip)) return STRIP_CATEGORY.ATZ;
-  if (isHandoffToGround(strip)) return STRIP_CATEGORY.HP;
+  if (isHandoffToTower(strip) || isHandoffToGround(strip)) return STRIP_CATEGORY.HP;
 
   if (strip.bayId === ATC_BAYS.T_ACTIVE) {
     if (strip.operationalState === 'downwind') return STRIP_CATEGORY.DOWNWIND;
@@ -305,6 +304,21 @@ export function isCategoryOwnedByRole(categoryId, role) {
   const owner = CATEGORY_OWNER[categoryId];
   if (!owner) return true;
   return owner === role;
+}
+
+const TOWER_DROP_CATEGORIES = [...TOWER_CATEGORY_ORDER, STRIP_CATEGORY.RUNWAY];
+
+export function isCategoryDropAllowed(categoryId, role) {
+  if (!role) return false;
+  if (categoryId === STRIP_CATEGORY.HP) return true;
+  if (role === OWNER_ROLE.GROUND) {
+    return GROUND_CATEGORY_ORDER.includes(categoryId) || categoryId === STRIP_CATEGORY.INACTIVE
+      || TOWER_DROP_CATEGORIES.includes(categoryId);
+  }
+  if (role === OWNER_ROLE.TOWER) {
+    return TOWER_DROP_CATEGORIES.includes(categoryId);
+  }
+  return false;
 }
 
 export function groupStripsByCategory(strips = []) {

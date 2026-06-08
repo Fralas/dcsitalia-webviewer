@@ -64,7 +64,7 @@ export function shouldPlayHandoffAlert(prevStrips, nextStrips, claimedRole, user
     const prev = prevById.get(strip.id);
     if (!prev) return;
 
-    if (isHandoffToTower(strip) && strip.bayId === ATC_BAYS.T_PENDING && !isHandoffToTower(prev)) {
+    if (isHandoffToTower(strip) && strip.bayId === ATC_BAYS.G_HP && !isHandoffToTower(prev)) {
       towerIncoming = true;
     }
 

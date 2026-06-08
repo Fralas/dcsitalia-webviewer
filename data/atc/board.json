@@ -86,7 +86,7 @@
           "position": 3,
           "coordinationStatus": null,
           "createdAt": 1780910934169,
-          "updatedAt": 1780916890535,
+          "updatedAt": 1780918342998,
           "createdBy": "system",
           "direction": "dep",
           "model": "B",
@@ -111,7 +111,11 @@
           "ssr": "4521",
           "delay": "",
           "clearanceText": "",
-          "instructions": ""
+          "instructions": "",
+          "handoffActive": false,
+          "handoffTarget": null,
+          "handoffFromBay": null,
+          "queuePosition": null
         },
         {
           "id": "demo_aleppo_5",
@@ -119,12 +123,12 @@
           "position": 1,
           "coordinationStatus": "accepted",
           "createdAt": 1780910934169,
-          "updatedAt": 1780918020344,
+          "updatedAt": 1780918455100,
           "createdBy": "system",
           "direction": "dep",
           "model": "B",
-          "bayId": "t_active",
-          "operationalState": "base",
+          "bayId": "t_runway",
+          "operationalState": "runway",
           "ownerRole": "TOWER",
           "flags": {
             "highlighted": false,
@@ -192,11 +196,11 @@
           "airportId": "aleppo",
           "model": "B",
           "direction": "dep",
-          "bayId": "t_active",
-          "position": 0,
+          "bayId": "t_final",
+          "position": 1,
           "ownerRole": "TOWER",
           "coordinationStatus": "accepted",
-          "operationalState": "tower_active",
+          "operationalState": "runway",
           "handoffActive": false,
           "handoffTarget": null,
           "handoffFromBay": null,
@@ -207,7 +211,7 @@
             "dynamic": true
           },
           "createdAt": 1780915346732,
-          "updatedAt": 1780918013287,
+          "updatedAt": 1780918459338,
           "createdBy": "675706661570347041",
           "eobt": "",
           "flightRule": "I",
@@ -235,7 +239,7 @@
         "TOWER": {
           "userId": "675706661570347041",
           "username": "Fralas",
-          "claimedAt": 1780918009996
+          "claimedAt": 1780918402844
         }
       },
       "tocQueue": [],

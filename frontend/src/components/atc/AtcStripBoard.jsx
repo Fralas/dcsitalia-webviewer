@@ -20,7 +20,7 @@ import {
   GROUND_CATEGORY_ORDER,
   groupStripsByCategory,
   canEditStrip,
-  isCategoryOwnedByRole,
+  isCategoryDropAllowed,
   getTargetBayForCategory,
   getOperationalStateForCategory,
   isHandoffToGround,
@@ -39,14 +39,8 @@ function parseCategoryDropId(id) {
   return id.slice(4);
 }
 
-function isSharedCategory(categoryId) {
-  return categoryId === STRIP_CATEGORY.HP;
-}
-
-function isCategoryDropAllowed(categoryId, role) {
-  if (categoryId === STRIP_CATEGORY.HP && role === OWNER_ROLE.TOWER) return false;
-  return isCategoryOwnedByRole(categoryId, role);
-}
+const TOWER_DROP_CATEGORIES = [...TOWER_CATEGORY_ORDER, STRIP_CATEGORY.RUNWAY];
+const GROUND_DROP_CATEGORIES = [...GROUND_CATEGORY_ORDER, STRIP_CATEGORY.INACTIVE];
 
 function DroppableCategory({ categoryId, disabled, children }) {
   const { setNodeRef, isOver } = useDroppable({
@@ -152,18 +146,28 @@ export default function AtcStripBoard({
 
     const targetBay = getTargetBayForCategory(strip, categoryId);
 
-    if (isHandoffToTower(strip) && categoryId !== STRIP_CATEGORY.ATZ) {
-      if (categoryId === STRIP_CATEGORY.HP || categoryId === STRIP_CATEGORY.TAXI || categoryId === STRIP_CATEGORY.STAND) {
-        onCancelHandoff?.(strip, targetBay);
+    if (isHandoffToTower(strip)) {
+      if (operatorRole === OWNER_ROLE.GROUND) {
+        if (GROUND_DROP_CATEGORIES.includes(categoryId) && categoryId !== STRIP_CATEGORY.HP) {
+          onCancelHandoff?.(strip, targetBay);
+        }
+        return;
       }
-      return;
+      if (operatorRole === OWNER_ROLE.TOWER && !TOWER_DROP_CATEGORIES.includes(categoryId)) {
+        return;
+      }
     }
 
-    if (isHandoffToGround(strip) && categoryId !== STRIP_CATEGORY.HP) {
-      if ([STRIP_CATEGORY.ATZ, STRIP_CATEGORY.DOWNWIND, STRIP_CATEGORY.BASE, STRIP_CATEGORY.FINAL, STRIP_CATEGORY.RUNWAY].includes(categoryId)) {
-        onCancelHandoff?.(strip, targetBay);
+    if (isHandoffToGround(strip)) {
+      if (operatorRole === OWNER_ROLE.TOWER) {
+        if (TOWER_DROP_CATEGORIES.includes(categoryId)) {
+          onCancelHandoff?.(strip, targetBay);
+        }
+        return;
       }
-      return;
+      if (operatorRole === OWNER_ROLE.GROUND && !GROUND_DROP_CATEGORIES.includes(categoryId) && categoryId !== STRIP_CATEGORY.HP) {
+        return;
+      }
     }
 
     const operationalState = getOperationalStateForCategory(categoryId);
@@ -178,13 +182,12 @@ export default function AtcStripBoard({
   if (!operatorRole) return null;
 
   const renderCategory = (categoryId, sectorRole) => {
-    const shared = isSharedCategory(categoryId);
-    const sectorReadOnly = shared ? false : sectorRole !== operatorRole;
-    const categoryLocked = readOnly || (!shared && sectorReadOnly) || !isCategoryDropAllowed(categoryId, operatorRole);
+    const dropDisabled = readOnly || !isCategoryDropAllowed(categoryId, operatorRole);
+    const stripSectorReadOnly = sectorRole !== operatorRole;
     const categoryStrips = grouped[categoryId] || [];
 
     return (
-      <DroppableCategory key={categoryId} categoryId={categoryId} disabled={categoryLocked}>
+      <DroppableCategory key={categoryId} categoryId={categoryId} disabled={dropDisabled}>
         <CategoryRow
           categoryId={categoryId}
           strips={categoryStrips}
@@ -197,7 +200,7 @@ export default function AtcStripBoard({
           onCancelHandoff={onCancelHandoff}
           operatorRole={operatorRole}
           readOnly={readOnly}
-          sectorReadOnly={categoryLocked}
+          sectorReadOnly={stripSectorReadOnly}
         />
       </DroppableCategory>
     );
