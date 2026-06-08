@@ -177,7 +177,6 @@ function ArrivalStrip({ strip, bind }) {
             {strip.atl || bind.editable ? '/' : ''}
             <Field value={strip.atl} {...fp('atl')} />
           </span>
-          <PhaseTimes value={strip.phaseTimes} />
         </Cell>
         <Cell label="I" className="atc-cell--i">
           <Field value={strip.destination} {...fp('destination', { uppercase: true })} />
@@ -194,11 +193,12 @@ function ArrivalStrip({ strip, bind }) {
         </Cell>
       </div>
 
-      <Cell label="M" className="atc-cell--m atc-cell--remarks" labelCorner="br">
+      <Cell label="M" className="atc-cell--m atc-cell--remarks" labelCorner="br" split>
         <span className="atc-state-row">
           {stateCode ? <span className="atc-state-code">{stateCode}</span> : null}
           <Field value={strip.remarks} {...fp('remarks', { multiline: true })} />
         </span>
+        <PhaseTimes value={strip.phaseTimes} />
       </Cell>
     </div>
   );

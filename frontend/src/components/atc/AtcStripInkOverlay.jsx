@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef } from 'react';
 import {
   drawInkStrokes,
   getInkPoint,
+  isInkDrawPointer,
+  isTouchPointer,
   normalizeInkPoint,
   parseInkValue,
   serializeInk,
@@ -10,6 +12,7 @@ import { TAP_SLOP_PX, useDoubleTapHandler } from './atcPointerGestures';
 
 const LONG_PRESS_MS = 550;
 const LONG_PRESS_MOVE_PX = 8;
+const INK_STROKE_WIDTH = 2.4;
 
 export default function AtcStripInkOverlay({
   value = '',
@@ -66,7 +69,21 @@ export default function AtcStripInkOverlay({
     longPressOriginRef.current = null;
   }, []);
 
+  const appendPoints = useCallback((events) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const next = [...strokesRef.current];
+    const last = next[next.length - 1];
+    if (!last) return;
+    const newPoints = events.map((event) => normalizeInkPoint(getInkPoint(event, canvas), canvas));
+    last.points = [...last.points, ...newPoints];
+    strokesRef.current = next;
+    redraw();
+    onChange?.(serializeInk(next));
+  }, [onChange, redraw]);
+
   const startStroke = useCallback((event) => {
+    if (!isInkDrawPointer(event)) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     canvas.setPointerCapture(event.pointerId);
@@ -74,15 +91,13 @@ export default function AtcStripInkOverlay({
     gestureDrewRef.current = true;
     resetDoubleTap();
     const pt = normalizeInkPoint(getInkPoint(event, canvas), canvas);
-    strokesRef.current = [...strokesRef.current, { width: 2.4, color: '#111', points: [pt] }];
+    strokesRef.current = [...strokesRef.current, { width: INK_STROKE_WIDTH, color: '#111', points: [pt] }];
     redraw();
     onChange?.(serializeInk(strokesRef.current));
   }, [onChange, redraw, resetDoubleTap]);
 
   const handlePointerDown = (event) => {
     if (!editable && !onDoubleTap) return;
-    event.preventDefault();
-    event.stopPropagation();
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -91,9 +106,24 @@ export default function AtcStripInkOverlay({
     tapOriginRef.current = { x: event.clientX, y: event.clientY };
     clearLongPress();
 
-    if (!editable) return;
+    if (editable && isInkDrawPointer(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      startStroke(event);
+      return;
+    }
 
-    if (onLongPress) {
+    if (!editable) {
+      if (onDoubleTap && isTouchPointer(event)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return;
+    }
+
+    if (isTouchPointer(event) && onLongPress) {
+      event.preventDefault();
+      event.stopPropagation();
       longPressOriginRef.current = { x: event.clientX, y: event.clientY };
       longPressTimerRef.current = window.setTimeout(() => {
         longPressTriggeredRef.current = true;
@@ -104,10 +134,7 @@ export default function AtcStripInkOverlay({
           navigator.vibrate(40);
         }
       }, LONG_PRESS_MS);
-      return;
     }
-
-    startStroke(event);
   };
 
   const handlePointerMove = (event) => {
@@ -118,23 +145,16 @@ export default function AtcStripInkOverlay({
       const dy = event.clientY - longPressOriginRef.current.y;
       if (Math.hypot(dx, dy) > LONG_PRESS_MOVE_PX) {
         clearLongPress();
-        startStroke(event);
       }
       return;
     }
 
-    if (!drawingRef.current) return;
+    if (!drawingRef.current || !isInkDrawPointer(event)) return;
     event.preventDefault();
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const pt = normalizeInkPoint(getInkPoint(event, canvas), canvas);
-    const next = [...strokesRef.current];
-    const last = next[next.length - 1];
-    if (!last) return;
-    last.points = [...last.points, pt];
-    strokesRef.current = next;
-    redraw();
-    onChange?.(serializeInk(next));
+    const events = typeof event.getCoalescedEvents === 'function'
+      ? event.getCoalescedEvents()
+      : [event];
+    appendPoints(events);
   };
 
   const endStroke = (event) => {
@@ -156,7 +176,7 @@ export default function AtcStripInkOverlay({
       return;
     }
 
-    if (onDoubleTap && tapOriginRef.current && event) {
+    if (onDoubleTap && tapOriginRef.current && event && isTouchPointer(event)) {
       const dx = event.clientX - tapOriginRef.current.x;
       const dy = event.clientY - tapOriginRef.current.y;
       if (Math.hypot(dx, dy) <= TAP_SLOP_PX) {

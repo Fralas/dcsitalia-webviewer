@@ -19,24 +19,34 @@ export function popLastInkStroke(value) {
   return serializeInk(strokes.slice(0, -1));
 }
 
+/** Penna/stylus o mouse: ok per disegnare. Il dito (touch) è escluso su tablet/mobile. */
+export function isInkDrawPointer(event) {
+  return event?.pointerType === 'pen' || event?.pointerType === 'mouse';
+}
+
+export function isTouchPointer(event) {
+  return event?.pointerType === 'touch';
+}
+
 export function getInkPoint(event, canvas) {
   const rect = canvas.getBoundingClientRect();
-  const src = event.touches?.[0] || event;
+  const scaleX = canvas.width / Math.max(rect.width, 1);
+  const scaleY = canvas.height / Math.max(rect.height, 1);
   return {
-    x: ((src.clientX - rect.left) / rect.width) * canvas.width,
-    y: ((src.clientY - rect.top) / rect.height) * canvas.height,
-    pressure: event.pressure ?? (event.touches ? 0.5 : 0.35),
+    x: (event.clientX - rect.left) * scaleX,
+    y: (event.clientY - rect.top) * scaleY,
+    pressure: event.pressure ?? 0.5,
   };
 }
 
 export function drawInkStrokes(ctx, strokes, width, height) {
   ctx.clearRect(0, 0, width, height);
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
+  ctx.lineCap = 'butt';
+  ctx.lineJoin = 'miter';
   (strokes || []).forEach((stroke) => {
     if (!stroke.points?.length) return;
     ctx.strokeStyle = stroke.color || '#111';
-    ctx.lineWidth = Math.max(1.4, (stroke.width || 2.4) * (stroke.points[0]?.pressure || 0.5));
+    ctx.lineWidth = stroke.width || 2.4;
     ctx.beginPath();
     stroke.points.forEach((pt, i) => {
       const x = (pt.x / 100) * width;

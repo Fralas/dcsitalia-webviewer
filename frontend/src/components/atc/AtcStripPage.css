@@ -1047,6 +1047,7 @@
 .atc-strip-ink-overlay--editable {
   pointer-events: auto;
   cursor: crosshair;
+  touch-action: none;
 }
 
 .atc-strip-ink-overlay--tappable {
