@@ -4032,6 +4032,9 @@ app.get('/api/airports/:id/charts', (req, res) => {
 // Serve static chart files
 app.use('/charts', express.static(path.resolve(__dirname, '../../charts')));
 
+// Serve ATC / UI sound effects
+app.use('/sfx', express.static(path.resolve(__dirname, '../../sfx')));
+
 // ==================== TEST ENDPOINTS ====================
 
 /**
@@ -5150,7 +5153,7 @@ app.use(express.static(path.resolve(__dirname, '../../frontend/dist')));
 // SPA fallback - serve index.html for all non-API routes
 app.get('*', (req, res, next) => {
   // Skip API routes - let them hit 404 handler
-  if (req.path.startsWith('/api/') || req.path.startsWith('/charts/')) {
+  if (req.path.startsWith('/api/') || req.path.startsWith('/charts/') || req.path.startsWith('/sfx/')) {
     return next();
   }
 

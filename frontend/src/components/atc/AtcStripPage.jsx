@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Loader2, Map, Pencil, Plus, Search, TowerControl } from 'lucide-react';
 
@@ -25,6 +25,8 @@ import AtcChartsPanel from './AtcChartsPanel';
 import AtcRoleSlots from './AtcRoleSlots';
 
 import { OWNER_ROLE, canEditStrip, resolveClaimedRole } from './atcStripModel';
+
+import { playHandoffAlert, primeHandoffAudio, shouldPlayHandoffAlert } from './atcHandoffSound';
 
 import './AtcStripPage.css';
 
@@ -98,6 +100,10 @@ export default function AtcStripPage() {
 
   const [chartsWidth, setChartsWidth] = useState(420);
 
+  const stripsSnapshotRef = useRef([]);
+
+  const handoffAlertReadyRef = useRef(false);
+
 
 
   const claimedRole = useMemo(
@@ -146,11 +152,15 @@ export default function AtcStripPage() {
 
       setLoading(true);
 
+      handoffAlertReadyRef.current = false;
+
       setError('');
 
       const payload = await api.getAtcBoard(airportId);
 
       applyBoardPayload(payload);
+
+      stripsSnapshotRef.current = payload.strips || [];
 
     } catch (err) {
 
@@ -159,6 +169,8 @@ export default function AtcStripPage() {
     } finally {
 
       setLoading(false);
+
+      handoffAlertReadyRef.current = true;
 
     }
 
@@ -176,11 +188,41 @@ export default function AtcStripPage() {
 
   useEffect(() => {
 
+    const primeOnInteraction = () => primeHandoffAudio();
+
+    window.addEventListener('pointerdown', primeOnInteraction, { once: true });
+
+    return () => window.removeEventListener('pointerdown', primeOnInteraction);
+
+  }, []);
+
+
+
+  useEffect(() => {
+
     socketService.connect();
 
     const unsubscribe = socketService.on('atc:updated', (payload) => {
 
       if (payload?.airportId && payload.airportId !== airportId) return;
+
+      const prevStrips = stripsSnapshotRef.current;
+
+      const nextStrips = payload.strips || [];
+
+      if (
+
+        handoffAlertReadyRef.current
+
+        && shouldPlayHandoffAlert(prevStrips, nextStrips, claimedRole, user?.id, payload.recentHistory)
+
+      ) {
+
+        playHandoffAlert();
+
+      }
+
+      stripsSnapshotRef.current = nextStrips;
 
       applyBoardPayload(payload);
 
@@ -196,7 +238,7 @@ export default function AtcStripPage() {
 
     return () => unsubscribe();
 
-  }, [airportId, applyBoardPayload]);
+  }, [airportId, applyBoardPayload, claimedRole, user?.id]);
 
 
 

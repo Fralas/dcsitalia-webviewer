@@ -232,11 +232,11 @@
           "airportId": "incirlik",
           "model": "B",
           "direction": "dep",
-          "bayId": "g_inactive",
+          "bayId": "archive",
           "position": 0,
           "ownerRole": null,
-          "coordinationStatus": null,
-          "operationalState": "planned",
+          "coordinationStatus": "accepted",
+          "operationalState": "archived",
           "handoffActive": false,
           "handoffFromBay": null,
           "queuePosition": null,
@@ -246,7 +246,7 @@
             "dynamic": false
           },
           "createdAt": 1780911751675,
-          "updatedAt": 1780911751675,
+          "updatedAt": 1780913133515,
           "createdBy": "675706661570347041",
           "eobt": "2341",
           "flightRule": "I",
@@ -261,17 +261,17 @@
           "ssr": "",
           "delay": "",
           "clearanceText": "",
-          "instructions": ""
+          "instructions": "HP 1204 | TOC 1204 | L/UP 1205 | L/UP 1205 | L/UP 1205 | L/W 1205 | TO 1205 | TO 1205 | ARCHIVE 1205"
         }
       ],
       "manualSort": false,
       "roleSlots": {
-        "GROUND": {
+        "GROUND": null,
+        "TOWER": {
           "userId": "675706661570347041",
           "username": "Fralas",
-          "claimedAt": 1780911718900
-        },
-        "TOWER": null
+          "claimedAt": 1780913094481
+        }
       },
       "tocQueue": []
     }

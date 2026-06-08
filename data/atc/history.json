@@ -579,6 +579,272 @@
       "role": "GROUND",
       "userId": "675706661570347041",
       "callsign": "DCORE01"
+    },
+    {
+      "id": "26c40422-dc3c-4423-99a4-158d9c2bfef9",
+      "timestamp": 1780913069760,
+      "airportId": "incirlik",
+      "stripId": "b1955c68-bb22-44e2-b9f0-c07040bfe83b",
+      "action": "MOVE",
+      "fromBay": "g_inactive",
+      "toBay": "g_active",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "FROCIO 1-1"
+    },
+    {
+      "id": "a1bbf79a-feff-40a0-bff2-cf09cc613dac",
+      "timestamp": 1780913070650,
+      "airportId": "incirlik",
+      "stripId": "b1955c68-bb22-44e2-b9f0-c07040bfe83b",
+      "action": "MOVE",
+      "fromBay": "g_active",
+      "toBay": "g_stand",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "FROCIO 1-1"
+    },
+    {
+      "id": "9b50decc-939b-4100-9212-bb3dc7963cdc",
+      "timestamp": 1780913071650,
+      "airportId": "incirlik",
+      "stripId": "b1955c68-bb22-44e2-b9f0-c07040bfe83b",
+      "action": "MOVE",
+      "fromBay": "g_stand",
+      "toBay": "g_active",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "FROCIO 1-1"
+    },
+    {
+      "id": "fbbd8461-b0e7-465f-8125-ed371ad18fe4",
+      "timestamp": 1780913072484,
+      "airportId": "incirlik",
+      "stripId": "b1955c68-bb22-44e2-b9f0-c07040bfe83b",
+      "action": "MOVE",
+      "fromBay": "g_active",
+      "toBay": "g_stand",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "FROCIO 1-1"
+    },
+    {
+      "id": "b3d1f3ac-7877-4a1a-ab0e-8c1ed005f18e",
+      "timestamp": 1780913073087,
+      "airportId": "incirlik",
+      "stripId": "b1955c68-bb22-44e2-b9f0-c07040bfe83b",
+      "action": "MOVE",
+      "fromBay": "g_stand",
+      "toBay": "g_taxi",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "FROCIO 1-1"
+    },
+    {
+      "id": "12d194b7-8ca3-4329-a665-75fbb7b89a43",
+      "timestamp": 1780913074135,
+      "airportId": "incirlik",
+      "stripId": "b1955c68-bb22-44e2-b9f0-c07040bfe83b",
+      "action": "HP",
+      "fromBay": "g_taxi",
+      "toBay": "g_hp",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "FROCIO 1-1"
+    },
+    {
+      "id": "8ac0652e-454b-41b1-bfea-eec504fbfd48",
+      "timestamp": 1780913077227,
+      "airportId": "incirlik",
+      "stripId": "b1955c68-bb22-44e2-b9f0-c07040bfe83b",
+      "action": "TOC",
+      "fromBay": "g_hp",
+      "toBay": "t_pending",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "FROCIO 1-1"
+    },
+    {
+      "id": "5b9a140d-afb4-49f2-a58d-a1bd2dd1982f",
+      "timestamp": 1780913086027,
+      "airportId": "incirlik",
+      "stripId": "b1955c68-bb22-44e2-b9f0-c07040bfe83b",
+      "action": "CANCEL_HANDOFF",
+      "fromBay": "t_pending",
+      "toBay": "g_hp",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "FROCIO 1-1",
+      "meta": {
+        "targetBay": null
+      }
+    },
+    {
+      "id": "fdb2b003-4dd4-44d9-a011-7d3c45f87cd4",
+      "timestamp": 1780913087710,
+      "airportId": "incirlik",
+      "stripId": "b1955c68-bb22-44e2-b9f0-c07040bfe83b",
+      "action": "MOVE",
+      "fromBay": "g_hp",
+      "toBay": "t_pending",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "FROCIO 1-1"
+    },
+    {
+      "id": "a32f7d52-b79b-4c8d-901e-b0e95168b7a8",
+      "timestamp": 1780913093742,
+      "airportId": "incirlik",
+      "action": "RELEASE_ROLE",
+      "role": "GROUND",
+      "userId": "675706661570347041"
+    },
+    {
+      "id": "a9c5ac9f-a0df-41e3-811c-58de504471f3",
+      "timestamp": 1780913094481,
+      "airportId": "incirlik",
+      "action": "CLAIM_ROLE",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": null,
+      "meta": {
+        "role": "TOWER"
+      }
+    },
+    {
+      "id": "f655c14c-f2f0-413c-9319-a85ada3b66f4",
+      "timestamp": 1780913099278,
+      "airportId": "incirlik",
+      "stripId": "b1955c68-bb22-44e2-b9f0-c07040bfe83b",
+      "action": "AOC",
+      "fromBay": "t_pending",
+      "toBay": "t_active",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "FROCIO 1-1",
+      "meta": {
+        "note": null
+      }
+    },
+    {
+      "id": "fded1758-e4d8-4dec-8408-1eaeee10f069",
+      "timestamp": 1780913109359,
+      "airportId": "incirlik",
+      "stripId": "b1955c68-bb22-44e2-b9f0-c07040bfe83b",
+      "action": "L/UP",
+      "fromBay": "t_active",
+      "toBay": "t_runway",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "FROCIO 1-1"
+    },
+    {
+      "id": "44708a3d-4176-4679-bac4-f20460069dac",
+      "timestamp": 1780913111301,
+      "airportId": "incirlik",
+      "stripId": "b1955c68-bb22-44e2-b9f0-c07040bfe83b",
+      "action": "MOVE",
+      "fromBay": "t_runway",
+      "toBay": "t_active",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "FROCIO 1-1"
+    },
+    {
+      "id": "d7c42897-2af6-49d3-9ca0-366392d5addc",
+      "timestamp": 1780913114940,
+      "airportId": "incirlik",
+      "stripId": "b1955c68-bb22-44e2-b9f0-c07040bfe83b",
+      "action": "L/UP",
+      "fromBay": "t_active",
+      "toBay": "t_runway",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "FROCIO 1-1"
+    },
+    {
+      "id": "b6bc97f4-f213-42c1-a395-a52605cf3b2e",
+      "timestamp": 1780913116238,
+      "airportId": "incirlik",
+      "stripId": "b1955c68-bb22-44e2-b9f0-c07040bfe83b",
+      "action": "MOVE",
+      "fromBay": "t_runway",
+      "toBay": "t_active",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "FROCIO 1-1"
+    },
+    {
+      "id": "1a4f979a-ca34-42d6-a832-38cf63860e95",
+      "timestamp": 1780913119445,
+      "airportId": "incirlik",
+      "stripId": "b1955c68-bb22-44e2-b9f0-c07040bfe83b",
+      "action": "MOVE",
+      "fromBay": "t_active",
+      "toBay": "t_runway",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "FROCIO 1-1"
+    },
+    {
+      "id": "fc886c74-f8b9-4608-822d-c0ce5626f836",
+      "timestamp": 1780913122860,
+      "airportId": "incirlik",
+      "stripId": "b1955c68-bb22-44e2-b9f0-c07040bfe83b",
+      "action": "L/UP",
+      "fromBay": "t_runway",
+      "toBay": "t_runway",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "FROCIO 1-1"
+    },
+    {
+      "id": "169d9f59-ecf9-41b4-9aa4-4d1b70603fdb",
+      "timestamp": 1780913123610,
+      "airportId": "incirlik",
+      "stripId": "b1955c68-bb22-44e2-b9f0-c07040bfe83b",
+      "action": "L/W",
+      "fromBay": "t_runway",
+      "toBay": "t_runway",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "FROCIO 1-1"
+    },
+    {
+      "id": "2c6c38d6-cd8a-4edd-b768-21c0802e319f",
+      "timestamp": 1780913127980,
+      "airportId": "incirlik",
+      "stripId": "b1955c68-bb22-44e2-b9f0-c07040bfe83b",
+      "action": "TO",
+      "fromBay": "t_runway",
+      "toBay": "t_runway",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "FROCIO 1-1"
+    },
+    {
+      "id": "bd0a6e7c-3fd5-49fd-90e1-16afdfcebc3d",
+      "timestamp": 1780913128951,
+      "airportId": "incirlik",
+      "stripId": "b1955c68-bb22-44e2-b9f0-c07040bfe83b",
+      "action": "TO",
+      "fromBay": "t_runway",
+      "toBay": "t_airborne",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "FROCIO 1-1"
+    },
+    {
+      "id": "3cbfe9ba-424e-4237-9153-89487854bf93",
+      "timestamp": 1780913133515,
+      "airportId": "incirlik",
+      "stripId": "b1955c68-bb22-44e2-b9f0-c07040bfe83b",
+      "action": "ARCHIVE",
+      "fromBay": "t_airborne",
+      "toBay": "archive",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "FROCIO 1-1"
     }
   ]
 }
