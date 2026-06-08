@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Loader2, Map, Pencil, Plus, Search, TowerControl } from 'lucide-react';
+import { Loader2, Map, Plus, Search, TowerControl } from 'lucide-react';
 
 import * as api from '../../services/api';
 
@@ -14,8 +14,6 @@ import airports from '../../config/airports';
 
 import AtcStripBoard from './AtcStripBoard';
 
-import AtcStripEditor from './AtcStripEditor';
-
 import AtcCoordinationPanel from './AtcCoordinationPanel';
 
 import AtcHistoryPanel from './AtcHistoryPanel';
@@ -24,7 +22,7 @@ import AtcChartsPanel from './AtcChartsPanel';
 
 import AtcRoleSlots from './AtcRoleSlots';
 
-import { OWNER_ROLE, canEditStrip, resolveClaimedRole, defaultRunwayConfig } from './atcStripModel';
+import { OWNER_ROLE, STRIP_DIRECTION, canEditStrip, resolveClaimedRole, defaultRunwayConfig, createEmptyForm } from './atcStripModel';
 
 import { playHandoffAlert, primeHandoffAudio, shouldPlayHandoffAlert } from './atcHandoffSound';
 
@@ -96,9 +94,7 @@ export default function AtcStripPage() {
 
   const [selectedId, setSelectedId] = useState(null);
 
-  const [editorOpen, setEditorOpen] = useState(false);
-
-  const [editingStrip, setEditingStrip] = useState(null);
+  const [inlineEditStripId, setInlineEditStripId] = useState(null);
 
   const [search, setSearch] = useState('');
 
@@ -111,6 +107,8 @@ export default function AtcStripPage() {
   const stripsSnapshotRef = useRef([]);
 
   const handoffAlertReadyRef = useRef(false);
+
+  const patchTimersRef = useRef({});
 
 
 
@@ -254,38 +252,6 @@ export default function AtcStripPage() {
 
 
 
-  useEffect(() => {
-
-    const onKey = (event) => {
-
-      if (event.target?.tagName === 'INPUT' || event.target?.tagName === 'TEXTAREA') return;
-
-      if ((event.key === 'n' || event.key === 'N') && claimedRole) {
-
-        setEditingStrip(null);
-
-        setEditorOpen(true);
-
-      }
-
-      if (event.key === '/') {
-
-        event.preventDefault();
-
-        document.getElementById('atc-search')?.focus();
-
-      }
-
-    };
-
-    window.addEventListener('keydown', onKey);
-
-    return () => window.removeEventListener('keydown', onKey);
-
-  }, [claimedRole]);
-
-
-
   const filteredStrips = useMemo(() => {
 
     if (!search.trim()) return strips;
@@ -406,29 +372,81 @@ export default function AtcStripPage() {
 
 
 
-  const handleSaveStrip = async (form) => {
+  const handleFieldChange = useCallback((stripId, field, value) => {
 
-    if (!requireClaimed()) return;
+    setStrips((prev) => {
 
-    try {
+      const next = prev.map((s) => (s.id === stripId ? { ...s, [field]: value } : s));
 
-      if (editingStrip?.id) {
+      stripsSnapshotRef.current = next;
 
-        const result = await api.patchAtcStrip(editingStrip.id, { ...form, airportId, role: claimedRole });
+      return next;
+
+    });
+
+  }, []);
+
+
+
+  const handleFieldCommit = useCallback((stripId, field, value) => {
+
+    if (!claimedRole || !user) return;
+
+    const timerKey = `${stripId}:${field}`;
+
+    clearTimeout(patchTimersRef.current[timerKey]);
+
+    patchTimersRef.current[timerKey] = window.setTimeout(async () => {
+
+      try {
+
+        const result = await api.patchAtcStrip(stripId, {
+
+          [field]: value,
+
+          airportId,
+
+          role: claimedRole,
+
+        });
 
         applyMutationResult(result);
 
-      } else {
+      } catch (err) {
 
-        const result = await api.createAtcStrip({ ...form, airportId, role: claimedRole });
-
-        applyMutationResult(result);
+        showError(err);
 
       }
 
-      setEditorOpen(false);
+    }, 300);
 
-      setEditingStrip(null);
+  }, [airportId, claimedRole, user, applyMutationResult]);
+
+
+
+  const handleNewStrip = useCallback(async () => {
+
+    if (!requireClaimed()) return;
+
+    const direction = claimedRole === OWNER_ROLE.TOWER ? STRIP_DIRECTION.ARR : STRIP_DIRECTION.DEP;
+
+    try {
+
+      const result = await api.createAtcStrip({
+
+        ...createEmptyForm(direction),
+
+        direction,
+
+        airportId,
+
+        role: claimedRole,
+
+      });
+
+      applyMutationResult(result);
+
+      if (result.strip?.id) setSelectedId(result.strip.id);
 
     } catch (err) {
 
@@ -436,7 +454,37 @@ export default function AtcStripPage() {
 
     }
 
-  };
+  }, [airportId, claimedRole, applyMutationResult]);
+
+
+
+  useEffect(() => {
+
+    const onKey = (event) => {
+
+      if (event.target?.tagName === 'INPUT' || event.target?.tagName === 'TEXTAREA') return;
+
+      if ((event.key === 'n' || event.key === 'N') && claimedRole) {
+
+        handleNewStrip();
+
+      }
+
+      if (event.key === '/') {
+
+        event.preventDefault();
+
+        document.getElementById('atc-search')?.focus();
+
+      }
+
+    };
+
+    window.addEventListener('keydown', onKey);
+
+    return () => window.removeEventListener('keydown', onKey);
+
+  }, [claimedRole, handleNewStrip]);
 
 
 
@@ -702,7 +750,7 @@ export default function AtcStripPage() {
 
                 className="atc-toolbar__btn atc-toolbar__btn--primary"
 
-                onClick={() => { setEditingStrip(null); setEditorOpen(true); }}
+                onClick={handleNewStrip}
 
               >
 
@@ -711,30 +759,6 @@ export default function AtcStripPage() {
                 {t('atc.newStrip')}
 
               </button>
-
-              {selectedEditable && (
-
-                <button
-
-                  type="button"
-
-                  className="atc-toolbar__btn"
-
-                  onClick={() => {
-
-                    if (selectedStrip) { setEditingStrip(selectedStrip); setEditorOpen(true); }
-
-                  }}
-
-                >
-
-                  <Pencil className="w-4 h-4" />
-
-                  {t('atc.editStrip')}
-
-                </button>
-
-              )}
 
               {selectedEditable && (
 
@@ -808,17 +832,15 @@ export default function AtcStripPage() {
 
               onSelect={(strip) => setSelectedId(strip.id)}
 
-              onEdit={(strip) => {
+              onFieldChange={handleFieldChange}
 
-                if (canEditStrip(strip, claimedRole)) {
+              onFieldCommit={handleFieldCommit}
 
-                  setEditingStrip(strip);
+              onInlineEditFocus={setInlineEditStripId}
 
-                  setEditorOpen(true);
+              onInlineEditBlur={() => setInlineEditStripId(null)}
 
-                }
-
-              }}
+              inlineEditStripId={inlineEditStripId}
 
               onAction={handleAction}
 
@@ -873,22 +895,6 @@ export default function AtcStripPage() {
         </aside>
 
       </div>
-
-
-
-      <AtcStripEditor
-
-        open={editorOpen}
-
-        strip={editingStrip}
-
-        claimedRole={claimedRole}
-
-        onClose={() => { setEditorOpen(false); setEditingStrip(null); }}
-
-        onSave={handleSaveStrip}
-
-      />
 
     </div>
 

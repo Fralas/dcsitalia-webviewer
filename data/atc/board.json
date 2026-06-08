@@ -120,10 +120,10 @@
         {
           "id": "demo_aleppo_5",
           "airportId": "aleppo",
-          "position": 1,
+          "position": 3,
           "coordinationStatus": "accepted",
           "createdAt": 1780910934169,
-          "updatedAt": 1780918806332,
+          "updatedAt": 1780919495344,
           "createdBy": "system",
           "direction": "dep",
           "model": "B",
@@ -157,15 +157,15 @@
         {
           "id": "demo_aleppo_6",
           "airportId": "aleppo",
-          "position": 2,
+          "position": 1,
           "coordinationStatus": "accepted",
           "createdAt": 1780910934169,
-          "updatedAt": 1780919361721,
+          "updatedAt": 1780919767894,
           "createdBy": "system",
           "direction": "dep",
           "model": "B",
-          "bayId": "t_pending",
-          "operationalState": "base",
+          "bayId": "t_active",
+          "operationalState": "downwind",
           "ownerRole": "TOWER",
           "flags": {
             "highlighted": false,
@@ -179,7 +179,7 @@
           "destination": "OS58",
           "runway": "09L",
           "sid": "",
-          "level": "",
+          "level": "DW",
           "startup": "",
           "clearanceTimes": "",
           "ssr": "",
@@ -189,7 +189,9 @@
           "handoffActive": false,
           "handoffTarget": null,
           "handoffFromBay": null,
-          "queuePosition": null
+          "queuePosition": null,
+          "route": "",
+          "taxiAuth": ""
         },
         {
           "id": "660a322e-1e12-473f-84c3-cbce27416d7f",

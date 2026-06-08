@@ -1182,6 +1182,72 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.atc-fit-field {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.atc-fit-field__text,
+.atc-fit-field__input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  outline: none;
+  line-height: 1.1;
+}
+
+.atc-fit-field__input::placeholder {
+  color: rgba(0, 0, 0, 0.28);
+}
+
+.atc-fit-field__input:focus {
+  background: rgba(78, 197, 255, 0.14);
+  outline: 1px solid rgba(78, 197, 255, 0.45);
+  border-radius: 1px;
+}
+
+.atc-strip--inline-edit .atc-cell {
+  cursor: text;
+}
+
+.atc-strip--inline-edit .atc-cell__value {
+  text-overflow: clip;
+}
+
+.atc-cell__split-row,
+.atc-state-row {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.atc-state-row .atc-state-code {
+  flex-shrink: 0;
+}
+
+.atc-cell-d__type {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .atc-cell__value--split {

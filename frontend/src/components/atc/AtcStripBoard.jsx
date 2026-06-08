@@ -76,7 +76,11 @@ function CategoryRow({
   selectedId,
   nextActions,
   onSelect,
-  onEdit,
+  onFieldChange,
+  onFieldCommit,
+  onInlineEditFocus,
+  onInlineEditBlur,
+  inlineEditStripId,
   onAction,
   onCoordinate,
   onCancelHandoff,
@@ -105,7 +109,11 @@ function CategoryRow({
               selected={selectedId === strip.id}
               nextAction={nextActions[strip.id]}
               onSelect={onSelect}
-              onEdit={onEdit}
+              onFieldChange={onFieldChange}
+              onFieldCommit={onFieldCommit}
+              onInlineEditFocus={onInlineEditFocus}
+              onInlineEditBlur={onInlineEditBlur}
+              inlineEditStripId={inlineEditStripId}
               onAction={onAction}
               onCoordinate={onCoordinate}
               onCancelHandoff={onCancelHandoff}
@@ -127,7 +135,11 @@ export default function AtcStripBoard({
   nextActions = {},
   runwayConfig = {},
   onSelect,
-  onEdit,
+  onFieldChange,
+  onFieldCommit,
+  onInlineEditFocus,
+  onInlineEditBlur,
+  inlineEditStripId,
   onAction,
   onCoordinate,
   onCancelHandoff,
@@ -203,7 +215,11 @@ export default function AtcStripBoard({
           selectedId={selectedId}
           nextActions={nextActions}
           onSelect={onSelect}
-          onEdit={onEdit}
+          onFieldChange={onFieldChange}
+          onFieldCommit={onFieldCommit}
+          onInlineEditFocus={onInlineEditFocus}
+          onInlineEditBlur={onInlineEditBlur}
+          inlineEditStripId={inlineEditStripId}
           onAction={onAction}
           onCoordinate={onCoordinate}
           onCancelHandoff={onCancelHandoff}
@@ -240,7 +256,11 @@ export default function AtcStripBoard({
           selectedId={selectedId}
           nextActions={nextActions}
           onSelect={onSelect}
-          onEdit={onEdit}
+          onFieldChange={onFieldChange}
+          onFieldCommit={onFieldCommit}
+          onInlineEditFocus={onInlineEditFocus}
+          onInlineEditBlur={onInlineEditBlur}
+          inlineEditStripId={inlineEditStripId}
           onAction={onAction}
           onCoordinate={onCoordinate}
           onCancelHandoff={onCancelHandoff}

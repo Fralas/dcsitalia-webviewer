@@ -73,7 +73,11 @@ export default function AtcRunwayPanel({
   selectedId,
   nextActions = {},
   onSelect,
-  onEdit,
+  onFieldChange,
+  onFieldCommit,
+  onInlineEditFocus,
+  onInlineEditBlur,
+  inlineEditStripId,
   onAction,
   onCoordinate,
   onCancelHandoff,
@@ -158,7 +162,11 @@ export default function AtcRunwayPanel({
                 selected={selectedId === strip.id}
                 nextAction={nextActions[strip.id]}
                 onSelect={onSelect}
-                onEdit={onEdit}
+                onFieldChange={onFieldChange}
+                onFieldCommit={onFieldCommit}
+                onInlineEditFocus={onInlineEditFocus}
+                onInlineEditBlur={onInlineEditBlur}
+                inlineEditStripId={inlineEditStripId}
                 onAction={onAction}
                 onCoordinate={onCoordinate}
                 onCancelHandoff={onCancelHandoff}

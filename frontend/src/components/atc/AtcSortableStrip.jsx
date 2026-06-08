@@ -8,7 +8,11 @@ export default function AtcSortableStrip({
   selected,
   nextAction,
   onSelect,
-  onEdit,
+  onFieldChange,
+  onFieldCommit,
+  onInlineEditFocus,
+  onInlineEditBlur,
+  inlineEditStripId,
   onAction,
   onCoordinate,
   onCancelHandoff,
@@ -16,11 +20,13 @@ export default function AtcSortableStrip({
   readOnly,
   sectorReadOnly,
 }) {
-  const editable = !readOnly && canEditStrip(strip, operatorRole);
+  const editable = !readOnly && !sectorReadOnly && canEditStrip(strip, operatorRole);
+  const dragDisabled = !editable || inlineEditStripId === strip.id;
+
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: strip.id,
     data: { strip, categoryId: getStripCategory(strip) },
-    disabled: !editable,
+    disabled: dragDisabled,
   });
 
   const style = {
@@ -31,18 +37,22 @@ export default function AtcSortableStrip({
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...(editable ? { ...attributes, ...listeners } : {})}>
+    <div ref={setNodeRef} style={style} {...(editable && inlineEditStripId !== strip.id ? { ...attributes, ...listeners } : {})}>
       <AtcStripCard
         strip={strip}
         selected={selected}
         nextAction={nextAction}
         onSelect={onSelect}
-        onEdit={editable ? onEdit : undefined}
+        onFieldChange={onFieldChange}
+        onFieldCommit={onFieldCommit}
+        onFieldFocus={() => onInlineEditFocus?.(strip.id)}
+        onFieldBlur={onInlineEditBlur}
         onAction={onAction}
         onCoordinate={onCoordinate}
         onCancelHandoff={onCancelHandoff}
         operatorRole={operatorRole}
         readOnly={!editable}
+        editable={editable}
       />
     </div>
   );
