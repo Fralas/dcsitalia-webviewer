@@ -27,6 +27,7 @@ import logger from './utils/logger.js';
 import * as airbaseStatusParser from './services/airbaseStatusParser.js';
 import * as airbaseStatusManager from './services/airbaseStatusManager.js';
 import * as discordAuth from './services/discordAuth.js';
+import { ATC_DISCORD_IDS, LIDC_DISCORD_IDS, requireFeatureAccess } from './config/featureAccess.js';
 import * as combatMissionDispatch from './services/combatMissionDispatch.js';
 import * as luaZoneSync from './services/luaZoneSync.js';
 import * as activeUsers from './services/activeUsers.js';
@@ -1959,6 +1960,9 @@ app.put('/api/profile', (req, res) => {
   const savedProfile = userProfiles.saveProfile(req.session.user.id, req.body);
   res.json(savedProfile);
 });
+
+app.use('/api/lidc', requireFeatureAccess(LIDC_DISCORD_IDS));
+app.use('/api/atc', requireFeatureAccess(ATC_DISCORD_IDS));
 
 /**
  * GET /api/lidc/templates - Get LIDC templates and unit catalog

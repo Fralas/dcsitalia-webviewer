@@ -14,6 +14,7 @@ import bannerImg from '../img/DCS_ITALIA_ICON.png';
 import gbFlagImg from '../img/flags/gb.svg';
 import itFlagImg from '../img/flags/it.svg';
 import { useUser } from './contexts/UserContext';
+import { canAccessAtc, canAccessLidc } from './config/featureAccess';
 
 const VIEW_TO_PATH = Object.freeze({
   frontline: '/',
@@ -130,6 +131,8 @@ function App() {
     UNDER_ATTACK: 0,
   });
   const { user } = useUser();
+  const showLidc = canAccessLidc(user?.id);
+  const showAtc = canAccessAtc(user?.id);
 
   const goToView = (view) => {
     const normalized = normalizeView(view);
@@ -150,6 +153,13 @@ function App() {
     // Canonicalize URL (supports old ?view=changelogs links and unknown paths).
     syncUrlWithView(currentView, { replace: true });
   }, [currentView]);
+
+  useEffect(() => {
+    if ((currentView === 'lidc' && !showLidc) || (currentView === 'atc' && !showAtc)) {
+      setCurrentView('frontline');
+      syncUrlWithView('frontline', { replace: true });
+    }
+  }, [currentView, showLidc, showAtc]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -343,32 +353,36 @@ function App() {
               >
                 <BookOpen className="w-4 h-4" />
               </button>
-              <button
-                type="button"
-                onClick={() => goToView('lidc')}
-                className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] transition-colors ${
-                  currentView === 'lidc'
-                    ? 'border-yt-accent bg-yt-accent/20 text-yt-accent'
-                    : 'border-yt-border/80 bg-[#151b25] text-yt-text-primary hover:border-yt-accent hover:text-white'
-                }`}
-                title="Apri LIDC"
-                aria-label="Apri LIDC"
-              >
-                <Users className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => goToView('atc')}
-                className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] transition-colors ${
-                  currentView === 'atc'
-                    ? 'border-yt-accent bg-yt-accent/20 text-yt-accent'
-                    : 'border-yt-border/80 bg-[#151b25] text-yt-text-primary hover:border-yt-accent hover:text-white'
-                }`}
-                title="ATC Strips"
-                aria-label="ATC Strips"
-              >
-                <TowerControl className="w-4 h-4" />
-              </button>
+              {showLidc && (
+                <button
+                  type="button"
+                  onClick={() => goToView('lidc')}
+                  className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] transition-colors ${
+                    currentView === 'lidc'
+                      ? 'border-yt-accent bg-yt-accent/20 text-yt-accent'
+                      : 'border-yt-border/80 bg-[#151b25] text-yt-text-primary hover:border-yt-accent hover:text-white'
+                  }`}
+                  title="Apri LIDC"
+                  aria-label="Apri LIDC"
+                >
+                  <Users className="w-4 h-4" />
+                </button>
+              )}
+              {showAtc && (
+                <button
+                  type="button"
+                  onClick={() => goToView('atc')}
+                  className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] transition-colors ${
+                    currentView === 'atc'
+                      ? 'border-yt-accent bg-yt-accent/20 text-yt-accent'
+                      : 'border-yt-border/80 bg-[#151b25] text-yt-text-primary hover:border-yt-accent hover:text-white'
+                  }`}
+                  title="ATC Strips"
+                  aria-label="ATC Strips"
+                >
+                  <TowerControl className="w-4 h-4" />
+                </button>
+              )}
               <UserMenu onOpenProfile={() => goToView('profile')} />
             </div>
           </div>
@@ -388,10 +402,10 @@ function App() {
         {currentView === 'wiki' && (
           <WikiPage language={appLanguage} />
         )}
-        {currentView === 'lidc' && (
+        {currentView === 'lidc' && showLidc && (
           <LidcPage />
         )}
-        {currentView === 'atc' && (
+        {currentView === 'atc' && showAtc && (
           <AtcStripPage />
         )}
       </main>
