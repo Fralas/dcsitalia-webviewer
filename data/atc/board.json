@@ -7,11 +7,11 @@
           "airportId": "aleppo",
           "model": "B",
           "direction": "dep",
-          "bayId": "g_active",
-          "position": 1,
+          "bayId": "g_taxi",
+          "position": 0,
           "ownerRole": "GROUND",
           "coordinationStatus": null,
-          "operationalState": "active",
+          "operationalState": "taxi",
           "handoffActive": false,
           "handoffTarget": null,
           "handoffFromBay": null,
@@ -22,7 +22,7 @@
             "dynamic": true
           },
           "createdAt": 1780943175162,
-          "updatedAt": 1780943212393,
+          "updatedAt": 1780943562790,
           "createdBy": "675706661570347041",
           "eobt": "",
           "flightRule": "I",
@@ -41,7 +41,7 @@
           "route": "",
           "clearanceText": "",
           "instructions": "",
-          "phaseTimes": "",
+          "phaseTimes": "TXI 2032",
           "stripInk": "ink:[{\"width\":2.4,\"color\":\"#111\",\"points\":[{\"x\":89.82808286003035,\"y\":54.21515176462572,\"pressure\":0.5}]},{\"width\":2.4,\"color\":\"#111\",\"points\":[{\"x\":43.696273161168435,\"y\":63.51747734602108,\"pressure\":0.5}]},{\"width\":2.4,\"color\":\"#111\",\"points\":[{\"x\":43.696273161168435,\"y\":63.51747734602108,\"pressure\":0.5}]}]",
           "remarks": ""
         },
@@ -97,7 +97,7 @@
         "GROUND": {
           "userId": "675706661570347041",
           "username": "Fralas",
-          "claimedAt": 1780943171589
+          "claimedAt": 1780943552216
         },
         "TOWER": null
       },
@@ -105,11 +105,12 @@
       "runwayConfig": {
         "end1": "05",
         "end2": "23",
-        "activeEnd": "2",
+        "activeEnd": "1",
         "qnh": "1013",
         "wind": "270/08",
-        "qfu": "",
-        "cloud": "SCT040"
+        "cloud": "SCT040",
+        "notes": "SCT040",
+        "qfu": ""
       }
     },
     "incirlik": {

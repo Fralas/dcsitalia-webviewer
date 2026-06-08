@@ -276,6 +276,8 @@ export default function AtcStripCard({
   selected = false,
   nextAction = null,
   onSelect,
+  onMoveArm,
+  moveArmed = false,
   onExpand,
   onFieldChange,
   onFieldCommit,
@@ -325,6 +327,7 @@ export default function AtcStripCard({
         readOnly ? 'atc-strip--readonly' : '',
         canEdit ? 'atc-strip--inline-edit' : '',
         inkMode ? 'atc-strip--ink-mode' : '',
+        moveArmed ? 'atc-strip--move-armed' : '',
         hasInk && !inkMode ? 'atc-strip--has-ink' : '',
         interactive ? 'atc-strip--interactive' : '',
       ].filter(Boolean).join(' ')}
@@ -340,6 +343,11 @@ export default function AtcStripCard({
       onDoubleClick={interactive ? (event) => {
         event.stopPropagation();
         onExpand?.(strip);
+      } : undefined}
+      onContextMenu={canEdit && inkMode ? (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onMoveArm?.(strip);
       } : undefined}
     >
       {pendingToc && <span className="atc-strip__badge">TOC</span>}
@@ -364,9 +372,10 @@ export default function AtcStripCard({
         {(inkMode || hasInk) && (
           <AtcStripInkOverlay
             value={strip.stripInk || ''}
-            editable={inkMode}
+            editable={inkMode && !moveArmed}
             onChange={(next) => handleFieldChange('stripInk', next)}
             onCommit={(next) => handleFieldCommit('stripInk', next)}
+            onLongPress={inkMode && !moveArmed ? () => onMoveArm?.(strip) : undefined}
           />
         )}
       </div>

@@ -66,6 +66,8 @@ export default function AtcRunwayPanel({
   runwayStrips = [],
   selectedId,
   moveSourceId,
+  moveArmedId,
+  onMoveArm,
   nextActions = {},
   entryMode,
   onSelect,
@@ -173,8 +175,10 @@ export default function AtcRunwayPanel({
                 strip={strip}
                 selected={selectedId === strip.id}
                 moveSelected={moveSourceId === strip.id}
+                moveArmed={moveArmedId === strip.id}
                 nextAction={nextActions[strip.id]}
                 onSelect={onSelect}
+                onMoveArm={onMoveArm}
                 onFieldChange={onFieldChange}
                 onFieldCommit={onFieldCommit}
                 onInlineEditFocus={onInlineEditFocus}

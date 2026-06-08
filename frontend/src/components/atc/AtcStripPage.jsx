@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Eraser, Keyboard, Loader2, Map, Maximize2, PenLine, Search, TowerControl } from 'lucide-react';
+import { Eraser, Keyboard, Loader2, Map, Maximize2, Move, PenLine, Search, TowerControl } from 'lucide-react';
 
 import * as api from '../../services/api';
 
@@ -120,6 +120,8 @@ export default function AtcStripPage() {
   const [search, setSearch] = useState('');
 
   const [entryMode, setEntryMode] = useState('keyboard');
+
+  const [moveArmedId, setMoveArmedId] = useState(null);
 
   const [chartsOpen, setChartsOpen] = useState(false);
 
@@ -305,6 +307,16 @@ export default function AtcStripPage() {
 
 
 
+  const moveSourceId = useMemo(
+
+    () => (selectedEditable && (entryMode !== 'ink' || moveArmedId === selectedId) ? selectedId : null),
+
+    [selectedEditable, entryMode, moveArmedId, selectedId],
+
+  );
+
+
+
   const showError = (err) => {
 
     setError(translateApiError(err));
@@ -457,6 +469,26 @@ export default function AtcStripPage() {
 
 
 
+  const handleMoveArm = useCallback((strip) => {
+
+    if (!strip?.id || entryMode !== 'ink') return;
+
+    setSelectedId(strip.id);
+
+    setMoveArmedId((prev) => (prev === strip.id ? null : strip.id));
+
+  }, [entryMode]);
+
+
+
+  useEffect(() => {
+
+    if (entryMode !== 'ink') setMoveArmedId(null);
+
+  }, [entryMode]);
+
+
+
   const handleNewStrip = useCallback(async (direction) => {
 
     if (!requireClaimed()) return;
@@ -605,6 +637,8 @@ export default function AtcStripPage() {
 
       setSelectedId(null);
 
+      setMoveArmedId(null);
+
     } catch (err) {
 
       showError(err);
@@ -682,6 +716,8 @@ export default function AtcStripPage() {
       }
 
       setSelectedId(null);
+
+      setMoveArmedId(null);
 
     } catch (err) {
 
@@ -945,45 +981,79 @@ export default function AtcStripPage() {
 
               )}
 
-              <button
-
-                type="button"
-
-                className={`atc-toolbar__btn ${entryMode === 'ink' ? 'atc-toolbar__btn--active' : ''}`}
-
-                onClick={() => setEntryMode((m) => (m === 'ink' ? 'keyboard' : 'ink'))}
-
-                title={entryMode === 'ink' ? t('atc.entry.keyboard') : t('atc.entry.ink')}
-
-              >
-
-                {entryMode === 'ink' ? <Keyboard className="w-4 h-4" /> : <PenLine className="w-4 h-4" />}
-
-                {entryMode === 'ink' ? t('atc.entry.keyboard') : t('atc.entry.ink')}
-
-              </button>
-
-              {entryMode === 'ink' && selectedStrip && (
+              <div className="atc-toolbar__entry-tools">
 
                 <button
 
                   type="button"
 
-                  className="atc-toolbar__btn"
+                  className={`atc-toolbar__btn atc-toolbar__btn--entry-toggle ${entryMode === 'ink' ? 'atc-toolbar__btn--active' : ''}`}
+
+                  onClick={() => setEntryMode((m) => (m === 'ink' ? 'keyboard' : 'ink'))}
+
+                  title={entryMode === 'ink' ? t('atc.entry.keyboard') : t('atc.entry.ink')}
+
+                >
+
+                  {entryMode === 'ink' ? <Keyboard className="w-4 h-4" /> : <PenLine className="w-4 h-4" />}
+
+                  <span className="atc-toolbar__btn-label">
+
+                    {entryMode === 'ink' ? t('atc.entry.keyboard') : t('atc.entry.ink')}
+
+                  </span>
+
+                </button>
+
+                <button
+
+                  type="button"
+
+                  className={`atc-toolbar__btn atc-toolbar__btn--tool-slot ${entryMode === 'ink' && selectedStrip ? 'is-visible' : ''}`}
 
                   onClick={handleClearInk}
 
                   title={t('atc.entry.clearInk')}
 
+                  tabIndex={entryMode === 'ink' && selectedStrip ? 0 : -1}
+
+                  aria-hidden={!(entryMode === 'ink' && selectedStrip)}
+
                 >
 
                   <Eraser className="w-4 h-4" />
 
-                  {t('atc.entry.clearInk')}
+                  <span className="atc-toolbar__btn-label">{t('atc.entry.clearInk')}</span>
 
                 </button>
 
-              )}
+                <button
+
+                  type="button"
+
+                  className={`atc-toolbar__btn atc-toolbar__btn--tool-slot ${entryMode === 'ink' && selectedEditable ? 'is-visible' : ''} ${moveArmedId === selectedId ? 'atc-toolbar__btn--active' : ''}`}
+
+                  onClick={() => selectedStrip && handleMoveArm(selectedStrip)}
+
+                  title={moveArmedId === selectedId ? t('atc.move.disarm') : t('atc.move.arm')}
+
+                  tabIndex={entryMode === 'ink' && selectedEditable ? 0 : -1}
+
+                  aria-hidden={!(entryMode === 'ink' && selectedEditable)}
+
+                >
+
+                  <Move className="w-4 h-4" />
+
+                  <span className="atc-toolbar__btn-label">
+
+                    {moveArmedId === selectedId ? t('atc.move.disarm') : t('atc.move.arm')}
+
+                  </span>
+
+                </button>
+
+              </div>
 
               {selectedEditable && (
 
@@ -1051,7 +1121,11 @@ export default function AtcStripPage() {
 
               selectedId={selectedId}
 
-              moveSourceId={selectedEditable && entryMode !== 'ink' ? selectedId : null}
+              moveSourceId={moveSourceId}
+
+              moveArmedId={moveArmedId}
+
+              onMoveArm={handleMoveArm}
 
               nextActions={nextActions}
 

@@ -657,6 +657,10 @@ export default {
     },
     move: {
       hint: 'Strip selezionata: clicca una fase di destinazione o uno slot tra le strip per riordinare.',
+      inkHint: 'Scrittura grafica: tasto destro sulla strip (o tieni premuto su mobile) per attivare lo spostamento, oppure usa il pulsante Sposta.',
+      inkArmedHint: 'Spostamento attivo: clicca una fase di destinazione o uno slot tra le strip.',
+      arm: 'Sposta',
+      disarm: 'Annulla sposta',
       insertStart: 'Inserisci all\'inizio della fila',
       insertEnd: 'Inserisci alla fine della fila',
       insertBefore: 'Inserisci prima di {callsign}',

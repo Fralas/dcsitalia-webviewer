@@ -45,6 +45,8 @@ function CategoryLane({
   strips,
   selectedId,
   moveSourceId,
+  moveArmedId,
+  onMoveArm,
   nextActions,
   onSelect,
   onFieldChange,
@@ -102,8 +104,10 @@ function CategoryLane({
               strip={strip}
               selected={selectedId === strip.id}
               moveSelected={moveSourceId === strip.id}
+              moveArmed={moveArmedId === strip.id}
               nextAction={nextActions[strip.id]}
               onSelect={onSelect}
+              onMoveArm={onMoveArm}
               onFieldChange={onFieldChange}
               onFieldCommit={onFieldCommit}
               onInlineEditFocus={onInlineEditFocus}
@@ -141,6 +145,8 @@ function CategoryRow({
   strips,
   selectedId,
   moveSourceId,
+  moveArmedId,
+  onMoveArm,
   nextActions,
   onSelect,
   onFieldChange,
@@ -175,6 +181,8 @@ function CategoryRow({
         strips={strips}
         selectedId={selectedId}
         moveSourceId={moveSourceId}
+        moveArmedId={moveArmedId}
+        onMoveArm={onMoveArm}
         nextActions={nextActions}
         onSelect={onSelect}
         onFieldChange={onFieldChange}
@@ -252,6 +260,8 @@ export default function AtcStripBoard({
   operatorRole,
   selectedId,
   moveSourceId,
+  moveArmedId,
+  onMoveArm,
   nextActions = {},
   runwayConfig = {},
   entryMode = 'keyboard',
@@ -325,6 +335,8 @@ export default function AtcStripBoard({
   const rowProps = {
     selectedId,
     moveSourceId,
+    moveArmedId,
+    onMoveArm,
     nextActions,
     onSelect,
     onFieldChange,
@@ -357,12 +369,6 @@ export default function AtcStripBoard({
 
   return (
     <div className="atc-board atc-board--runway">
-      {moveSourceId && (
-        <div className="atc-move-hint" role="status">
-          {t('atc.move.hint')}
-        </div>
-      )}
-
       <section className="atc-board-section atc-board-section--tower">
         {renderCategory(STRIP_CATEGORY.ATZ, OWNER_ROLE.TOWER)}
         {TOWER_PAIRED_CATEGORY_ROWS.map((row) => (
@@ -383,6 +389,8 @@ export default function AtcStripBoard({
         runwayStrips={grouped[STRIP_CATEGORY.RUNWAY] || []}
         selectedId={selectedId}
         moveSourceId={moveSourceId}
+        moveArmedId={moveArmedId}
+        onMoveArm={onMoveArm}
         nextActions={nextActions}
         entryMode={entryMode}
         onSelect={onSelect}

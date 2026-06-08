@@ -657,6 +657,10 @@ export default {
     },
     move: {
       hint: 'Strip selected: click a destination phase or a slot between strips to reorder.',
+      inkHint: 'Ink mode: right-click a strip (or long-press on mobile) to arm move, or use the Move button.',
+      inkArmedHint: 'Move armed: click a destination phase or a slot between strips.',
+      arm: 'Move',
+      disarm: 'Cancel move',
       insertStart: 'Insert at start of row',
       insertEnd: 'Insert at end of row',
       insertBefore: 'Insert before {callsign}',

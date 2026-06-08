@@ -551,13 +551,16 @@ export function applyMove(strip, targetBayId, role, options = {}) {
       if (targetBayId === ATC_BAYS.T_ACTIVE && options.operationalState) {
         operationalState = options.operationalState;
       }
+      const phaseTimes = LATERAL_PHASE_LABELS[operationalState]
+        ? stampLateralPhaseTime(accepted.strip, operationalState)
+        : stampPhaseTime(accepted.strip, ENAV_ACTIONS.AOC);
       return {
         ...accepted,
         strip: {
           ...accepted.strip,
           bayId: targetBayId,
           operationalState,
-          phaseTimes: stampPhaseTime(accepted.strip, ENAV_ACTIONS.AOC),
+          phaseTimes,
         },
         toBay: targetBayId,
       };
@@ -585,12 +588,17 @@ export function applyMove(strip, targetBayId, role, options = {}) {
     ownerRole: getOwnerRoleForBay(targetBayId),
   };
 
-  const moveAction = step?.action;
-  if (moveAction && moveAction !== ENAV_ACTIONS.ACTIVATE) {
-    updated.phaseTimes = stampPhaseTime(strip, moveAction);
+  const lateralLabel = LATERAL_PHASE_LABELS[operationalState];
+  if (lateralLabel) {
+    updated.phaseTimes = stampLateralPhaseTime(strip, operationalState);
+  } else {
+    const moveAction = step?.action;
+    if (moveAction && moveAction !== ENAV_ACTIONS.ACTIVATE) {
+      updated.phaseTimes = stampPhaseTime(strip, moveAction);
+    }
   }
 
-  return { ok: true, strip: updated, fromBay: strip.bayId, toBay: targetBayId, action: moveAction || null };
+  return { ok: true, strip: updated, fromBay: strip.bayId, toBay: targetBayId };
 }
 
 export function defaultRunwayConfig() {
@@ -746,11 +754,29 @@ const PHASE_TIME_LABELS = Object.freeze({
   [ENAV_ACTIONS.L_UP]: 'L/UP',
 });
 
+const LATERAL_PHASE_LABELS = Object.freeze({
+  downwind_left: 'LDW',
+  downwind_right: 'RDW',
+  base_left: 'LB',
+  base_right: 'RB',
+});
+
+export function stampPhaseTimeLabel(strip, label) {
+  if (!label) return strip.phaseTimes || '';
+  const stamp = formatEnavTime(Date.now(), strip);
+  return appendInstruction(strip.phaseTimes || '', `${label} ${stamp}`);
+}
+
 export function stampPhaseTime(strip, actionCode) {
   if (!actionCode || actionCode === ENAV_ACTIONS.ACTIVATE) return strip.phaseTimes || '';
   const label = PHASE_TIME_LABELS[actionCode] || actionCode;
-  const stamp = formatEnavTime(Date.now(), strip);
-  return appendInstruction(strip.phaseTimes || '', `${label} ${stamp}`);
+  return stampPhaseTimeLabel(strip, label);
+}
+
+export function stampLateralPhaseTime(strip, operationalState) {
+  const label = LATERAL_PHASE_LABELS[operationalState];
+  if (!label) return strip.phaseTimes || '';
+  return stampPhaseTimeLabel(strip, label);
 }
 
 export function formatEnavTime(timestamp, strip) {

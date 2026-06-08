@@ -7,14 +7,21 @@ import {
   serializeInk,
 } from './atcInkCore';
 
+const LONG_PRESS_MS = 550;
+const LONG_PRESS_MOVE_PX = 8;
+
 export default function AtcStripInkOverlay({
   value = '',
   editable = false,
   onChange,
   onCommit,
+  onLongPress,
 }) {
   const canvasRef = useRef(null);
   const drawingRef = useRef(false);
+  const longPressTimerRef = useRef(null);
+  const longPressOriginRef = useRef(null);
+  const longPressTriggeredRef = useRef(false);
   const strokesRef = useRef(parseInkValue(value) || []);
 
   useEffect(() => {
@@ -46,10 +53,15 @@ export default function AtcStripInkOverlay({
     return () => ro.disconnect();
   }, [resizeCanvas]);
 
-  const handlePointerDown = (event) => {
-    if (!editable) return;
-    event.preventDefault();
-    event.stopPropagation();
+  const clearLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressOriginRef.current = null;
+  }, []);
+
+  const startStroke = useCallback((event) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     canvas.setPointerCapture(event.pointerId);
@@ -58,10 +70,48 @@ export default function AtcStripInkOverlay({
     strokesRef.current = [...strokesRef.current, { width: 2.4, color: '#111', points: [pt] }];
     redraw();
     onChange?.(serializeInk(strokesRef.current));
+  }, [onChange, redraw]);
+
+  const handlePointerDown = (event) => {
+    if (!editable) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    longPressTriggeredRef.current = false;
+    clearLongPress();
+
+    if (onLongPress) {
+      longPressOriginRef.current = { x: event.clientX, y: event.clientY };
+      longPressTimerRef.current = window.setTimeout(() => {
+        longPressTriggeredRef.current = true;
+        clearLongPress();
+        onLongPress();
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          navigator.vibrate(40);
+        }
+      }, LONG_PRESS_MS);
+      return;
+    }
+
+    startStroke(event);
   };
 
   const handlePointerMove = (event) => {
-    if (!editable || !drawingRef.current) return;
+    if (!editable) return;
+
+    if (longPressTimerRef.current && longPressOriginRef.current) {
+      const dx = event.clientX - longPressOriginRef.current.x;
+      const dy = event.clientY - longPressOriginRef.current.y;
+      if (Math.hypot(dx, dy) > LONG_PRESS_MOVE_PX) {
+        clearLongPress();
+        startStroke(event);
+      }
+      return;
+    }
+
+    if (!drawingRef.current) return;
     event.preventDefault();
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -76,6 +126,11 @@ export default function AtcStripInkOverlay({
   };
 
   const endStroke = (event) => {
+    clearLongPress();
+    if (longPressTriggeredRef.current) {
+      longPressTriggeredRef.current = false;
+      return;
+    }
     if (!drawingRef.current) return;
     drawingRef.current = false;
     if (event?.pointerId && canvasRef.current?.hasPointerCapture?.(event.pointerId)) {
