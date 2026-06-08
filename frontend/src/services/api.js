@@ -860,6 +860,14 @@ export async function setAtcBoardSettings(airportId, manualSort) {
   });
 }
 
+export async function setAtcRunwayConfig(airportId, config) {
+  return fetchAPI('/atc/board/runway', {
+    method: 'POST',
+    body: JSON.stringify({ airportId, ...config }),
+    credentials: 'include',
+  });
+}
+
 export async function createAtcStrip(payload) {
   return fetchAPI('/atc/strips', {
     method: 'POST',
@@ -1013,6 +1021,7 @@ export default {
   getAtcBoard,
   getAtcHistory,
   setAtcBoardSettings,
+  setAtcRunwayConfig,
   createAtcStrip,
   patchAtcStrip,
   moveAtcStrip,

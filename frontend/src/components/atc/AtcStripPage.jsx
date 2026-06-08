@@ -24,7 +24,7 @@ import AtcChartsPanel from './AtcChartsPanel';
 
 import AtcRoleSlots from './AtcRoleSlots';
 
-import { OWNER_ROLE, canEditStrip, resolveClaimedRole } from './atcStripModel';
+import { OWNER_ROLE, canEditStrip, resolveClaimedRole, defaultRunwayConfig } from './atcStripModel';
 
 import { playHandoffAlert, primeHandoffAudio, shouldPlayHandoffAlert } from './atcHandoffSound';
 
@@ -79,6 +79,8 @@ export default function AtcStripPage() {
   const [tocQueue, setTocQueue] = useState([]);
 
   const [manualSort, setManualSort] = useState(false);
+
+  const [runwayConfig, setRunwayConfig] = useState(defaultRunwayConfig);
 
   const [loading, setLoading] = useState(true);
 
@@ -141,6 +143,8 @@ export default function AtcStripPage() {
     setTocQueue(payload.tocQueue || []);
 
     if (payload.manualSort !== undefined) setManualSort(payload.manualSort);
+
+    if (payload.runwayConfig) setRunwayConfig({ ...defaultRunwayConfig(), ...payload.runwayConfig });
 
   }, []);
 
@@ -432,13 +436,35 @@ export default function AtcStripPage() {
 
 
 
-  const handleMoveStrip = async (strip, bayId) => {
+  const handleMoveStrip = async (strip, bayId, { operationalState } = {}) => {
 
     if (!requireClaimed()) return;
 
     try {
 
-      await api.moveAtcStrip(strip.id, { airportId, bayId, role: claimedRole });
+      await api.moveAtcStrip(strip.id, { airportId, bayId, role: claimedRole, operationalState });
+
+    } catch (err) {
+
+      showError(err);
+
+    }
+
+  };
+
+
+
+  const handleRunwayConfigChange = async (patch) => {
+
+    if (!requireClaimed()) return;
+
+    setRunwayConfig((prev) => ({ ...prev, ...patch }));
+
+    try {
+
+      const payload = await api.setAtcRunwayConfig(airportId, { ...patch, role: claimedRole });
+
+      applyBoardPayload(payload);
 
     } catch (err) {
 
@@ -592,6 +618,22 @@ export default function AtcStripPage() {
 
           </label>
 
+          <AtcRoleSlots
+
+            roleSlots={roleSlots}
+
+            userId={user?.id}
+
+            claimedRole={claimedRole}
+
+            onClaim={handleClaimRole}
+
+            onRelease={handleReleaseRole}
+
+            compact
+
+          />
+
         </div>
 
 
@@ -708,22 +750,6 @@ export default function AtcStripPage() {
 
 
 
-      <AtcRoleSlots
-
-        roleSlots={roleSlots}
-
-        userId={user?.id}
-
-        claimedRole={claimedRole}
-
-        onClaim={handleClaimRole}
-
-        onRelease={handleReleaseRole}
-
-      />
-
-
-
       {!claimedRole && (
 
         <div className="atc-banner atc-banner--warn">{t('atc.errors.claimToOperate')}</div>
@@ -770,6 +796,8 @@ export default function AtcStripPage() {
 
               nextActions={nextActions}
 
+              runwayConfig={runwayConfig}
+
               onSelect={(strip) => setSelectedId(strip.id)}
 
               onEdit={(strip) => {
@@ -791,6 +819,8 @@ export default function AtcStripPage() {
               onCancelHandoff={handleCancelHandoff}
 
               onMoveStrip={handleMoveStrip}
+
+              onRunwayConfigChange={handleRunwayConfigChange}
 
               activeDragId={activeDragId}
 
@@ -828,11 +858,13 @@ export default function AtcStripPage() {
 
         )}
 
+        <aside className="atc-history-side">
+
+          <AtcHistoryPanel entries={history} filterCallsign={search} />
+
+        </aside>
+
       </div>
-
-
-
-      <AtcHistoryPanel entries={history} filterCallsign={search} />
 
 
 

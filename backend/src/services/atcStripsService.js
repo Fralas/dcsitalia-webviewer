@@ -24,6 +24,8 @@ import {
   buildDemoStrips,
   isGroundStorageBay,
   isTowerBay,
+  defaultRunwayConfig,
+  canEditStrip,
 } from './atcStripModel.js';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data/atc');
@@ -120,11 +122,13 @@ function getAirportBoard(airportId) {
       manualSort: false,
       roleSlots: createEmptyRoleSlots(),
       tocQueue: [],
+      runwayConfig: defaultRunwayConfig(),
     };
   }
   const board = boardState.airports[airportId];
   if (!board.roleSlots) board.roleSlots = createEmptyRoleSlots();
   if (!Array.isArray(board.tocQueue)) board.tocQueue = [];
+  if (!board.runwayConfig) board.runwayConfig = defaultRunwayConfig();
   return board;
 }
 
@@ -173,24 +177,18 @@ function assertRoleClaimed(board, user, role) {
 }
 
 function assertStripEditableByRole(strip, role, { allowCancelHandoff = false, allowCoordinate = false } = {}) {
-  if (role === OWNER_ROLE.GROUND) {
-    if (allowCoordinate && isHandoffToGround(strip)) return null;
-    if (allowCancelHandoff && strip.handoffActive && isHandoffToTower(strip)) return null;
-    if (isHandoffToGround(strip) && strip.bayId === ATC_BAYS.G_HP) return null;
-    if (isGroundStorageBay(strip.bayId) && !strip.handoffActive) return null;
+  if (allowCoordinate) {
+    if (role === OWNER_ROLE.TOWER && isHandoffToTower(strip)) return null;
+    if (role === OWNER_ROLE.GROUND && isHandoffToGround(strip)) return null;
+  }
+  if (allowCancelHandoff) {
+    if (role === OWNER_ROLE.GROUND && isHandoffToTower(strip)) return null;
+    if (role === OWNER_ROLE.TOWER && isHandoffToGround(strip)) return null;
+  }
+  if (!canEditStrip(strip, role)) {
     return { error: 'STRIP_NOT_IN_YOUR_SECTOR', status: 403 };
   }
-
-  if (role === OWNER_ROLE.TOWER) {
-    if (allowCoordinate && isHandoffToTower(strip)) return null;
-    if (allowCancelHandoff && strip.handoffActive && isHandoffToGround(strip)) return null;
-    if (isHandoffToGround(strip)) return null;
-    if (isTowerBay(strip.bayId) && !strip.handoffActive) return null;
-    if (strip.handoffActive && isHandoffToTower(strip)) return null;
-    return { error: 'STRIP_NOT_IN_YOUR_SECTOR', status: 403 };
-  }
-
-  return { error: 'INVALID_ROLE', status: 400 };
+  return null;
 }
 
 function assertTargetBayForRole(targetBayId, role) {
@@ -214,6 +212,12 @@ function findStrip(airportId, stripId) {
   const board = getAirportBoard(airportId);
   const strip = board.strips.find((s) => s.id === stripId);
   return { board, strip };
+}
+
+function nextStripPosition(board, bayId) {
+  const inBay = board.strips.filter((s) => s.bayId === bayId);
+  const maxPos = inBay.reduce((max, s) => Math.max(max, Number.isFinite(s.position) ? s.position : 0), 0);
+  return maxPos + 1;
 }
 
 export function initAtcStripsService() {
@@ -254,6 +258,7 @@ export function getBoardPayload(airportId) {
     airportId,
     strips: board.strips,
     manualSort: board.manualSort,
+    runwayConfig: { ...defaultRunwayConfig(), ...board.runwayConfig },
     recentHistory,
     nextActions,
     roleSlots: board.roleSlots,
@@ -329,6 +334,42 @@ export function setManualSort(airportId, manualSort) {
   return getBoardPayload(airportId);
 }
 
+export function setRunwayConfig(airportId, config, user, role) {
+  if (!user?.id) return { error: 'NOT_AUTHENTICATED', status: 401 };
+  const board = getAirportBoard(airportId);
+  const authErr = assertRoleClaimed(board, user, role);
+  if (authErr) return authErr;
+
+  const current = { ...defaultRunwayConfig(), ...board.runwayConfig };
+  const next = { ...current };
+
+  if (config.end1 !== undefined) next.end1 = String(config.end1).slice(0, 3);
+  if (config.end2 !== undefined) next.end2 = String(config.end2).slice(0, 3);
+  if (config.qnh !== undefined) next.qnh = String(config.qnh).slice(0, 8);
+  if (config.wind !== undefined) next.wind = String(config.wind).slice(0, 16);
+  if (config.qfu !== undefined) next.qfu = String(config.qfu).slice(0, 8);
+  if (config.cloud !== undefined) next.cloud = String(config.cloud).slice(0, 24);
+
+  if (config.activeEnd !== undefined) {
+    if (role !== OWNER_ROLE.TOWER) {
+      return { error: 'TOWER_ONLY', status: 403 };
+    }
+    next.activeEnd = config.activeEnd === '2' ? '2' : '1';
+  }
+
+  board.runwayConfig = next;
+  appendHistory({
+    airportId,
+    action: 'RUNWAY_CONFIG',
+    role,
+    userId: user.id,
+    callsign: null,
+    meta: next,
+  });
+  persist();
+  return getBoardPayload(airportId);
+}
+
 export function createStrip(airportId, payload, user) {
   const board = getAirportBoard(airportId);
   const role = payload.role;
@@ -349,6 +390,8 @@ export function createStrip(airportId, payload, user) {
     createdBy: user?.id || user?.userId || null,
     flags: { highlighted: false, unread: false, dynamic: true },
   });
+
+  strip.position = nextStripPosition(board, strip.bayId);
 
   board.strips.push(strip);
   appendHistory({
@@ -397,7 +440,7 @@ export function updateStrip(airportId, stripId, payload, user) {
   return { strip, payload: getBoardPayload(airportId), lastAction: 'UPDATE' };
 }
 
-export function moveStrip(airportId, stripId, { bayId, position, action, role }, user) {
+export function moveStrip(airportId, stripId, { bayId, position, action, role, operationalState }, user) {
   const { board, strip } = findStrip(airportId, stripId);
   if (!strip) return { error: 'STRIP_NOT_FOUND', status: 404 };
 
@@ -416,7 +459,10 @@ export function moveStrip(airportId, stripId, { bayId, position, action, role },
   if (action) {
     result = applyAction(strip, action);
   } else if (bayId) {
-    result = applyMove(strip, bayId, role);
+    result = applyMove(strip, bayId, role, { operationalState });
+    if (result.ok && bayId === strip.bayId && operationalState && result.strip) {
+      result.strip.operationalState = operationalState;
+    }
   } else {
     return { error: 'MISSING_TARGET', status: 400 };
   }
@@ -424,7 +470,11 @@ export function moveStrip(airportId, stripId, { bayId, position, action, role },
   if (!result.ok) return { error: result.error, status: 400 };
 
   const updated = { ...result.strip, updatedAt: Date.now() };
-  if (Number.isFinite(position)) updated.position = position;
+  if (Number.isFinite(position)) {
+    updated.position = position;
+  } else if (bayId && result.toBay !== result.fromBay) {
+    updated.position = nextStripPosition(board, updated.bayId);
+  }
 
   if (result.enqueue) enqueueHandoff(board, stripId);
   if (result.dequeue) dequeueHandoff(board, stripId);

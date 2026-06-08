@@ -2,6 +2,7 @@ import { Pencil } from 'lucide-react';
 import {
   STRIP_DIRECTION,
   getStripModelClass,
+  getStripStateCode,
   isPendingGroundCoordination,
   isPendingTowerCoordination,
 } from './atcStripModel';
@@ -26,8 +27,21 @@ function formatEtaDisplay(value) {
   );
 }
 
+function formatStateCell(stateCode, text) {
+  if (!stateCode && !text) return '';
+  if (!text) return stateCode;
+  if (!stateCode) return text;
+  return (
+    <>
+      <span className="atc-state-code">{stateCode}</span>
+      <span className="atc-state-text">{text}</span>
+    </>
+  );
+}
+
 /** Mod. A/C/E — arrivi e sorvoli (layout ENAV) */
 function ArrivalStrip({ strip }) {
+  const stateCode = getStripStateCode(strip);
   return (
     <div className="atc-strip__grid atc-strip__grid--arr">
       <div className="atc-strip__sec-ab">
@@ -74,13 +88,16 @@ function ArrivalStrip({ strip }) {
         </Cell>
       </div>
 
-      <Cell label="M" className="atc-cell--m" labelCorner="br">{strip.remarks || ''}</Cell>
+      <Cell label="M" className="atc-cell--m" labelCorner="br">
+        {formatStateCell(stateCode, strip.remarks)}
+      </Cell>
     </div>
   );
 }
 
 /** Mod. B/D — partenze (layout ENAV) */
 function DepartureStrip({ strip }) {
+  const stateCode = getStripStateCode(strip);
   return (
     <div className="atc-strip__grid atc-strip__grid--dep">
       <div className="atc-strip__sec-dep-left">
@@ -121,7 +138,9 @@ function DepartureStrip({ strip }) {
       </div>
 
       <div className="atc-strip__sec-dep-right">
-        <Cell label="K" className="atc-cell--k-dep" labelCorner="tr">{strip.clearanceText || ''}</Cell>
+        <Cell label="K" className="atc-cell--k-dep" labelCorner="tr">
+          {formatStateCell(stateCode, strip.clearanceText)}
+        </Cell>
         <Cell label="L" className="atc-cell--l-dep" labelCorner="br">{strip.instructions || ''}</Cell>
       </div>
     </div>

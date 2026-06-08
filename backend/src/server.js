@@ -4701,6 +4701,16 @@ app.post('/api/atc/board/settings', (req, res) => {
   res.json(payload);
 });
 
+app.post('/api/atc/board/runway', (req, res) => {
+  if (!requireAtcSession(req, res)) return;
+  const airportId = String(req.body?.airportId || 'aleppo');
+  const { role, ...config } = req.body || {};
+  const result = atcStripsService.setRunwayConfig(airportId, config, req.session.user, role);
+  if (result.error) return res.status(result.status).json({ error: result.error });
+  emitAtcUpdated(airportId, result, 'RUNWAY_CONFIG');
+  res.json(result);
+});
+
 app.post('/api/atc/strips', (req, res) => {
   if (!requireAtcSession(req, res)) return;
   const airportId = String(req.body?.airportId || 'aleppo');

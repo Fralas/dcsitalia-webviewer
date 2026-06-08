@@ -5,15 +5,15 @@
         {
           "id": "demo_aleppo_1",
           "airportId": "aleppo",
-          "position": 0,
+          "position": 6,
           "coordinationStatus": "accepted",
           "createdAt": 1780910934169,
-          "updatedAt": 1780912116080,
+          "updatedAt": 1780917566224,
           "createdBy": "system",
           "direction": "arr",
           "model": "A",
-          "bayId": "g_taxi",
-          "operationalState": "taxi_in",
+          "bayId": "g_hp",
+          "operationalState": "pending_ground",
           "ownerRole": "GROUND",
           "flags": {
             "highlighted": false,
@@ -35,45 +35,11 @@
           "destination": "OSAP",
           "stand": "",
           "standAcknowledged": false,
-          "remarks": "INBOUND ESTIMATE | FIN 48 | L 48 | RV 48 | TXI 48",
+          "remarks": "INBOUND ESTIMATE | FIN 48 | L 48 | RV 48 | TXI 48 | TOG 1319",
           "handoffActive": false,
           "handoffFromBay": null,
-          "queuePosition": null
-        },
-        {
-          "id": "demo_aleppo_2",
-          "airportId": "aleppo",
-          "position": 1,
-          "coordinationStatus": null,
-          "createdAt": 1780910934169,
-          "updatedAt": 1780912105510,
-          "createdBy": "system",
-          "direction": "arr",
-          "model": "A",
-          "bayId": "g_taxi",
-          "operationalState": "taxi_in",
-          "ownerRole": "GROUND",
-          "flags": {
-            "highlighted": false,
-            "unread": false,
-            "dynamic": true
-          },
-          "eta": "1153",
-          "flightRule": "I",
-          "origin": "LIRF",
-          "aircraftType": "B738",
-          "wakeCategory": "M",
-          "callsign": "ITY204",
-          "tas": "",
-          "ata": "",
-          "pilotEstimate": "",
-          "previousFix": "",
-          "ato": "",
-          "atl": "",
-          "destination": "OSAP",
-          "stand": "A04",
-          "standAcknowledged": false,
-          "remarks": "B MHP | FIN 48 | L 48 | RV 48 | TXI 48"
+          "queuePosition": null,
+          "handoffTarget": null
         },
         {
           "id": "demo_aleppo_3",
@@ -120,12 +86,12 @@
           "position": 3,
           "coordinationStatus": null,
           "createdAt": 1780910934169,
-          "updatedAt": 1780912625291,
+          "updatedAt": 1780916890535,
           "createdBy": "system",
           "direction": "dep",
           "model": "B",
-          "bayId": "g_stand",
-          "operationalState": "startup",
+          "bayId": "g_hp",
+          "operationalState": "holding",
           "ownerRole": "GROUND",
           "flags": {
             "highlighted": false,
@@ -150,16 +116,16 @@
         {
           "id": "demo_aleppo_5",
           "airportId": "aleppo",
-          "position": 4,
-          "coordinationStatus": null,
+          "position": 1,
+          "coordinationStatus": "accepted",
           "createdAt": 1780910934169,
-          "updatedAt": 1780910934169,
+          "updatedAt": 1780918020344,
           "createdBy": "system",
           "direction": "dep",
           "model": "B",
-          "bayId": "g_taxi",
-          "operationalState": "taxi",
-          "ownerRole": "GROUND",
+          "bayId": "t_active",
+          "operationalState": "base",
+          "ownerRole": "TOWER",
           "flags": {
             "highlighted": false,
             "unread": false,
@@ -178,7 +144,11 @@
           "ssr": "1200",
           "delay": "",
           "clearanceText": "",
-          "instructions": "TXI 14"
+          "instructions": "TXI 14 | TOC 1312",
+          "handoffActive": false,
+          "handoffTarget": null,
+          "handoffFromBay": null,
+          "queuePosition": null
         },
         {
           "id": "demo_aleppo_6",
@@ -186,7 +156,7 @@
           "position": 5,
           "coordinationStatus": null,
           "createdAt": 1780910934169,
-          "updatedAt": 1780910934169,
+          "updatedAt": 1780917544786,
           "createdBy": "system",
           "direction": "dep",
           "model": "B",
@@ -211,19 +181,73 @@
           "ssr": "",
           "delay": "",
           "clearanceText": "",
-          "instructions": "TXI 16 | HP 18"
+          "instructions": "TXI 16 | HP 18 | HP 1313 | TOC 1313",
+          "handoffActive": false,
+          "handoffTarget": null,
+          "handoffFromBay": null,
+          "queuePosition": null
+        },
+        {
+          "id": "660a322e-1e12-473f-84c3-cbce27416d7f",
+          "airportId": "aleppo",
+          "model": "B",
+          "direction": "dep",
+          "bayId": "t_active",
+          "position": 0,
+          "ownerRole": "TOWER",
+          "coordinationStatus": "accepted",
+          "operationalState": "tower_active",
+          "handoffActive": false,
+          "handoffTarget": null,
+          "handoffFromBay": null,
+          "queuePosition": null,
+          "flags": {
+            "highlighted": false,
+            "unread": false,
+            "dynamic": true
+          },
+          "createdAt": 1780915346732,
+          "updatedAt": 1780918013287,
+          "createdBy": "675706661570347041",
+          "eobt": "",
+          "flightRule": "I",
+          "callsign": "AW9DAHWDIAUHW",
+          "aircraftType": "",
+          "destination": "",
+          "runway": "",
+          "sid": "",
+          "levelPlanned": "",
+          "level": "",
+          "startup": "",
+          "taxiAuth": "",
+          "clearanceTimes": "",
+          "ssr": "",
+          "delay": "",
+          "route": "",
+          "clearanceText": "",
+          "instructions": "NSEF HP5 | S/UP 1313 | TXI 1313 | HP 1313 | TOC 1326",
+          "remarks": ""
         }
       ],
       "manualSort": false,
       "roleSlots": {
-        "GROUND": {
+        "GROUND": null,
+        "TOWER": {
           "userId": "675706661570347041",
           "username": "Fralas",
-          "claimedAt": 1780912120319
-        },
-        "TOWER": null
+          "claimedAt": 1780918009996
+        }
       },
-      "tocQueue": []
+      "tocQueue": [],
+      "runwayConfig": {
+        "end1": "05",
+        "end2": "23",
+        "activeEnd": "1",
+        "qnh": "1013",
+        "wind": "270/08",
+        "qfu": "",
+        "cloud": "SCT040"
+      }
     },
     "incirlik": {
       "strips": [
@@ -270,7 +294,7 @@
         "TOWER": {
           "userId": "675706661570347041",
           "username": "Fralas",
-          "claimedAt": 1780913094481
+          "claimedAt": 1780916294363
         }
       },
       "tocQueue": []

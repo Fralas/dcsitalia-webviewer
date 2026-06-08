@@ -389,7 +389,7 @@ export function applyAction(strip, actionCode) {
   return { ok: true, strip: updated, action: actionCode, fromBay: strip.bayId, toBay: next.bay };
 }
 
-export function applyMove(strip, targetBayId, role) {
+export function applyMove(strip, targetBayId, role, options = {}) {
   if (targetBayId === ATC_BAYS.G_HANDOFF) {
     if (role !== OWNER_ROLE.GROUND || strip.bayId !== ATC_BAYS.G_HP || isHandoffToGround(strip)) {
       return { ok: false, error: 'INVALID_BAY_TRANSITION' };
@@ -410,14 +410,53 @@ export function applyMove(strip, targetBayId, role) {
 
   const flow = getFlowForDirection(strip.direction);
   const step = flow.find((s) => s.bay === targetBayId);
+  let operationalState = step?.state || strip.operationalState;
+  if (targetBayId === ATC_BAYS.T_ACTIVE && options.operationalState) {
+    operationalState = options.operationalState;
+  }
   const updated = {
     ...strip,
     bayId: targetBayId,
-    operationalState: step?.state || strip.operationalState,
+    operationalState,
     ownerRole: getOwnerRoleForBay(targetBayId),
   };
 
   return { ok: true, strip: updated, fromBay: strip.bayId, toBay: targetBayId };
+}
+
+export function defaultRunwayConfig() {
+  return {
+    end1: '05',
+    end2: '23',
+    activeEnd: '1',
+    qnh: '1013',
+    wind: '270/08',
+    qfu: '',
+    cloud: 'SCT040',
+  };
+}
+
+export function canEditStrip(strip, role) {
+  if (!role || !strip) return false;
+
+  if (role === OWNER_ROLE.GROUND) {
+    if (isHandoffToGround(strip)) return true;
+    if (isHandoffToTower(strip)) return true;
+    if (strip.ownerRole === OWNER_ROLE.TOWER) return false;
+    if (strip.bayId?.startsWith('t_')) return false;
+    return isGroundStorageBay(strip.bayId);
+  }
+
+  if (role === OWNER_ROLE.TOWER) {
+    if (isHandoffToTower(strip)) return true;
+    if (isHandoffToGround(strip)) return false;
+    if (strip.bayId === ATC_BAYS.G_HP) return false;
+    if (isTowerBay(strip.bayId) && strip.bayId !== ATC_BAYS.T_HANDOFF) return true;
+    if (strip.bayId === ATC_BAYS.ARCHIVE) return true;
+    return false;
+  }
+
+  return false;
 }
 
 export function acceptGroundCoordination(strip) {
@@ -425,13 +464,13 @@ export function acceptGroundCoordination(strip) {
     return { ok: false, error: 'NO_PENDING_COORDINATION' };
   }
 
-  const targetBay = ATC_BAYS.G_TAXI;
+  const targetBay = ATC_BAYS.G_HP;
   return {
     ok: true,
     strip: {
       ...strip,
       bayId: targetBay,
-      operationalState: 'taxi_in',
+      operationalState: 'holding',
       coordinationStatus: COORDINATION_STATUS.ACCEPTED,
       handoffActive: false,
       handoffTarget: null,

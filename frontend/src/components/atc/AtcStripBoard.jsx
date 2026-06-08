@@ -8,22 +8,21 @@ import {
   closestCenter,
   useDroppable,
 } from '@dnd-kit/core';
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import AtcStripCard from './AtcStripCard';
+import AtcSortableStrip from './AtcSortableStrip';
+import AtcRunwayPanel from './AtcRunwayPanel';
 import {
   ATC_BAYS,
-  BAY_META,
-  GROUND_BAYS,
-  TOWER_BAYS,
   OWNER_ROLE,
-  groupStripsForFullBoard,
+  STRIP_CATEGORY,
+  TOWER_CATEGORY_ORDER,
+  GROUND_CATEGORY_ORDER,
+  groupStripsByCategory,
   canEditStrip,
-  isBayOwnedByRole,
+  isCategoryOwnedByRole,
+  getTargetBayForCategory,
+  getOperationalStateForCategory,
   isHandoffToGround,
   isHandoffToTower,
   isPendingGroundCoordination,
@@ -31,65 +30,44 @@ import {
 } from './atcStripModel';
 import { t } from '../../utils/locale';
 
-function SortableStrip({
-  strip,
-  selected,
-  nextAction,
-  onSelect,
-  onEdit,
-  onAction,
-  onCoordinate,
-  onCancelHandoff,
-  operatorRole,
-  readOnly,
-  sectorReadOnly,
-}) {
-  const editable = !readOnly && !sectorReadOnly && canEditStrip(strip, operatorRole);
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: strip.id,
-    data: { strip, bayId: strip.bayId },
-    disabled: !editable,
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-  };
-
-  return (
-    <div ref={setNodeRef} style={style} {...(editable ? { ...attributes, ...listeners } : {})}>
-      <AtcStripCard
-        strip={strip}
-        selected={selected}
-        nextAction={nextAction}
-        onSelect={onSelect}
-        onEdit={editable ? onEdit : undefined}
-        onAction={onAction}
-        onCoordinate={onCoordinate}
-        onCancelHandoff={onCancelHandoff}
-        operatorRole={operatorRole}
-        readOnly={!editable}
-      />
-    </div>
-  );
+function categoryDropId(categoryId) {
+  return `cat_${categoryId}`;
 }
 
-function DroppableBay({ bayId, disabled, children }) {
-  const { setNodeRef, isOver } = useDroppable({ id: bayId, data: { bayId }, disabled });
+function parseCategoryDropId(id) {
+  if (typeof id !== 'string' || !id.startsWith('cat_')) return null;
+  return id.slice(4);
+}
+
+function isSharedCategory(categoryId) {
+  return categoryId === STRIP_CATEGORY.HP;
+}
+
+function isCategoryDropAllowed(categoryId, role) {
+  if (categoryId === STRIP_CATEGORY.HP && role === OWNER_ROLE.TOWER) return false;
+  return isCategoryOwnedByRole(categoryId, role);
+}
+
+function DroppableCategory({ categoryId, disabled, children }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: categoryDropId(categoryId),
+    data: { categoryId },
+    disabled,
+  });
+
   return (
     <div
       ref={setNodeRef}
-      className={`atc-bay-drop ${isOver && !disabled ? 'atc-bay-drop--over' : ''} ${disabled ? 'atc-bay-drop--locked' : ''}`}
-      data-bay-drop={bayId}
+      className={`atc-category-drop ${isOver && !disabled ? 'atc-category-drop--over' : ''} ${disabled ? 'atc-category-drop--locked' : ''}`}
+      data-category={categoryId}
     >
       {children}
     </div>
   );
 }
 
-function BayColumn({
-  bayId,
+function CategoryRow({
+  categoryId,
   strips,
   selectedId,
   nextActions,
@@ -102,23 +80,22 @@ function BayColumn({
   readOnly,
   sectorReadOnly,
 }) {
-  const meta = BAY_META[bayId];
   const pendingCount = strips.filter(
     (s) => isPendingTowerCoordination(s) || isPendingGroundCoordination(s),
   ).length;
-  const bayLocked = readOnly || sectorReadOnly;
+  const labelKey = `atc.categories.${categoryId}`;
 
   return (
-    <div className={`atc-bay ${pendingCount ? 'atc-bay--alert' : ''} ${bayLocked ? 'atc-bay--readonly' : ''}`} data-bay={bayId}>
-      <div className="atc-bay__header">
-        <span>{t(meta?.labelKey || bayId)}</span>
-        <span className="atc-bay__count">{strips.length}</span>
-        {pendingCount > 0 && <span className="atc-bay__pending">{pendingCount}</span>}
+    <div className={`atc-category-row ${pendingCount ? 'atc-category-row--alert' : ''} ${sectorReadOnly ? 'atc-category-row--readonly' : ''}`}>
+      <div className="atc-category-row__label">
+        <span>{t(labelKey)}</span>
+        <span className="atc-category-row__count">{strips.length}</span>
+        {pendingCount > 0 && <span className="atc-category-row__pending">{pendingCount}</span>}
       </div>
-      <SortableContext items={strips.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-        <div className="atc-bay__strips">
+      <SortableContext items={strips.map((s) => s.id)} strategy={horizontalListSortingStrategy}>
+        <div className="atc-category-row__strips">
           {strips.map((strip) => (
-            <SortableStrip
+            <AtcSortableStrip
               key={strip.id}
               strip={strip}
               selected={selectedId === strip.id}
@@ -130,7 +107,7 @@ function BayColumn({
               onCancelHandoff={onCancelHandoff}
               operatorRole={operatorRole}
               readOnly={readOnly}
-              sectorReadOnly={bayLocked}
+              sectorReadOnly={sectorReadOnly}
             />
           ))}
         </div>
@@ -139,29 +116,25 @@ function BayColumn({
   );
 }
 
-const BOARD_SECTIONS = [
-  { role: OWNER_ROLE.GROUND, bays: GROUND_BAYS, titleKey: 'atc.roles.ground' },
-  { role: OWNER_ROLE.TOWER, bays: TOWER_BAYS, titleKey: 'atc.roles.tower' },
-];
-
 export default function AtcStripBoard({
   strips = [],
   operatorRole,
   selectedId,
   nextActions = {},
+  runwayConfig = {},
   onSelect,
   onEdit,
   onAction,
   onCoordinate,
   onCancelHandoff,
   onMoveStrip,
+  onRunwayConfigChange,
   activeDragId,
   setActiveDragId,
   readOnly = false,
 }) {
-  const grouped = useMemo(() => groupStripsForFullBoard(strips), [strips]);
+  const grouped = useMemo(() => groupStripsByCategory(strips), [strips]);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
-
   const activeStrip = strips.find((s) => s.id === activeDragId);
 
   const handleDragEnd = (event) => {
@@ -172,31 +145,65 @@ export default function AtcStripBoard({
     const strip = strips.find((s) => s.id === active.id);
     if (!strip || !canEditStrip(strip, operatorRole)) return;
 
-    const overBay = over.data?.current?.bayId || over.id;
-    const isBay = typeof overBay === 'string' && (
-      overBay.startsWith('g_') || overBay.startsWith('t_') || overBay === ATC_BAYS.ARCHIVE
-    );
-    if (!isBay || !isBayOwnedByRole(overBay, operatorRole)) return;
+    const categoryId = parseCategoryDropId(over.id) || over.data?.current?.categoryId;
+    if (!categoryId) return;
 
-    if (isHandoffToTower(strip) && overBay.startsWith('g_') && overBay !== ATC_BAYS.G_HANDOFF) {
-      onCancelHandoff?.(strip, overBay);
+    if (!isCategoryDropAllowed(categoryId, operatorRole)) return;
+
+    const targetBay = getTargetBayForCategory(strip, categoryId);
+
+    if (isHandoffToTower(strip) && categoryId !== STRIP_CATEGORY.ATZ) {
+      if (categoryId === STRIP_CATEGORY.HP || categoryId === STRIP_CATEGORY.TAXI || categoryId === STRIP_CATEGORY.STAND) {
+        onCancelHandoff?.(strip, targetBay);
+      }
       return;
     }
 
-    if (isHandoffToGround(strip) && overBay.startsWith('t_') && overBay !== ATC_BAYS.T_HANDOFF) {
-      onCancelHandoff?.(strip, overBay);
+    if (isHandoffToGround(strip) && categoryId !== STRIP_CATEGORY.HP) {
+      if ([STRIP_CATEGORY.ATZ, STRIP_CATEGORY.DOWNWIND, STRIP_CATEGORY.BASE, STRIP_CATEGORY.FINAL, STRIP_CATEGORY.RUNWAY].includes(categoryId)) {
+        onCancelHandoff?.(strip, targetBay);
+      }
       return;
     }
 
-    let displayBay = strip.bayId;
-    if (isHandoffToTower(strip)) displayBay = ATC_BAYS.G_HANDOFF;
-    if (isHandoffToGround(strip)) displayBay = ATC_BAYS.T_HANDOFF;
-    if (overBay !== displayBay) {
-      onMoveStrip?.(strip, overBay);
-    }
+    const operationalState = getOperationalStateForCategory(categoryId);
+    const sameBay = targetBay === strip.bayId;
+    const sameState = !operationalState || operationalState === strip.operationalState;
+
+    if (sameBay && sameState) return;
+
+    onMoveStrip?.(strip, targetBay, { operationalState });
   };
 
   if (!operatorRole) return null;
+
+  const renderCategory = (categoryId, sectorRole) => {
+    const shared = isSharedCategory(categoryId);
+    const sectorReadOnly = shared ? false : sectorRole !== operatorRole;
+    const categoryLocked = readOnly || (!shared && sectorReadOnly) || !isCategoryDropAllowed(categoryId, operatorRole);
+    const categoryStrips = grouped[categoryId] || [];
+
+    return (
+      <DroppableCategory key={categoryId} categoryId={categoryId} disabled={categoryLocked}>
+        <CategoryRow
+          categoryId={categoryId}
+          strips={categoryStrips}
+          selectedId={selectedId}
+          nextActions={nextActions}
+          onSelect={onSelect}
+          onEdit={onEdit}
+          onAction={onAction}
+          onCoordinate={onCoordinate}
+          onCancelHandoff={onCancelHandoff}
+          operatorRole={operatorRole}
+          readOnly={readOnly}
+          sectorReadOnly={categoryLocked}
+        />
+      </DroppableCategory>
+    );
+  };
+
+  const runwayLocked = readOnly || operatorRole !== OWNER_ROLE.TOWER;
 
   return (
     <DndContext
@@ -210,47 +217,33 @@ export default function AtcStripBoard({
       }}
       onDragEnd={handleDragEnd}
     >
-      <div className="atc-board">
-        {BOARD_SECTIONS.map((section) => {
-          const sectorReadOnly = section.role !== operatorRole;
-          return (
-            <section
-              key={section.role}
-              className={`atc-board-section ${sectorReadOnly ? 'atc-board-section--readonly' : ''}`}
-            >
-              <h3 className="atc-board-section__title">
-                {t(section.titleKey)}
-                {sectorReadOnly && (
-                  <span className="atc-board-section__badge">{t('atc.otherSector')}</span>
-                )}
-              </h3>
-              <div className="atc-board-section__columns">
-                {section.bays.map((bayId) => {
-                  const bayLocked = sectorReadOnly || !isBayOwnedByRole(bayId, operatorRole);
-                  return (
-                    <DroppableBay key={bayId} bayId={bayId} disabled={bayLocked || readOnly}>
-                      <BayColumn
-                        bayId={bayId}
-                        strips={grouped[bayId] || []}
-                        selectedId={selectedId}
-                        nextActions={nextActions}
-                        onSelect={onSelect}
-                        onEdit={onEdit}
-                        onAction={onAction}
-                        onCoordinate={onCoordinate}
-                        onCancelHandoff={onCancelHandoff}
-                        operatorRole={operatorRole}
-                        readOnly={readOnly}
-                        sectorReadOnly={bayLocked}
-                      />
-                    </DroppableBay>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })}
+      <div className="atc-board atc-board--runway">
+        <section className="atc-board-section atc-board-section--tower">
+          {TOWER_CATEGORY_ORDER.map((cat) => renderCategory(cat, OWNER_ROLE.TOWER))}
+        </section>
+
+        <AtcRunwayPanel
+          config={runwayConfig}
+          runwayStrips={grouped[STRIP_CATEGORY.RUNWAY] || []}
+          selectedId={selectedId}
+          nextActions={nextActions}
+          onSelect={onSelect}
+          onEdit={onEdit}
+          onAction={onAction}
+          onCoordinate={onCoordinate}
+          onCancelHandoff={onCancelHandoff}
+          operatorRole={operatorRole}
+          onConfigChange={onRunwayConfigChange}
+          readOnly={readOnly}
+          runwayDropDisabled={runwayLocked}
+        />
+
+        <section className="atc-board-section atc-board-section--ground">
+          {GROUND_CATEGORY_ORDER.map((cat) => renderCategory(cat, OWNER_ROLE.GROUND))}
+          {(grouped[STRIP_CATEGORY.INACTIVE]?.length > 0) && renderCategory(STRIP_CATEGORY.INACTIVE, OWNER_ROLE.GROUND)}
+        </section>
       </div>
+
       <DragOverlay>
         {activeStrip ? (
           <AtcStripCard strip={activeStrip} selected={false} readOnly />
