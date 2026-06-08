@@ -1,0 +1,367 @@
+{
+  "entries": [
+    {
+      "id": "31367e6f-6110-4311-8872-7c58b97d13a6",
+      "timestamp": 1780910639461,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_4",
+      "action": "MOVE",
+      "fromBay": "g_stand",
+      "toBay": "g_active",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "DCORE01"
+    },
+    {
+      "id": "17bd13e3-4a2c-48e5-9a46-591c45263f41",
+      "timestamp": 1780910655154,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_5",
+      "action": "MOVE",
+      "fromBay": "g_taxi",
+      "toBay": "g_stand",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "REACH33"
+    },
+    {
+      "id": "652b35fe-e6c8-469e-ac17-a6f448466b10",
+      "timestamp": 1780910657185,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_6",
+      "action": "MOVE",
+      "fromBay": "g_hp",
+      "toBay": "g_taxi",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "SPAR11"
+    },
+    {
+      "id": "22d79345-55a0-4fd9-a5a4-26892c046317",
+      "timestamp": 1780910658341,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_6",
+      "action": "MOVE",
+      "fromBay": "g_taxi",
+      "toBay": "g_hp",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "SPAR11"
+    },
+    {
+      "id": "2f8d1f92-bd17-44b0-9d07-86e7979b73a9",
+      "timestamp": 1780910659292,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_6",
+      "action": "MOVE",
+      "fromBay": "g_hp",
+      "toBay": "g_handoff",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "SPAR11"
+    },
+    {
+      "id": "a95fc7da-f8ad-4a1f-9333-629d8071040e",
+      "timestamp": 1780910662110,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_6",
+      "action": "MOVE",
+      "fromBay": "g_handoff",
+      "toBay": "g_hp",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "SPAR11"
+    },
+    {
+      "id": "7f25c5d4-d430-41ea-a189-be99df847879",
+      "timestamp": 1780910663968,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_6",
+      "action": "MOVE",
+      "fromBay": "g_hp",
+      "toBay": "g_handoff",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "SPAR11"
+    },
+    {
+      "id": "76614e8d-2e9b-42cf-bdb7-3cbb60bcc336",
+      "timestamp": 1780910664814,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_6",
+      "action": "MOVE",
+      "fromBay": "g_handoff",
+      "toBay": "g_taxi",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "SPAR11"
+    },
+    {
+      "id": "192d6f14-43fc-4ee8-b10c-ca1db504e5c7",
+      "timestamp": 1780910668085,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_6",
+      "action": "MOVE",
+      "fromBay": "g_taxi",
+      "toBay": "g_hp",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "SPAR11"
+    },
+    {
+      "id": "15b4c3bf-55db-42c8-bfa0-2cc973e2928c",
+      "timestamp": 1780910669680,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_6",
+      "action": "MOVE",
+      "fromBay": "g_hp",
+      "toBay": "g_handoff",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "SPAR11"
+    },
+    {
+      "id": "3cf4d48c-946b-48c0-be43-8b2ee84e5475",
+      "timestamp": 1780910676650,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_5",
+      "action": "TXI",
+      "fromBay": "g_stand",
+      "toBay": "g_taxi",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "REACH33"
+    },
+    {
+      "id": "84b04f75-fae7-484a-900a-37ff64baaf26",
+      "timestamp": 1780910683943,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_2",
+      "action": "MOVE",
+      "fromBay": "t_active",
+      "toBay": "t_final",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "ITY204"
+    },
+    {
+      "id": "4525c229-47ec-4959-b0bf-3c48a55c5bac",
+      "timestamp": 1780910685053,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_1",
+      "action": "MOVE",
+      "fromBay": "t_pending",
+      "toBay": "t_active",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "AZA471"
+    },
+    {
+      "id": "fa75f175-5fc8-4822-a97f-984ccef5f770",
+      "timestamp": 1780910687233,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_6",
+      "action": "MOVE",
+      "fromBay": "g_handoff",
+      "toBay": "g_hp",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "SPAR11"
+    },
+    {
+      "id": "ff556964-4866-4d29-a9e5-0eb48b69a436",
+      "timestamp": 1780910688173,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_6",
+      "action": "MOVE",
+      "fromBay": "g_hp",
+      "toBay": "g_handoff",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "SPAR11"
+    },
+    {
+      "id": "39a65c0a-3393-46af-a68c-ca676a6bf93e",
+      "timestamp": 1780910701178,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_1",
+      "action": "AOC",
+      "fromBay": "t_active",
+      "toBay": "t_active",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "AZA471",
+      "meta": {
+        "note": null
+      }
+    },
+    {
+      "id": "4cc85565-82d7-46d7-b71e-4ef424e49013",
+      "timestamp": 1780910703612,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_6",
+      "action": "MOVE",
+      "fromBay": "g_handoff",
+      "toBay": "g_hp",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "SPAR11"
+    },
+    {
+      "id": "ccba0ed7-a894-4f45-a858-f99f76dd08dd",
+      "timestamp": 1780910704355,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_6",
+      "action": "MOVE",
+      "fromBay": "g_hp",
+      "toBay": "g_handoff",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "SPAR11"
+    },
+    {
+      "id": "ca830bbe-3915-4eb5-88c9-2d6669e985f1",
+      "timestamp": 1780910712388,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_4",
+      "action": "MOVE",
+      "fromBay": "g_active",
+      "toBay": "g_stand",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "DCORE01"
+    },
+    {
+      "id": "820fa8ab-6763-49b2-9004-c3431b295b9f",
+      "timestamp": 1780910713097,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_4",
+      "action": "MOVE",
+      "fromBay": "g_stand",
+      "toBay": "g_taxi",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "DCORE01"
+    },
+    {
+      "id": "196df023-6229-42c4-bad2-905ffabc8748",
+      "timestamp": 1780910724275,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_4",
+      "action": "DELETE",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "DCORE01"
+    },
+    {
+      "id": "cd2525d5-c877-4a15-98b9-76307012a449",
+      "timestamp": 1780910726435,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_5",
+      "action": "DELETE",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "REACH33"
+    },
+    {
+      "id": "7b820aa6-d030-4dd3-acd9-50764510effe",
+      "timestamp": 1780910728218,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_6",
+      "action": "REJECT_TOC",
+      "fromBay": "g_handoff",
+      "toBay": "g_hp",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "SPAR11",
+      "meta": {
+        "note": null
+      }
+    },
+    {
+      "id": "174075a6-b0d8-4622-8620-18f4a25718bc",
+      "timestamp": 1780910730320,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_6",
+      "action": "DELETE",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "SPAR11"
+    },
+    {
+      "id": "bb09ec9c-5f45-49b9-8d30-bdaa68abbc32",
+      "timestamp": 1780910732414,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_1",
+      "action": "DELETE",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "AZA471"
+    },
+    {
+      "id": "f6e7d3a2-13ff-40fc-856d-56aac71dd6f5",
+      "timestamp": 1780910736089,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_2",
+      "action": "DELETE",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "ITY204"
+    },
+    {
+      "id": "a4790575-d233-4a66-8c97-1b1339a642f5",
+      "timestamp": 1780910738417,
+      "airportId": "aleppo",
+      "stripId": "demo_aleppo_3",
+      "action": "DELETE",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "GAO12F"
+    },
+    {
+      "id": "9a668318-a41e-40db-a471-9b79c88d064b",
+      "timestamp": 1780911506274,
+      "airportId": "incirlik",
+      "action": "CLAIM_ROLE",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": null,
+      "meta": {
+        "role": "TOWER"
+      }
+    },
+    {
+      "id": "e943865c-edee-4052-8aca-3e25072df0b1",
+      "timestamp": 1780911717996,
+      "airportId": "incirlik",
+      "action": "RELEASE_ROLE",
+      "role": "TOWER",
+      "userId": "675706661570347041"
+    },
+    {
+      "id": "2d3a506e-e369-4ccc-abbe-5495e54fe965",
+      "timestamp": 1780911718900,
+      "airportId": "incirlik",
+      "action": "CLAIM_ROLE",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": null,
+      "meta": {
+        "role": "GROUND"
+      }
+    },
+    {
+      "id": "164455aa-cd49-47ef-8582-c089638e4e58",
+      "timestamp": 1780911751675,
+      "airportId": "incirlik",
+      "stripId": "b1955c68-bb22-44e2-b9f0-c07040bfe83b",
+      "action": "CREATE",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "FROCIO 1-1",
+      "meta": {
+        "direction": "dep"
+      }
+    }
+  ]
+}

@@ -12,6 +12,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import c130ModelUrl from '../assets/3D/yc-130prototype_of_c-130.glb';
 import ch47ModelUrl from '../assets/3D/ch47.glb';
 import t72ModelUrl from '../assets/3D/t90.glb';
+import kc135ModelUrl from '../assets/3D/kc-135_dcs_world.glb';
 import { Ambulance, Anchor, Blend, Box, Boxes, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChessRook, Clock3, Factory, Forklift, Fuel, Hammer, MapPin, PersonStanding, Satellite, TowerControl, X } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import airports from '../config/airports';
@@ -521,6 +522,12 @@ const DBUILD_CONTEXT_HIGHLIGHT_RADIUS_M = 35;
 const TANKER_MIN_DIST_NM = 45;
 const TANKER_EXCLUSION_RADIUS_M = TANKER_MIN_DIST_NM * 1852;
 const TANKER_ROUTE_COLOR = '#22d3ee';
+const TANKER_ROUTE_ALTITUDE_FT = 150000;
+const TANKER_ROUTE_ALTITUDE_M = TANKER_ROUTE_ALTITUDE_FT * 0.3048;
+const TANKER_ROUTE_TUBE_RADIUS_M = 85;
+const TANKER_ROUTE_ENDPOINT_RADIUS_M = 180;
+const TANKER_ROUTE_ENDPOINT_COLOR = '#0b5568';
+const TANKER_KC135_ROUTE_CLEARANCE_M = TANKER_ROUTE_TUBE_RADIUS_M + 120;
 
 function formatTankerRouteLabel(route) {
   if (!route) return 'Tanker';
@@ -530,6 +537,7 @@ function formatTankerRouteLabel(route) {
   if (Number.isFinite(route.altitude_ft)) parts.push(`${Math.round(route.altitude_ft)} ft`);
   if (Number.isFinite(route.speed_kt)) parts.push(`${Math.round(route.speed_kt)} kts`);
   if (Number.isFinite(route.distance_nm)) parts.push(`${route.distance_nm.toFixed(1)} NM`);
+  parts.push(`FL${Math.round(TANKER_ROUTE_ALTITUDE_FT / 100)}`);
   return parts.join(' • ');
 }
 
@@ -544,9 +552,32 @@ function normalizeTankerLatLon(lat, lon) {
   return { lat: nextLat, lon: nextLon };
 }
 
+function addTankerRouteEndpointCircle(group, map, lon, lat, altMeters) {
+  if (!group || !map) return null;
+  const merc = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], altMeters);
+  const scaleMerc = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], 0);
+  const radius = scaleMerc.meterInMercatorCoordinateUnits() * TANKER_ROUTE_ENDPOINT_RADIUS_M;
+  const geometry = new THREE.SphereGeometry(1, 20, 16);
+  const material = new THREE.MeshPhongMaterial({
+    color: TANKER_ROUTE_ENDPOINT_COLOR,
+    emissive: new THREE.Color(TANKER_ROUTE_ENDPOINT_COLOR),
+    emissiveIntensity: 0.06,
+    transparent: false,
+    opacity: 1,
+    depthTest: true,
+    depthWrite: true,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.position.set(merc.x, merc.y, merc.z);
+  mesh.scale.set(radius, radius, radius);
+  mesh.renderOrder = 10;
+  mesh.userData.disposeGeometry = true;
+  group.add(mesh);
+  return mesh;
+}
+
 function buildTankerRouteFeatures(routes) {
   const lineFeatures = [];
-  const pointFeatures = [];
 
   (routes || []).forEach((route) => {
     const wp1Raw = route?.wp1;
@@ -568,20 +599,9 @@ function buildTankerRouteFeatures(routes) {
         keyword: route.keyword || '',
       },
     });
-
-    pointFeatures.push({
-      type: 'Feature',
-      geometry: { type: 'Point', coordinates: [wp1.lon, wp1.lat] },
-      properties: { id: `${route.id || route.keyword}-wp1`, kind: 'wp1', label: `${route.keyword || 'Tanker'} WP1` },
-    });
-    pointFeatures.push({
-      type: 'Feature',
-      geometry: { type: 'Point', coordinates: [wp2.lon, wp2.lat] },
-      properties: { id: `${route.id || route.keyword}-wp2`, kind: 'wp2', label: `${route.keyword || 'Tanker'} WP2` },
-    });
   });
 
-  return { lineFeatures, pointFeatures };
+  return { lineFeatures };
 }
 
 const TANKER_OPTIONS_FALLBACK = [
@@ -2201,45 +2221,15 @@ function FlatMapView({
                 positions={[[wp1.lat, wp1.lon], [wp2.lat, wp2.lon]]}
                 pathOptions={{
                   color: TANKER_ROUTE_COLOR,
-                  weight: 3,
-                  opacity: 0.92,
+                  weight: 2,
+                  opacity: 0.35,
                   dashArray: '10,8',
                 }}
               >
                 <Tooltip sticky opacity={0.95}>
-                  {formatTankerRouteLabel(route)}
+                  {`${formatTankerRouteLabel(route)} (ground track)`}
                 </Tooltip>
               </Polyline>
-              <CircleMarker
-                key={`tanker-route-wp1-${routeKey}`}
-                center={[wp1.lat, wp1.lon]}
-                radius={7}
-                pathOptions={{
-                  color: '#ffffff',
-                  fillColor: TANKER_ROUTE_COLOR,
-                  fillOpacity: 0.95,
-                  weight: 2,
-                }}
-              >
-                <Tooltip direction="top" offset={[0, -8]} opacity={0.95}>
-                  {`${route.keyword || 'Tanker'} WP1`}
-                </Tooltip>
-              </CircleMarker>
-              <CircleMarker
-                key={`tanker-route-wp2-${routeKey}`}
-                center={[wp2.lat, wp2.lon]}
-                radius={7}
-                pathOptions={{
-                  color: '#ffffff',
-                  fillColor: TANKER_ROUTE_COLOR,
-                  fillOpacity: 0.95,
-                  weight: 2,
-                }}
-              >
-                <Tooltip direction="top" offset={[0, -8]} opacity={0.95}>
-                  {`${route.keyword || 'Tanker'} WP2`}
-                </Tooltip>
-              </CircleMarker>
             </>
           );
         })}
@@ -2350,6 +2340,7 @@ function MapLibreFlatMapView({
   const LOGISTICS_ROUTE_RADIUS_METERS = 120;
   const LOGISTICS_C130_MODEL_SIZE_METERS = 110;
   const LOGISTICS_CH47_MODEL_SIZE_METERS = 92;
+  const TANKER_KC135_MODEL_SIZE_METERS = 125;
   const LOGISTICS_CONVOY_MODEL_SIZE_METERS = 120;
   const AIRLIFT_C130_MODEL_SIZE_METERS = 92;
   const AIRLIFT_CH47_MODEL_SIZE_METERS = 78;
@@ -2372,6 +2363,7 @@ function MapLibreFlatMapView({
     routes: [],
     c130Template: null,
     ch47Template: null,
+    kc135Template: null,
     convoyTemplate: null,
     planeLoaderPromise: null,
   });
@@ -2797,11 +2789,6 @@ function MapLibreFlatMapView({
     return { type: 'FeatureCollection', features: lineFeatures };
   }, [tankerRoutes]);
 
-  const fcTankerRoutePoints = useMemo(() => {
-    const { pointFeatures } = buildTankerRouteFeatures(tankerRoutes);
-    return { type: 'FeatureCollection', features: pointFeatures };
-  }, [tankerRoutes]);
-
   const disposeThreeNode = useCallback((node) => {
     if (!node) return;
     node.traverse?.((entry) => {
@@ -2829,7 +2816,7 @@ function MapLibreFlatMapView({
     domes3dRef.current.domes = [];
     domes3dRef.current.routes = [];
 
-    if (!showAto && !showLogistics && !showConvoys && !showAirliftPlayers) {
+    if (!showAto && !showLogistics && !showConvoys && !showAirliftPlayers && !(tankerRoutes || []).length) {
       map.triggerRepaint();
       return;
     }
@@ -3193,8 +3180,128 @@ function MapLibreFlatMapView({
       });
     }
 
+    (tankerRoutes || []).forEach((route) => {
+      const wp1Raw = route?.wp1;
+      const wp2Raw = route?.wp2;
+      if (!wp1Raw || !wp2Raw) return;
+      const wp1 = normalizeTankerLatLon(Number(wp1Raw.lat), Number(wp1Raw.lon));
+      const wp2 = normalizeTankerLatLon(Number(wp2Raw.lat), Number(wp2Raw.lon));
+      if (!wp1 || !wp2) return;
+
+      const altMeters = TANKER_ROUTE_ALTITUDE_M;
+      const segments = 16;
+      const points = [];
+      for (let i = 0; i <= segments; i += 1) {
+        const t = i / segments;
+        const lat = wp1.lat + ((wp2.lat - wp1.lat) * t);
+        const lon = wp1.lon + ((wp2.lon - wp1.lon) * t);
+        const merc = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], altMeters);
+        points.push(new THREE.Vector3(merc.x, merc.y, merc.z));
+      }
+
+      const curve = new THREE.CatmullRomCurve3(points);
+      const midMerc = maplibregl.MercatorCoordinate.fromLngLat(
+        [(wp1.lon + wp2.lon) / 2, (wp1.lat + wp2.lat) / 2],
+        0
+      );
+      const tubeRadius = midMerc.meterInMercatorCoordinateUnits() * TANKER_ROUTE_TUBE_RADIUS_M;
+      const tubeGeometry = new THREE.TubeGeometry(curve, segments, tubeRadius, 8, false);
+      const routeColor = TANKER_ROUTE_COLOR;
+      const routeMaterial = new THREE.MeshPhongMaterial({
+        color: routeColor,
+        emissive: new THREE.Color(routeColor),
+        emissiveIntensity: 0.22,
+        transparent: true,
+        opacity: 0.88,
+        depthTest: true,
+        depthWrite: true,
+      });
+      const routeMesh = new THREE.Mesh(tubeGeometry, routeMaterial);
+      routeMesh.userData.disposeGeometry = true;
+      routeMesh.renderOrder = 9;
+      group.add(routeMesh);
+
+      addTankerRouteEndpointCircle(group, map, wp1.lon, wp1.lat, altMeters);
+      addTankerRouteEndpointCircle(group, map, wp2.lon, wp2.lat, altMeters);
+
+      const kc135Template = domes3dRef.current.kc135Template || domes3dRef.current.c130Template;
+      if (kc135Template) {
+        const planeRoot = kc135Template.clone(true);
+        const seed = hashString(String(route.id || route.keyword || `${wp1.lat},${wp1.lon}`));
+        const t = 0.2 + ((seed % 61) / 100);
+        const latAtT = wp1.lat + ((wp2.lat - wp1.lat) * t);
+        const lonAtT = wp1.lon + ((wp2.lon - wp1.lon) * t);
+        const planeAltMeters = altMeters + TANKER_KC135_ROUTE_CLEARANCE_M;
+        const planeMerc = maplibregl.MercatorCoordinate.fromLngLat([lonAtT, latAtT], planeAltMeters);
+        const routeBearingDeg = computeBearingDeg([wp1.lat, wp1.lon], [wp2.lat, wp2.lon]);
+        const headingYaw = THREE.MathUtils.degToRad(routeBearingDeg) + Math.PI;
+        const modelScale = midMerc.meterInMercatorCoordinateUnits() * TANKER_KC135_MODEL_SIZE_METERS;
+        const routeOpacity = 0.88;
+        const routeColorThree = new THREE.Color(routeColor);
+
+        planeRoot.position.set(planeMerc.x, planeMerc.y, planeMerc.z);
+        planeRoot.scale.set(modelScale, modelScale, modelScale);
+        const headingQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), headingYaw);
+        const levelQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0, 'XYZ'));
+        planeRoot.quaternion.copy(headingQuat).multiply(levelQuat);
+        planeRoot.renderOrder = 12;
+
+        planeRoot.traverse((child) => {
+          if (child?.isMesh) {
+            child.frustumCulled = false;
+            if (Array.isArray(child.material)) {
+              child.material = child.material.map((mat) => {
+                if (!mat) return mat;
+                const material = typeof mat.clone === 'function' ? mat.clone() : mat;
+                material.depthTest = true;
+                material.depthWrite = true;
+                material.toneMapped = false;
+                if (material.color) {
+                  material.color = routeColorThree.clone();
+                }
+                if (material.emissive) {
+                  material.emissive = routeColorThree.clone();
+                  material.emissiveIntensity = 0.14;
+                }
+                material.transparent = true;
+                material.opacity = routeOpacity;
+                material.needsUpdate = true;
+                return material;
+              });
+            } else if (child.material) {
+              if (typeof child.material.clone === 'function') {
+                const material = child.material.clone();
+                material.depthTest = true;
+                material.depthWrite = true;
+                material.toneMapped = false;
+                if (material.color) {
+                  material.color = routeColorThree.clone();
+                }
+                if (material.emissive) {
+                  material.emissive = routeColorThree.clone();
+                  material.emissiveIntensity = 0.14;
+                }
+                material.transparent = true;
+                material.opacity = routeOpacity;
+                material.needsUpdate = true;
+                child.material = material;
+              } else {
+                child.material.depthTest = true;
+                child.material.depthWrite = true;
+                child.material.toneMapped = false;
+                child.material.transparent = true;
+                child.material.opacity = routeOpacity;
+              }
+            }
+          }
+        });
+
+        group.add(planeRoot);
+      }
+    });
+
     map.triggerRepaint();
-  }, [zones, showAto, selectedZoneId, showLogistics, logisticsMissions, logisticsFrontlineAirportIds, airportsById, showConvoys, convoys, showAirliftPlayers, airliftPlayers, disposeThreeNode]);
+  }, [zones, showAto, selectedZoneId, showLogistics, logisticsMissions, logisticsFrontlineAirportIds, airportsById, showConvoys, convoys, showAirliftPlayers, airliftPlayers, tankerRoutes, disposeThreeNode]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -3345,11 +3452,13 @@ function MapLibreFlatMapView({
               loader.loadAsync(c130ModelUrl),
               loader.loadAsync(ch47ModelUrl),
               loader.loadAsync(t72ModelUrl),
+              loader.loadAsync(kc135ModelUrl),
             ])
               .then((results) => {
                 const c130Result = results[0];
                 const ch47Result = results[1];
                 const t72Result = results[2];
+                const kc135Result = results[3];
                 if (c130Result.status === 'fulfilled') {
                   domes3dRef.current.c130Template = prepareTemplate(c130Result.value);
                 } else {
@@ -3365,6 +3474,11 @@ function MapLibreFlatMapView({
                 } else {
                   console.error('Failed to load T72 model:', t72Result.reason);
                 }
+                if (kc135Result.status === 'fulfilled') {
+                  domes3dRef.current.kc135Template = prepareTemplate(kc135Result.value);
+                } else {
+                  console.error('Failed to load KC-135 model:', kc135Result.reason);
+                }
                 rebuildThreeDomes();
                 map.triggerRepaint();
               })
@@ -3375,6 +3489,7 @@ function MapLibreFlatMapView({
             domes3dRef.current.c130Template
             || domes3dRef.current.ch47Template
             || domes3dRef.current.convoyTemplate
+            || domes3dRef.current.kc135Template
           ) {
             rebuildThreeDomes();
             map.triggerRepaint();
@@ -3690,7 +3805,6 @@ function MapLibreFlatMapView({
       addGeoSource('tanker-exclusion-ring-src', fcTankerExclusionRing);
       addGeoSource('tanker-wp1-point-src', fcTankerWp1Point);
       addGeoSource('tanker-routes-src', fcTankerRoutes);
-      addGeoSource('tanker-route-points-src', fcTankerRoutePoints);
       addGeoSource('dbuild-markers-src', fcDbuildMarkers);
 
       map.addLayer({
@@ -3769,21 +3883,8 @@ function MapLibreFlatMapView({
         },
         paint: {
           'line-color': TANKER_ROUTE_COLOR,
-          'line-width': 4,
-          'line-opacity': 0.95,
-          'line-dasharray': [2, 2],
-        },
-      });
-      map.addLayer({
-        id: 'tanker-route-points-layer',
-        type: 'circle',
-        source: 'tanker-route-points-src',
-        paint: {
-          'circle-radius': 7,
-          'circle-color': TANKER_ROUTE_COLOR,
-          'circle-opacity': 0.95,
-          'circle-stroke-color': '#ffffff',
-          'circle-stroke-width': 2,
+          'line-width': 14,
+          'line-opacity': 0.001,
         },
       });
 
@@ -4158,8 +4259,6 @@ function MapLibreFlatMapView({
     const applyTankerRouteData = () => {
       const routesSource = map.getSource('tanker-routes-src');
       if (routesSource?.setData) routesSource.setData(fcTankerRoutes);
-      const pointsSource = map.getSource('tanker-route-points-src');
-      if (pointsSource?.setData) pointsSource.setData(fcTankerRoutePoints);
     };
 
     if (map.isStyleLoaded()) {
@@ -4171,7 +4270,7 @@ function MapLibreFlatMapView({
     return () => {
       map.off('load', applyTankerRouteData);
     };
-  }, [fcTankerRoutes, fcTankerRoutePoints]);
+  }, [fcTankerRoutes]);
 
   useEffect(() => {
     const map = mapRef.current;

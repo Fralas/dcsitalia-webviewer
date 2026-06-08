@@ -39,6 +39,7 @@ import * as changelogTranslator from './services/changelogTranslator.js';
 import * as wikiService from './services/wiki.js';
 import * as achievementsService from './services/achievements.js';
 import * as lidcService from './services/lidcService.js';
+import * as atcStripsService from './services/atcStripsService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -4616,6 +4617,127 @@ app.post('/api/debug/clear-orders', authenticateToken, requireAdmin, (req, res) 
   });
 });
 
+// ==================== ATC STRIP SIMULATION ====================
+
+function emitAtcUpdated(airportId, payload, lastAction) {
+  io.emit('atc:updated', {
+    airportId,
+    strips: payload.strips,
+    manualSort: payload.manualSort,
+    recentHistory: payload.recentHistory,
+    nextActions: payload.nextActions,
+    roleSlots: payload.roleSlots,
+    tocQueue: payload.tocQueue,
+    lastAction,
+  });
+}
+
+function requireAtcSession(req, res) {
+  if (!req.session?.user?.id) {
+    res.status(401).json({ error: 'Not authenticated' });
+    return false;
+  }
+  return true;
+}
+
+app.get('/api/atc/board', (req, res) => {
+  const airportId = String(req.query.airportId || 'aleppo');
+  res.json(atcStripsService.getBoardPayload(airportId));
+});
+
+app.post('/api/atc/role/claim', (req, res) => {
+  if (!requireAtcSession(req, res)) return;
+  const airportId = String(req.body?.airportId || 'aleppo');
+  const role = String(req.body?.role || '').toUpperCase();
+  const result = atcStripsService.claimRole(airportId, role, req.session.user);
+  if (result.error) {
+    return res.status(result.status || 400).json({
+      error: result.error,
+      occupiedBy: result.occupiedBy || null,
+    });
+  }
+  emitAtcUpdated(airportId, result.payload, 'CLAIM_ROLE');
+  res.json(result.payload);
+});
+
+app.post('/api/atc/role/release', (req, res) => {
+  if (!requireAtcSession(req, res)) return;
+  const airportId = String(req.body?.airportId || 'aleppo');
+  const role = String(req.body?.role || '').toUpperCase();
+  const result = atcStripsService.releaseRole(airportId, role, req.session.user);
+  if (result.error) return res.status(result.status || 400).json({ error: result.error });
+  emitAtcUpdated(airportId, result.payload, 'RELEASE_ROLE');
+  res.json(result.payload);
+});
+
+app.post('/api/atc/strips/:id/cancel-handoff', (req, res) => {
+  if (!requireAtcSession(req, res)) return;
+  const airportId = String(req.body?.airportId || 'aleppo');
+  const result = atcStripsService.cancelHandoffStrip(airportId, req.params.id, req.body || {}, req.session.user);
+  if (result.error) return res.status(result.status || 400).json({ error: result.error });
+  emitAtcUpdated(airportId, result.payload, result.lastAction);
+  res.json({ strip: result.strip, ...result.payload });
+});
+
+app.get('/api/atc/history', (req, res) => {
+  const airportId = req.query.airportId ? String(req.query.airportId) : undefined;
+  const stripId = req.query.stripId ? String(req.query.stripId) : undefined;
+  const limit = Number(req.query.limit || 200);
+  res.json({ entries: atcStripsService.getHistory({ airportId, stripId, limit }) });
+});
+
+app.post('/api/atc/board/settings', (req, res) => {
+  if (!requireAtcSession(req, res)) return;
+  const airportId = String(req.body?.airportId || 'aleppo');
+  const payload = atcStripsService.setManualSort(airportId, req.body?.manualSort);
+  emitAtcUpdated(airportId, payload, 'SETTINGS');
+  res.json(payload);
+});
+
+app.post('/api/atc/strips', (req, res) => {
+  if (!requireAtcSession(req, res)) return;
+  const airportId = String(req.body?.airportId || 'aleppo');
+  const result = atcStripsService.createStrip(airportId, req.body || {}, req.session.user);
+  emitAtcUpdated(airportId, result.payload, result.lastAction);
+  res.status(201).json({ strip: result.strip, ...result.payload });
+});
+
+app.patch('/api/atc/strips/:id', (req, res) => {
+  if (!requireAtcSession(req, res)) return;
+  const airportId = String(req.body?.airportId || req.query.airportId || 'aleppo');
+  const result = atcStripsService.updateStrip(airportId, req.params.id, req.body || {}, req.session.user);
+  if (result.error) return res.status(result.status).json({ error: result.error });
+  emitAtcUpdated(airportId, result.payload, result.lastAction);
+  res.json({ strip: result.strip, ...result.payload });
+});
+
+app.post('/api/atc/strips/:id/move', (req, res) => {
+  if (!requireAtcSession(req, res)) return;
+  const airportId = String(req.body?.airportId || 'aleppo');
+  const result = atcStripsService.moveStrip(airportId, req.params.id, req.body || {}, req.session.user);
+  if (result.error) return res.status(result.status).json({ error: result.error });
+  emitAtcUpdated(airportId, result.payload, result.lastAction);
+  res.json({ strip: result.strip, ...result.payload });
+});
+
+app.post('/api/atc/strips/:id/coordination', (req, res) => {
+  if (!requireAtcSession(req, res)) return;
+  const airportId = String(req.body?.airportId || 'aleppo');
+  const result = atcStripsService.coordinateStrip(airportId, req.params.id, req.body || {}, req.session.user);
+  if (result.error) return res.status(result.status).json({ error: result.error });
+  emitAtcUpdated(airportId, result.payload, result.lastAction);
+  res.json({ strip: result.strip, ...result.payload });
+});
+
+app.delete('/api/atc/strips/:id', (req, res) => {
+  if (!requireAtcSession(req, res)) return;
+  const airportId = String(req.query.airportId || req.body?.airportId || 'aleppo');
+  const result = atcStripsService.deleteStrip(airportId, req.params.id, req.session.user, req.body?.role);
+  if (result.error) return res.status(result.status).json({ error: result.error });
+  emitAtcUpdated(airportId, result.payload, result.lastAction);
+  res.json(result.payload);
+});
+
 // ==================== WEBSOCKET ====================
 
 io.on('connection', (socket) => {
@@ -4660,6 +4782,11 @@ io.on('connection', (socket) => {
   socket.emit('dbuild-sites:updated', {
     sites: dbuildSites,
     placements: enrichDbuildPlacements(dbuildPlacementsService.getPlacements()),
+  });
+  socket.emit('atc:updated', {
+    airportId: 'aleppo',
+    ...atcStripsService.getBoardPayload('aleppo'),
+    lastAction: 'INITIAL',
   });
 
   socket.on('disconnect', () => {
@@ -4892,6 +5019,7 @@ syncWebCommandResultsFromFile();
 syncWebSpawnMarkersFromFile();
 syncTankerRoutesFromFile();
 syncDbuildSitesFromFile();
+atcStripsService.initAtcStripsService();
 
 httpServer.listen(PORT, () => {
   const activeAirports = airbaseStatusManager.getActiveAirports();

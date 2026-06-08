@@ -835,6 +835,91 @@ export async function cancelDbuildPlacement(placementId) {
   });
 }
 
+export async function getAtcBoard(airportId = 'aleppo') {
+  return fetchAPI(`/atc/board?airportId=${encodeURIComponent(airportId)}`);
+}
+
+export async function getAtcHistory({ airportId, stripId, limit } = {}) {
+  const params = new URLSearchParams();
+  if (airportId) params.set('airportId', airportId);
+  if (stripId) params.set('stripId', stripId);
+  if (limit) params.set('limit', String(limit));
+  const qs = params.toString();
+  return fetchAPI(`/atc/history${qs ? `?${qs}` : ''}`);
+}
+
+export async function setAtcBoardSettings(airportId, manualSort) {
+  return fetchAPI('/atc/board/settings', {
+    method: 'POST',
+    body: JSON.stringify({ airportId, manualSort }),
+    credentials: 'include',
+  });
+}
+
+export async function createAtcStrip(payload) {
+  return fetchAPI('/atc/strips', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    credentials: 'include',
+  });
+}
+
+export async function patchAtcStrip(stripId, payload) {
+  return fetchAPI(`/atc/strips/${encodeURIComponent(stripId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+    credentials: 'include',
+  });
+}
+
+export async function moveAtcStrip(stripId, payload) {
+  return fetchAPI(`/atc/strips/${encodeURIComponent(stripId)}/move`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    credentials: 'include',
+  });
+}
+
+export async function coordinateAtcStrip(stripId, payload) {
+  return fetchAPI(`/atc/strips/${encodeURIComponent(stripId)}/coordination`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    credentials: 'include',
+  });
+}
+
+export async function deleteAtcStrip(stripId, airportId, role) {
+  return fetchAPI(`/atc/strips/${encodeURIComponent(stripId)}?airportId=${encodeURIComponent(airportId)}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ airportId, role }),
+    credentials: 'include',
+  });
+}
+
+export async function claimAtcRole(airportId, role) {
+  return fetchAPI('/atc/role/claim', {
+    method: 'POST',
+    body: JSON.stringify({ airportId, role }),
+    credentials: 'include',
+  });
+}
+
+export async function releaseAtcRole(airportId, role) {
+  return fetchAPI('/atc/role/release', {
+    method: 'POST',
+    body: JSON.stringify({ airportId, role }),
+    credentials: 'include',
+  });
+}
+
+export async function cancelAtcHandoff(stripId, { airportId, role, targetBay }) {
+  return fetchAPI(`/atc/strips/${encodeURIComponent(stripId)}/cancel-handoff`, {
+    method: 'POST',
+    body: JSON.stringify({ airportId, role, targetBay }),
+    credentials: 'include',
+  });
+}
+
 export default {
   getServerTime,
   getAirports,
@@ -920,4 +1005,15 @@ export default {
   createDbuildPlacement,
   confirmDbuildPlacement,
   cancelDbuildPlacement,
+  getAtcBoard,
+  getAtcHistory,
+  setAtcBoardSettings,
+  createAtcStrip,
+  patchAtcStrip,
+  moveAtcStrip,
+  coordinateAtcStrip,
+  deleteAtcStrip,
+  claimAtcRole,
+  releaseAtcRole,
+  cancelAtcHandoff,
 };
