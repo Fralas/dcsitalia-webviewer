@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Loader2, Map, Plus, Search, TowerControl } from 'lucide-react';
+import { Loader2, Map, Maximize2, Search, TowerControl } from 'lucide-react';
 
 import * as api from '../../services/api';
 
@@ -15,6 +15,10 @@ import airports from '../../config/airports';
 import AtcStripBoard from './AtcStripBoard';
 
 import AtcCoordinationPanel from './AtcCoordinationPanel';
+
+import AtcNewStripMenu from './AtcNewStripMenu';
+
+import AtcStripFocusOverlay from './AtcStripFocusOverlay';
 
 import AtcHistoryPanel from './AtcHistoryPanel';
 
@@ -95,6 +99,10 @@ export default function AtcStripPage() {
   const [selectedId, setSelectedId] = useState(null);
 
   const [inlineEditStripId, setInlineEditStripId] = useState(null);
+
+  const [focusStripId, setFocusStripId] = useState(null);
+
+  const [newStripMenuOpen, setNewStripMenuOpen] = useState(false);
 
   const [search, setSearch] = useState('');
 
@@ -424,19 +432,19 @@ export default function AtcStripPage() {
 
 
 
-  const handleNewStrip = useCallback(async () => {
+  const handleNewStrip = useCallback(async (direction) => {
 
     if (!requireClaimed()) return;
 
-    const direction = claimedRole === OWNER_ROLE.TOWER ? STRIP_DIRECTION.ARR : STRIP_DIRECTION.DEP;
+    const stripDirection = direction === STRIP_DIRECTION.ARR ? STRIP_DIRECTION.ARR : STRIP_DIRECTION.DEP;
 
     try {
 
       const result = await api.createAtcStrip({
 
-        ...createEmptyForm(direction),
+        ...createEmptyForm(stripDirection),
 
-        direction,
+        direction: stripDirection,
 
         airportId,
 
@@ -446,7 +454,13 @@ export default function AtcStripPage() {
 
       applyMutationResult(result);
 
-      if (result.strip?.id) setSelectedId(result.strip.id);
+      if (result.strip?.id) {
+
+        setSelectedId(result.strip.id);
+
+        setFocusStripId(result.strip.id);
+
+      }
 
     } catch (err) {
 
@@ -466,7 +480,19 @@ export default function AtcStripPage() {
 
       if ((event.key === 'n' || event.key === 'N') && claimedRole) {
 
-        handleNewStrip();
+        setNewStripMenuOpen(true);
+
+      }
+
+      if (event.key === 'f' || event.key === 'F') {
+
+        if (selectedId) {
+
+          event.preventDefault();
+
+          setFocusStripId(selectedId);
+
+        }
 
       }
 
@@ -484,7 +510,17 @@ export default function AtcStripPage() {
 
     return () => window.removeEventListener('keydown', onKey);
 
-  }, [claimedRole, handleNewStrip]);
+  }, [claimedRole, selectedId]);
+
+
+
+  const focusStrip = useMemo(
+
+    () => strips.find((s) => s.id === focusStripId) || null,
+
+    [strips, focusStripId],
+
+  );
 
 
 
@@ -744,21 +780,35 @@ export default function AtcStripPage() {
 
             <>
 
-              <button
+              <AtcNewStripMenu
 
-                type="button"
+                open={newStripMenuOpen}
 
-                className="atc-toolbar__btn atc-toolbar__btn--primary"
+                onToggle={setNewStripMenuOpen}
 
-                onClick={handleNewStrip}
+                onCreate={handleNewStrip}
 
-              >
+              />
 
-                <Plus className="w-4 h-4" />
+              {selectedStrip && (
 
-                {t('atc.newStrip')}
+                <button
 
-              </button>
+                  type="button"
+
+                  className="atc-toolbar__btn"
+
+                  onClick={() => setFocusStripId(selectedStrip.id)}
+
+                >
+
+                  <Maximize2 className="w-4 h-4" />
+
+                  {t('atc.focus.open')}
+
+                </button>
+
+              )}
 
               {selectedEditable && (
 
@@ -842,6 +892,8 @@ export default function AtcStripPage() {
 
               inlineEditStripId={inlineEditStripId}
 
+              onExpand={(strip) => setFocusStripId(strip.id)}
+
               onAction={handleAction}
 
               onCoordinate={handleCoordinate}
@@ -895,6 +947,40 @@ export default function AtcStripPage() {
         </aside>
 
       </div>
+
+
+
+      {focusStrip && (
+
+        <AtcStripFocusOverlay
+
+          strip={focusStrip}
+
+          nextAction={nextActions[focusStrip.id]}
+
+          editable={Boolean(claimedRole && canEditStrip(focusStrip, claimedRole))}
+
+          operatorRole={claimedRole}
+
+          onClose={() => setFocusStripId(null)}
+
+          onFieldChange={handleFieldChange}
+
+          onFieldCommit={handleFieldCommit}
+
+          onInlineEditFocus={setInlineEditStripId}
+
+          onInlineEditBlur={() => setInlineEditStripId(null)}
+
+          onAction={handleAction}
+
+          onCoordinate={handleCoordinate}
+
+          onCancelHandoff={handleCancelHandoff}
+
+        />
+
+      )}
 
     </div>
 

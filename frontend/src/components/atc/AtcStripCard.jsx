@@ -1,3 +1,4 @@
+import { Maximize2 } from 'lucide-react';
 import {
   STRIP_DIRECTION,
   getStripModelClass,
@@ -7,6 +8,7 @@ import {
 } from './atcStripModel';
 import AtcActionBar from './AtcActionBar';
 import AtcFitField from './AtcFitField';
+import { t } from '../../utils/locale';
 
 function Cell({
   label,
@@ -16,7 +18,7 @@ function Cell({
   labelCorner = 'tl',
 }) {
   return (
-    <div className={`atc-cell atc-cell--label-${labelCorner} ${className}`}>
+    <div className={`atc-cell atc-cell--label-${labelCorner} ${className}`.trim()}>
       <span className="atc-cell__label">{label}</span>
       <div className={`atc-cell__value ${split ? 'atc-cell__value--split' : ''}`}>{children}</div>
     </div>
@@ -94,117 +96,91 @@ function EtaField({
   return <span className="atc-eta">{formatEtaDisplay(value)}</span>;
 }
 
-function ArrivalStrip({
-  strip,
-  editable,
-  onFieldChange,
-  onFieldCommit,
-  onFieldFocus,
-  onFieldBlur,
-}) {
+function fieldProps(bind, field, extra = {}) {
+  const { ...rest } = bind;
+  return { ...rest, field, ...extra };
+}
+
+function ArrivalStrip({ strip, bind }) {
   const stateCode = getStripStateCode(strip);
-  const bind = {
-    editable,
-    onFieldChange,
-    onFieldCommit,
-    onFieldFocus,
-    onFieldBlur,
-  };
+  const fp = (field, opts = {}) => fieldProps(bind, field, opts);
 
   return (
     <div className="atc-strip__grid atc-strip__grid--arr">
       <div className="atc-strip__sec-ab">
-        <div className="atc-cell atc-cell--a">
-          <span className="atc-cell__label">A</span>
-          <div className="atc-cell__value">
-            <EtaField value={strip.eta} field="eta" {...bind} />
-          </div>
-        </div>
-        <div className="atc-cell atc-cell--b-corner">
-          <span className="atc-cell__label">B</span>
-          <div className="atc-cell__value">
-            <Field value={strip.levelPlanned || strip.level} field="levelPlanned" uppercase {...bind} />
-          </div>
-        </div>
+        <Cell label="A" className="atc-cell--a">
+          <EtaField value={strip.eta} field="eta" {...bind} />
+        </Cell>
+        <Cell label="B" className="atc-cell--b-corner">
+          <Field value={strip.levelPlanned || strip.level} {...fp('levelPlanned', { uppercase: true })} />
+        </Cell>
       </div>
 
-      <Cell label="C" className="atc-cell--c">
-        <Field value={strip.flightRule} field="flightRule" uppercase maxLength={2} {...bind} />
+      <Cell label="C" className="atc-cell--c" split>
+        <Field value={strip.flightRule} {...fp('flightRule', { uppercase: true, maxLength: 2 })} />
+        <Field value={strip.localC} {...fp('localC', { uppercase: true })} />
       </Cell>
 
       <Cell label="D" className="atc-cell--d" labelCorner="br">
         <div className="atc-cell-d">
-          <Field value={strip.origin} field="origin" uppercase className="atc-cell-d__origin" {...bind} />
+          <Field value={strip.origin} {...fp('origin', { uppercase: true, className: 'atc-cell-d__origin' })} />
           <span className="atc-cell-d__type">
-            <Field value={strip.aircraftType} field="aircraftType" uppercase {...bind} />
-            {strip.wakeCategory ? '/' : ''}
-            <Field value={strip.wakeCategory} field="wakeCategory" uppercase maxLength={1} {...bind} />
+            <Field value={strip.aircraftType} {...fp('aircraftType', { uppercase: true })} />
+            {strip.wakeCategory || bind.editable ? '/' : ''}
+            <Field value={strip.wakeCategory} {...fp('wakeCategory', { uppercase: true, maxLength: 1 })} />
           </span>
-          <Field value={strip.callsign} field="callsign" uppercase className="atc-cell-d__callsign" maxFontSize={12} {...bind} />
-          <Field value={strip.tas} field="tas" className="atc-cell-d__tas" inputMode="numeric" {...bind} />
+          <Field value={strip.callsign} {...fp('callsign', { uppercase: true, className: 'atc-cell-d__callsign', maxFontSize: 14 })} />
+          <Field value={strip.tas} {...fp('tas', { className: 'atc-cell-d__tas', inputMode: 'numeric' })} />
         </div>
       </Cell>
 
       <div className="atc-strip__sec-grid8">
         <Cell label="E" className="atc-cell--e">
-          <Field value={strip.missedApproach} field="missedApproach" uppercase {...bind} />
+          <Field value={strip.missedApproach} {...fp('missedApproach', { uppercase: true })} />
         </Cell>
         <Cell label="F" className="atc-cell--f">
-          <Field value={strip.ata} field="ata" {...bind} />
+          <Field value={strip.ata} {...fp('ata')} />
           {strip.ataAcknowledged ? ' ✓' : ''}
         </Cell>
         <Cell label="G" className="atc-cell--g">
-          <Field value={strip.pilotEstimate} field="pilotEstimate" {...bind} />
+          <Field value={strip.pilotEstimate} {...fp('pilotEstimate')} />
         </Cell>
         <Cell label="H" className="atc-cell--h" split>
-          <Field value={strip.previousFix} field="previousFix" uppercase maxFontSize={9} {...bind} />
+          <Field value={strip.previousFix} {...fp('previousFix', { uppercase: true })} />
           <span className="atc-cell__split-row">
-            <Field value={strip.ato} field="ato" maxFontSize={9} {...bind} />
-            {strip.atl ? '/' : ''}
-            <Field value={strip.atl} field="atl" maxFontSize={9} {...bind} />
+            <Field value={strip.ato} {...fp('ato')} />
+            {strip.atl || bind.editable ? '/' : ''}
+            <Field value={strip.atl} {...fp('atl')} />
           </span>
         </Cell>
         <Cell label="I" className="atc-cell--i">
-          <Field value={strip.destination} field="destination" uppercase {...bind} />
+          <Field value={strip.destination} {...fp('destination', { uppercase: true })} />
         </Cell>
         <Cell label="J" className="atc-cell--j">
-          <Field value={strip.localJ} field="localJ" {...bind} />
+          <Field value={strip.localJ} {...fp('localJ')} />
         </Cell>
         <Cell label="K" className="atc-cell--k">
-          <Field value={strip.localK} field="localK" {...bind} />
+          <Field value={strip.localK} {...fp('localK')} />
         </Cell>
         <Cell label="L" className="atc-cell--l">
-          <Field value={strip.stand} field="stand" uppercase {...bind} />
+          <Field value={strip.stand} {...fp('stand', { uppercase: true })} />
           {strip.standAcknowledged ? ' ✓' : ''}
         </Cell>
       </div>
 
-      <Cell label="M" className="atc-cell--m" labelCorner="br">
+      <Cell label="M" className="atc-cell--m atc-cell--remarks" labelCorner="br">
         <span className="atc-state-row">
           {stateCode ? <span className="atc-state-code">{stateCode}</span> : null}
-          <Field value={strip.remarks} field="remarks" {...bind} />
+          <Field value={strip.remarks} {...fp('remarks')} />
         </span>
       </Cell>
     </div>
   );
 }
 
-function DepartureStrip({
-  strip,
-  editable,
-  onFieldChange,
-  onFieldCommit,
-  onFieldFocus,
-  onFieldBlur,
-}) {
+function DepartureStrip({ strip, bind }) {
   const stateCode = getStripStateCode(strip);
-  const bind = {
-    editable,
-    onFieldChange,
-    onFieldCommit,
-    onFieldFocus,
-    onFieldBlur,
-  };
+  const fp = (field, opts = {}) => fieldProps(bind, field, opts);
 
   return (
     <div className="atc-strip__grid atc-strip__grid--dep">
@@ -214,68 +190,65 @@ function DepartureStrip({
             <EtaField value={strip.eobt} field="eobt" {...bind} />
           </Cell>
           <Cell label="B" className="atc-cell--b-dep">
-            <Field value={strip.levelPlanned} field="levelPlanned" uppercase {...bind} />
+            <Field value={strip.levelPlanned} {...fp('levelPlanned', { uppercase: true })} />
           </Cell>
         </div>
         <div className="atc-strip__dep-row atc-strip__dep-row--triple">
           <Cell label="C" className="atc-cell--c-dep">
-            <Field value={strip.flightRule} field="flightRule" uppercase maxLength={2} {...bind} />
+            <Field value={strip.flightRule} {...fp('flightRule', { uppercase: true, maxLength: 2 })} />
           </Cell>
           <Cell label="D" className="atc-cell--d-dep">
             <div className="atc-cell-d atc-cell-d--dep">
-              <Field value={strip.callsign} field="callsign" uppercase className="atc-cell-d__callsign" maxFontSize={12} {...bind} />
-              <Field value={strip.aircraftType} field="aircraftType" uppercase className="atc-cell-d__type" {...bind} />
+              <Field value={strip.callsign} {...fp('callsign', { uppercase: true, className: 'atc-cell-d__callsign' })} />
+              <Field value={strip.aircraftType} {...fp('aircraftType', { uppercase: true, className: 'atc-cell-d__type' })} />
             </div>
           </Cell>
           <Cell label="E" className="atc-cell--e-dep">
-            <Field value={strip.level} field="level" uppercase {...bind} />
+            <Field value={strip.level} {...fp('level', { uppercase: true })} />
           </Cell>
         </div>
       </div>
 
       <Cell label="F" className="atc-cell--f-dep" labelCorner="br">
         <span className="atc-cell__split-row">
-          <Field value={strip.runway} field="runway" uppercase maxFontSize={9} {...bind} />
-          <Field value={strip.sid} field="sid" uppercase maxFontSize={9} {...bind} />
+          <Field value={strip.runway} {...fp('runway', { uppercase: true })} />
+          <Field value={strip.sid} {...fp('sid', { uppercase: true })} />
         </span>
       </Cell>
 
       <div className="atc-strip__sec-dep-mid">
         <div className="atc-strip__dep-row atc-strip__dep-row--triple">
           <Cell label="G" className="atc-cell--g-dep" split>
-            <Field value={strip.startup} field="startup" uppercase maxFontSize={9} {...bind} />
-            <Field value={strip.taxiAuth} field="taxiAuth" uppercase maxFontSize={9} {...bind} />
+            <Field value={strip.startup} {...fp('startup', { uppercase: true })} />
+            <Field value={strip.taxiAuth} {...fp('taxiAuth', { uppercase: true })} />
           </Cell>
           <Cell label="H" className="atc-cell--h-dep">
-            <Field value={strip.clearanceTimes} field="clearanceTimes" {...bind} />
+            <Field value={strip.clearanceTimes} {...fp('clearanceTimes')} />
           </Cell>
           <Cell label="I" className="atc-cell--i-dep">
             <span className="atc-cell__split-row">
-              <Field value={strip.ssr} field="ssr" maxFontSize={9} {...bind} />
-              <Field value={strip.delay} field="delay" maxFontSize={9} {...bind} />
+              <Field value={strip.ssr} {...fp('ssr')} />
+              <Field value={strip.delay} {...fp('delay')} />
             </span>
           </Cell>
         </div>
-        <Cell label="J" className="atc-cell--j-dep">
+        <Cell label="J" className="atc-cell--j-dep atc-cell--route">
           <Field
-            value={editable ? (strip.route ?? '') : (strip.route || strip.destination || '')}
-            field="route"
-            uppercase
-            placeholder={strip.destination || ''}
-            {...bind}
+            value={bind.editable ? (strip.route ?? '') : (strip.route || strip.destination || '')}
+            {...fp('route', { uppercase: true, placeholder: strip.destination || '' })}
           />
         </Cell>
       </div>
 
       <div className="atc-strip__sec-dep-right">
-        <Cell label="K" className="atc-cell--k-dep" labelCorner="tr">
+        <Cell label="K" className="atc-cell--k-dep atc-cell--clearance" labelCorner="tr">
           <span className="atc-state-row">
             {stateCode ? <span className="atc-state-code">{stateCode}</span> : null}
-            <Field value={strip.clearanceText} field="clearanceText" {...bind} />
+            <Field value={strip.clearanceText} {...fp('clearanceText')} />
           </span>
         </Cell>
-        <Cell label="L" className="atc-cell--l-dep" labelCorner="br">
-          <Field value={strip.instructions} field="instructions" {...bind} />
+        <Cell label="L" className="atc-cell--l-dep atc-cell--instructions" labelCorner="br">
+          <Field value={strip.instructions} {...fp('instructions')} />
         </Cell>
       </div>
     </div>
@@ -284,9 +257,11 @@ function DepartureStrip({
 
 export default function AtcStripCard({
   strip,
+  variant = 'board',
   selected = false,
   nextAction = null,
   onSelect,
+  onExpand,
   onFieldChange,
   onFieldCommit,
   onFieldFocus,
@@ -297,6 +272,8 @@ export default function AtcStripCard({
   operatorRole,
   readOnly = false,
   editable = false,
+  showActionBar = false,
+  interactive = true,
 }) {
   const isArrival = strip.direction === STRIP_DIRECTION.ARR;
   const pendingToc = isPendingTowerCoordination(strip);
@@ -306,40 +283,61 @@ export default function AtcStripCard({
   const handleFieldChange = (field, value) => onFieldChange?.(strip.id, field, value);
   const handleFieldCommit = (field, value) => onFieldCommit?.(strip.id, field, value);
 
+  const bind = {
+    editable: canEdit,
+    variant,
+    onFieldChange: handleFieldChange,
+    onFieldCommit: handleFieldCommit,
+    onFieldFocus,
+    onFieldBlur,
+  };
+
+  const actionVisible = (showActionBar || (selected && variant === 'board')) && !readOnly;
+
   return (
     <div
-      className={`atc-strip ${getStripModelClass(strip.model)} ${selected ? 'atc-strip--selected' : ''} ${pendingToc || pendingAog ? 'atc-strip--pending' : ''} ${strip.flags?.highlighted ? 'atc-strip--highlight' : ''} ${readOnly ? 'atc-strip--readonly' : ''} ${canEdit ? 'atc-strip--inline-edit' : ''}`}
-      onClick={() => onSelect?.(strip)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(event) => {
+      className={[
+        'atc-strip',
+        getStripModelClass(strip.model),
+        `atc-strip--${variant}`,
+        selected ? 'atc-strip--selected' : '',
+        pendingToc || pendingAog ? 'atc-strip--pending' : '',
+        strip.flags?.highlighted ? 'atc-strip--highlight' : '',
+        readOnly ? 'atc-strip--readonly' : '',
+        canEdit ? 'atc-strip--inline-edit' : '',
+        interactive ? 'atc-strip--interactive' : '',
+      ].filter(Boolean).join(' ')}
+      onClick={interactive ? () => onSelect?.(strip) : undefined}
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onKeyDown={interactive ? (event) => {
         if (event.key === 'Enter') onSelect?.(strip);
-      }}
+      } : undefined}
+      onDoubleClick={interactive ? (event) => {
+        event.stopPropagation();
+        onExpand?.(strip);
+      } : undefined}
     >
       {pendingToc && <span className="atc-strip__badge">TOC</span>}
       {pendingAog && <span className="atc-strip__badge atc-strip__badge--aog">AOG</span>}
 
-      {isArrival ? (
-        <ArrivalStrip
-          strip={strip}
-          editable={canEdit}
-          onFieldChange={handleFieldChange}
-          onFieldCommit={handleFieldCommit}
-          onFieldFocus={onFieldFocus}
-          onFieldBlur={onFieldBlur}
-        />
-      ) : (
-        <DepartureStrip
-          strip={strip}
-          editable={canEdit}
-          onFieldChange={handleFieldChange}
-          onFieldCommit={handleFieldCommit}
-          onFieldFocus={onFieldFocus}
-          onFieldBlur={onFieldBlur}
-        />
+      {interactive && onExpand && variant === 'board' && (
+        <button
+          type="button"
+          className="atc-strip__expand"
+          title={t('atc.focus.open')}
+          onClick={(event) => {
+            event.stopPropagation();
+            onExpand(strip);
+          }}
+        >
+          <Maximize2 className="w-3 h-3" />
+        </button>
       )}
 
-      {selected && !readOnly && (
+      {isArrival ? <ArrivalStrip strip={strip} bind={bind} /> : <DepartureStrip strip={strip} bind={bind} />}
+
+      {actionVisible && (
         <AtcActionBar
           strip={strip}
           nextAction={nextAction}

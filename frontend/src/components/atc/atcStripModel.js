@@ -359,6 +359,7 @@ export function createEmptyForm(direction) {
       direction,
       callsign: '',
       flightRule: 'I',
+      localC: '',
       eta: '',
       origin: '',
       destination: '',

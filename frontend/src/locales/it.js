@@ -533,6 +533,8 @@ export default {
     title: 'Strip ATC',
     loading: 'Caricamento strippiera...',
     newStrip: 'Nuova strip',
+    newStripArrival: 'Strip arrivo',
+    newStripDeparture: 'Strip partenza',
     editStrip: 'Modifica',
     deleteStrip: 'Elimina',
     searchPlaceholder: 'Cerca callsign...',
@@ -553,6 +555,12 @@ export default {
       resize: 'Ridimensiona pannello chart',
     },
     direction: { arr: 'Arrivo', dep: 'Partenza' },
+    focus: {
+      title: 'Strip ingrandita',
+      open: 'Ingrandisci',
+      close: 'Chiudi',
+      hint: 'Clicca sulle celle per modificare. Esc o clic fuori per chiudere.',
+    },
     errors: {
       loginRequired: 'Accedi con Discord per operare sulle strip',
       viewOnly: 'Modalità osservatore: accedi per creare o spostare strip',

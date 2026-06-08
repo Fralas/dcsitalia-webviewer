@@ -1,7 +1,7 @@
 import { useCallback, useLayoutEffect, useRef } from 'react';
 
-const DEFAULT_MAX = 12;
-const DEFAULT_MIN = 6;
+const DEFAULT_MAX = 14;
+const DEFAULT_MIN = 9;
 
 export default function AtcFitField({
   value = '',

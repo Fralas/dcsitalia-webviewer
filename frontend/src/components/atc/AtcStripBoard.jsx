@@ -81,6 +81,7 @@ function CategoryRow({
   onInlineEditFocus,
   onInlineEditBlur,
   inlineEditStripId,
+  onExpand,
   onAction,
   onCoordinate,
   onCancelHandoff,
@@ -114,6 +115,7 @@ function CategoryRow({
               onInlineEditFocus={onInlineEditFocus}
               onInlineEditBlur={onInlineEditBlur}
               inlineEditStripId={inlineEditStripId}
+              onExpand={onExpand}
               onAction={onAction}
               onCoordinate={onCoordinate}
               onCancelHandoff={onCancelHandoff}
@@ -140,6 +142,7 @@ export default function AtcStripBoard({
   onInlineEditFocus,
   onInlineEditBlur,
   inlineEditStripId,
+  onExpand,
   onAction,
   onCoordinate,
   onCancelHandoff,

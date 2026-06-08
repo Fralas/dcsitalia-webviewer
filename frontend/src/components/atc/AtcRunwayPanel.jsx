@@ -78,6 +78,7 @@ export default function AtcRunwayPanel({
   onInlineEditFocus,
   onInlineEditBlur,
   inlineEditStripId,
+  onExpand,
   onAction,
   onCoordinate,
   onCancelHandoff,
@@ -167,6 +168,7 @@ export default function AtcRunwayPanel({
                 onInlineEditFocus={onInlineEditFocus}
                 onInlineEditBlur={onInlineEditBlur}
                 inlineEditStripId={inlineEditStripId}
+                onExpand={onExpand}
                 onAction={onAction}
                 onCoordinate={onCoordinate}
                 onCancelHandoff={onCancelHandoff}

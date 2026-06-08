@@ -533,6 +533,8 @@ export default {
     title: 'ATC Strips',
     loading: 'Loading strip board...',
     newStrip: 'New strip',
+    newStripArrival: 'Arrival strip',
+    newStripDeparture: 'Departure strip',
     editStrip: 'Edit',
     deleteStrip: 'Delete',
     searchPlaceholder: 'Search callsign...',
@@ -553,6 +555,12 @@ export default {
       resize: 'Resize charts panel',
     },
     direction: { arr: 'Arrival', dep: 'Departure' },
+    focus: {
+      title: 'Enlarged strip',
+      open: 'Enlarge',
+      close: 'Close',
+      hint: 'Click cells to edit. Esc or click outside to close.',
+    },
     errors: {
       loginRequired: 'Sign in with Discord to control strips',
       viewOnly: 'Observer mode: sign in to create or move strips',

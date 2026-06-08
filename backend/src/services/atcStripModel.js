@@ -730,6 +730,7 @@ export function createEmptyStripFields(direction) {
     return {
       eta: '',
       flightRule: 'I',
+      localC: '',
       origin: '',
       aircraftType: '',
       wakeCategory: 'M',

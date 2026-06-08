@@ -13,6 +13,7 @@ export default function AtcSortableStrip({
   onInlineEditFocus,
   onInlineEditBlur,
   inlineEditStripId,
+  onExpand,
   onAction,
   onCoordinate,
   onCancelHandoff,
@@ -47,6 +48,7 @@ export default function AtcSortableStrip({
         onFieldCommit={onFieldCommit}
         onFieldFocus={() => onInlineEditFocus?.(strip.id)}
         onFieldBlur={onInlineEditBlur}
+        onExpand={onExpand}
         onAction={onAction}
         onCoordinate={onCoordinate}
         onCancelHandoff={onCancelHandoff}
