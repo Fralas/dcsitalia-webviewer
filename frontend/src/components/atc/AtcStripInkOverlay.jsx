@@ -6,6 +6,7 @@ import {
   parseInkValue,
   serializeInk,
 } from './atcInkCore';
+import { TAP_SLOP_PX, useDoubleTapHandler } from './atcPointerGestures';
 
 const LONG_PRESS_MS = 550;
 const LONG_PRESS_MOVE_PX = 8;
@@ -16,13 +17,17 @@ export default function AtcStripInkOverlay({
   onChange,
   onCommit,
   onLongPress,
+  onDoubleTap,
 }) {
   const canvasRef = useRef(null);
   const drawingRef = useRef(false);
+  const gestureDrewRef = useRef(false);
   const longPressTimerRef = useRef(null);
   const longPressOriginRef = useRef(null);
   const longPressTriggeredRef = useRef(false);
+  const tapOriginRef = useRef(null);
   const strokesRef = useRef(parseInkValue(value) || []);
+  const { registerTap, reset: resetDoubleTap, afterStroke } = useDoubleTapHandler(onDoubleTap);
 
   useEffect(() => {
     strokesRef.current = parseInkValue(value) || [];
@@ -66,27 +71,34 @@ export default function AtcStripInkOverlay({
     if (!canvas) return;
     canvas.setPointerCapture(event.pointerId);
     drawingRef.current = true;
+    gestureDrewRef.current = true;
+    resetDoubleTap();
     const pt = normalizeInkPoint(getInkPoint(event, canvas), canvas);
     strokesRef.current = [...strokesRef.current, { width: 2.4, color: '#111', points: [pt] }];
     redraw();
     onChange?.(serializeInk(strokesRef.current));
-  }, [onChange, redraw]);
+  }, [onChange, redraw, resetDoubleTap]);
 
   const handlePointerDown = (event) => {
-    if (!editable) return;
+    if (!editable && !onDoubleTap) return;
     event.preventDefault();
     event.stopPropagation();
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    gestureDrewRef.current = false;
     longPressTriggeredRef.current = false;
+    tapOriginRef.current = { x: event.clientX, y: event.clientY };
     clearLongPress();
+
+    if (!editable) return;
 
     if (onLongPress) {
       longPressOriginRef.current = { x: event.clientX, y: event.clientY };
       longPressTimerRef.current = window.setTimeout(() => {
         longPressTriggeredRef.current = true;
         clearLongPress();
+        resetDoubleTap();
         onLongPress();
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
           navigator.vibrate(40);
@@ -99,7 +111,7 @@ export default function AtcStripInkOverlay({
   };
 
   const handlePointerMove = (event) => {
-    if (!editable) return;
+    if (!editable && !onDoubleTap) return;
 
     if (longPressTimerRef.current && longPressOriginRef.current) {
       const dx = event.clientX - longPressOriginRef.current.x;
@@ -131,18 +143,40 @@ export default function AtcStripInkOverlay({
       longPressTriggeredRef.current = false;
       return;
     }
-    if (!drawingRef.current) return;
-    drawingRef.current = false;
-    if (event?.pointerId && canvasRef.current?.hasPointerCapture?.(event.pointerId)) {
-      canvasRef.current.releasePointerCapture(event.pointerId);
+
+    if (gestureDrewRef.current) {
+      afterStroke();
+      gestureDrewRef.current = false;
+      if (!drawingRef.current) return;
+      drawingRef.current = false;
+      if (event?.pointerId && canvasRef.current?.hasPointerCapture?.(event.pointerId)) {
+        canvasRef.current.releasePointerCapture(event.pointerId);
+      }
+      onCommit?.(serializeInk(strokesRef.current));
+      return;
     }
-    onCommit?.(serializeInk(strokesRef.current));
+
+    if (onDoubleTap && tapOriginRef.current && event) {
+      const dx = event.clientX - tapOriginRef.current.x;
+      const dy = event.clientY - tapOriginRef.current.y;
+      if (Math.hypot(dx, dy) <= TAP_SLOP_PX) {
+        registerTap(tapOriginRef.current.x, tapOriginRef.current.y);
+      } else {
+        resetDoubleTap();
+      }
+    }
+
+    tapOriginRef.current = null;
   };
 
   return (
     <canvas
       ref={canvasRef}
-      className={`atc-strip-ink-overlay ${editable ? 'atc-strip-ink-overlay--editable' : ''}`}
+      className={[
+        'atc-strip-ink-overlay',
+        editable ? 'atc-strip-ink-overlay--editable' : '',
+        !editable && onDoubleTap ? 'atc-strip-ink-overlay--tappable' : '',
+      ].filter(Boolean).join(' ')}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={endStroke}

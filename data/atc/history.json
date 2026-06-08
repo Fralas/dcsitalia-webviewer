@@ -7548,6 +7548,100 @@
       "role": "GROUND",
       "userId": "675706661570347041",
       "callsign": ""
+    },
+    {
+      "id": "b93479a7-c841-46f0-beda-376ddcfa93ac",
+      "timestamp": 1780943674977,
+      "airportId": "aleppo",
+      "action": "RELEASE_ROLE",
+      "role": "GROUND",
+      "userId": "675706661570347041"
+    },
+    {
+      "id": "a51ae9b6-5946-4198-a0f9-92b98c7ee952",
+      "timestamp": 1780943676468,
+      "airportId": "aleppo",
+      "action": "CLAIM_ROLE",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": null,
+      "meta": {
+        "role": "GROUND"
+      }
+    },
+    {
+      "id": "69a2513a-d581-4b68-9af5-4fbf296e034a",
+      "timestamp": 1780943681408,
+      "airportId": "aleppo",
+      "stripId": "5a4f3f15-92b2-4dc7-9619-215710aef9cd",
+      "action": "MOVE",
+      "fromBay": "g_taxi",
+      "toBay": "g_hp",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": ""
+    },
+    {
+      "id": "e58ef63b-3e3d-425d-89b5-4ab635ab434b",
+      "timestamp": 1780943685893,
+      "airportId": "aleppo",
+      "stripId": "5a4f3f15-92b2-4dc7-9619-215710aef9cd",
+      "action": "TOC",
+      "fromBay": "g_hp",
+      "toBay": "g_hp",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": ""
+    },
+    {
+      "id": "474cd161-6a38-41f6-9887-11b9244ee0ec",
+      "timestamp": 1780943768074,
+      "airportId": "aleppo",
+      "stripId": "5a4f3f15-92b2-4dc7-9619-215710aef9cd",
+      "action": "UPDATE",
+      "role": "GROUND",
+      "userId": "675706661570347041",
+      "callsign": "",
+      "meta": {
+        "stripInk": "ink:[{\"width\":2.4,\"color\":\"#111\",\"points\":[{\"x\":89.82808286003035,\"y\":54.21515176462572,\"pressure\":0.5}]},{\"width\":2.4,\"color\":\"#111\",\"points\":[{\"x\":43.696273161168435,\"y\":63.51747734602108,\"pressure\":0.5}]},{\"width\":2.4,\"color\":\"#111\",\"points\":[{\"x\":43.696273161168435,\"y\":63.51747734602108,\"pressure\":0.5}]},{\"width\":2.4,\"color\":\"#111\",\"points\":[{\"x\":39.82807739484826,\"y\":73.16862594249636,\"pressure\":0.5},{\"x\":38.10888413442336,\"y\":72.23840757857921,\"pressure\":0.5}]}]",
+        "airportId": "aleppo",
+        "role": "GROUND"
+      }
+    },
+    {
+      "id": "0445c423-d03e-4e83-8626-fb2286ef33a8",
+      "timestamp": 1780943772485,
+      "airportId": "aleppo",
+      "action": "RELEASE_ROLE",
+      "role": "GROUND",
+      "userId": "675706661570347041"
+    },
+    {
+      "id": "8e5cdc4d-fc86-432b-9762-e7bdd7075f74",
+      "timestamp": 1780943774062,
+      "airportId": "aleppo",
+      "action": "CLAIM_ROLE",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": null,
+      "meta": {
+        "role": "TOWER"
+      }
+    },
+    {
+      "id": "8be733bd-2641-43f4-9522-5dff66315663",
+      "timestamp": 1780943782372,
+      "airportId": "aleppo",
+      "stripId": "5a4f3f15-92b2-4dc7-9619-215710aef9cd",
+      "action": "AOC",
+      "fromBay": "g_hp",
+      "toBay": "g_hp",
+      "role": "TOWER",
+      "userId": "675706661570347041",
+      "callsign": "",
+      "meta": {
+        "note": null
+      }
     }
   ]
 }

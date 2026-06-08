@@ -1035,6 +1035,7 @@
 
 .atc-strip__surface {
   position: relative;
+  touch-action: manipulation;
 }
 
 .atc-strip-ink-overlay {
@@ -1052,6 +1053,11 @@
 .atc-strip-ink-overlay--editable {
   pointer-events: auto;
   cursor: crosshair;
+}
+
+.atc-strip-ink-overlay--tappable {
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 
 .atc-strip--ink-mode .atc-strip__surface .atc-strip__grid,
@@ -1282,6 +1288,16 @@
 .atc-strip--interactive:hover .atc-strip__expand,
 .atc-strip--selected .atc-strip__expand {
   opacity: 1;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .atc-strip__expand {
+    opacity: 1;
+    width: 28px;
+    height: 28px;
+    top: 4px;
+    left: 4px;
+  }
 }
 
 .atc-strip__edit {

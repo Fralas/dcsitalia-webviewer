@@ -340,9 +340,10 @@ export default function AtcStripCard({
       onKeyDown={interactive ? (event) => {
         if (event.key === 'Enter') onSelect?.(strip);
       } : undefined}
-      onDoubleClick={interactive ? (event) => {
+      onDoubleClick={interactive && onExpand ? (event) => {
+        if (window.matchMedia('(pointer: coarse)').matches) return;
         event.stopPropagation();
-        onExpand?.(strip);
+        onExpand(strip);
       } : undefined}
       onContextMenu={canEdit && inkMode ? (event) => {
         event.preventDefault();
@@ -376,6 +377,7 @@ export default function AtcStripCard({
             onChange={(next) => handleFieldChange('stripInk', next)}
             onCommit={(next) => handleFieldCommit('stripInk', next)}
             onLongPress={inkMode && !moveArmed ? () => onMoveArm?.(strip) : undefined}
+            onDoubleTap={interactive && onExpand ? () => onExpand(strip) : undefined}
           />
         )}
       </div>

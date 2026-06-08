@@ -7,11 +7,11 @@
           "airportId": "aleppo",
           "model": "B",
           "direction": "dep",
-          "bayId": "g_taxi",
+          "bayId": "g_hp",
           "position": 0,
-          "ownerRole": "GROUND",
-          "coordinationStatus": null,
-          "operationalState": "taxi",
+          "ownerRole": "TOWER",
+          "coordinationStatus": "accepted",
+          "operationalState": "tower_active",
           "handoffActive": false,
           "handoffTarget": null,
           "handoffFromBay": null,
@@ -22,7 +22,7 @@
             "dynamic": true
           },
           "createdAt": 1780943175162,
-          "updatedAt": 1780943562790,
+          "updatedAt": 1780943782372,
           "createdBy": "675706661570347041",
           "eobt": "",
           "flightRule": "I",
@@ -40,9 +40,9 @@
           "delay": "",
           "route": "",
           "clearanceText": "",
-          "instructions": "",
-          "phaseTimes": "TXI 2032",
-          "stripInk": "ink:[{\"width\":2.4,\"color\":\"#111\",\"points\":[{\"x\":89.82808286003035,\"y\":54.21515176462572,\"pressure\":0.5}]},{\"width\":2.4,\"color\":\"#111\",\"points\":[{\"x\":43.696273161168435,\"y\":63.51747734602108,\"pressure\":0.5}]},{\"width\":2.4,\"color\":\"#111\",\"points\":[{\"x\":43.696273161168435,\"y\":63.51747734602108,\"pressure\":0.5}]}]",
+          "instructions": "TOC 2034",
+          "phaseTimes": "TXI 2032 | HP 2034 | H/O 2034 | H/O 2036",
+          "stripInk": "ink:[{\"width\":2.4,\"color\":\"#111\",\"points\":[{\"x\":89.82808286003035,\"y\":54.21515176462572,\"pressure\":0.5}]},{\"width\":2.4,\"color\":\"#111\",\"points\":[{\"x\":43.696273161168435,\"y\":63.51747734602108,\"pressure\":0.5}]},{\"width\":2.4,\"color\":\"#111\",\"points\":[{\"x\":43.696273161168435,\"y\":63.51747734602108,\"pressure\":0.5}]},{\"width\":2.4,\"color\":\"#111\",\"points\":[{\"x\":39.82807739484826,\"y\":73.16862594249636,\"pressure\":0.5},{\"x\":38.10888413442336,\"y\":72.23840757857921,\"pressure\":0.5}]}]",
           "remarks": ""
         },
         {
@@ -94,12 +94,12 @@
       ],
       "manualSort": false,
       "roleSlots": {
-        "GROUND": {
+        "GROUND": null,
+        "TOWER": {
           "userId": "675706661570347041",
           "username": "Fralas",
-          "claimedAt": 1780943552216
-        },
-        "TOWER": null
+          "claimedAt": 1780943774062
+        }
       },
       "tocQueue": [],
       "runwayConfig": {

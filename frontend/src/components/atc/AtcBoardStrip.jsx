@@ -1,8 +1,7 @@
 import { useRef } from 'react';
 import AtcStripCard from './AtcStripCard';
 import { canEditStrip } from './atcStripModel';
-
-const LONG_PRESS_MS = 550;
+import { isCoarsePointer, TAP_SLOP_PX, useDoubleTapHandler } from './atcPointerGestures';
 
 export default function AtcBoardStrip({
   strip,
@@ -28,31 +27,32 @@ export default function AtcBoardStrip({
 }) {
   const editable = !readOnly && !sectorReadOnly && canEditStrip(strip, operatorRole);
   const inkMode = editable && entryMode === 'ink';
-  const longPressTimerRef = useRef(null);
-  const longPressTriggeredRef = useRef(false);
-
-  const clearLongPress = () => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-  };
+  const { registerTap } = useDoubleTapHandler(() => onExpand?.(strip));
+  const tapRef = useRef(null);
 
   const handlePointerDown = (event) => {
-    if (!inkMode || event.button === 2) return;
-    longPressTriggeredRef.current = false;
-    clearLongPress();
-    longPressTimerRef.current = window.setTimeout(() => {
-      longPressTriggeredRef.current = true;
-      onMoveArm?.(strip);
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(40);
-      }
-    }, LONG_PRESS_MS);
+    if (inkMode || !onExpand || !isCoarsePointer(event)) return;
+    tapRef.current = { x: event.clientX, y: event.clientY, moved: false };
   };
 
-  const handlePointerUp = () => {
-    clearLongPress();
+  const handlePointerMove = (event) => {
+    if (!tapRef.current || inkMode) return;
+    const dx = event.clientX - tapRef.current.x;
+    const dy = event.clientY - tapRef.current.y;
+    if (Math.hypot(dx, dy) > TAP_SLOP_PX) tapRef.current.moved = true;
+  };
+
+  const handlePointerUp = (event) => {
+    if (inkMode || !onExpand || !tapRef.current || tapRef.current.moved) {
+      tapRef.current = null;
+      return;
+    }
+    if (!isCoarsePointer(event)) {
+      tapRef.current = null;
+      return;
+    }
+    registerTap(tapRef.current.x, tapRef.current.y);
+    tapRef.current = null;
   };
 
   return (
@@ -64,10 +64,10 @@ export default function AtcBoardStrip({
         moveArmed ? 'atc-board-strip--move-armed' : '',
       ].filter(Boolean).join(' ')}
       style={{ flexShrink: 0 }}
-      onPointerDown={inkMode ? handlePointerDown : undefined}
-      onPointerUp={inkMode ? handlePointerUp : undefined}
-      onPointerCancel={inkMode ? handlePointerUp : undefined}
-      onPointerLeave={inkMode ? handlePointerUp : undefined}
+      onPointerDown={onExpand ? handlePointerDown : undefined}
+      onPointerMove={onExpand ? handlePointerMove : undefined}
+      onPointerUp={onExpand ? handlePointerUp : undefined}
+      onPointerCancel={onExpand ? handlePointerUp : undefined}
     >
       <AtcStripCard
         strip={strip}
