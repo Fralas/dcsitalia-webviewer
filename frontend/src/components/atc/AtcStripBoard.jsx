@@ -20,11 +20,14 @@ import {
   BAY_META,
   GROUND_BAYS,
   TOWER_BAYS,
-  COORDINATION_STATUS,
   OWNER_ROLE,
   groupStripsForFullBoard,
   canEditStrip,
   isBayOwnedByRole,
+  isHandoffToGround,
+  isHandoffToTower,
+  isPendingGroundCoordination,
+  isPendingTowerCoordination,
 } from './atcStripModel';
 import { t } from '../../utils/locale';
 
@@ -39,8 +42,9 @@ function SortableStrip({
   onCancelHandoff,
   operatorRole,
   readOnly,
+  sectorReadOnly,
 }) {
-  const editable = !readOnly && canEditStrip(strip, operatorRole);
+  const editable = !readOnly && !sectorReadOnly && canEditStrip(strip, operatorRole);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: strip.id,
     data: { strip, bayId: strip.bayId },
@@ -99,7 +103,9 @@ function BayColumn({
   sectorReadOnly,
 }) {
   const meta = BAY_META[bayId];
-  const pendingCount = strips.filter((s) => s.coordinationStatus === COORDINATION_STATUS.PENDING_TOC).length;
+  const pendingCount = strips.filter(
+    (s) => isPendingTowerCoordination(s) || isPendingGroundCoordination(s),
+  ).length;
   const bayLocked = readOnly || sectorReadOnly;
 
   return (
@@ -124,6 +130,7 @@ function BayColumn({
               onCancelHandoff={onCancelHandoff}
               operatorRole={operatorRole}
               readOnly={readOnly}
+              sectorReadOnly={bayLocked}
             />
           ))}
         </div>
@@ -171,12 +178,19 @@ export default function AtcStripBoard({
     );
     if (!isBay || !isBayOwnedByRole(overBay, operatorRole)) return;
 
-    if (strip.handoffActive && overBay.startsWith('g_') && overBay !== ATC_BAYS.G_HANDOFF) {
+    if (isHandoffToTower(strip) && overBay.startsWith('g_') && overBay !== ATC_BAYS.G_HANDOFF) {
       onCancelHandoff?.(strip, overBay);
       return;
     }
 
-    const displayBay = strip.handoffActive ? ATC_BAYS.G_HANDOFF : strip.bayId;
+    if (isHandoffToGround(strip) && overBay.startsWith('t_') && overBay !== ATC_BAYS.T_HANDOFF) {
+      onCancelHandoff?.(strip, overBay);
+      return;
+    }
+
+    let displayBay = strip.bayId;
+    if (isHandoffToTower(strip)) displayBay = ATC_BAYS.G_HANDOFF;
+    if (isHandoffToGround(strip)) displayBay = ATC_BAYS.T_HANDOFF;
     if (overBay !== displayBay) {
       onMoveStrip?.(strip, overBay);
     }

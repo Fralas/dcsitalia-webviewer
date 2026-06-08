@@ -1,4 +1,4 @@
-import { ATC_BAYS, OWNER_ROLE } from './atcStripModel';
+import { ATC_BAYS, OWNER_ROLE, isHandoffToGround, isHandoffToTower } from './atcStripModel';
 
 const SFX_BASE = import.meta.env.VITE_SOCKET_URL
   || (typeof window !== 'undefined' ? window.location.origin : '');
@@ -64,11 +64,15 @@ export function shouldPlayHandoffAlert(prevStrips, nextStrips, claimedRole, user
     const prev = prevById.get(strip.id);
     if (!prev) return;
 
-    if (strip.handoffActive && strip.bayId === ATC_BAYS.T_PENDING && !prev.handoffActive) {
+    if (isHandoffToTower(strip) && strip.bayId === ATC_BAYS.T_PENDING && !isHandoffToTower(prev)) {
       towerIncoming = true;
     }
 
-    if (prev.handoffActive && !strip.handoffActive && strip.bayId?.startsWith('g_')) {
+    if (isHandoffToGround(strip) && strip.bayId === ATC_BAYS.G_HP && !isHandoffToGround(prev)) {
+      groundIncoming = true;
+    }
+
+    if (prev.handoffActive && !strip.handoffActive && strip.bayId?.startsWith('g_') && isHandoffToTower(prev)) {
       groundIncoming = true;
     }
   });

@@ -16,8 +16,14 @@ export const OWNER_ROLE = Object.freeze({
 
 export const COORDINATION_STATUS = Object.freeze({
   PENDING_TOC: 'pending_toc',
+  PENDING_AOG: 'pending_aog',
   ACCEPTED: 'accepted',
   REJECTED: 'rejected',
+});
+
+export const HANDOFF_TARGET = Object.freeze({
+  TOWER: 'tower',
+  GROUND: 'ground',
 });
 
 export const ATC_BAYS = Object.freeze({
@@ -27,6 +33,7 @@ export const ATC_BAYS = Object.freeze({
   G_TAXI: 'g_taxi',
   G_HP: 'g_hp',
   G_HANDOFF: 'g_handoff',
+  T_HANDOFF: 't_handoff',
   T_PENDING: 't_pending',
   T_ACTIVE: 't_active',
   T_FINAL: 't_final',
@@ -43,13 +50,14 @@ export const BAY_META = Object.freeze({
   [ATC_BAYS.G_TAXI]: { role: OWNER_ROLE.GROUND, labelKey: 'atc.bays.gTaxi', order: 3 },
   [ATC_BAYS.G_HP]: { role: OWNER_ROLE.GROUND, labelKey: 'atc.bays.gHp', order: 4 },
   [ATC_BAYS.G_HANDOFF]: { role: OWNER_ROLE.GROUND, labelKey: 'atc.bays.gHandoff', order: 5 },
-  [ATC_BAYS.T_PENDING]: { role: OWNER_ROLE.TOWER, labelKey: 'atc.bays.tPending', order: 6 },
-  [ATC_BAYS.T_ACTIVE]: { role: OWNER_ROLE.TOWER, labelKey: 'atc.bays.tActive', order: 7 },
-  [ATC_BAYS.T_FINAL]: { role: OWNER_ROLE.TOWER, labelKey: 'atc.bays.tFinal', order: 8 },
-  [ATC_BAYS.T_RUNWAY]: { role: OWNER_ROLE.TOWER, labelKey: 'atc.bays.tRunway', order: 9 },
-  [ATC_BAYS.T_AIRBORNE]: { role: OWNER_ROLE.TOWER, labelKey: 'atc.bays.tAirborne', order: 10 },
-  [ATC_BAYS.T_LANDED]: { role: OWNER_ROLE.TOWER, labelKey: 'atc.bays.tLanded', order: 11 },
-  [ATC_BAYS.ARCHIVE]: { role: null, labelKey: 'atc.bays.archive', order: 12 },
+  [ATC_BAYS.T_HANDOFF]: { role: OWNER_ROLE.TOWER, labelKey: 'atc.bays.tHandoff', order: 6 },
+  [ATC_BAYS.T_PENDING]: { role: OWNER_ROLE.TOWER, labelKey: 'atc.bays.tPending', order: 7 },
+  [ATC_BAYS.T_ACTIVE]: { role: OWNER_ROLE.TOWER, labelKey: 'atc.bays.tActive', order: 8 },
+  [ATC_BAYS.T_FINAL]: { role: OWNER_ROLE.TOWER, labelKey: 'atc.bays.tFinal', order: 9 },
+  [ATC_BAYS.T_RUNWAY]: { role: OWNER_ROLE.TOWER, labelKey: 'atc.bays.tRunway', order: 10 },
+  [ATC_BAYS.T_AIRBORNE]: { role: OWNER_ROLE.TOWER, labelKey: 'atc.bays.tAirborne', order: 11 },
+  [ATC_BAYS.T_LANDED]: { role: OWNER_ROLE.TOWER, labelKey: 'atc.bays.tLanded', order: 12 },
+  [ATC_BAYS.ARCHIVE]: { role: null, labelKey: 'atc.bays.archive', order: 13 },
 });
 
 export const ENAV_ACTIONS = Object.freeze({
@@ -59,6 +67,8 @@ export const ENAV_ACTIONS = Object.freeze({
   HP: 'HP',
   TOC: 'TOC',
   AOC: 'AOC',
+  TOG: 'TOG',
+  AOG: 'AOG',
   CANCEL_HANDOFF: 'CANCEL_HANDOFF',
   L_UP: 'L/UP',
   L_W: 'L/W',
@@ -79,6 +89,7 @@ export const GROUND_BAY_IDS = new Set([
 ]);
 
 export const TOWER_BAY_IDS = new Set([
+  ATC_BAYS.T_HANDOFF,
   ATC_BAYS.T_PENDING,
   ATC_BAYS.T_ACTIVE,
   ATC_BAYS.T_FINAL,
@@ -108,6 +119,7 @@ const ARRIVAL_FLOW = [
   { bay: ATC_BAYS.T_FINAL, action: ENAV_ACTIONS.FIN, state: 'final' },
   { bay: ATC_BAYS.T_RUNWAY, action: ENAV_ACTIONS.L, state: 'runway' },
   { bay: ATC_BAYS.T_LANDED, action: ENAV_ACTIONS.RV, state: 'landed' },
+  { bay: ATC_BAYS.G_HP, action: ENAV_ACTIONS.TOG, state: 'pending_ground', handoffToGround: true },
   { bay: ATC_BAYS.G_TAXI, action: ENAV_ACTIONS.TXI, state: 'taxi_in' },
   { bay: ATC_BAYS.G_STAND, action: null, state: 'parked' },
   { bay: ATC_BAYS.ARCHIVE, action: ENAV_ACTIONS.ARCHIVE, state: 'archived' },
@@ -159,6 +171,15 @@ export function isTowerBay(bayId) {
   return TOWER_BAY_IDS.has(bayId);
 }
 
+export function isHandoffToTower(strip) {
+  if (!strip?.handoffActive) return false;
+  return strip.handoffTarget !== HANDOFF_TARGET.GROUND;
+}
+
+export function isHandoffToGround(strip) {
+  return Boolean(strip?.handoffActive && strip.handoffTarget === HANDOFF_TARGET.GROUND);
+}
+
 export function enterHandoffQueue(strip, fromBay = strip.bayId) {
   return {
     ok: true,
@@ -168,6 +189,7 @@ export function enterHandoffQueue(strip, fromBay = strip.bayId) {
       operationalState: 'pending_tower',
       coordinationStatus: COORDINATION_STATUS.PENDING_TOC,
       handoffActive: true,
+      handoffTarget: HANDOFF_TARGET.TOWER,
       handoffFromBay: fromBay,
       ownerRole: OWNER_ROLE.TOWER,
       flags: { ...strip.flags, highlighted: true, unread: true },
@@ -179,9 +201,61 @@ export function enterHandoffQueue(strip, fromBay = strip.bayId) {
   };
 }
 
+export function enterGroundHandoffQueue(strip, fromBay = strip.bayId) {
+  return {
+    ok: true,
+    strip: {
+      ...strip,
+      bayId: ATC_BAYS.G_HP,
+      operationalState: 'pending_ground',
+      coordinationStatus: COORDINATION_STATUS.PENDING_AOG,
+      handoffActive: true,
+      handoffTarget: HANDOFF_TARGET.GROUND,
+      handoffFromBay: fromBay,
+      ownerRole: OWNER_ROLE.GROUND,
+      flags: { ...strip.flags, highlighted: true, unread: true },
+    },
+    fromBay: strip.bayId,
+    toBay: ATC_BAYS.G_HP,
+    action: ENAV_ACTIONS.TOG,
+    enqueue: true,
+  };
+}
+
 export function cancelHandoff(strip, targetBay) {
   if (!strip.handoffActive) {
     return { ok: false, error: 'NOT_IN_HANDOFF' };
+  }
+
+  if (isHandoffToGround(strip)) {
+    const fallbackBay = targetBay || strip.handoffFromBay || ATC_BAYS.T_LANDED;
+    if (!isTowerBay(fallbackBay) || fallbackBay === ATC_BAYS.T_HANDOFF) {
+      return { ok: false, error: 'INVALID_CANCEL_TARGET' };
+    }
+
+    const flow = getFlowForDirection(strip.direction);
+    const step = flow.find((s) => s.bay === fallbackBay);
+
+    return {
+      ok: true,
+      strip: {
+        ...strip,
+        bayId: fallbackBay,
+        operationalState: step?.state || 'landed',
+        coordinationStatus: null,
+        handoffActive: false,
+        handoffTarget: null,
+        handoffFromBay: null,
+        queuePosition: null,
+        ownerRole: OWNER_ROLE.TOWER,
+        flags: { ...strip.flags, highlighted: false, unread: false },
+      },
+      fromBay: ATC_BAYS.G_HP,
+      toBay: fallbackBay,
+      action: ENAV_ACTIONS.CANCEL_HANDOFF,
+      dequeue: true,
+      enqueue: false,
+    };
   }
 
   const fallbackBay = targetBay || strip.handoffFromBay || ATC_BAYS.G_HP;
@@ -200,6 +274,7 @@ export function cancelHandoff(strip, targetBay) {
       operationalState: step?.state || 'holding',
       coordinationStatus: null,
       handoffActive: false,
+      handoffTarget: null,
       handoffFromBay: null,
       queuePosition: null,
       ownerRole: OWNER_ROLE.GROUND,
@@ -244,7 +319,11 @@ export function isBayTransitionAllowed(strip, targetBayId, role) {
   }
 
   if (targetBayId === ATC_BAYS.G_HANDOFF) {
-    return role === OWNER_ROLE.GROUND && strip.bayId === ATC_BAYS.G_HP;
+    return role === OWNER_ROLE.GROUND && strip.bayId === ATC_BAYS.G_HP && !isHandoffToGround(strip);
+  }
+
+  if (targetBayId === ATC_BAYS.T_HANDOFF) {
+    return role === OWNER_ROLE.TOWER && strip.bayId === ATC_BAYS.T_LANDED && !isHandoffToTower(strip);
   }
 
   if (targetBayId === ATC_BAYS.ARCHIVE) return true;
@@ -281,6 +360,13 @@ export function applyAction(strip, actionCode) {
     return result;
   }
 
+  if (next.handoffToGround && actionCode === ENAV_ACTIONS.TOG) {
+    const result = enterGroundHandoffQueue(strip, strip.bayId);
+    const stamp = formatEnavTime(Date.now(), strip);
+    result.strip.remarks = appendInstruction(result.strip.remarks, `${actionCode} ${stamp}`);
+    return result;
+  }
+
   const updated = { ...strip };
   updated.bayId = next.bay;
   updated.operationalState = next.state;
@@ -305,10 +391,17 @@ export function applyAction(strip, actionCode) {
 
 export function applyMove(strip, targetBayId, role) {
   if (targetBayId === ATC_BAYS.G_HANDOFF) {
-    if (role !== OWNER_ROLE.GROUND || strip.bayId !== ATC_BAYS.G_HP) {
+    if (role !== OWNER_ROLE.GROUND || strip.bayId !== ATC_BAYS.G_HP || isHandoffToGround(strip)) {
       return { ok: false, error: 'INVALID_BAY_TRANSITION' };
     }
     return enterHandoffQueue(strip, strip.bayId);
+  }
+
+  if (targetBayId === ATC_BAYS.T_HANDOFF) {
+    if (role !== OWNER_ROLE.TOWER || strip.bayId !== ATC_BAYS.T_LANDED || isHandoffToTower(strip)) {
+      return { ok: false, error: 'INVALID_BAY_TRANSITION' };
+    }
+    return enterGroundHandoffQueue(strip, strip.bayId);
   }
 
   if (!isBayTransitionAllowed(strip, targetBayId, role)) {
@@ -327,6 +420,41 @@ export function applyMove(strip, targetBayId, role) {
   return { ok: true, strip: updated, fromBay: strip.bayId, toBay: targetBayId };
 }
 
+export function acceptGroundCoordination(strip) {
+  if (strip.coordinationStatus !== COORDINATION_STATUS.PENDING_AOG || !isHandoffToGround(strip)) {
+    return { ok: false, error: 'NO_PENDING_COORDINATION' };
+  }
+
+  const targetBay = ATC_BAYS.G_TAXI;
+  return {
+    ok: true,
+    strip: {
+      ...strip,
+      bayId: targetBay,
+      operationalState: 'taxi_in',
+      coordinationStatus: COORDINATION_STATUS.ACCEPTED,
+      handoffActive: false,
+      handoffTarget: null,
+      handoffFromBay: null,
+      queuePosition: null,
+      ownerRole: OWNER_ROLE.GROUND,
+      flags: { ...strip.flags, unread: false, highlighted: false },
+    },
+    fromBay: strip.bayId,
+    toBay: targetBay,
+    action: ENAV_ACTIONS.AOG,
+    dequeue: true,
+  };
+}
+
+export function rejectGroundCoordination(strip, note = '') {
+  if (strip.coordinationStatus !== COORDINATION_STATUS.PENDING_AOG || !isHandoffToGround(strip)) {
+    return { ok: false, error: 'NO_PENDING_COORDINATION' };
+  }
+
+  return cancelHandoff(strip, strip.handoffFromBay || ATC_BAYS.T_LANDED);
+}
+
 export function acceptCoordination(strip) {
   if (strip.coordinationStatus !== COORDINATION_STATUS.PENDING_TOC) {
     return { ok: false, error: 'NO_PENDING_COORDINATION' };
@@ -341,6 +469,7 @@ export function acceptCoordination(strip) {
       operationalState: 'tower_active',
       coordinationStatus: COORDINATION_STATUS.ACCEPTED,
       handoffActive: false,
+      handoffTarget: null,
       handoffFromBay: null,
       queuePosition: null,
       ownerRole: OWNER_ROLE.TOWER,

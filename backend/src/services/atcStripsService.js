@@ -8,8 +8,13 @@ import {
   applyAction,
   applyMove,
   acceptCoordination,
+  acceptGroundCoordination,
   rejectCoordination,
+  rejectGroundCoordination,
   cancelHandoff,
+  isHandoffToGround,
+  isHandoffToTower,
+  HANDOFF_TARGET,
   createEmptyStripFields,
   getDefaultBayForDirection,
   getDefaultBayForCreate,
@@ -73,6 +78,7 @@ function normalizeStrip(raw = {}) {
     coordinationStatus: raw.coordinationStatus || null,
     operationalState: raw.operationalState || 'planned',
     handoffActive: Boolean(raw.handoffActive),
+    handoffTarget: raw.handoffTarget || (raw.handoffActive ? HANDOFF_TARGET.TOWER : null),
     handoffFromBay: raw.handoffFromBay || null,
     queuePosition: Number.isFinite(raw.queuePosition) ? raw.queuePosition : null,
     flags: {
@@ -166,15 +172,21 @@ function assertRoleClaimed(board, user, role) {
   return null;
 }
 
-function assertStripEditableByRole(strip, role, { allowCancelHandoff = false } = {}) {
+function assertStripEditableByRole(strip, role, { allowCancelHandoff = false, allowCoordinate = false } = {}) {
   if (role === OWNER_ROLE.GROUND) {
-    if (allowCancelHandoff && strip.handoffActive) return null;
+    if (allowCoordinate && isHandoffToGround(strip)) return null;
+    if (allowCancelHandoff && strip.handoffActive && isHandoffToTower(strip)) return null;
+    if (isHandoffToGround(strip) && strip.bayId === ATC_BAYS.G_HP) return null;
     if (isGroundStorageBay(strip.bayId) && !strip.handoffActive) return null;
     return { error: 'STRIP_NOT_IN_YOUR_SECTOR', status: 403 };
   }
 
   if (role === OWNER_ROLE.TOWER) {
-    if (isTowerBay(strip.bayId)) return null;
+    if (allowCoordinate && isHandoffToTower(strip)) return null;
+    if (allowCancelHandoff && strip.handoffActive && isHandoffToGround(strip)) return null;
+    if (isHandoffToGround(strip)) return null;
+    if (isTowerBay(strip.bayId) && !strip.handoffActive) return null;
+    if (strip.handoffActive && isHandoffToTower(strip)) return null;
     return { error: 'STRIP_NOT_IN_YOUR_SECTOR', status: 403 };
   }
 
@@ -183,6 +195,7 @@ function assertStripEditableByRole(strip, role, { allowCancelHandoff = false } =
 
 function assertTargetBayForRole(targetBayId, role) {
   if (targetBayId === ATC_BAYS.G_HANDOFF && role === OWNER_ROLE.GROUND) return null;
+  if (targetBayId === ATC_BAYS.T_HANDOFF && role === OWNER_ROLE.TOWER) return null;
 
   if (role === OWNER_ROLE.GROUND) {
     if (isGroundStorageBay(targetBayId)) return null;
@@ -440,14 +453,25 @@ export function coordinateStrip(airportId, stripId, { accept, note, role }, user
   const authErr = assertRoleClaimed(board, user, role);
   if (authErr) return authErr;
 
-  if (role !== OWNER_ROLE.TOWER) {
-    return { error: 'ONLY_TOWER_CAN_COORDINATE', status: 403 };
+  if (role === OWNER_ROLE.TOWER && !isHandoffToTower(strip)) {
+    return { error: 'ONLY_TOWER_CAN_COORDINATE_TOC', status: 403 };
+  }
+  if (role === OWNER_ROLE.GROUND && !isHandoffToGround(strip)) {
+    return { error: 'ONLY_GROUND_CAN_COORDINATE_AOG', status: 403 };
+  }
+  if (role !== OWNER_ROLE.TOWER && role !== OWNER_ROLE.GROUND) {
+    return { error: 'INVALID_ROLE', status: 400 };
   }
 
-  const sectorErr = assertStripEditableByRole(strip, role);
+  const sectorErr = assertStripEditableByRole(strip, role, { allowCoordinate: true });
   if (sectorErr) return sectorErr;
 
-  const result = accept ? acceptCoordination(strip) : rejectCoordination(strip, note);
+  let result;
+  if (role === OWNER_ROLE.TOWER) {
+    result = accept ? acceptCoordination(strip) : rejectCoordination(strip, note);
+  } else {
+    result = accept ? acceptGroundCoordination(strip) : rejectGroundCoordination(strip, note);
+  }
   if (!result.ok) return { error: result.error, status: 400 };
 
   const updated = { ...result.strip, updatedAt: Date.now() };
@@ -478,8 +502,14 @@ export function cancelHandoffStrip(airportId, stripId, { targetBay, role }, user
   const authErr = assertRoleClaimed(board, user, role);
   if (authErr) return authErr;
 
-  if (role !== OWNER_ROLE.GROUND) {
-    return { error: 'ONLY_GROUND_CAN_CANCEL_HANDOFF', status: 403 };
+  if (role === OWNER_ROLE.GROUND && !isHandoffToTower(strip)) {
+    return { error: 'ONLY_GROUND_CAN_CANCEL_TOC_HANDOFF', status: 403 };
+  }
+  if (role === OWNER_ROLE.TOWER && !isHandoffToGround(strip)) {
+    return { error: 'ONLY_TOWER_CAN_CANCEL_TOG_HANDOFF', status: 403 };
+  }
+  if (role !== OWNER_ROLE.GROUND && role !== OWNER_ROLE.TOWER) {
+    return { error: 'INVALID_ROLE', status: 400 };
   }
 
   const sectorErr = assertStripEditableByRole(strip, role, { allowCancelHandoff: true });

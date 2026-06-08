@@ -452,7 +452,7 @@ export default function AtcStripPage() {
 
   const handleCancelHandoff = async (strip, targetBay) => {
 
-    if (!requireClaimed() || claimedRole !== OWNER_ROLE.GROUND) return;
+    if (!requireClaimed()) return;
 
     try {
 
@@ -472,7 +472,7 @@ export default function AtcStripPage() {
 
   const handleCoordinate = async (strip, accept) => {
 
-    if (!requireClaimed() || claimedRole !== OWNER_ROLE.TOWER) return;
+    if (!requireClaimed()) return;
 
     try {
 
@@ -732,13 +732,15 @@ export default function AtcStripPage() {
 
 
 
-      {claimedRole === OWNER_ROLE.TOWER && (
+      {claimedRole && (
 
         <AtcCoordinationPanel
 
           strips={strips}
 
           tocQueue={tocQueue}
+
+          operatorRole={claimedRole}
 
           onAccept={(strip) => handleCoordinate(strip, true)}
 

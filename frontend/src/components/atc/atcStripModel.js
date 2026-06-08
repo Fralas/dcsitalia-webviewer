@@ -16,8 +16,14 @@ export const OWNER_ROLE = Object.freeze({
 
 export const COORDINATION_STATUS = Object.freeze({
   PENDING_TOC: 'pending_toc',
+  PENDING_AOG: 'pending_aog',
   ACCEPTED: 'accepted',
   REJECTED: 'rejected',
+});
+
+export const HANDOFF_TARGET = Object.freeze({
+  TOWER: 'tower',
+  GROUND: 'ground',
 });
 
 export const ATC_BAYS = Object.freeze({
@@ -27,6 +33,7 @@ export const ATC_BAYS = Object.freeze({
   G_TAXI: 'g_taxi',
   G_HP: 'g_hp',
   G_HANDOFF: 'g_handoff',
+  T_HANDOFF: 't_handoff',
   T_PENDING: 't_pending',
   T_ACTIVE: 't_active',
   T_FINAL: 't_final',
@@ -46,6 +53,7 @@ export const GROUND_BAYS = [
 ];
 
 export const TOWER_BAYS = [
+  ATC_BAYS.T_HANDOFF,
   ATC_BAYS.T_PENDING,
   ATC_BAYS.T_ACTIVE,
   ATC_BAYS.T_FINAL,
@@ -62,6 +70,7 @@ export const BAY_META = Object.freeze({
   [ATC_BAYS.G_TAXI]: { role: OWNER_ROLE.GROUND, labelKey: 'atc.bays.gTaxi' },
   [ATC_BAYS.G_HP]: { role: OWNER_ROLE.GROUND, labelKey: 'atc.bays.gHp' },
   [ATC_BAYS.G_HANDOFF]: { role: OWNER_ROLE.GROUND, labelKey: 'atc.bays.gHandoff' },
+  [ATC_BAYS.T_HANDOFF]: { role: OWNER_ROLE.TOWER, labelKey: 'atc.bays.tHandoff' },
   [ATC_BAYS.T_PENDING]: { role: OWNER_ROLE.TOWER, labelKey: 'atc.bays.tPending' },
   [ATC_BAYS.T_ACTIVE]: { role: OWNER_ROLE.TOWER, labelKey: 'atc.bays.tActive' },
   [ATC_BAYS.T_FINAL]: { role: OWNER_ROLE.TOWER, labelKey: 'atc.bays.tFinal' },
@@ -70,6 +79,15 @@ export const BAY_META = Object.freeze({
   [ATC_BAYS.T_LANDED]: { role: OWNER_ROLE.TOWER, labelKey: 'atc.bays.tLanded' },
   [ATC_BAYS.ARCHIVE]: { role: null, labelKey: 'atc.bays.archive' },
 });
+
+export function isHandoffToTower(strip) {
+  if (!strip?.handoffActive) return false;
+  return strip.handoffTarget !== HANDOFF_TARGET.GROUND;
+}
+
+export function isHandoffToGround(strip) {
+  return Boolean(strip?.handoffActive && strip.handoffTarget === HANDOFF_TARGET.GROUND);
+}
 
 export function groupStripsByBay(strips = []) {
   const grouped = {};
@@ -102,45 +120,18 @@ function sortPendingQueue(strips = []) {
 export function groupStripsForFullBoard(strips = []) {
   const grouped = groupStripsByBay(strips);
   grouped[ATC_BAYS.G_HANDOFF] = [];
+  grouped[ATC_BAYS.T_HANDOFF] = [];
 
   strips.forEach((strip) => {
-    if (strip.handoffActive && strip.bayId === ATC_BAYS.T_PENDING) {
+    if (isHandoffToTower(strip) && strip.bayId === ATC_BAYS.T_PENDING) {
       grouped[ATC_BAYS.G_HANDOFF].push(strip);
+    }
+    if (isHandoffToGround(strip) && strip.bayId === ATC_BAYS.G_HP) {
+      grouped[ATC_BAYS.T_HANDOFF].push(strip);
     }
   });
 
   if (grouped[ATC_BAYS.T_PENDING]?.length) {
-    grouped[ATC_BAYS.T_PENDING] = sortPendingQueue(grouped[ATC_BAYS.T_PENDING]);
-  }
-
-  return grouped;
-}
-
-/** @deprecated Usare groupStripsForFullBoard per la vista operativa. */
-export function groupStripsForRole(strips = [], role) {
-  const grouped = {};
-  getBaysForRole(role).forEach((bayId) => {
-    grouped[bayId] = [];
-  });
-
-  strips.forEach((strip) => {
-    if (role === OWNER_ROLE.GROUND) {
-      if (strip.handoffActive && strip.bayId === ATC_BAYS.T_PENDING) {
-        grouped[ATC_BAYS.G_HANDOFF].push(strip);
-      } else if (strip.bayId?.startsWith('g_') && !strip.handoffActive) {
-        grouped[strip.bayId]?.push(strip);
-      }
-      return;
-    }
-
-    if (role === OWNER_ROLE.TOWER) {
-      if (strip.bayId?.startsWith('t_') || strip.bayId === ATC_BAYS.ARCHIVE) {
-        grouped[strip.bayId]?.push(strip);
-      }
-    }
-  });
-
-  if (grouped[ATC_BAYS.T_PENDING]) {
     grouped[ATC_BAYS.T_PENDING] = sortPendingQueue(grouped[ATC_BAYS.T_PENDING]);
   }
 
@@ -163,17 +154,25 @@ export function resolveClaimedRole(roleSlots, userId) {
 export function canEditStrip(strip, role) {
   if (!role) return false;
   if (role === OWNER_ROLE.GROUND) {
-    if (strip.handoffActive) return true;
+    if (isHandoffToGround(strip)) return true;
+    if (isHandoffToTower(strip)) return true;
     return strip.bayId?.startsWith('g_') && strip.bayId !== ATC_BAYS.G_HANDOFF;
   }
   if (role === OWNER_ROLE.TOWER) {
-    return strip.bayId?.startsWith('t_') || strip.bayId === ATC_BAYS.ARCHIVE;
+    if (isHandoffToGround(strip)) return true;
+    if (isHandoffToTower(strip)) return true;
+    return strip.bayId?.startsWith('t_') && strip.bayId !== ATC_BAYS.T_HANDOFF
+      || strip.bayId === ATC_BAYS.ARCHIVE;
   }
   return false;
 }
 
-export function isPendingCoordination(strip) {
-  return strip?.coordinationStatus === COORDINATION_STATUS.PENDING_TOC;
+export function isPendingTowerCoordination(strip) {
+  return strip?.coordinationStatus === COORDINATION_STATUS.PENDING_TOC && isHandoffToTower(strip);
+}
+
+export function isPendingGroundCoordination(strip) {
+  return strip?.coordinationStatus === COORDINATION_STATUS.PENDING_AOG && isHandoffToGround(strip);
 }
 
 export function getStripModelClass(model) {

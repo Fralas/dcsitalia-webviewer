@@ -1,5 +1,10 @@
 import { Pencil } from 'lucide-react';
-import { COORDINATION_STATUS, STRIP_DIRECTION, getStripModelClass } from './atcStripModel';
+import {
+  STRIP_DIRECTION,
+  getStripModelClass,
+  isPendingGroundCoordination,
+  isPendingTowerCoordination,
+} from './atcStripModel';
 import AtcActionBar from './AtcActionBar';
 
 function Cell({ label, children, className = '', split, labelCorner = 'tl' }) {
@@ -136,11 +141,12 @@ export default function AtcStripCard({
   readOnly = false,
 }) {
   const isArrival = strip.direction === STRIP_DIRECTION.ARR;
-  const pending = strip.coordinationStatus === COORDINATION_STATUS.PENDING_TOC;
+  const pendingToc = isPendingTowerCoordination(strip);
+  const pendingAog = isPendingGroundCoordination(strip);
 
   return (
     <div
-      className={`atc-strip ${getStripModelClass(strip.model)} ${selected ? 'atc-strip--selected' : ''} ${pending ? 'atc-strip--pending' : ''} ${strip.flags?.highlighted ? 'atc-strip--highlight' : ''} ${readOnly ? 'atc-strip--readonly' : ''}`}
+      className={`atc-strip ${getStripModelClass(strip.model)} ${selected ? 'atc-strip--selected' : ''} ${pendingToc || pendingAog ? 'atc-strip--pending' : ''} ${strip.flags?.highlighted ? 'atc-strip--highlight' : ''} ${readOnly ? 'atc-strip--readonly' : ''}`}
       onClick={() => onSelect?.(strip)}
       onDoubleClick={(event) => {
         event.stopPropagation();
@@ -156,7 +162,8 @@ export default function AtcStripCard({
         }
       }}
     >
-      {pending && <span className="atc-strip__badge">TOC</span>}
+      {pendingToc && <span className="atc-strip__badge">TOC</span>}
+      {pendingAog && <span className="atc-strip__badge atc-strip__badge--aog">AOG</span>}
       {!readOnly && selected && (
         <button
           type="button"

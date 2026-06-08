@@ -1,5 +1,10 @@
 import { Check, X } from 'lucide-react';
-import { COORDINATION_STATUS } from './atcStripModel';
+import {
+  isHandoffToGround,
+  isHandoffToTower,
+  isPendingGroundCoordination,
+  isPendingTowerCoordination,
+} from './atcStripModel';
 import { t } from '../../utils/locale';
 
 export default function AtcActionBar({
@@ -10,9 +15,12 @@ export default function AtcActionBar({
   onCoordinate,
   onCancelHandoff,
 }) {
-  const pending = strip.coordinationStatus === COORDINATION_STATUS.PENDING_TOC;
-  const canAccept = pending && operatorRole === 'TOWER';
-  const canCancelHandoff = strip.handoffActive && operatorRole === 'GROUND';
+  const canAcceptToc = isPendingTowerCoordination(strip) && operatorRole === 'TOWER';
+  const canAcceptAog = isPendingGroundCoordination(strip) && operatorRole === 'GROUND';
+  const canCancelHandoff = (
+    (operatorRole === 'GROUND' && isHandoffToTower(strip))
+    || (operatorRole === 'TOWER' && isHandoffToGround(strip))
+  );
 
   return (
     <div className="atc-action-bar" onClick={(e) => e.stopPropagation()}>
@@ -24,7 +32,7 @@ export default function AtcActionBar({
         >
           {t('atc.actions.cancelHandoff')}
         </button>
-      ) : canAccept ? (
+      ) : canAcceptToc ? (
         <div className="atc-action-bar__coord">
           <button type="button" className="atc-action-btn atc-action-btn--accept" onClick={() => onCoordinate?.(strip, true)}>
             <Check className="w-3.5 h-3.5" />
@@ -33,6 +41,17 @@ export default function AtcActionBar({
           <button type="button" className="atc-action-btn atc-action-btn--reject" onClick={() => onCoordinate?.(strip, false)}>
             <X className="w-3.5 h-3.5" />
             {t('atc.actions.rejectToc')}
+          </button>
+        </div>
+      ) : canAcceptAog ? (
+        <div className="atc-action-bar__coord">
+          <button type="button" className="atc-action-btn atc-action-btn--accept" onClick={() => onCoordinate?.(strip, true)}>
+            <Check className="w-3.5 h-3.5" />
+            {t('atc.actions.acceptAog')}
+          </button>
+          <button type="button" className="atc-action-btn atc-action-btn--reject" onClick={() => onCoordinate?.(strip, false)}>
+            <X className="w-3.5 h-3.5" />
+            {t('atc.actions.rejectAog')}
           </button>
         </div>
       ) : nextAction?.action ? (

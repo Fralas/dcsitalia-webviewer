@@ -563,7 +563,11 @@ export default {
       stripNotInSector: 'Strip is outside your operational sector',
       onlyGroundCreate: 'Only GROUND can create new strips',
     },
-    coord: { title: 'Pending coordination' },
+    coord: {
+      title: 'Pending coordination',
+      titleToc: 'Pending TOC (Tower)',
+      titleAog: 'Pending TOG (Ground)',
+    },
     history: {
       title: 'Action history',
       empty: 'No actions yet',
@@ -575,6 +579,8 @@ export default {
     actions: {
       acceptToc: 'AOC',
       rejectToc: 'Reject',
+      acceptAog: 'AOG',
+      rejectAog: 'Reject',
       cancelHandoff: 'Cancel handoff',
       dragOrWait: 'Drag or wait for coordination',
     },
@@ -633,6 +639,7 @@ export default {
       gTaxi: 'Taxi',
       gHp: 'HP',
       gHandoff: 'Handoff TOC',
+      tHandoff: 'Handoff TOG',
       tPending: 'Pending TOC',
       tActive: 'TWR Active',
       tFinal: 'Final',

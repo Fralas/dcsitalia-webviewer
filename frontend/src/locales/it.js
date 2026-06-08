@@ -563,7 +563,11 @@ export default {
       stripNotInSector: 'Strip fuori dal tuo settore operativo',
       onlyGroundCreate: 'Solo GROUND può creare nuove strip',
     },
-    coord: { title: 'Coordinamenti in attesa' },
+    coord: {
+      title: 'Coordinamenti in attesa',
+      titleToc: 'TOC in attesa (Tower)',
+      titleAog: 'TOG in attesa (Ground)',
+    },
     history: {
       title: 'Storico azioni',
       empty: 'Nessuna azione registrata',
@@ -575,6 +579,8 @@ export default {
     actions: {
       acceptToc: 'AOC',
       rejectToc: 'Rifiuta',
+      acceptAog: 'AOG',
+      rejectAog: 'Rifiuta',
       cancelHandoff: 'Annulla handoff',
       dragOrWait: 'Trascina o attendi coordinamento',
     },
@@ -633,6 +639,7 @@ export default {
       gTaxi: 'Rullaggio',
       gHp: 'HP',
       gHandoff: 'Handoff TOC',
+      tHandoff: 'Handoff TOG',
       tPending: 'In attesa TOC',
       tActive: 'Attivi TWR',
       tFinal: 'Finale',
