@@ -25,6 +25,7 @@ import {
   isGroundStorageBay,
   isTowerBay,
   defaultRunwayConfig,
+  normalizeRunwayConfig,
   canEditStrip,
 } from './atcStripModel.js';
 
@@ -258,7 +259,7 @@ export function getBoardPayload(airportId) {
     airportId,
     strips: board.strips,
     manualSort: board.manualSort,
-    runwayConfig: { ...defaultRunwayConfig(), ...board.runwayConfig },
+    runwayConfig: normalizeRunwayConfig(board.runwayConfig),
     recentHistory,
     nextActions,
     roleSlots: board.roleSlots,
@@ -340,15 +341,16 @@ export function setRunwayConfig(airportId, config, user, role) {
   const authErr = assertRoleClaimed(board, user, role);
   if (authErr) return authErr;
 
-  const current = { ...defaultRunwayConfig(), ...board.runwayConfig };
+  const current = normalizeRunwayConfig(board.runwayConfig);
   const next = { ...current };
 
   if (config.end1 !== undefined) next.end1 = String(config.end1).slice(0, 3);
   if (config.end2 !== undefined) next.end2 = String(config.end2).slice(0, 3);
   if (config.qnh !== undefined) next.qnh = String(config.qnh).slice(0, 8);
   if (config.wind !== undefined) next.wind = String(config.wind).slice(0, 16);
-  if (config.qfu !== undefined) next.qfu = String(config.qfu).slice(0, 8);
   if (config.cloud !== undefined) next.cloud = String(config.cloud).slice(0, 24);
+  if (config.notes !== undefined) next.notes = String(config.notes).slice(0, 48);
+  if (config.qfu !== undefined) next.cloud = String(config.qfu).slice(0, 24);
 
   if (config.activeEnd !== undefined) {
     if (role !== OWNER_ROLE.TOWER) {
@@ -440,7 +442,7 @@ export function updateStrip(airportId, stripId, payload, user) {
   return { strip, payload: getBoardPayload(airportId), lastAction: 'UPDATE' };
 }
 
-export function moveStrip(airportId, stripId, { bayId, position, action, role, operationalState }, user) {
+export function moveStrip(airportId, stripId, { bayId, position, action, role, operationalState, reorderOnly }, user) {
   const { board, strip } = findStrip(airportId, stripId);
   if (!strip) return { error: 'STRIP_NOT_FOUND', status: 404 };
 
@@ -449,6 +451,25 @@ export function moveStrip(airportId, stripId, { bayId, position, action, role, o
 
   const sectorErr = assertStripEditableByRole(strip, role);
   if (sectorErr) return sectorErr;
+
+  if (reorderOnly && Number.isFinite(position)) {
+    const idx = board.strips.findIndex((s) => s.id === stripId);
+    const updated = { ...strip, position, updatedAt: Date.now() };
+    board.strips[idx] = updated;
+    appendHistory({
+      airportId,
+      stripId,
+      action: 'REORDER',
+      fromBay: strip.bayId,
+      toBay: strip.bayId,
+      role: role || null,
+      userId: user?.id || null,
+      callsign: updated.callsign,
+      meta: { position },
+    });
+    persist();
+    return { strip: updated, payload: getBoardPayload(airportId), lastAction: 'REORDER' };
+  }
 
   if (bayId) {
     const targetErr = assertTargetBayForRole(bayId, role);
@@ -459,6 +480,26 @@ export function moveStrip(airportId, stripId, { bayId, position, action, role, o
   if (action) {
     result = applyAction(strip, action);
   } else if (bayId) {
+    const sameBay = bayId === strip.bayId;
+    const sameOp = !operationalState || operationalState === strip.operationalState;
+    if (sameBay && sameOp && Number.isFinite(position)) {
+      const idx = board.strips.findIndex((s) => s.id === stripId);
+      const updated = { ...strip, position, updatedAt: Date.now() };
+      board.strips[idx] = updated;
+      appendHistory({
+        airportId,
+        stripId,
+        action: 'REORDER',
+        fromBay: strip.bayId,
+        toBay: strip.bayId,
+        role: role || null,
+        userId: user?.id || null,
+        callsign: updated.callsign,
+        meta: { position },
+      });
+      persist();
+      return { strip: updated, payload: getBoardPayload(airportId), lastAction: 'REORDER' };
+    }
     result = applyMove(strip, bayId, role, { operationalState });
     if (result.ok && bayId === strip.bayId && operationalState && result.strip) {
       result.strip.operationalState = operationalState;

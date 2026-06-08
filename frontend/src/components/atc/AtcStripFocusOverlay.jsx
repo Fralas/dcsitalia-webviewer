@@ -8,6 +8,7 @@ export default function AtcStripFocusOverlay({
   selected = true,
   nextAction,
   editable,
+  entryMode = 'keyboard',
   operatorRole,
   onClose,
   onFieldChange,
@@ -53,6 +54,7 @@ export default function AtcStripFocusOverlay({
             nextAction={nextAction}
             editable={editable}
             readOnly={!editable}
+            entryMode={entryMode}
             operatorRole={operatorRole}
             interactive={false}
             onFieldChange={onFieldChange}

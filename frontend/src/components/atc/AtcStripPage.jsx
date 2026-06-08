@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Loader2, Map, Maximize2, Search, TowerControl } from 'lucide-react';
+import { Eraser, Keyboard, Loader2, Map, Maximize2, PenLine, Search, TowerControl } from 'lucide-react';
 
 import * as api from '../../services/api';
 
@@ -26,7 +26,20 @@ import AtcChartsPanel from './AtcChartsPanel';
 
 import AtcRoleSlots from './AtcRoleSlots';
 
-import { OWNER_ROLE, STRIP_DIRECTION, canEditStrip, resolveClaimedRole, defaultRunwayConfig, createEmptyForm } from './atcStripModel';
+import {
+  OWNER_ROLE,
+  STRIP_DIRECTION,
+  STRIP_CATEGORY,
+  canEditStrip,
+  resolveClaimedRole,
+  defaultRunwayConfig,
+  normalizeRunwayConfig,
+  createEmptyForm,
+  getStripCategory,
+  getTargetBayForCategory,
+  getOperationalStateForCategory,
+  isHandoffToTower,
+} from './atcStripModel';
 
 import { playHandoffAlert, primeHandoffAudio, shouldPlayHandoffAlert } from './atcHandoffSound';
 
@@ -106,7 +119,7 @@ export default function AtcStripPage() {
 
   const [search, setSearch] = useState('');
 
-  const [activeDragId, setActiveDragId] = useState(null);
+  const [entryMode, setEntryMode] = useState('keyboard');
 
   const [chartsOpen, setChartsOpen] = useState(false);
 
@@ -158,7 +171,7 @@ export default function AtcStripPage() {
 
     setTocQueue(payload.tocQueue || []);
 
-    if (payload.runwayConfig) setRunwayConfig({ ...defaultRunwayConfig(), ...payload.runwayConfig });
+    if (payload.runwayConfig) setRunwayConfig(normalizeRunwayConfig(payload.runwayConfig));
 
   }, []);
 
@@ -432,6 +445,18 @@ export default function AtcStripPage() {
 
 
 
+  const handleClearInk = useCallback(() => {
+
+    if (!selectedId || entryMode !== 'ink') return;
+
+    handleFieldChange(selectedId, 'stripInk', '');
+
+    handleFieldCommit(selectedId, 'stripInk', '');
+
+  }, [selectedId, entryMode, handleFieldChange, handleFieldCommit]);
+
+
+
   const handleNewStrip = useCallback(async (direction) => {
 
     if (!requireClaimed()) return;
@@ -546,21 +571,131 @@ export default function AtcStripPage() {
 
 
 
-  const handleMoveStrip = async (strip, bayId, { operationalState } = {}) => {
+  const handleMoveToCategory = async (strip, categoryId, { targetBay, operationalState } = {}) => {
 
     if (!requireClaimed()) return;
 
     try {
 
-      const result = await api.moveAtcStrip(strip.id, { airportId, bayId, role: claimedRole, operationalState });
+      if (isHandoffToTower(strip) && claimedRole === OWNER_ROLE.TOWER && categoryId !== STRIP_CATEGORY.HP) {
+
+        const accepted = await api.coordinateAtcStrip(strip.id, { airportId, accept: true, role: claimedRole });
+
+        applyMutationResult(accepted);
+
+      }
+
+      const bayId = targetBay || getTargetBayForCategory(strip, categoryId);
+
+      const opState = operationalState ?? getOperationalStateForCategory(categoryId);
+
+      const result = await api.moveAtcStrip(strip.id, {
+
+        airportId,
+
+        bayId,
+
+        role: claimedRole,
+
+        operationalState: opState,
+
+      });
 
       applyMutationResult(result);
+
+      setSelectedId(null);
 
     } catch (err) {
 
       showError(err);
 
     }
+
+  };
+
+
+
+  const handleReorderInCategory = async (strip, categoryId, { position, targetBay, operationalState } = {}) => {
+
+    if (!requireClaimed()) return;
+
+    try {
+
+      const currentCategory = getStripCategory(strip);
+
+      const bayId = targetBay || getTargetBayForCategory(strip, categoryId);
+
+      const opState = operationalState ?? getOperationalStateForCategory(categoryId) ?? strip.operationalState;
+
+      const needsMove = currentCategory !== categoryId
+
+        || bayId !== strip.bayId
+
+        || (opState && opState !== strip.operationalState);
+
+
+
+      if (needsMove) {
+
+        if (isHandoffToTower(strip) && claimedRole === OWNER_ROLE.TOWER) {
+
+          const accepted = await api.coordinateAtcStrip(strip.id, { airportId, accept: true, role: claimedRole });
+
+          applyMutationResult(accepted);
+
+        }
+
+        const result = await api.moveAtcStrip(strip.id, {
+
+          airportId,
+
+          bayId,
+
+          role: claimedRole,
+
+          operationalState: opState,
+
+          position,
+
+        });
+
+        applyMutationResult(result);
+
+      } else {
+
+        const result = await api.moveAtcStrip(strip.id, {
+
+          airportId,
+
+          bayId: strip.bayId,
+
+          role: claimedRole,
+
+          position,
+
+          reorderOnly: true,
+
+        });
+
+        applyMutationResult(result);
+
+      }
+
+      setSelectedId(null);
+
+    } catch (err) {
+
+      showError(err);
+
+    }
+
+  };
+
+
+
+  const handleSelectStrip = (strip) => {
+
+    setSelectedId((prev) => (prev === strip.id ? null : strip.id));
 
   };
 
@@ -810,6 +945,46 @@ export default function AtcStripPage() {
 
               )}
 
+              <button
+
+                type="button"
+
+                className={`atc-toolbar__btn ${entryMode === 'ink' ? 'atc-toolbar__btn--active' : ''}`}
+
+                onClick={() => setEntryMode((m) => (m === 'ink' ? 'keyboard' : 'ink'))}
+
+                title={entryMode === 'ink' ? t('atc.entry.keyboard') : t('atc.entry.ink')}
+
+              >
+
+                {entryMode === 'ink' ? <Keyboard className="w-4 h-4" /> : <PenLine className="w-4 h-4" />}
+
+                {entryMode === 'ink' ? t('atc.entry.keyboard') : t('atc.entry.ink')}
+
+              </button>
+
+              {entryMode === 'ink' && selectedStrip && (
+
+                <button
+
+                  type="button"
+
+                  className="atc-toolbar__btn"
+
+                  onClick={handleClearInk}
+
+                  title={t('atc.entry.clearInk')}
+
+                >
+
+                  <Eraser className="w-4 h-4" />
+
+                  {t('atc.entry.clearInk')}
+
+                </button>
+
+              )}
+
               {selectedEditable && (
 
                 <button type="button" className="atc-toolbar__btn atc-toolbar__btn--danger" onClick={handleDelete}>
@@ -876,11 +1051,15 @@ export default function AtcStripPage() {
 
               selectedId={selectedId}
 
+              moveSourceId={selectedEditable && entryMode !== 'ink' ? selectedId : null}
+
               nextActions={nextActions}
 
               runwayConfig={runwayConfig}
 
-              onSelect={(strip) => setSelectedId(strip.id)}
+              entryMode={entryMode}
+
+              onSelect={handleSelectStrip}
 
               onFieldChange={handleFieldChange}
 
@@ -900,13 +1079,11 @@ export default function AtcStripPage() {
 
               onCancelHandoff={handleCancelHandoff}
 
-              onMoveStrip={handleMoveStrip}
+              onMoveToCategory={handleMoveToCategory}
+
+              onReorderInCategory={handleReorderInCategory}
 
               onRunwayConfigChange={handleRunwayConfigChange}
-
-              activeDragId={activeDragId}
-
-              setActiveDragId={setActiveDragId}
 
               readOnly={!claimedRole}
 
@@ -959,6 +1136,8 @@ export default function AtcStripPage() {
           nextAction={nextActions[focusStrip.id]}
 
           editable={Boolean(claimedRole && canEditStrip(focusStrip, claimedRole))}
+
+          entryMode={entryMode}
 
           operatorRole={claimedRole}
 

@@ -190,8 +190,10 @@ export function getStripModelClass(model) {
 
 export const STRIP_CATEGORY = Object.freeze({
   ATZ: 'atz',
-  DOWNWIND: 'downwind',
-  BASE: 'base',
+  LDOWNWIND: 'ldownwind',
+  RDOWNWIND: 'rdownwind',
+  LBASE: 'lbase',
+  RBASE: 'rbase',
   FINAL: 'final',
   RUNWAY: 'runway',
   HP: 'hp',
@@ -202,8 +204,10 @@ export const STRIP_CATEGORY = Object.freeze({
 
 export const CATEGORY_CODES = Object.freeze({
   [STRIP_CATEGORY.ATZ]: 'Z',
-  [STRIP_CATEGORY.DOWNWIND]: 'D',
-  [STRIP_CATEGORY.BASE]: 'B',
+  [STRIP_CATEGORY.LDOWNWIND]: 'DL',
+  [STRIP_CATEGORY.RDOWNWIND]: 'DR',
+  [STRIP_CATEGORY.LBASE]: 'BL',
+  [STRIP_CATEGORY.RBASE]: 'BR',
   [STRIP_CATEGORY.FINAL]: 'F',
   [STRIP_CATEGORY.RUNWAY]: 'R',
   [STRIP_CATEGORY.HP]: 'H',
@@ -212,11 +216,37 @@ export const CATEGORY_CODES = Object.freeze({
   [STRIP_CATEGORY.INACTIVE]: '',
 });
 
-export const TOWER_CATEGORY_ORDER = [
+/** Righe ATZ / FINAL (singola colonna). */
+export const TOWER_SINGLE_CATEGORY_ORDER = [
   STRIP_CATEGORY.ATZ,
-  STRIP_CATEGORY.DOWNWIND,
-  STRIP_CATEGORY.BASE,
   STRIP_CATEGORY.FINAL,
+];
+
+/** Downwind e Base: due colonne sinistra/destra alla stessa altezza. */
+export const TOWER_PAIRED_CATEGORY_ROWS = [
+  {
+    rowKey: 'downwind',
+    left: STRIP_CATEGORY.LDOWNWIND,
+    right: STRIP_CATEGORY.RDOWNWIND,
+  },
+  {
+    rowKey: 'base',
+    left: STRIP_CATEGORY.LBASE,
+    right: STRIP_CATEGORY.RBASE,
+  },
+];
+
+export const TOWER_LATERAL_CATEGORIES = [
+  STRIP_CATEGORY.LDOWNWIND,
+  STRIP_CATEGORY.RDOWNWIND,
+  STRIP_CATEGORY.LBASE,
+  STRIP_CATEGORY.RBASE,
+];
+
+export const TOWER_CATEGORY_ORDER = [
+  ...TOWER_SINGLE_CATEGORY_ORDER.slice(0, 1),
+  ...TOWER_LATERAL_CATEGORIES,
+  ...TOWER_SINGLE_CATEGORY_ORDER.slice(1),
 ];
 
 export const GROUND_CATEGORY_ORDER = [
@@ -240,8 +270,10 @@ const BAY_TO_CATEGORY = Object.freeze({
 
 export const CATEGORY_OWNER = Object.freeze({
   [STRIP_CATEGORY.ATZ]: OWNER_ROLE.TOWER,
-  [STRIP_CATEGORY.DOWNWIND]: OWNER_ROLE.TOWER,
-  [STRIP_CATEGORY.BASE]: OWNER_ROLE.TOWER,
+  [STRIP_CATEGORY.LDOWNWIND]: OWNER_ROLE.TOWER,
+  [STRIP_CATEGORY.RDOWNWIND]: OWNER_ROLE.TOWER,
+  [STRIP_CATEGORY.LBASE]: OWNER_ROLE.TOWER,
+  [STRIP_CATEGORY.RBASE]: OWNER_ROLE.TOWER,
   [STRIP_CATEGORY.FINAL]: OWNER_ROLE.TOWER,
   [STRIP_CATEGORY.RUNWAY]: OWNER_ROLE.TOWER,
   [STRIP_CATEGORY.HP]: null,
@@ -257,11 +289,22 @@ export function getStripCategory(strip) {
   if (isHandoffToTower(strip) || isHandoffToGround(strip)) return STRIP_CATEGORY.HP;
 
   if (strip.bayId === ATC_BAYS.T_ACTIVE) {
-    if (strip.operationalState === 'downwind') return STRIP_CATEGORY.DOWNWIND;
-    if (strip.operationalState === 'base') return STRIP_CATEGORY.BASE;
+    const lateral = {
+      downwind_left: STRIP_CATEGORY.LDOWNWIND,
+      downwind_right: STRIP_CATEGORY.RDOWNWIND,
+      base_left: STRIP_CATEGORY.LBASE,
+      base_right: STRIP_CATEGORY.RBASE,
+      downwind: STRIP_CATEGORY.LDOWNWIND,
+      base: STRIP_CATEGORY.LBASE,
+    };
+    if (lateral[strip.operationalState]) return lateral[strip.operationalState];
     return strip.direction === STRIP_DIRECTION.ARR
-      ? STRIP_CATEGORY.DOWNWIND
-      : STRIP_CATEGORY.BASE;
+      ? STRIP_CATEGORY.LDOWNWIND
+      : STRIP_CATEGORY.LBASE;
+  }
+
+  if (strip.bayId === ATC_BAYS.G_HP && strip.ownerRole === OWNER_ROLE.TOWER && !strip.handoffActive) {
+    return STRIP_CATEGORY.HP;
   }
 
   return BAY_TO_CATEGORY[strip.bayId] || STRIP_CATEGORY.STAND;
@@ -277,7 +320,7 @@ export function getTargetBayForCategory(strip, categoryId) {
     if (strip.bayId === ATC_BAYS.T_AIRBORNE) return ATC_BAYS.T_AIRBORNE;
     return ATC_BAYS.T_PENDING;
   }
-  if (categoryId === STRIP_CATEGORY.DOWNWIND || categoryId === STRIP_CATEGORY.BASE) {
+  if (TOWER_LATERAL_CATEGORIES.includes(categoryId)) {
     return ATC_BAYS.T_ACTIVE;
   }
   if (categoryId === STRIP_CATEGORY.HP) {
@@ -295,9 +338,13 @@ export function getTargetBayForCategory(strip, categoryId) {
 }
 
 export function getOperationalStateForCategory(categoryId) {
-  if (categoryId === STRIP_CATEGORY.DOWNWIND) return 'downwind';
-  if (categoryId === STRIP_CATEGORY.BASE) return 'base';
-  return null;
+  const map = {
+    [STRIP_CATEGORY.LDOWNWIND]: 'downwind_left',
+    [STRIP_CATEGORY.RDOWNWIND]: 'downwind_right',
+    [STRIP_CATEGORY.LBASE]: 'base_left',
+    [STRIP_CATEGORY.RBASE]: 'base_right',
+  };
+  return map[categoryId] || null;
 }
 
 export function isCategoryOwnedByRole(categoryId, role) {
@@ -321,9 +368,22 @@ export function isCategoryDropAllowed(categoryId, role) {
   return false;
 }
 
+/** Slot di riordino/spostamento visibili solo nel settore operativo del ruolo. */
+export function canShowMoveSlots(categoryId, role) {
+  if (!role || !isCategoryDropAllowed(categoryId, role)) return false;
+  if (categoryId === STRIP_CATEGORY.HP) return true;
+  return isCategoryOwnedByRole(categoryId, role);
+}
+
 export function groupStripsByCategory(strips = []) {
   const groups = {};
-  [...TOWER_CATEGORY_ORDER, STRIP_CATEGORY.RUNWAY, ...GROUND_CATEGORY_ORDER, STRIP_CATEGORY.INACTIVE].forEach((cat) => {
+  [
+    ...TOWER_SINGLE_CATEGORY_ORDER,
+    ...TOWER_LATERAL_CATEGORIES,
+    STRIP_CATEGORY.RUNWAY,
+    ...GROUND_CATEGORY_ORDER,
+    STRIP_CATEGORY.INACTIVE,
+  ].forEach((cat) => {
     groups[cat] = [];
   });
 
@@ -348,9 +408,41 @@ export function defaultRunwayConfig() {
     activeEnd: '1',
     qnh: '1013',
     wind: '270/08',
-    qfu: '',
-    cloud: 'SCT040',
+    cloud: '',
+    notes: 'SCT040',
   };
+}
+
+export function normalizeRunwayConfig(raw = {}) {
+  const base = defaultRunwayConfig();
+  return {
+    ...base,
+    ...raw,
+    cloud: raw.cloud ?? raw.qfu ?? base.cloud,
+    notes: raw.notes ?? raw.cloud ?? base.notes,
+  };
+}
+
+/** Calcola position per inserimento in categoria (ordinamento orizzontale). */
+export function computeInsertPosition(stripsInCategory, insertBeforeStripId) {
+  if (!stripsInCategory.length) return 0;
+  if (!insertBeforeStripId) {
+    const max = stripsInCategory.reduce(
+      (m, s) => Math.max(m, Number.isFinite(s.position) ? s.position : 0),
+      0,
+    );
+    return max + 1;
+  }
+  const idx = stripsInCategory.findIndex((s) => s.id === insertBeforeStripId);
+  if (idx <= 0) {
+    const first = stripsInCategory[0];
+    return (Number.isFinite(first?.position) ? first.position : 0) - 1;
+  }
+  const prev = stripsInCategory[idx - 1];
+  const next = stripsInCategory[idx];
+  const prevPos = Number.isFinite(prev.position) ? prev.position : idx - 1;
+  const nextPos = Number.isFinite(next.position) ? next.position : idx;
+  return (prevPos + nextPos) / 2;
 }
 
 export function createEmptyForm(direction) {
@@ -377,6 +469,8 @@ export function createEmptyForm(direction) {
       localK: '',
       stand: '',
       standAcknowledged: false,
+      phaseTimes: '',
+      stripInk: '',
       remarks: '',
     };
   }
@@ -399,6 +493,8 @@ export function createEmptyForm(direction) {
     route: '',
     clearanceText: '',
     instructions: '',
+    phaseTimes: '',
+    stripInk: '',
     remarks: '',
   };
 }

@@ -8,6 +8,8 @@ import {
 } from './atcStripModel';
 import AtcActionBar from './AtcActionBar';
 import AtcFitField from './AtcFitField';
+import AtcStripInkOverlay from './AtcStripInkOverlay';
+import { parseInkValue } from './atcInkCore';
 import { t } from '../../utils/locale';
 
 function Cell({
@@ -39,23 +41,33 @@ function Field({
   inputMode,
   placeholder,
   maxFontSize,
+  entryMode = 'keyboard',
 }) {
+  const common = {
+    value: value ?? '',
+    editable,
+    className,
+    onChange: (next) => onFieldChange?.(field, next),
+    onCommit: (next) => onFieldCommit?.(field, next),
+    onFocus: onFieldFocus,
+    onBlur: onFieldBlur,
+  };
+
   return (
     <AtcFitField
-      value={value ?? ''}
-      editable={editable}
+      {...common}
       uppercase={uppercase}
       maxLength={maxLength}
-      className={className}
       inputMode={inputMode}
       placeholder={placeholder}
       maxFontSize={maxFontSize}
-      onChange={(next) => onFieldChange?.(field, next)}
-      onCommit={(next) => onFieldCommit?.(field, next)}
-      onFocus={onFieldFocus}
-      onBlur={onFieldBlur}
     />
   );
+}
+
+function PhaseTimes({ value }) {
+  if (!value) return null;
+  return <span className="atc-phase-times">{value}</span>;
 }
 
 function formatEtaDisplay(value) {
@@ -97,8 +109,9 @@ function EtaField({
 }
 
 function fieldProps(bind, field, extra = {}) {
-  const { ...rest } = bind;
-  return { ...rest, field, ...extra };
+  const { entryMode, ...rest } = bind;
+  const cellEditable = rest.editable && entryMode !== 'ink';
+  return { ...rest, editable: cellEditable, field, entryMode, ...extra };
 }
 
 function ArrivalStrip({ strip, bind }) {
@@ -152,6 +165,7 @@ function ArrivalStrip({ strip, bind }) {
             {strip.atl || bind.editable ? '/' : ''}
             <Field value={strip.atl} {...fp('atl')} />
           </span>
+          <PhaseTimes value={strip.phaseTimes} />
         </Cell>
         <Cell label="I" className="atc-cell--i">
           <Field value={strip.destination} {...fp('destination', { uppercase: true })} />
@@ -247,8 +261,9 @@ function DepartureStrip({ strip, bind }) {
             <Field value={strip.clearanceText} {...fp('clearanceText')} />
           </span>
         </Cell>
-        <Cell label="L" className="atc-cell--l-dep atc-cell--instructions" labelCorner="br">
+        <Cell label="L" className="atc-cell--l-dep atc-cell--instructions" labelCorner="br" split>
           <Field value={strip.instructions} {...fp('instructions')} />
+          <PhaseTimes value={strip.phaseTimes} />
         </Cell>
       </div>
     </div>
@@ -266,6 +281,7 @@ export default function AtcStripCard({
   onFieldCommit,
   onFieldFocus,
   onFieldBlur,
+  entryMode = 'keyboard',
   onAction,
   onCoordinate,
   onCancelHandoff,
@@ -279,6 +295,8 @@ export default function AtcStripCard({
   const pendingToc = isPendingTowerCoordination(strip);
   const pendingAog = isPendingGroundCoordination(strip);
   const canEdit = editable && !readOnly;
+  const inkMode = canEdit && entryMode === 'ink';
+  const hasInk = Boolean(parseInkValue(strip.stripInk));
 
   const handleFieldChange = (field, value) => onFieldChange?.(strip.id, field, value);
   const handleFieldCommit = (field, value) => onFieldCommit?.(strip.id, field, value);
@@ -286,6 +304,7 @@ export default function AtcStripCard({
   const bind = {
     editable: canEdit,
     variant,
+    entryMode,
     onFieldChange: handleFieldChange,
     onFieldCommit: handleFieldCommit,
     onFieldFocus,
@@ -305,9 +324,14 @@ export default function AtcStripCard({
         strip.flags?.highlighted ? 'atc-strip--highlight' : '',
         readOnly ? 'atc-strip--readonly' : '',
         canEdit ? 'atc-strip--inline-edit' : '',
+        inkMode ? 'atc-strip--ink-mode' : '',
+        hasInk && !inkMode ? 'atc-strip--has-ink' : '',
         interactive ? 'atc-strip--interactive' : '',
       ].filter(Boolean).join(' ')}
-      onClick={interactive ? () => onSelect?.(strip) : undefined}
+      onClick={interactive && !inkMode ? (event) => {
+        event.stopPropagation();
+        onSelect?.(strip);
+      } : undefined}
       role={interactive ? 'button' : undefined}
       tabIndex={interactive ? 0 : undefined}
       onKeyDown={interactive ? (event) => {
@@ -335,7 +359,17 @@ export default function AtcStripCard({
         </button>
       )}
 
-      {isArrival ? <ArrivalStrip strip={strip} bind={bind} /> : <DepartureStrip strip={strip} bind={bind} />}
+      <div className="atc-strip__surface">
+        {isArrival ? <ArrivalStrip strip={strip} bind={bind} /> : <DepartureStrip strip={strip} bind={bind} />}
+        {(inkMode || hasInk) && (
+          <AtcStripInkOverlay
+            value={strip.stripInk || ''}
+            editable={inkMode}
+            onChange={(next) => handleFieldChange('stripInk', next)}
+            onCommit={(next) => handleFieldCommit('stripInk', next)}
+          />
+        )}
+      </div>
 
       {actionVisible && (
         <AtcActionBar

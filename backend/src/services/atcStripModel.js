@@ -424,6 +424,7 @@ export function completeTowerHandoffAccept(strip, targetBayId, options = {}) {
       handoffFromBay: null,
       queuePosition: null,
       ownerRole: OWNER_ROLE.TOWER,
+      phaseTimes: stampPhaseTime(strip, ENAV_ACTIONS.AOC),
       flags: { ...strip.flags, unread: false, highlighted: false },
     },
     fromBay: strip.bayId,
@@ -473,6 +474,7 @@ export function applyAction(strip, actionCode) {
     if (actionCode !== ENAV_ACTIONS.ACTIVATE) {
       const stamp = formatEnavTime(Date.now(), strip);
       result.strip.instructions = appendInstruction(result.strip.instructions, `${actionCode} ${stamp}`);
+      result.strip.phaseTimes = stampPhaseTime(strip, actionCode);
     }
     return result;
   }
@@ -501,6 +503,7 @@ export function applyAction(strip, actionCode) {
     } else {
       updated.remarks = appendInstruction(updated.remarks, `${actionCode} ${stamp}`);
     }
+    updated.phaseTimes = stampPhaseTime(strip, actionCode);
   }
 
   return { ok: true, strip: updated, action: actionCode, fromBay: strip.bayId, toBay: next.bay };
@@ -535,8 +538,30 @@ export function applyMove(strip, targetBayId, role, options = {}) {
     return enterGroundHandoffQueue(strip, strip.bayId);
   }
 
-  if (strip.handoffActive && isHandoffToTower(strip) && role === OWNER_ROLE.TOWER && isTowerBay(targetBayId)) {
-    return completeTowerHandoffAccept(strip, targetBayId, options);
+  if (strip.handoffActive && isHandoffToTower(strip) && role === OWNER_ROLE.TOWER) {
+    if (targetBayId === ATC_BAYS.G_HP) {
+      return completeTowerHandoffAccept(strip, targetBayId, options);
+    }
+    if (isTowerBay(targetBayId)) {
+      const accepted = completeTowerHandoffAccept(strip, targetBayId, options);
+      if (!accepted.ok) return accepted;
+      const flow = getFlowForDirection(strip.direction);
+      const step = flow.find((s) => s.bay === targetBayId);
+      let operationalState = step?.state || accepted.strip.operationalState;
+      if (targetBayId === ATC_BAYS.T_ACTIVE && options.operationalState) {
+        operationalState = options.operationalState;
+      }
+      return {
+        ...accepted,
+        strip: {
+          ...accepted.strip,
+          bayId: targetBayId,
+          operationalState,
+          phaseTimes: stampPhaseTime(accepted.strip, ENAV_ACTIONS.AOC),
+        },
+        toBay: targetBayId,
+      };
+    }
   }
 
   if (strip.handoffActive && isHandoffToGround(strip) && role === OWNER_ROLE.GROUND && isGroundStorageBay(targetBayId)) {
@@ -560,7 +585,12 @@ export function applyMove(strip, targetBayId, role, options = {}) {
     ownerRole: getOwnerRoleForBay(targetBayId),
   };
 
-  return { ok: true, strip: updated, fromBay: strip.bayId, toBay: targetBayId };
+  const moveAction = step?.action;
+  if (moveAction && moveAction !== ENAV_ACTIONS.ACTIVATE) {
+    updated.phaseTimes = stampPhaseTime(strip, moveAction);
+  }
+
+  return { ok: true, strip: updated, fromBay: strip.bayId, toBay: targetBayId, action: moveAction || null };
 }
 
 export function defaultRunwayConfig() {
@@ -570,8 +600,18 @@ export function defaultRunwayConfig() {
     activeEnd: '1',
     qnh: '1013',
     wind: '270/08',
-    qfu: '',
-    cloud: 'SCT040',
+    cloud: '',
+    notes: 'SCT040',
+  };
+}
+
+export function normalizeRunwayConfig(raw = {}) {
+  const base = defaultRunwayConfig();
+  return {
+    ...base,
+    ...raw,
+    cloud: raw.cloud ?? raw.qfu ?? base.cloud,
+    notes: raw.notes ?? (raw.qfu ? '' : raw.cloud) ?? base.notes,
   };
 }
 
@@ -652,6 +692,7 @@ export function acceptCoordination(strip) {
       handoffFromBay: null,
       queuePosition: null,
       ownerRole: OWNER_ROLE.TOWER,
+      phaseTimes: stampPhaseTime(strip, ENAV_ACTIONS.AOC),
       flags: { ...strip.flags, unread: false, highlighted: false },
     },
     fromBay: strip.bayId,
@@ -691,6 +732,25 @@ export function rejectCoordination(strip, note = '') {
 function appendInstruction(current, line) {
   const base = String(current || '').trim();
   return base ? `${base} | ${line}` : line;
+}
+
+const PHASE_TIME_LABELS = Object.freeze({
+  [ENAV_ACTIONS.S_UP]: 'SUP',
+  [ENAV_ACTIONS.TOC]: 'H/O',
+  [ENAV_ACTIONS.AOC]: 'H/O',
+  [ENAV_ACTIONS.TXI]: 'TXI',
+  [ENAV_ACTIONS.TO]: 'TO',
+  [ENAV_ACTIONS.TOG]: 'H/O',
+  [ENAV_ACTIONS.L]: 'L',
+  [ENAV_ACTIONS.RV]: 'RV',
+  [ENAV_ACTIONS.L_UP]: 'L/UP',
+});
+
+export function stampPhaseTime(strip, actionCode) {
+  if (!actionCode || actionCode === ENAV_ACTIONS.ACTIVATE) return strip.phaseTimes || '';
+  const label = PHASE_TIME_LABELS[actionCode] || actionCode;
+  const stamp = formatEnavTime(Date.now(), strip);
+  return appendInstruction(strip.phaseTimes || '', `${label} ${stamp}`);
 }
 
 export function formatEnavTime(timestamp, strip) {
@@ -750,6 +810,8 @@ export function createEmptyStripFields(direction) {
       missedApproach: '',
       localJ: '',
       localK: '',
+      phaseTimes: '',
+      stripInk: '',
       remarks: '',
     };
   }
@@ -772,6 +834,8 @@ export function createEmptyStripFields(direction) {
     route: '',
     clearanceText: '',
     instructions: '',
+    phaseTimes: '',
+    stripInk: '',
     remarks: '',
   };
 }
