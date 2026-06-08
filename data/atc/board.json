@@ -157,14 +157,14 @@
         {
           "id": "demo_aleppo_6",
           "airportId": "aleppo",
-          "position": 5,
+          "position": 2,
           "coordinationStatus": "accepted",
           "createdAt": 1780910934169,
-          "updatedAt": 1780919191518,
+          "updatedAt": 1780919361721,
           "createdBy": "system",
           "direction": "dep",
           "model": "B",
-          "bayId": "t_active",
+          "bayId": "t_pending",
           "operationalState": "base",
           "ownerRole": "TOWER",
           "flags": {

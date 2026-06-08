@@ -18,8 +18,8 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.65rem 1rem;
+  gap: 0.5rem;
+  padding: 0.5rem 0.85rem;
   border-bottom: 1px solid #243446;
   background: #0b1119;
 }
@@ -29,7 +29,8 @@
 .atc-toolbar__right {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.45rem;
+  min-height: 1.75rem;
 }
 
 .atc-toolbar__title {
@@ -53,14 +54,38 @@
   color: #8fa3bb;
 }
 
+.atc-toolbar__field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 1.75rem;
+}
+
+.atc-toolbar__field-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8fa3bb;
+  white-space: nowrap;
+}
+
+.atc-toolbar__field--airport .atc-toolbar__select {
+  min-width: 7.5rem;
+  max-width: 10rem;
+}
+
 .atc-toolbar__select-wrap select,
+.atc-toolbar__select,
 .atc-search input {
   background: #141b25;
   border: 1px solid #243446;
   color: #e9f1ff;
   border-radius: 4px;
-  padding: 0.35rem 0.5rem;
-  font-size: 0.8rem;
+  padding: 0.28rem 0.45rem;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  min-height: 1.75rem;
 }
 
 .atc-role-toggle {
@@ -92,24 +117,27 @@
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.25rem 0.5rem;
+  padding: 0 0.45rem;
   border: 1px solid #243446;
   border-radius: 4px;
   background: #141b25;
+  min-height: 1.75rem;
 }
 
 .atc-search input {
   border: none;
   background: transparent;
-  padding: 0.2rem;
-  min-width: 120px;
+  padding: 0.15rem 0;
+  min-width: 110px;
+  min-height: 0;
 }
 
 .atc-toolbar__btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.35rem;
-  padding: 0.4rem 0.65rem;
+  padding: 0.28rem 0.55rem;
   border: 1px solid #243446;
   border-radius: 4px;
   background: #141b25;
@@ -117,10 +145,29 @@
   font-size: 0.72rem;
   font-weight: 600;
   text-transform: uppercase;
+  line-height: 1.2;
+  min-height: 1.75rem;
+  white-space: nowrap;
+}
+
+.atc-toolbar__btn--icon {
+  padding: 0.28rem;
+  min-width: 1.75rem;
+}
+
+.atc-toolbar__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .atc-toolbar__btn--primary {
   border-color: rgba(78, 197, 255, 0.5);
+  color: #4ec5ff;
+}
+
+.atc-toolbar__btn--active {
+  background: rgba(78, 197, 255, 0.12);
+  border-color: rgba(78, 197, 255, 0.45);
   color: #4ec5ff;
 }
 
@@ -161,14 +208,14 @@
 .atc-slots--guest.atc-slots--compact {
   padding: 0;
   font-size: 0.62rem;
-  max-width: 140px;
+  max-width: 120px;
   line-height: 1.2;
 }
 
 .atc-slot {
   border: 1px solid #243446;
-  border-radius: 6px;
-  background: #0f1721;
+  border-radius: 4px;
+  background: #141b25;
   padding: 0.55rem 0.65rem;
   display: flex;
   flex-direction: column;
@@ -178,23 +225,24 @@
 .atc-slot--compact {
   flex-direction: row;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.15rem 0.25rem 0.15rem 0.35rem;
+  gap: 0.25rem;
+  padding: 0.15rem 0.2rem 0.15rem 0.35rem;
   border-radius: 4px;
   min-width: 0;
-  max-width: 168px;
+  max-width: 148px;
+  min-height: 1.75rem;
 }
 
 .atc-slot--compact .atc-slot__header {
   gap: 0.2rem;
-  font-size: 0.58rem;
+  font-size: 0.62rem;
   flex-shrink: 0;
 }
 
 .atc-slot--compact .atc-slot__status {
   flex: 1;
   min-width: 0;
-  font-size: 0.55rem;
+  font-size: 0.58rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -429,12 +477,6 @@
   display: flex;
   flex-direction: column;
   padding: 0.5rem 1rem 0.5rem;
-}
-
-.atc-toolbar__btn--active {
-  border-color: rgba(78, 197, 255, 0.55);
-  background: rgba(78, 197, 255, 0.14);
-  color: #4ec5ff;
 }
 
 .atc-charts-panel {

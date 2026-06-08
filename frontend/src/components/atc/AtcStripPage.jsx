@@ -46,17 +46,27 @@ const ERROR_KEYS = {
 
   STRIP_NOT_IN_YOUR_SECTOR: 'atc.errors.stripNotInSector',
 
+  NOT_AUTHENTICATED: 'atc.errors.loginRequired',
+
 };
 
 
 
 function translateApiError(err) {
 
-  const key = ERROR_KEYS[err?.message] || ERROR_KEYS[err?.error];
+  const raw = err?.message || err?.error || '';
+
+  if (raw === 'Not authenticated' || raw === 'NOT_AUTHENTICATED') {
+
+    return t('atc.errors.loginRequired');
+
+  }
+
+  const key = ERROR_KEYS[raw] || ERROR_KEYS[err?.message] || ERROR_KEYS[err?.error];
 
   if (key) return t(key);
 
-  return err?.message || String(err);
+  return raw || String(err);
 
 }
 
@@ -64,7 +74,7 @@ function translateApiError(err) {
 
 export default function AtcStripPage() {
 
-  const { user } = useUser();
+  const { user, loading: userLoading } = useUser();
 
   const [airportId, setAirportId] = useState(BLUE_AIRPORTS[0]?.id || 'aleppo');
 
@@ -77,8 +87,6 @@ export default function AtcStripPage() {
   const [roleSlots, setRoleSlots] = useState({ GROUND: null, TOWER: null });
 
   const [tocQueue, setTocQueue] = useState([]);
-
-  const [manualSort, setManualSort] = useState(false);
 
   const [runwayConfig, setRunwayConfig] = useState(defaultRunwayConfig);
 
@@ -143,8 +151,6 @@ export default function AtcStripPage() {
     setRoleSlots(payload.roleSlots || { GROUND: null, TOWER: null });
 
     setTocQueue(payload.tocQueue || []);
-
-    if (payload.manualSort !== undefined) setManualSort(payload.manualSort);
 
     if (payload.runwayConfig) setRunwayConfig({ ...defaultRunwayConfig(), ...payload.runwayConfig });
 
@@ -324,6 +330,12 @@ export default function AtcStripPage() {
 
   const requireClaimed = () => {
 
+    if (userLoading) {
+
+      return false;
+
+    }
+
     if (!user) {
 
       showError(new Error(t('atc.errors.loginRequired')));
@@ -348,6 +360,8 @@ export default function AtcStripPage() {
 
   const handleClaimRole = async (role) => {
 
+    if (userLoading) return;
+
     if (!user) return showError(new Error(t('atc.errors.loginRequired')));
 
     try {
@@ -369,6 +383,10 @@ export default function AtcStripPage() {
 
 
   const handleReleaseRole = async (role) => {
+
+    if (userLoading) return;
+
+    if (!user) return showError(new Error(t('atc.errors.loginRequired')));
 
     try {
 
@@ -556,27 +574,7 @@ export default function AtcStripPage() {
 
 
 
-  const toggleManualSort = async () => {
-
-    if (!requireClaimed()) return;
-
-    try {
-
-      const payload = await api.setAtcBoardSettings(airportId, !manualSort);
-
-      applyBoardPayload(payload);
-
-    } catch (err) {
-
-      showError(err);
-
-    }
-
-  };
-
-
-
-  if (loading) {
+  if (loading || userLoading) {
 
     return (
 
@@ -618,11 +616,15 @@ export default function AtcStripPage() {
 
         <div className="atc-toolbar__center">
 
-          <label className="atc-toolbar__select-wrap">
+          <label className="atc-toolbar__field atc-toolbar__field--airport">
 
-            <span>{t('atc.fields.airport')}</span>
+            <span className="atc-toolbar__field-label">{t('atc.fields.airport')}</span>
 
-            <select value={airportId} onChange={(e) => setAirportId(e.target.value)}>
+            <select
+              className="atc-toolbar__select"
+              value={airportId}
+              onChange={(e) => setAirportId(e.target.value)}
+            >
 
               {BLUE_AIRPORTS.map((a) => (
 
@@ -693,12 +695,6 @@ export default function AtcStripPage() {
           {claimedRole && (
 
             <>
-
-              <button type="button" className="atc-toolbar__btn" onClick={toggleManualSort}>
-
-                {manualSort ? t('atc.sortManual') : t('atc.sortAuto')}
-
-              </button>
 
               <button
 

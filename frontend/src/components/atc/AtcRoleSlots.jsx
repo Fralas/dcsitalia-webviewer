@@ -34,18 +34,23 @@ function SlotCard({
         </div>
         <span className={`atc-slot__status ${isMine ? 'atc-slot__status--mine' : ''}`}>{status}</span>
         {isMine ? (
-          <button type="button" className="atc-slot__btn atc-slot__btn--icon" onClick={() => onRelease?.(role)} title={t('atc.slots.release')}>
-            <LogOut className="atc-slot__icon" />
+          <button
+            type="button"
+            className="atc-toolbar__btn atc-toolbar__btn--icon"
+            onClick={() => onRelease?.(role)}
+            title={t('atc.slots.release')}
+          >
+            <LogOut className="w-3.5 h-3.5" />
           </button>
         ) : (
           <button
             type="button"
-            className="atc-slot__btn atc-slot__btn--primary atc-slot__btn--icon"
+            className="atc-toolbar__btn atc-toolbar__btn--primary atc-toolbar__btn--icon"
             disabled={disabled || (occupied && !isMine)}
             onClick={() => onClaim?.(role)}
             title={t('atc.slots.claim')}
           >
-            <Icon className="atc-slot__icon" />
+            <Icon className="w-3.5 h-3.5" />
           </button>
         )}
       </div>

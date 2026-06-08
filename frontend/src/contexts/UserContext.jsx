@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { getDefaultUserProfile, loadUserProfile, saveUserProfile } from '../utils/userProfile';
 import * as api from '../services/api';
+import { resolveApiBase } from '../services/api';
 
 const UserContext = createContext(null);
 
@@ -16,7 +17,7 @@ export function UserProvider({ children }) {
   useEffect(() => {
     const handleUnauthorized = async () => {
       try {
-        const response = await fetch('/api/auth/user', {
+        const response = await fetch(`${resolveApiBase()}/auth/user`, {
           credentials: 'include',
         });
         if (response.ok) {
@@ -57,8 +58,8 @@ export function UserProvider({ children }) {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch('/api/auth/user', {
-        credentials: 'include'
+      const response = await fetch(`${resolveApiBase()}/auth/user`, {
+        credentials: 'include',
       });
 
       if (response.ok) {

@@ -1,5 +1,15 @@
-const API_BASE = import.meta.env.VITE_API_URL
-  || (typeof window !== 'undefined' ? `${window.location.origin}/api` : '/api');
+/**
+ * Browser requests use same-origin /api so session cookies match auth checks
+ * (Vite dev proxy or reverse proxy). Server-side fallbacks use VITE_API_URL.
+ */
+export function resolveApiBase() {
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/api`;
+  }
+  return import.meta.env.VITE_API_URL || '/api';
+}
+
+const API_BASE = resolveApiBase();
 
 /**
  * Fetch wrapper with error handling
@@ -7,6 +17,7 @@ const API_BASE = import.meta.env.VITE_API_URL
 async function fetchAPI(endpoint, options = {}) {
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, {
+      credentials: 'include',
       ...options,
       headers: {
         'Content-Type': 'application/json',
