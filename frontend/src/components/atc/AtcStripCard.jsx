@@ -2,9 +2,9 @@ import { Pencil } from 'lucide-react';
 import { COORDINATION_STATUS, STRIP_DIRECTION, getStripModelClass } from './atcStripModel';
 import AtcActionBar from './AtcActionBar';
 
-function Cell({ label, children, className = '', split }) {
+function Cell({ label, children, className = '', split, labelCorner = 'tl' }) {
   return (
-    <div className={`atc-cell ${className}`}>
+    <div className={`atc-cell atc-cell--label-${labelCorner} ${className}`}>
       <span className="atc-cell__label">{label}</span>
       <div className={`atc-cell__value ${split ? 'atc-cell__value--split' : ''}`}>{children}</div>
     </div>
@@ -21,70 +21,104 @@ function formatEtaDisplay(value) {
   );
 }
 
+/** Mod. A/C/E — arrivi e sorvoli (layout ENAV) */
 function ArrivalStrip({ strip }) {
   return (
     <div className="atc-strip__grid atc-strip__grid--arr">
-      <Cell label="A" className="atc-cell--a">
-        <span className="atc-eta">{formatEtaDisplay(strip.eta)}</span>
-      </Cell>
-      <Cell label="B" className="atc-cell--b" />
+      <div className="atc-strip__sec-ab">
+        <div className="atc-cell atc-cell--a">
+          <span className="atc-cell__label">A</span>
+          <div className="atc-cell__value">
+            <span className="atc-eta">{formatEtaDisplay(strip.eta)}</span>
+          </div>
+        </div>
+        <div className="atc-cell atc-cell--b-corner">
+          <span className="atc-cell__label">B</span>
+          <div className="atc-cell__value">{strip.levelPlanned || strip.level || ''}</div>
+        </div>
+      </div>
+
       <Cell label="C" className="atc-cell--c">{strip.flightRule || ''}</Cell>
-      <Cell label="D" className="atc-cell--d">
+
+      <Cell label="D" className="atc-cell--d" labelCorner="br">
         <div className="atc-cell-d">
           <span className="atc-cell-d__origin">{strip.origin || ''}</span>
-          <span className="atc-cell-d__type">{strip.aircraftType || ''}{strip.wakeCategory ? `/${strip.wakeCategory}` : ''}</span>
+          <span className="atc-cell-d__type">
+            {strip.aircraftType || ''}{strip.wakeCategory ? `/${strip.wakeCategory}` : ''}
+          </span>
           <span className="atc-cell-d__callsign">{strip.callsign || ''}</span>
           <span className="atc-cell-d__tas">{strip.tas || ''}</span>
         </div>
       </Cell>
-      <Cell label="E" className="atc-cell--e">{strip.missedApproach || ''}</Cell>
-      <Cell label="I" className="atc-cell--i">{strip.destination || ''}</Cell>
-      <Cell label="F" className="atc-cell--f">
-        {strip.ata || ''}{strip.ataAcknowledged ? ' ✓' : ''}
-      </Cell>
-      <Cell label="J" className="atc-cell--j">{strip.localJ || ''}</Cell>
-      <Cell label="G" className="atc-cell--g">{strip.pilotEstimate || ''}</Cell>
-      <Cell label="K" className="atc-cell--k">{strip.localK || ''}</Cell>
-      <Cell label="H" className="atc-cell--h" split>
-        <span>{strip.previousFix || ''}</span>
-        <span>{strip.ato || ''}{strip.atl ? `/${strip.atl}` : ''}</span>
-      </Cell>
-      <Cell label="L" className="atc-cell--l">
-        {strip.stand || ''}{strip.standAcknowledged ? ' ✓' : ''}
-      </Cell>
-      <Cell label="M" className="atc-cell--m">{strip.remarks || ''}</Cell>
+
+      <div className="atc-strip__sec-grid8">
+        <Cell label="E" className="atc-cell--e">{strip.missedApproach || ''}</Cell>
+        <Cell label="F" className="atc-cell--f">
+          {strip.ata || ''}{strip.ataAcknowledged ? ' ✓' : ''}
+        </Cell>
+        <Cell label="G" className="atc-cell--g">{strip.pilotEstimate || ''}</Cell>
+        <Cell label="H" className="atc-cell--h" split>
+          <span>{strip.previousFix || ''}</span>
+          <span>{strip.ato || ''}{strip.atl ? `/${strip.atl}` : ''}</span>
+        </Cell>
+        <Cell label="I" className="atc-cell--i">{strip.destination || ''}</Cell>
+        <Cell label="J" className="atc-cell--j">{strip.localJ || ''}</Cell>
+        <Cell label="K" className="atc-cell--k">{strip.localK || ''}</Cell>
+        <Cell label="L" className="atc-cell--l">
+          {strip.stand || ''}{strip.standAcknowledged ? ' ✓' : ''}
+        </Cell>
+      </div>
+
+      <Cell label="M" className="atc-cell--m" labelCorner="br">{strip.remarks || ''}</Cell>
     </div>
   );
 }
 
+/** Mod. B/D — partenze (layout ENAV) */
 function DepartureStrip({ strip }) {
   return (
     <div className="atc-strip__grid atc-strip__grid--dep">
-      <Cell label="F" className="atc-cell--f-top">{strip.runway || ''}{strip.sid ? ` ${strip.sid}` : ''}</Cell>
-      <Cell label="A" className="atc-cell--a-dep">
-        <span className="atc-eta">{formatEtaDisplay(strip.eobt)}</span>
-      </Cell>
-      <Cell label="B" className="atc-cell--b-dep">{strip.levelPlanned || strip.level || ''}</Cell>
-      <Cell label="C" className="atc-cell--c-dep">{strip.flightRule || ''}</Cell>
-      <Cell label="D" className="atc-cell--d-dep">
-        <div className="atc-cell-d atc-cell-d--dep">
-          <span className="atc-cell-d__callsign">{strip.callsign || ''}</span>
-          <span className="atc-cell-d__type">{strip.aircraftType || ''}</span>
-          <span className="atc-cell-d__dest">{strip.destination || ''}</span>
+      <div className="atc-strip__sec-dep-left">
+        <div className="atc-strip__dep-row">
+          <Cell label="A" className="atc-cell--a-dep">
+            <span className="atc-eta">{formatEtaDisplay(strip.eobt)}</span>
+          </Cell>
+          <Cell label="B" className="atc-cell--b-dep">{strip.levelPlanned || ''}</Cell>
         </div>
+        <div className="atc-strip__dep-row atc-strip__dep-row--triple">
+          <Cell label="C" className="atc-cell--c-dep">{strip.flightRule || ''}</Cell>
+          <Cell label="D" className="atc-cell--d-dep">
+            <div className="atc-cell-d atc-cell-d--dep">
+              <span className="atc-cell-d__callsign">{strip.callsign || ''}</span>
+              <span className="atc-cell-d__type">{strip.aircraftType || ''}</span>
+            </div>
+          </Cell>
+          <Cell label="E" className="atc-cell--e-dep">{strip.level || ''}</Cell>
+        </div>
+      </div>
+
+      <Cell label="F" className="atc-cell--f-dep" labelCorner="br">
+        {strip.runway || ''}{strip.sid ? ` ${strip.sid}` : ''}
       </Cell>
-      <Cell label="E" className="atc-cell--e-dep">{strip.level || ''}</Cell>
-      <Cell label="G" className="atc-cell--g-dep" split>
-        <span>{strip.startup || ''}</span>
-        <span>{strip.taxiAuth || ''}</span>
-      </Cell>
-      <Cell label="H" className="atc-cell--h-dep">{strip.clearanceTimes || ''}</Cell>
-      <Cell label="I" className="atc-cell--i-dep">
-        {strip.ssr || ''}{strip.delay ? ` ${strip.delay}` : ''}
-      </Cell>
-      <Cell label="K" className="atc-cell--k-dep">{strip.clearanceText || ''}</Cell>
-      <Cell label="L" className="atc-cell--l-dep">{strip.instructions || ''}</Cell>
-      <Cell label="J" className="atc-cell--j-dep">{strip.route || strip.destination || ''}</Cell>
+
+      <div className="atc-strip__sec-dep-mid">
+        <div className="atc-strip__dep-row atc-strip__dep-row--triple">
+          <Cell label="G" className="atc-cell--g-dep" split>
+            <span>{strip.startup || ''}</span>
+            <span>{strip.taxiAuth || ''}</span>
+          </Cell>
+          <Cell label="H" className="atc-cell--h-dep">{strip.clearanceTimes || ''}</Cell>
+          <Cell label="I" className="atc-cell--i-dep">
+            {strip.ssr || ''}{strip.delay ? ` ${strip.delay}` : ''}
+          </Cell>
+        </div>
+        <Cell label="J" className="atc-cell--j-dep">{strip.route || strip.destination || ''}</Cell>
+      </div>
+
+      <div className="atc-strip__sec-dep-right">
+        <Cell label="K" className="atc-cell--k-dep" labelCorner="tr">{strip.clearanceText || ''}</Cell>
+        <Cell label="L" className="atc-cell--l-dep" labelCorner="br">{strip.instructions || ''}</Cell>
+      </div>
     </div>
   );
 }
@@ -106,7 +140,7 @@ export default function AtcStripCard({
 
   return (
     <div
-      className={`atc-strip ${getStripModelClass(strip.model)} ${selected ? 'atc-strip--selected' : ''} ${pending ? 'atc-strip--pending' : ''} ${strip.flags?.highlighted ? 'atc-strip--highlight' : ''}`}
+      className={`atc-strip ${getStripModelClass(strip.model)} ${selected ? 'atc-strip--selected' : ''} ${pending ? 'atc-strip--pending' : ''} ${strip.flags?.highlighted ? 'atc-strip--highlight' : ''} ${readOnly ? 'atc-strip--readonly' : ''}`}
       onClick={() => onSelect?.(strip)}
       onDoubleClick={(event) => {
         event.stopPropagation();

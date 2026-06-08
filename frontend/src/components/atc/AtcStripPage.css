@@ -342,6 +342,9 @@
 }
 
 .atc-board-section__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-size: 0.72rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -349,10 +352,34 @@
   margin-bottom: 0.4rem;
 }
 
+.atc-board-section__badge {
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  border: 1px solid #334155;
+  border-radius: 999px;
+  padding: 0.1rem 0.4rem;
+  font-weight: 600;
+}
+
+.atc-board-section--readonly .atc-board-section__title {
+  color: #64748b;
+}
+
+.atc-bay--readonly {
+  opacity: 0.72;
+}
+
+.atc-bay--readonly .atc-strip {
+  cursor: default;
+}
+
+
 .atc-board-section__columns {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(170px, 1fr);
+  grid-auto-columns: minmax(492px, 1fr);
   gap: 0.45rem;
   align-items: start;
 }
@@ -414,19 +441,24 @@
 
 .atc-strip {
   position: relative;
-  border: 1px solid #9ca3af;
-  border-radius: 3px;
-  padding: 0.25rem;
+  width: 480px;
+  border: 1.5px solid #1a1a1a;
+  border-radius: 0;
+  padding: 0;
   cursor: grab;
-  font-family: 'Consolas', 'Courier New', monospace;
-  font-size: 0.68rem;
+  font-family: 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 11px;
   color: #111;
   user-select: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
-.atc-strip--arrival { background: #f5e6a8; }
-.atc-strip--departure { background: #f8f8f8; }
-.atc-strip--local { background: #f5c6d6; }
+/* ENAV Mod. A — gialla (arrivi) */
+.atc-strip--arrival { background: #f7e89a; }
+/* ENAV Mod. B — bianca (partenze) */
+.atc-strip--departure { background: #fefefe; }
+/* ENAV Mod. C — rosa (voli locali) */
+.atc-strip--local { background: #f4c2d0; }
 
 .atc-strip--selected {
   outline: 2px solid #4ec5ff;
@@ -442,6 +474,11 @@
   transform: translateX(4px);
 }
 
+.atc-strip--readonly {
+  cursor: default;
+  opacity: 0.88;
+}
+
 @keyframes atc-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.35); }
   50% { box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.25); }
@@ -451,67 +488,234 @@
   position: absolute;
   top: -6px;
   right: 4px;
+  z-index: 2;
   background: #d97706;
   color: #fff;
-  font-size: 0.55rem;
+  font-size: 9px;
   font-weight: 800;
-  padding: 0 0.25rem;
+  padding: 0 4px;
   border-radius: 2px;
 }
 
-.atc-strip__row {
-  display: grid;
-  gap: 0.15rem;
-}
-
-.atc-strip__row--top {
-  grid-template-columns: 0.7fr 0.45fr 2fr 0.55fr;
-}
-
-.atc-strip__row--bottom {
-  grid-template-columns: 1fr 0.8fr 0.7fr 1.2fr;
-  margin-top: 0.15rem;
-  border-top: 1px solid rgba(0, 0, 0, 0.12);
-  padding-top: 0.15rem;
-}
-
-.atc-strip__cell {
-  position: relative;
-  min-height: 1.1rem;
-  padding: 0.1rem 0.15rem 0.1rem 0.9rem;
-}
-
-.atc-strip__label {
+.atc-strip__edit {
   position: absolute;
-  left: 0.1rem;
-  top: 0.05rem;
-  font-size: 0.5rem;
-  opacity: 0.55;
-  font-weight: 700;
+  top: 2px;
+  right: 2px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid #333;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #111;
 }
 
-.atc-strip__time,
-.atc-strip__callsign {
-  font-weight: 800;
-  letter-spacing: 0.04em;
-}
-
-.atc-strip__d-grid {
+/* ── Mod. A/C/E — arrivi: | A+B | C | D | EFGH/IJKL | M | ── */
+.atc-strip__grid--arr {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.1rem;
+  grid-template-columns: 58px 22px 92px 168px 140px;
+  width: 100%;
+  height: 74px;
 }
 
-.atc-strip__callsign {
+.atc-strip__sec-ab {
+  position: relative;
+  border: 1px solid #1a1a1a;
+  margin: -0.5px;
+  overflow: hidden;
+}
+
+.atc-strip__sec-ab .atc-cell--a {
+  position: absolute;
+  inset: 0;
+  border: none;
+  margin: 0;
+  padding: 2px 4px;
+}
+
+.atc-strip__sec-ab::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 44%;
+  height: 40%;
+  border-top: 1px solid #1a1a1a;
+  transform: skewY(-32deg);
+  transform-origin: bottom right;
+  pointer-events: none;
+}
+
+.atc-strip__sec-ab .atc-cell--b-corner {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 40%;
+  height: 36%;
+  border: none;
+  margin: 0;
+  padding: 0 2px 1px 2px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
+.atc-strip--arrival .atc-strip__sec-ab .atc-cell--b-corner {
+  background: #f7e89a;
+}
+
+.atc-strip--local .atc-strip__sec-ab .atc-cell--b-corner {
+  background: #f4c2d0;
+}
+
+.atc-strip__grid--arr .atc-cell--c { min-width: 0; }
+.atc-strip__grid--arr .atc-cell--d { min-width: 0; }
+.atc-strip__grid--arr .atc-cell--m { min-width: 0; }
+
+.atc-strip__sec-grid8 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: 1fr 1fr;
+  margin: -0.5px;
+}
+
+.atc-strip__sec-grid8 .atc-cell {
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ── Mod. B/D — partenze: | AB/CDE | F | GHI/J | K/L | ── */
+.atc-strip__grid--dep {
+  display: grid;
+  grid-template-columns: 118px 1fr 118px 88px;
+  width: 100%;
+  height: 74px;
+}
+
+.atc-strip__sec-dep-left,
+.atc-strip__sec-dep-mid,
+.atc-strip__sec-dep-right {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  margin: -0.5px;
+  min-width: 0;
+}
+
+.atc-strip__dep-row {
+  display: grid;
+  grid-template-columns: 1.4fr 0.8fr;
+  min-height: 0;
+}
+
+.atc-strip__dep-row--triple {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.atc-strip__sec-dep-mid .atc-cell--j-dep {
   grid-column: 1 / -1;
-  text-align: center;
-  font-size: 0.78rem;
 }
 
-.atc-strip__remarks {
+.atc-strip__grid--dep .atc-cell--f-dep {
+  margin: -0.5px;
+  min-width: 0;
+}
+
+.atc-cell {
+  position: relative;
+  border: 1px solid #1a1a1a;
+  margin: -0.5px;
+  padding: 1px 3px 1px 9px;
+  overflow: hidden;
+  line-height: 1.1;
+  min-height: 0;
+}
+
+.atc-cell__label {
+  position: absolute;
+  font-size: 8px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.5);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.atc-cell--label-tl .atc-cell__label { left: 2px; top: 0; }
+.atc-cell--label-tr .atc-cell__label { right: 2px; top: 0; left: auto; }
+.atc-cell--label-br .atc-cell__label { right: 2px; bottom: 1px; top: auto; left: auto; }
+
+.atc-strip__sec-ab .atc-cell--a .atc-cell__label { left: 2px; top: 0; }
+.atc-strip__sec-ab .atc-cell--b-corner .atc-cell__label { right: 2px; bottom: 1px; left: auto; top: auto; }
+
+.atc-cell__value {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.atc-cell__value--split {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  font-size: 9px;
+}
+
+.atc-cell-d {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  gap: 0;
+  padding: 0 2px;
+}
+
+.atc-cell-d__callsign {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  line-height: 1.1;
+}
+
+.atc-cell-d__origin,
+.atc-cell-d__type,
+.atc-cell-d__tas,
+.atc-cell-d__dest {
+  font-size: 8px;
+  line-height: 1.05;
+}
+
+.atc-cell-d--dep {
+  justify-content: flex-start;
+  padding-top: 2px;
+}
+
+.atc-cell-d--dep .atc-cell-d__callsign {
+  font-size: 10px;
+}
+
+.atc-eta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  font-weight: 700;
+}
+
+.atc-eta__hh {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.atc-eta__mm {
+  font-size: 10px;
+  font-weight: 600;
+  align-self: flex-start;
 }
 
 .atc-action-bar {
@@ -623,10 +827,47 @@
 
 .atc-editor {
   width: min(520px, 92vw);
+  max-height: 92vh;
+  overflow-y: auto;
   background: #0f1721;
   border: 1px solid #243446;
   border-radius: 8px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+
+.atc-editor--wide {
+  width: min(640px, 94vw);
+}
+
+.atc-editor__preview {
+  padding: 0.75rem 1rem 0;
+  border-bottom: 1px solid #243446;
+}
+
+.atc-editor__preview-label {
+  display: block;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8fa3bb;
+  margin-bottom: 0.45rem;
+}
+
+.atc-editor__preview-card {
+  display: flex;
+  justify-content: center;
+  padding-bottom: 0.75rem;
+}
+
+.atc-editor__preview-card .atc-strip {
+  cursor: default;
+  pointer-events: none;
+}
+
+.atc-editor__field--check {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .atc-editor__header {

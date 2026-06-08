@@ -21,9 +21,10 @@ import {
   GROUND_BAYS,
   TOWER_BAYS,
   COORDINATION_STATUS,
-  getBaysForRole,
-  groupStripsForRole,
+  OWNER_ROLE,
+  groupStripsForFullBoard,
   canEditStrip,
+  isBayOwnedByRole,
 } from './atcStripModel';
 import { t } from '../../utils/locale';
 
@@ -59,7 +60,7 @@ function SortableStrip({
         selected={selected}
         nextAction={nextAction}
         onSelect={onSelect}
-        onEdit={onEdit}
+        onEdit={editable ? onEdit : undefined}
         onAction={onAction}
         onCoordinate={onCoordinate}
         onCancelHandoff={onCancelHandoff}
@@ -70,10 +71,14 @@ function SortableStrip({
   );
 }
 
-function DroppableBay({ bayId, children }) {
-  const { setNodeRef, isOver } = useDroppable({ id: bayId, data: { bayId } });
+function DroppableBay({ bayId, disabled, children }) {
+  const { setNodeRef, isOver } = useDroppable({ id: bayId, data: { bayId }, disabled });
   return (
-    <div ref={setNodeRef} className={`atc-bay-drop ${isOver ? 'atc-bay-drop--over' : ''}`} data-bay-drop={bayId}>
+    <div
+      ref={setNodeRef}
+      className={`atc-bay-drop ${isOver && !disabled ? 'atc-bay-drop--over' : ''} ${disabled ? 'atc-bay-drop--locked' : ''}`}
+      data-bay-drop={bayId}
+    >
       {children}
     </div>
   );
@@ -91,12 +96,14 @@ function BayColumn({
   onCancelHandoff,
   operatorRole,
   readOnly,
+  sectorReadOnly,
 }) {
   const meta = BAY_META[bayId];
   const pendingCount = strips.filter((s) => s.coordinationStatus === COORDINATION_STATUS.PENDING_TOC).length;
+  const bayLocked = readOnly || sectorReadOnly;
 
   return (
-    <div className={`atc-bay ${pendingCount ? 'atc-bay--alert' : ''}`} data-bay={bayId}>
+    <div className={`atc-bay ${pendingCount ? 'atc-bay--alert' : ''} ${bayLocked ? 'atc-bay--readonly' : ''}`} data-bay={bayId}>
       <div className="atc-bay__header">
         <span>{t(meta?.labelKey || bayId)}</span>
         <span className="atc-bay__count">{strips.length}</span>
@@ -125,6 +132,11 @@ function BayColumn({
   );
 }
 
+const BOARD_SECTIONS = [
+  { role: OWNER_ROLE.GROUND, bays: GROUND_BAYS, titleKey: 'atc.roles.ground' },
+  { role: OWNER_ROLE.TOWER, bays: TOWER_BAYS, titleKey: 'atc.roles.tower' },
+];
+
 export default function AtcStripBoard({
   strips = [],
   operatorRole,
@@ -140,11 +152,7 @@ export default function AtcStripBoard({
   setActiveDragId,
   readOnly = false,
 }) {
-  const grouped = useMemo(
-    () => (operatorRole ? groupStripsForRole(strips, operatorRole) : {}),
-    [strips, operatorRole],
-  );
-  const bays = useMemo(() => getBaysForRole(operatorRole), [operatorRole]);
+  const grouped = useMemo(() => groupStripsForFullBoard(strips), [strips]);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const activeStrip = strips.find((s) => s.id === activeDragId);
@@ -152,16 +160,16 @@ export default function AtcStripBoard({
   const handleDragEnd = (event) => {
     const { active, over } = event;
     setActiveDragId?.(null);
-    if (!over) return;
+    if (!over || readOnly) return;
 
     const strip = strips.find((s) => s.id === active.id);
-    if (!strip) return;
+    if (!strip || !canEditStrip(strip, operatorRole)) return;
 
     const overBay = over.data?.current?.bayId || over.id;
     const isBay = typeof overBay === 'string' && (
       overBay.startsWith('g_') || overBay.startsWith('t_') || overBay === ATC_BAYS.ARCHIVE
     );
-    if (!isBay) return;
+    if (!isBay || !isBayOwnedByRole(overBay, operatorRole)) return;
 
     if (strip.handoffActive && overBay.startsWith('g_') && overBay !== ATC_BAYS.G_HANDOFF) {
       onCancelHandoff?.(strip, overBay);
@@ -181,39 +189,57 @@ export default function AtcStripBoard({
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragStart={(e) => {
-        if (!readOnly) setActiveDragId?.(e.active.id);
+        const strip = strips.find((s) => s.id === e.active.id);
+        if (!readOnly && strip && canEditStrip(strip, operatorRole)) {
+          setActiveDragId?.(e.active.id);
+        }
       }}
       onDragEnd={handleDragEnd}
     >
       <div className="atc-board">
-        <section className="atc-board-section">
-          <h3 className="atc-board-section__title">
-            {operatorRole === 'GROUND' ? t('atc.roles.ground') : t('atc.roles.tower')}
-          </h3>
-          <div className="atc-board-section__columns">
-            {bays.map((bayId) => (
-              <DroppableBay key={bayId} bayId={bayId}>
-                <BayColumn
-                  bayId={bayId}
-                  strips={grouped[bayId] || []}
-                  selectedId={selectedId}
-                  nextActions={nextActions}
-                  onSelect={onSelect}
-                  onEdit={onEdit}
-                  onAction={onAction}
-                  onCoordinate={onCoordinate}
-                  onCancelHandoff={onCancelHandoff}
-                  operatorRole={operatorRole}
-                  readOnly={readOnly}
-                />
-              </DroppableBay>
-            ))}
-          </div>
-        </section>
+        {BOARD_SECTIONS.map((section) => {
+          const sectorReadOnly = section.role !== operatorRole;
+          return (
+            <section
+              key={section.role}
+              className={`atc-board-section ${sectorReadOnly ? 'atc-board-section--readonly' : ''}`}
+            >
+              <h3 className="atc-board-section__title">
+                {t(section.titleKey)}
+                {sectorReadOnly && (
+                  <span className="atc-board-section__badge">{t('atc.otherSector')}</span>
+                )}
+              </h3>
+              <div className="atc-board-section__columns">
+                {section.bays.map((bayId) => {
+                  const bayLocked = sectorReadOnly || !isBayOwnedByRole(bayId, operatorRole);
+                  return (
+                    <DroppableBay key={bayId} bayId={bayId} disabled={bayLocked || readOnly}>
+                      <BayColumn
+                        bayId={bayId}
+                        strips={grouped[bayId] || []}
+                        selectedId={selectedId}
+                        nextActions={nextActions}
+                        onSelect={onSelect}
+                        onEdit={onEdit}
+                        onAction={onAction}
+                        onCoordinate={onCoordinate}
+                        onCancelHandoff={onCancelHandoff}
+                        operatorRole={operatorRole}
+                        readOnly={readOnly}
+                        sectorReadOnly={bayLocked}
+                      />
+                    </DroppableBay>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
       </div>
       <DragOverlay>
         {activeStrip ? (
-          <AtcStripCard strip={activeStrip} selected={false} />
+          <AtcStripCard strip={activeStrip} selected={false} readOnly />
         ) : null}
       </DragOverlay>
     </DndContext>

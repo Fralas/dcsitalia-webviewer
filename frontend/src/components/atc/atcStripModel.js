@@ -87,6 +87,36 @@ export function getBaysForRole(role) {
   return role === OWNER_ROLE.GROUND ? GROUND_BAYS : TOWER_BAYS;
 }
 
+function sortPendingQueue(strips = []) {
+  return [...strips].sort((a, b) => {
+    if (a.handoffActive && b.handoffActive) {
+      return (a.queuePosition ?? 999) - (b.queuePosition ?? 999);
+    }
+    if (a.handoffActive) return -1;
+    if (b.handoffActive) return 1;
+    return String(a.eobt || a.eta || '').localeCompare(String(b.eobt || b.eta || ''));
+  });
+}
+
+/** Raggruppa tutte le strip per baia (vista completa GROUND + TOWER). */
+export function groupStripsForFullBoard(strips = []) {
+  const grouped = groupStripsByBay(strips);
+  grouped[ATC_BAYS.G_HANDOFF] = [];
+
+  strips.forEach((strip) => {
+    if (strip.handoffActive && strip.bayId === ATC_BAYS.T_PENDING) {
+      grouped[ATC_BAYS.G_HANDOFF].push(strip);
+    }
+  });
+
+  if (grouped[ATC_BAYS.T_PENDING]?.length) {
+    grouped[ATC_BAYS.T_PENDING] = sortPendingQueue(grouped[ATC_BAYS.T_PENDING]);
+  }
+
+  return grouped;
+}
+
+/** @deprecated Usare groupStripsForFullBoard per la vista operativa. */
 export function groupStripsForRole(strips = [], role) {
   const grouped = {};
   getBaysForRole(role).forEach((bayId) => {
@@ -111,17 +141,16 @@ export function groupStripsForRole(strips = [], role) {
   });
 
   if (grouped[ATC_BAYS.T_PENDING]) {
-    grouped[ATC_BAYS.T_PENDING].sort((a, b) => {
-      if (a.handoffActive && b.handoffActive) {
-        return (a.queuePosition ?? 999) - (b.queuePosition ?? 999);
-      }
-      if (a.handoffActive) return -1;
-      if (b.handoffActive) return 1;
-      return String(a.eobt || a.eta || '').localeCompare(String(b.eobt || b.eta || ''));
-    });
+    grouped[ATC_BAYS.T_PENDING] = sortPendingQueue(grouped[ATC_BAYS.T_PENDING]);
   }
 
   return grouped;
+}
+
+export function isBayOwnedByRole(bayId, role) {
+  if (!role) return false;
+  if (bayId === ATC_BAYS.ARCHIVE) return role === OWNER_ROLE.TOWER;
+  return BAY_META[bayId]?.role === role;
 }
 
 export function resolveClaimedRole(roleSlots, userId) {

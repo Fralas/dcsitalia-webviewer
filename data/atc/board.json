@@ -6,18 +6,18 @@
           "id": "demo_aleppo_1",
           "airportId": "aleppo",
           "position": 0,
-          "coordinationStatus": "pending_toc",
+          "coordinationStatus": "accepted",
           "createdAt": 1780910934169,
-          "updatedAt": 1780910934169,
+          "updatedAt": 1780912116080,
           "createdBy": "system",
           "direction": "arr",
           "model": "A",
-          "bayId": "t_pending",
-          "operationalState": "inbound_pending",
-          "ownerRole": "TOWER",
+          "bayId": "g_taxi",
+          "operationalState": "taxi_in",
+          "ownerRole": "GROUND",
           "flags": {
-            "highlighted": true,
-            "unread": true,
+            "highlighted": false,
+            "unread": false,
             "dynamic": true
           },
           "eta": "1140",
@@ -35,7 +35,10 @@
           "destination": "OSAP",
           "stand": "",
           "standAcknowledged": false,
-          "remarks": "INBOUND ESTIMATE"
+          "remarks": "INBOUND ESTIMATE | FIN 48 | L 48 | RV 48 | TXI 48",
+          "handoffActive": false,
+          "handoffFromBay": null,
+          "queuePosition": null
         },
         {
           "id": "demo_aleppo_2",
@@ -43,13 +46,13 @@
           "position": 1,
           "coordinationStatus": null,
           "createdAt": 1780910934169,
-          "updatedAt": 1780910934169,
+          "updatedAt": 1780912105510,
           "createdBy": "system",
           "direction": "arr",
           "model": "A",
-          "bayId": "t_active",
-          "operationalState": "tower_active",
-          "ownerRole": "TOWER",
+          "bayId": "g_taxi",
+          "operationalState": "taxi_in",
+          "ownerRole": "GROUND",
           "flags": {
             "highlighted": false,
             "unread": false,
@@ -70,7 +73,7 @@
           "destination": "OSAP",
           "stand": "A04",
           "standAcknowledged": false,
-          "remarks": "B MHP"
+          "remarks": "B MHP | FIN 48 | L 48 | RV 48 | TXI 48"
         },
         {
           "id": "demo_aleppo_3",
@@ -78,7 +81,7 @@
           "position": 2,
           "coordinationStatus": null,
           "createdAt": 1780910934169,
-          "updatedAt": 1780910934169,
+          "updatedAt": 1780912314907,
           "createdBy": "system",
           "direction": "arr",
           "model": "A",
@@ -94,18 +97,22 @@
           "flightRule": "V",
           "origin": "OS72",
           "aircraftType": "C172",
-          "wakeCategory": "L",
-          "callsign": "GAO12F",
-          "tas": "",
-          "ata": "",
+          "wakeCategory": "M",
+          "callsign": "FROCIO",
+          "tas": "250",
+          "ata": "R",
           "pilotEstimate": "",
           "previousFix": "",
-          "ato": "",
+          "ato": "H",
           "atl": "",
           "destination": "OSAP",
-          "stand": "",
+          "stand": "123",
           "standAcknowledged": false,
-          "remarks": ""
+          "remarks": "Frocio bastardo",
+          "ataAcknowledged": false,
+          "missedApproach": "",
+          "localJ": "",
+          "localK": ""
         },
         {
           "id": "demo_aleppo_4",
@@ -209,7 +216,11 @@
       ],
       "manualSort": false,
       "roleSlots": {
-        "GROUND": null,
+        "GROUND": {
+          "userId": "675706661570347041",
+          "username": "Fralas",
+          "claimedAt": 1780912120319
+        },
         "TOWER": null
       },
       "tocQueue": []

@@ -22,7 +22,7 @@ import AtcHistoryPanel from './AtcHistoryPanel';
 
 import AtcRoleSlots from './AtcRoleSlots';
 
-import { OWNER_ROLE, resolveClaimedRole } from './atcStripModel';
+import { OWNER_ROLE, canEditStrip, resolveClaimedRole } from './atcStripModel';
 
 import './AtcStripPage.css';
 
@@ -200,7 +200,7 @@ export default function AtcStripPage() {
 
       if (event.target?.tagName === 'INPUT' || event.target?.tagName === 'TEXTAREA') return;
 
-      if ((event.key === 'n' || event.key === 'N') && claimedRole === OWNER_ROLE.GROUND) {
+      if ((event.key === 'n' || event.key === 'N') && claimedRole) {
 
         setEditingStrip(null);
 
@@ -235,6 +235,26 @@ export default function AtcStripPage() {
     return strips.filter((s) => String(s.callsign || '').toLowerCase().includes(q));
 
   }, [strips, search]);
+
+
+
+  const selectedStrip = useMemo(
+
+    () => strips.find((s) => s.id === selectedId) || null,
+
+    [strips, selectedId],
+
+  );
+
+
+
+  const selectedEditable = useMemo(
+
+    () => Boolean(selectedStrip && claimedRole && canEditStrip(selectedStrip, claimedRole)),
+
+    [selectedStrip, claimedRole],
+
+  );
 
 
 
@@ -574,7 +594,7 @@ export default function AtcStripPage() {
 
               </button>
 
-              {selectedId && (
+              {selectedEditable && (
 
                 <button
 
@@ -584,9 +604,7 @@ export default function AtcStripPage() {
 
                   onClick={() => {
 
-                    const s = strips.find((x) => x.id === selectedId);
-
-                    if (s) { setEditingStrip(s); setEditorOpen(true); }
+                    if (selectedStrip) { setEditingStrip(selectedStrip); setEditorOpen(true); }
 
                   }}
 
@@ -600,7 +618,7 @@ export default function AtcStripPage() {
 
               )}
 
-              {selectedId && (
+              {selectedEditable && (
 
                 <button type="button" className="atc-toolbar__btn atc-toolbar__btn--danger" onClick={handleDelete}>
 
@@ -686,7 +704,17 @@ export default function AtcStripPage() {
 
               onSelect={(strip) => setSelectedId(strip.id)}
 
-              onEdit={(strip) => { setEditingStrip(strip); setEditorOpen(true); }}
+              onEdit={(strip) => {
+
+                if (canEditStrip(strip, claimedRole)) {
+
+                  setEditingStrip(strip);
+
+                  setEditorOpen(true);
+
+                }
+
+              }}
 
               onAction={handleAction}
 
