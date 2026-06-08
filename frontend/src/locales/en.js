@@ -669,6 +669,7 @@ export default {
       ink: 'Ink input',
       keyboard: 'Keyboard',
       clearInk: 'Clear ink',
+      undoInk: 'Undo stroke',
     },
     runway: {
       qnh: 'QNH',

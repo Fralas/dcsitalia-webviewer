@@ -5,6 +5,7 @@ import {
   getStripStateCode,
   isPendingGroundCoordination,
   isPendingTowerCoordination,
+  isIncomingHandoffForRole,
 } from './atcStripModel';
 import AtcActionBar from './AtcActionBar';
 import AtcFitField from './AtcFitField';
@@ -41,6 +42,7 @@ function Field({
   inputMode,
   placeholder,
   maxFontSize,
+  multiline = false,
   entryMode = 'keyboard',
 }) {
   const common = {
@@ -61,13 +63,23 @@ function Field({
       inputMode={inputMode}
       placeholder={placeholder}
       maxFontSize={maxFontSize}
+      multiline={multiline}
     />
   );
 }
 
 function PhaseTimes({ value }) {
   if (!value) return null;
-  return <span className="atc-phase-times">{value}</span>;
+  return (
+    <AtcFitField
+      value={value}
+      editable={false}
+      maxFontSize={11}
+      minFontSize={7}
+      multiline
+      className="atc-phase-times"
+    />
+  );
 }
 
 function formatEtaDisplay(value) {
@@ -149,7 +161,7 @@ function ArrivalStrip({ strip, bind }) {
 
       <div className="atc-strip__sec-grid8">
         <Cell label="E" className="atc-cell--e">
-          <Field value={strip.missedApproach} {...fp('missedApproach', { uppercase: true })} />
+          <Field value={strip.missedApproach} {...fp('missedApproach', { uppercase: true, multiline: true })} />
         </Cell>
         <Cell label="F" className="atc-cell--f">
           <Field value={strip.ata} {...fp('ata')} />
@@ -185,7 +197,7 @@ function ArrivalStrip({ strip, bind }) {
       <Cell label="M" className="atc-cell--m atc-cell--remarks" labelCorner="br">
         <span className="atc-state-row">
           {stateCode ? <span className="atc-state-code">{stateCode}</span> : null}
-          <Field value={strip.remarks} {...fp('remarks')} />
+          <Field value={strip.remarks} {...fp('remarks', { multiline: true })} />
         </span>
       </Cell>
     </div>
@@ -237,7 +249,7 @@ function DepartureStrip({ strip, bind }) {
             <Field value={strip.taxiAuth} {...fp('taxiAuth', { uppercase: true })} />
           </Cell>
           <Cell label="H" className="atc-cell--h-dep">
-            <Field value={strip.clearanceTimes} {...fp('clearanceTimes')} />
+            <Field value={strip.clearanceTimes} {...fp('clearanceTimes', { multiline: true })} />
           </Cell>
           <Cell label="I" className="atc-cell--i-dep">
             <span className="atc-cell__split-row">
@@ -249,7 +261,7 @@ function DepartureStrip({ strip, bind }) {
         <Cell label="J" className="atc-cell--j-dep atc-cell--route">
           <Field
             value={bind.editable ? (strip.route ?? '') : (strip.route || strip.destination || '')}
-            {...fp('route', { uppercase: true, placeholder: strip.destination || '' })}
+            {...fp('route', { uppercase: true, placeholder: strip.destination || '', multiline: true })}
           />
         </Cell>
       </div>
@@ -258,11 +270,11 @@ function DepartureStrip({ strip, bind }) {
         <Cell label="K" className="atc-cell--k-dep atc-cell--clearance" labelCorner="tr">
           <span className="atc-state-row">
             {stateCode ? <span className="atc-state-code">{stateCode}</span> : null}
-            <Field value={strip.clearanceText} {...fp('clearanceText')} />
+            <Field value={strip.clearanceText} {...fp('clearanceText', { multiline: true })} />
           </span>
         </Cell>
         <Cell label="L" className="atc-cell--l-dep atc-cell--instructions" labelCorner="br" split>
-          <Field value={strip.instructions} {...fp('instructions')} />
+          <Field value={strip.instructions} {...fp('instructions', { multiline: true })} />
           <PhaseTimes value={strip.phaseTimes} />
         </Cell>
       </div>
@@ -296,8 +308,9 @@ export default function AtcStripCard({
   const isArrival = strip.direction === STRIP_DIRECTION.ARR;
   const pendingToc = isPendingTowerCoordination(strip);
   const pendingAog = isPendingGroundCoordination(strip);
+  const incomingHandoff = Boolean(operatorRole && isIncomingHandoffForRole(strip, operatorRole));
   const canEdit = editable && !readOnly;
-  const inkMode = canEdit && entryMode === 'ink';
+  const inkMode = canEdit && entryMode === 'ink' && !incomingHandoff;
   const hasInk = Boolean(parseInkValue(strip.stripInk));
 
   const handleFieldChange = (field, value) => onFieldChange?.(strip.id, field, value);
@@ -322,7 +335,8 @@ export default function AtcStripCard({
         getStripModelClass(strip.model),
         `atc-strip--${variant}`,
         selected ? 'atc-strip--selected' : '',
-        pendingToc || pendingAog ? 'atc-strip--pending' : '',
+        incomingHandoff ? 'atc-strip--handoff-attention' : '',
+        (pendingToc || pendingAog) && !incomingHandoff ? 'atc-strip--pending' : '',
         strip.flags?.highlighted ? 'atc-strip--highlight' : '',
         readOnly ? 'atc-strip--readonly' : '',
         canEdit ? 'atc-strip--inline-edit' : '',
@@ -331,7 +345,7 @@ export default function AtcStripCard({
         hasInk && !inkMode ? 'atc-strip--has-ink' : '',
         interactive ? 'atc-strip--interactive' : '',
       ].filter(Boolean).join(' ')}
-      onClick={interactive && !inkMode ? (event) => {
+      onClick={interactive && (!inkMode || incomingHandoff) ? (event) => {
         event.stopPropagation();
         onSelect?.(strip);
       } : undefined}
@@ -373,10 +387,10 @@ export default function AtcStripCard({
         {(inkMode || hasInk) && (
           <AtcStripInkOverlay
             value={strip.stripInk || ''}
-            editable={inkMode && !moveArmed}
+            editable={inkMode && !moveArmed && !incomingHandoff}
             onChange={(next) => handleFieldChange('stripInk', next)}
             onCommit={(next) => handleFieldCommit('stripInk', next)}
-            onLongPress={inkMode && !moveArmed ? () => onMoveArm?.(strip) : undefined}
+            onLongPress={inkMode && !moveArmed && !incomingHandoff ? () => onMoveArm?.(strip) : undefined}
             onDoubleTap={interactive && onExpand ? () => onExpand(strip) : undefined}
           />
         )}

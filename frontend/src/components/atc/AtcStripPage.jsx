@@ -14,7 +14,8 @@ import airports from '../../config/airports';
 
 import AtcStripBoard from './AtcStripBoard';
 
-import AtcCoordinationPanel from './AtcCoordinationPanel';
+import { popLastInkStroke } from './atcInkCore';
+
 
 import AtcNewStripMenu from './AtcNewStripMenu';
 
@@ -31,6 +32,7 @@ import {
   STRIP_DIRECTION,
   STRIP_CATEGORY,
   canEditStrip,
+  isIncomingHandoffForRole,
   resolveClaimedRole,
   defaultRunwayConfig,
   normalizeRunwayConfig,
@@ -457,15 +459,21 @@ export default function AtcStripPage() {
 
 
 
-  const handleClearInk = useCallback(() => {
+  const handleUndoInk = useCallback(() => {
 
     if (!selectedId || entryMode !== 'ink') return;
 
-    handleFieldChange(selectedId, 'stripInk', '');
+    const strip = strips.find((s) => s.id === selectedId);
 
-    handleFieldCommit(selectedId, 'stripInk', '');
+    if (!strip) return;
 
-  }, [selectedId, entryMode, handleFieldChange, handleFieldCommit]);
+    const next = popLastInkStroke(strip.stripInk || '');
+
+    handleFieldChange(selectedId, 'stripInk', next);
+
+    handleFieldCommit(selectedId, 'stripInk', next);
+
+  }, [selectedId, entryMode, strips, handleFieldChange, handleFieldCommit]);
 
 
 
@@ -729,7 +737,15 @@ export default function AtcStripPage() {
 
 
 
-  const handleSelectStrip = (strip) => {
+  const handleSelectStrip = async (strip) => {
+
+    if (claimedRole && isIncomingHandoffForRole(strip, claimedRole)) {
+
+      await handleCoordinate(strip, true);
+
+      return;
+
+    }
 
     setSelectedId((prev) => (prev === strip.id ? null : strip.id));
 
@@ -1011,9 +1027,9 @@ export default function AtcStripPage() {
 
                   className={`atc-toolbar__btn atc-toolbar__btn--tool-slot ${entryMode === 'ink' && selectedStrip ? 'is-visible' : ''}`}
 
-                  onClick={handleClearInk}
+                  onClick={handleUndoInk}
 
-                  title={t('atc.entry.clearInk')}
+                  title={t('atc.entry.undoInk')}
 
                   tabIndex={entryMode === 'ink' && selectedStrip ? 0 : -1}
 
@@ -1023,7 +1039,7 @@ export default function AtcStripPage() {
 
                   <Eraser className="w-4 h-4" />
 
-                  <span className="atc-toolbar__btn-label">{t('atc.entry.clearInk')}</span>
+                  <span className="atc-toolbar__btn-label">{t('atc.entry.undoInk')}</span>
 
                 </button>
 
@@ -1080,26 +1096,6 @@ export default function AtcStripPage() {
       {!claimedRole && (
 
         <div className="atc-banner atc-banner--warn">{t('atc.errors.claimToOperate')}</div>
-
-      )}
-
-
-
-      {claimedRole && (
-
-        <AtcCoordinationPanel
-
-          strips={strips}
-
-          tocQueue={tocQueue}
-
-          operatorRole={claimedRole}
-
-          onAccept={(strip) => handleCoordinate(strip, true)}
-
-          onReject={(strip) => handleCoordinate(strip, false)}
-
-        />
 
       )}
 

@@ -669,6 +669,7 @@ export default {
       ink: 'Scrittura grafica',
       keyboard: 'Tastiera',
       clearInk: 'Cancella scrittura',
+      undoInk: 'Annulla tratto',
     },
     runway: {
       qnh: 'QNH',

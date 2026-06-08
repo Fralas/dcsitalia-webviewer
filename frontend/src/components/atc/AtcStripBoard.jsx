@@ -18,6 +18,7 @@ import {
   isPendingTowerCoordination,
   computeInsertPosition,
   canShowMoveSlots,
+  isStripSectorReadOnly,
 } from './atcStripModel';
 import { t } from '../../utils/locale';
 
@@ -69,7 +70,8 @@ function CategoryLane({
   const pendingCount = strips.filter(
     (s) => isPendingTowerCoordination(s) || isPendingGroundCoordination(s),
   ).length;
-  const canDrop = dropHighlight && moveSourceId && !sectorReadOnly && !readOnly;
+  const laneSectorReadOnly = categoryId === STRIP_CATEGORY.HP ? false : sectorReadOnly;
+  const canDrop = dropHighlight && moveSourceId && !readOnly && (categoryId === STRIP_CATEGORY.HP || !sectorReadOnly);
   const showSlots = Boolean(
     moveSourceId && !readOnly && canShowMoveSlots(categoryId, operatorRole),
   );
@@ -79,7 +81,7 @@ function CategoryLane({
       className={[
         'atc-category-lane',
         pendingCount ? 'atc-category-lane--alert' : '',
-        sectorReadOnly ? 'atc-category-lane--readonly' : '',
+        laneSectorReadOnly ? 'atc-category-lane--readonly' : '',
         canDrop ? 'atc-category-lane--drop-target' : '',
       ].filter(Boolean).join(' ')}
       onClick={() => {
@@ -120,7 +122,7 @@ function CategoryLane({
               onCancelHandoff={onCancelHandoff}
               operatorRole={operatorRole}
               readOnly={readOnly}
-              sectorReadOnly={sectorReadOnly}
+              sectorReadOnly={isStripSectorReadOnly(strip, operatorRole, categoryId)}
             />
           </div>
         ))}
@@ -169,9 +171,10 @@ function CategoryRow({
     moveSourceId
     && canShowMoveSlots(categoryId, operatorRole),
   );
+  const laneSectorReadOnly = categoryId === STRIP_CATEGORY.HP ? false : sectorReadOnly;
 
   return (
-    <div className={`atc-category-row ${sectorReadOnly ? 'atc-category-row--readonly' : ''}`}>
+    <div className={`atc-category-row ${laneSectorReadOnly ? 'atc-category-row--readonly' : ''}`}>
       <div className="atc-category-row__label">
         <span>{label || t(`atc.categories.${categoryId}`)}</span>
         <span className="atc-category-row__count">{strips.length}</span>

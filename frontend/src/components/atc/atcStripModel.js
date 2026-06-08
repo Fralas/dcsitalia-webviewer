@@ -182,6 +182,20 @@ export function isPendingGroundCoordination(strip) {
   return strip?.coordinationStatus === COORDINATION_STATUS.PENDING_AOG && isHandoffToGround(strip);
 }
 
+export function isIncomingHandoffForRole(strip, role) {
+  if (!strip || !role) return false;
+  if (role === OWNER_ROLE.TOWER) return isPendingTowerCoordination(strip);
+  if (role === OWNER_ROLE.GROUND) return isPendingGroundCoordination(strip);
+  return false;
+}
+
+export function isHandoffSender(strip, role) {
+  if (!strip?.handoffActive || !role) return false;
+  if (role === OWNER_ROLE.GROUND && isHandoffToTower(strip)) return true;
+  if (role === OWNER_ROLE.TOWER && isHandoffToGround(strip)) return true;
+  return false;
+}
+
 export function getStripModelClass(model) {
   if (model === STRIP_MODEL.ARRIVAL) return 'atc-strip--arrival';
   if (model === STRIP_MODEL.LOCAL) return 'atc-strip--local';
@@ -281,6 +295,17 @@ export const CATEGORY_OWNER = Object.freeze({
   [STRIP_CATEGORY.STAND]: OWNER_ROLE.GROUND,
   [STRIP_CATEGORY.INACTIVE]: OWNER_ROLE.GROUND,
 });
+
+/** HP è condivisa: readonly per strip in base a owner/handoff, non al solo settore GROUND. */
+export function isStripSectorReadOnly(strip, operatorRole, categoryId) {
+  if (!operatorRole || !strip) return true;
+  if (categoryId === STRIP_CATEGORY.HP) {
+    return !canEditStrip(strip, operatorRole);
+  }
+  const owner = CATEGORY_OWNER[categoryId];
+  if (!owner) return !canEditStrip(strip, operatorRole);
+  return owner !== operatorRole;
+}
 
 export function getStripCategory(strip) {
   if (!strip) return null;

@@ -13,6 +13,12 @@ export function serializeInk(strokes) {
   return strokes?.length ? `${INK_PREFIX}${JSON.stringify(strokes)}` : '';
 }
 
+export function popLastInkStroke(value) {
+  const strokes = parseInkValue(value);
+  if (!strokes?.length) return '';
+  return serializeInk(strokes.slice(0, -1));
+}
+
 export function getInkPoint(event, canvas) {
   const rect = canvas.getBoundingClientRect();
   const src = event.touches?.[0] || event;

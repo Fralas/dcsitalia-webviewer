@@ -165,6 +165,15 @@ export function findFlowIndex(direction, bayId) {
 
 function findFlowStepIndex(strip, flow) {
   if (strip.bayId === ATC_BAYS.G_HP) {
+    if (
+      strip.direction === STRIP_DIRECTION.DEP
+      && strip.ownerRole === OWNER_ROLE.GROUND
+      && !strip.handoffActive
+    ) {
+      const hpIdx = flow.findIndex((s) => s.action === ENAV_ACTIONS.HP);
+      if (hpIdx >= 0) return hpIdx;
+    }
+
     if (strip.handoffActive && isHandoffToGround(strip)) {
       return flow.findIndex((s) => s.handoffToGround);
     }
@@ -181,10 +190,10 @@ function findFlowStepIndex(strip, flow) {
     if (strip.operationalState === 'holding') {
       return flow.findIndex((s) => s.action === ENAV_ACTIONS.HP);
     }
-    if (strip.operationalState === 'pending_tower') {
+    if (strip.operationalState === 'pending_tower' && strip.handoffActive) {
       return flow.findIndex((s) => s.handoff);
     }
-    if (strip.operationalState === 'pending_ground') {
+    if (strip.operationalState === 'pending_ground' && strip.handoffActive) {
       return flow.findIndex((s) => s.handoffToGround);
     }
   }
@@ -212,6 +221,13 @@ export function isHandoffToTower(strip) {
 
 export function isHandoffToGround(strip) {
   return Boolean(strip?.handoffActive && strip.handoffTarget === HANDOFF_TARGET.GROUND);
+}
+
+export function isHandoffSender(strip, role) {
+  if (!strip?.handoffActive || !role) return false;
+  if (role === OWNER_ROLE.GROUND && isHandoffToTower(strip)) return true;
+  if (role === OWNER_ROLE.TOWER && isHandoffToGround(strip)) return true;
+  return false;
 }
 
 export function enterHandoffQueue(strip, fromBay = strip.bayId) {
@@ -462,6 +478,20 @@ export function completeGroundHandoffAccept(strip, targetBayId) {
 export function applyAction(strip, actionCode) {
   if (actionCode === ENAV_ACTIONS.CANCEL_HANDOFF) {
     return cancelHandoff(strip);
+  }
+
+  if (
+    actionCode === ENAV_ACTIONS.TOC
+    && strip.direction === STRIP_DIRECTION.DEP
+    && strip.bayId === ATC_BAYS.G_HP
+    && strip.ownerRole === OWNER_ROLE.GROUND
+    && !strip.handoffActive
+  ) {
+    const result = enterHandoffQueue(strip, strip.bayId);
+    const stamp = formatEnavTime(Date.now(), strip);
+    result.strip.instructions = appendInstruction(result.strip.instructions, `${actionCode} ${stamp}`);
+    result.strip.phaseTimes = stampPhaseTime(strip, actionCode);
+    return result;
   }
 
   const next = getNextStep(strip);

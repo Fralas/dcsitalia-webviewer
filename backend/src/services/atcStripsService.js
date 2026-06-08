@@ -27,6 +27,7 @@ import {
   defaultRunwayConfig,
   normalizeRunwayConfig,
   canEditStrip,
+  isHandoffSender,
 } from './atcStripModel.js';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data/atc');
@@ -442,6 +443,32 @@ export function updateStrip(airportId, stripId, payload, user) {
   return { strip, payload: getBoardPayload(airportId), lastAction: 'UPDATE' };
 }
 
+function cancelSenderHandoffForMove(board, strip, stripId, role, user, airportId) {
+  if (!isHandoffSender(strip, role)) return { strip };
+
+  const cancel = cancelHandoff(strip, strip.handoffFromBay);
+  if (!cancel.ok) return { error: cancel.error };
+
+  const cancelled = { ...cancel.strip, updatedAt: Date.now() };
+  const idx = board.strips.findIndex((s) => s.id === stripId);
+  if (idx !== -1) board.strips[idx] = cancelled;
+  if (cancel.dequeue) dequeueHandoff(board, stripId);
+
+  appendHistory({
+    airportId,
+    stripId,
+    action: cancel.action,
+    fromBay: cancel.fromBay,
+    toBay: cancel.toBay,
+    role: role || null,
+    userId: user?.id || null,
+    callsign: cancelled.callsign,
+    meta: { autoRejectOnMove: true },
+  });
+
+  return { strip: cancelled, cancelled: true };
+}
+
 export function moveStrip(airportId, stripId, { bayId, position, action, role, operationalState, reorderOnly }, user) {
   const { board, strip } = findStrip(airportId, stripId);
   if (!strip) return { error: 'STRIP_NOT_FOUND', status: 404 };
@@ -452,16 +479,20 @@ export function moveStrip(airportId, stripId, { bayId, position, action, role, o
   const sectorErr = assertStripEditableByRole(strip, role);
   if (sectorErr) return sectorErr;
 
+  const handoffCancel = cancelSenderHandoffForMove(board, strip, stripId, role, user, airportId);
+  if (handoffCancel.error) return { error: handoffCancel.error, status: 400 };
+  let workingStrip = handoffCancel.strip;
+
   if (reorderOnly && Number.isFinite(position)) {
     const idx = board.strips.findIndex((s) => s.id === stripId);
-    const updated = { ...strip, position, updatedAt: Date.now() };
+    const updated = { ...workingStrip, position, updatedAt: Date.now() };
     board.strips[idx] = updated;
     appendHistory({
       airportId,
       stripId,
       action: 'REORDER',
-      fromBay: strip.bayId,
-      toBay: strip.bayId,
+      fromBay: workingStrip.bayId,
+      toBay: workingStrip.bayId,
       role: role || null,
       userId: user?.id || null,
       callsign: updated.callsign,
@@ -478,20 +509,20 @@ export function moveStrip(airportId, stripId, { bayId, position, action, role, o
 
   let result;
   if (action) {
-    result = applyAction(strip, action);
+    result = applyAction(workingStrip, action);
   } else if (bayId) {
-    const sameBay = bayId === strip.bayId;
-    const sameOp = !operationalState || operationalState === strip.operationalState;
+    const sameBay = bayId === workingStrip.bayId;
+    const sameOp = !operationalState || operationalState === workingStrip.operationalState;
     if (sameBay && sameOp && Number.isFinite(position)) {
       const idx = board.strips.findIndex((s) => s.id === stripId);
-      const updated = { ...strip, position, updatedAt: Date.now() };
+      const updated = { ...workingStrip, position, updatedAt: Date.now() };
       board.strips[idx] = updated;
       appendHistory({
         airportId,
         stripId,
         action: 'REORDER',
-        fromBay: strip.bayId,
-        toBay: strip.bayId,
+        fromBay: workingStrip.bayId,
+        toBay: workingStrip.bayId,
         role: role || null,
         userId: user?.id || null,
         callsign: updated.callsign,
@@ -500,8 +531,8 @@ export function moveStrip(airportId, stripId, { bayId, position, action, role, o
       persist();
       return { strip: updated, payload: getBoardPayload(airportId), lastAction: 'REORDER' };
     }
-    result = applyMove(strip, bayId, role, { operationalState });
-    if (result.ok && bayId === strip.bayId && operationalState && result.strip) {
+    result = applyMove(workingStrip, bayId, role, { operationalState });
+    if (result.ok && bayId === workingStrip.bayId && operationalState && result.strip) {
       result.strip.operationalState = operationalState;
     }
   } else {
