@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { Loader2, Pencil, Plus, Search, TowerControl } from 'lucide-react';
+import { Loader2, Map, Pencil, Plus, Search, TowerControl } from 'lucide-react';
 
 import * as api from '../../services/api';
 
@@ -19,6 +19,8 @@ import AtcStripEditor from './AtcStripEditor';
 import AtcCoordinationPanel from './AtcCoordinationPanel';
 
 import AtcHistoryPanel from './AtcHistoryPanel';
+
+import AtcChartsPanel from './AtcChartsPanel';
 
 import AtcRoleSlots from './AtcRoleSlots';
 
@@ -91,6 +93,10 @@ export default function AtcStripPage() {
   const [activeDragId, setActiveDragId] = useState(null);
 
   const [toast, setToast] = useState('');
+
+  const [chartsOpen, setChartsOpen] = useState(false);
+
+  const [chartsWidth, setChartsWidth] = useState(420);
 
 
 
@@ -568,6 +574,22 @@ export default function AtcStripPage() {
 
           </div>
 
+          <button
+
+            type="button"
+
+            className={`atc-toolbar__btn ${chartsOpen ? 'atc-toolbar__btn--active' : ''}`}
+
+            onClick={() => setChartsOpen((open) => !open)}
+
+          >
+
+            <Map className="w-4 h-4" />
+
+            {t('atc.charts.toggle')}
+
+          </button>
+
           {claimedRole && (
 
             <>
@@ -686,9 +708,11 @@ export default function AtcStripPage() {
 
 
 
-      <div className="atc-main">
+      <div className="atc-workspace">
 
-        <div className="atc-board-wrap">
+        <div className="atc-main">
+
+          <div className="atc-board-wrap">
 
           {claimedRole ? (
 
@@ -738,7 +762,27 @@ export default function AtcStripPage() {
 
           )}
 
+          </div>
+
         </div>
+
+
+
+        {chartsOpen && (
+
+          <AtcChartsPanel
+
+            airportId={airportId}
+
+            width={chartsWidth}
+
+            onWidthChange={setChartsWidth}
+
+            onClose={() => setChartsOpen(false)}
+
+          />
+
+        )}
 
       </div>
 

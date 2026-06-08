@@ -542,6 +542,16 @@ export default {
     confirmDelete: 'Eliminare la strip {{callsign}}?',
     roles: { ground: 'GROUND', tower: 'TOWER' },
     otherSector: 'Sola lettura',
+    charts: {
+      toggle: 'Chart',
+      title: 'Chart aeroporto',
+      select: 'Seleziona chart',
+      loading: 'Caricamento chart...',
+      empty: 'Nessuna chart disponibile per questo aeroporto',
+      error: 'Errore nel caricamento delle chart',
+      close: 'Chiudi pannello chart',
+      resize: 'Ridimensiona pannello chart',
+    },
     direction: { arr: 'Arrivo', dep: 'Partenza' },
     errors: {
       loginRequired: 'Accedi con Discord per operare sulle strip',

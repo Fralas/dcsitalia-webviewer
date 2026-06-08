@@ -835,6 +835,10 @@ export async function cancelDbuildPlacement(placementId) {
   });
 }
 
+export async function getAirportCharts(airportId) {
+  return fetchAPI(`/airports/${encodeURIComponent(airportId)}/charts`);
+}
+
 export async function getAtcBoard(airportId = 'aleppo') {
   return fetchAPI(`/atc/board?airportId=${encodeURIComponent(airportId)}`);
 }
@@ -1005,6 +1009,7 @@ export default {
   createDbuildPlacement,
   confirmDbuildPlacement,
   cancelDbuildPlacement,
+  getAirportCharts,
   getAtcBoard,
   getAtcHistory,
   setAtcBoardSettings,

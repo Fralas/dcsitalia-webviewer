@@ -542,6 +542,16 @@ export default {
     confirmDelete: 'Delete strip {{callsign}}?',
     roles: { ground: 'GROUND', tower: 'TOWER' },
     otherSector: 'Read only',
+    charts: {
+      toggle: 'Charts',
+      title: 'Airport charts',
+      select: 'Select chart',
+      loading: 'Loading charts...',
+      empty: 'No charts available for this airport',
+      error: 'Failed to load charts',
+      close: 'Close charts panel',
+      resize: 'Resize charts panel',
+    },
     direction: { arr: 'Arrival', dep: 'Departure' },
     errors: {
       loginRequired: 'Sign in with Discord to control strips',

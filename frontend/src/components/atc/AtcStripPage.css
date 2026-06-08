@@ -320,12 +320,146 @@
   font-size: 0.68rem;
 }
 
+.atc-workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
 .atc-main {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
   padding: 0.5rem 1rem 0;
+}
+
+.atc-toolbar__btn--active {
+  border-color: rgba(78, 197, 255, 0.55);
+  background: rgba(78, 197, 255, 0.14);
+  color: #4ec5ff;
+}
+
+.atc-charts-panel {
+  position: relative;
+  flex-shrink: 0;
+  min-width: 280px;
+  max-width: 75vw;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #243446;
+  background: #0b1119;
+  min-height: 0;
+}
+
+.atc-charts-panel__resizer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  transform: translateX(-3px);
+  cursor: col-resize;
+  z-index: 2;
+}
+
+.atc-charts-panel__resizer:hover,
+.atc-charts-panel__resizer:active {
+  background: rgba(78, 197, 255, 0.25);
+}
+
+.atc-charts-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border-bottom: 1px solid #243446;
+  flex-shrink: 0;
+}
+
+.atc-charts-panel__title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8fa3bb;
+}
+
+.atc-charts-panel__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: 1px solid #243446;
+  background: #141b25;
+  color: #b8c7da;
+}
+
+.atc-charts-panel__close:hover {
+  border-color: #3b4f66;
+  color: #e9f1ff;
+}
+
+.atc-charts-panel__controls {
+  padding: 0.45rem 0.65rem;
+  border-bottom: 1px solid #243446;
+  flex-shrink: 0;
+}
+
+.atc-charts-panel__select-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.62rem;
+  color: #8fa3bb;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.atc-charts-panel__select-wrap select {
+  width: 100%;
+  padding: 0.35rem 0.45rem;
+  border-radius: 4px;
+  border: 1px solid #243446;
+  background: #141b25;
+  color: #e9f1ff;
+  font-size: 0.75rem;
+}
+
+.atc-charts-panel__viewport {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.5rem;
+  background: #050a11;
+}
+
+.atc-charts-panel__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid #243446;
+  border-radius: 4px;
+  background: #0f1721;
+}
+
+.atc-charts-panel__message {
+  padding: 1rem;
+  text-align: center;
+  color: #8fa3bb;
+  font-size: 0.78rem;
+}
+
+.atc-charts-panel__message--error {
+  color: #fca5a5;
 }
 
 .atc-board-wrap {
