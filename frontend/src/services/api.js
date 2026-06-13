@@ -60,6 +60,13 @@ export async function getAirbaseStatus() {
 }
 
 /**
+ * Get static airport catalog from backend config
+ */
+export async function getAirportCatalog() {
+  return fetchAPI('/config/airports');
+}
+
+/**
  * Get authoritative server time and launch status
  */
 export async function getServerTime() {
@@ -954,6 +961,7 @@ export default {
   getServerTime,
   getAirports,
   getAirbaseStatus,
+  getAirportCatalog,
   getAirport,
   getAirportHistory,
   getWeaponHistory,

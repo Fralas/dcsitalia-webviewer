@@ -15,12 +15,19 @@ function collectAirportStatusAliases(airport) {
     aliases.add(raw);
     aliases.add(normalizeAirbaseName(raw));
   };
+  const addUnderscoreVariant = (value) => {
+    if (!value) return;
+    add(String(value).trim().replace(/[\s-]+/g, '_'));
+  };
 
   add(airport?.name);
   add(airport?.displayName);
   add(airport?.csvPrefix);
   add(airport?.id);
   add(airport?.id?.replace(/-/g, '_'));
+  addUnderscoreVariant(airport?.name);
+  addUnderscoreVariant(airport?.displayName);
+  addUnderscoreVariant(airport?.id);
 
   return aliases;
 }
@@ -55,7 +62,6 @@ export function isAirportActiveOnMap(airport, airbaseStatus = null) {
   if (!airport?.coordinates) return false;
   if (airport.isMainBase || airport.isCarrier) return true;
   if (airport.isAlwaysActive) return true;
-  if (airport.isActive === false) return false;
 
   const hasStatusFile = airbaseStatus && Object.keys(airbaseStatus).length > 0;
   if (hasStatusFile) {
@@ -65,5 +71,6 @@ export function isAirportActiveOnMap(airport, airbaseStatus = null) {
     }
   }
 
+  if (airport.isActive === false) return false;
   return airport.isActive !== false;
 }

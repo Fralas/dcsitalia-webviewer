@@ -4402,7 +4402,7 @@ function MapLibreFlatMapView({
   );
 }
 
-export default function FrontlineMap({ airportsData, airbaseStatus = {} }) {
+export default function FrontlineMap({ airportsData, airportCatalog = [], airbaseStatus = {} }) {
   const { user } = useUser();
   const canManageLogisticsRouteVisibility = user?.canManageLogisticsRouteVisibility === true;
   const isMapLibreEngine = MAP_ENGINE === 'maplibre';
@@ -4982,7 +4982,13 @@ export default function FrontlineMap({ airportsData, airbaseStatus = {} }) {
       });
     }
 
-    const mergedAirports = airports.map((configAirport) => {
+    const catalog = (Array.isArray(airportCatalog) && airportCatalog.length > 0)
+      ? airportCatalog
+      : airports;
+    const catalogIds = new Set();
+
+    const mergedAirports = catalog.map((configAirport) => {
+      catalogIds.add(configAirport.id);
       const runtimeAirport = runtimeById.get(configAirport.id);
       if (!runtimeAirport) return configAirport;
 
@@ -4990,15 +4996,22 @@ export default function FrontlineMap({ airportsData, airbaseStatus = {} }) {
         ...configAirport,
         ...runtimeAirport,
         coordinates: runtimeAirport.coordinates || configAirport.coordinates,
+        csvPrefix: runtimeAirport.csvPrefix || configAirport.csvPrefix,
         isMainBase: runtimeAirport.isMainBase ?? configAirport.isMainBase,
         isCarrier: runtimeAirport.isCarrier ?? configAirport.isCarrier,
         isHeliport: runtimeAirport.isHeliport ?? configAirport.isHeliport,
         isAlwaysActive: runtimeAirport.isAlwaysActive ?? configAirport.isAlwaysActive,
+        isActive: runtimeAirport.isActive ?? configAirport.isActive,
       };
     });
 
-    return mergedAirports.filter((airport) => isAirportActiveOnMap(airport, airbaseStatus));
-  }, [airportsData, airbaseStatus]);
+    const extraRuntimeAirports = Array.from(runtimeById.values()).filter(
+      (airport) => airport?.id && !catalogIds.has(airport.id)
+    );
+
+    return [...mergedAirports, ...extraRuntimeAirports]
+      .filter((airport) => isAirportActiveOnMap(airport, airbaseStatus));
+  }, [airportsData, airportCatalog, airbaseStatus]);
 
   const combatMissionByZone = useMemo(() => {
     const map = new Map();

@@ -648,7 +648,7 @@ const airports = [
     isHeliport: false,
     isCarrier: true,
     herculesBase: false,
-    coordinates: { lat: 35.986389, lon: 33.511389 },
+    coordinates: { lat: 31.536111, lon: 33.904167 },
   },
   {
     id: 'kharab-ishk',

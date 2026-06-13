@@ -121,6 +121,7 @@ function App() {
   const [currentView, setCurrentView] = useState(() => viewFromLocation());
   const [appLanguage, setAppLanguage] = useState(DEFAULT_WIKI_LANGUAGE);
   const [airports, setAirports] = useState({});
+  const [airportCatalog, setAirportCatalog] = useState([]);
   const [airbaseStatus, setAirbaseStatus] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -208,14 +209,16 @@ function App() {
     try {
       setLoading(true);
       setError(null);
-      const [airportsData, zonesData, airbaseStatusData] = await Promise.all([
+      const [airportsData, zonesData, airbaseStatusData, airportCatalogData] = await Promise.all([
         api.getAirports(),
         api.getFrontlineZones(),
         api.getAirbaseStatus().catch(() => ({})),
+        api.getAirportCatalog().catch(() => []),
       ]);
 
       setAirports(airportsData);
       setAirbaseStatus(airbaseStatusData || {});
+      setAirportCatalog(Array.isArray(airportCatalogData) ? airportCatalogData : []);
 
       const zones = zonesData?.zones || zonesData;
       if (Array.isArray(zones)) {
@@ -399,7 +402,11 @@ function App() {
 
       <main className={`flex-1 ${(currentView === 'frontline' || currentView === 'lidc' || currentView === 'atc') ? 'overflow-hidden' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
         {currentView === 'frontline' && (
-          <FrontlineMap airportsData={Object.values(airports)} airbaseStatus={airbaseStatus} />
+          <FrontlineMap
+            airportsData={Object.values(airports)}
+            airportCatalog={airportCatalog}
+            airbaseStatus={airbaseStatus}
+          />
         )}
         {currentView === 'profile' && (
           <UserProfile />

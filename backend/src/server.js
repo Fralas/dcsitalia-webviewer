@@ -3239,6 +3239,13 @@ app.get('/api/time', (req, res) => {
 });
 
 /**
+ * GET /api/config/airports - Public airport catalog (coordinates + DCS keys)
+ */
+app.get('/api/config/airports', (req, res) => {
+  res.json(airports);
+});
+
+/**
  * GET /api/airports - Get all airports with current data
  */
 app.get('/api/airports', (req, res) => {

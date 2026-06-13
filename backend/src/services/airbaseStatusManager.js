@@ -27,12 +27,19 @@ function collectAirportStatusAliases(airport) {
     aliases.add(raw);
     aliases.add(normalizeAirbaseName(raw));
   };
+  const addUnderscoreVariant = (value) => {
+    if (!value) return;
+    add(String(value).trim().replace(/[\s-]+/g, '_'));
+  };
 
   add(airport?.name);
   add(airport?.displayName);
   add(airport?.csvPrefix);
   add(airport?.id);
   add(airport?.id?.replace(/-/g, '_'));
+  addUnderscoreVariant(airport?.name);
+  addUnderscoreVariant(airport?.displayName);
+  addUnderscoreVariant(airport?.id);
 
   return aliases;
 }
