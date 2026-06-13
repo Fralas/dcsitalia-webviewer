@@ -1630,6 +1630,11 @@ function loadAirbaseStatus() {
 
     // Broadcast updated status to all connected clients
     io.emit('airbase:status', airbaseStatus);
+
+    if (currentData && Object.keys(currentData).length > 0) {
+      processData(currentData);
+      io.emit('data:updated', currentData);
+    }
   } catch (error) {
     console.error('❌ Error loading airbase status:', error.message);
     airbaseStatus = {}; // Reset to empty if error
@@ -1648,6 +1653,20 @@ function processData(data) {
     return currentData;
   }
 
+  // Include coalition-active airports from config even when CSV/buffer data is missing.
+  airbaseStatusManager.getActiveAirports().forEach((airportConfig) => {
+    if (airportDataMap[airportConfig.id]) return;
+
+    airportDataMap[airportConfig.id] = {
+      ...airportConfig,
+      data: {
+        weapons: [],
+        liquids: [],
+        timestamp: Date.now(),
+      },
+    };
+  });
+
   // Add isActive field to each airport based on airbase status
   Object.entries(airportDataMap).forEach(([airportId, airportData]) => {
     // Keep static airport metadata aligned with config,
@@ -1662,13 +1681,13 @@ function processData(data) {
       airportData.isCarrier = Boolean(airportConfig.isCarrier);
       airportData.isAlwaysActive = Boolean(airportConfig.isAlwaysActive);
       airportData.herculesBase = Boolean(airportConfig.herculesBase);
+      airportData.csvPrefix = airportConfig.csvPrefix || '';
       if (airportConfig.coordinates) {
         airportData.coordinates = airportConfig.coordinates;
       }
     }
 
-    airportData.isActive = airbaseStatusManager.isAirportAlwaysActive(airportData) ||
-                           airbaseStatusManager.isAirbaseActive(airportData.name);
+    airportData.isActive = airbaseStatusManager.isAirportActive(airportData);
 
     if (airportData.data && airportData.data.weapons) {
       historicalData.saveSnapshot(airportId, airportData.data);
@@ -3227,6 +3246,13 @@ app.get('/api/airports', (req, res) => {
 });
 
 /**
+ * GET /api/airbases/status - Get coalition status map for airbases
+ */
+app.get('/api/airbases/status', (req, res) => {
+  res.json(airbaseStatusManager.getAirbaseStatus());
+});
+
+/**
  * GET /api/airports/:id - Get specific airport data
  */
 app.get('/api/airports/:id', (req, res) => {
@@ -4763,6 +4789,7 @@ io.on('connection', (socket) => {
 
   // Send current data on connection
   socket.emit('data:initial', currentData);
+  socket.emit('airbase:status', airbaseStatusManager.getAirbaseStatus());
   socket.emit('missions:updated', {
     missions: historicalData.getActiveMissions()
   });
@@ -5142,7 +5169,7 @@ app.get('/api/admin/config/airports', authenticateToken, requireAdmin, (req, res
     const airbaseStatusData = airbaseStatusManager.getAirbaseStatus();
     const airportsWithStatus = airports.map(airport => ({
       ...airport,
-      isActive: airbaseStatusManager.isAirportAlwaysActive(airport) || airbaseStatusManager.isAirbaseActive(airport.name)
+      isActive: airbaseStatusManager.isAirportActive(airport)
     }));
 
     res.json({

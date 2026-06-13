@@ -53,6 +53,13 @@ export async function getAirports() {
 }
 
 /**
+ * Get coalition status for all airbases
+ */
+export async function getAirbaseStatus() {
+  return fetchAPI('/airbases/status');
+}
+
+/**
  * Get authoritative server time and launch status
  */
 export async function getServerTime() {
@@ -946,6 +953,7 @@ export async function cancelAtcHandoff(stripId, { airportId, role, targetBay }) 
 export default {
   getServerTime,
   getAirports,
+  getAirbaseStatus,
   getAirport,
   getAirportHistory,
   getWeaponHistory,

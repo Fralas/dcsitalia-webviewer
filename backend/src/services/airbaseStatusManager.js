@@ -18,6 +18,38 @@ function normalizeAirbaseName(name) {
     .trim();
 }
 
+function collectAirportStatusAliases(airport) {
+  const aliases = new Set();
+  const add = (value) => {
+    if (!value) return;
+    const raw = String(value).trim();
+    if (!raw) return;
+    aliases.add(raw);
+    aliases.add(normalizeAirbaseName(raw));
+  };
+
+  add(airport?.name);
+  add(airport?.displayName);
+  add(airport?.csvPrefix);
+  add(airport?.id);
+  add(airport?.id?.replace(/-/g, '_'));
+
+  return aliases;
+}
+
+function lookupAirbaseStatusValue(airport) {
+  for (const alias of collectAirportStatusAliases(airport)) {
+    if (Object.prototype.hasOwnProperty.call(airbaseStatus, alias)) {
+      return airbaseStatus[alias];
+    }
+    if (Object.prototype.hasOwnProperty.call(normalizedAirbaseStatus, alias)) {
+      return normalizedAirbaseStatus[alias];
+    }
+  }
+
+  return undefined;
+}
+
 /**
  * Check if an airport is forced active regardless of status file.
  * Main base, carriers and explicitly flagged always-active airbases are forced active.
@@ -50,26 +82,33 @@ export function getAirbaseStatus() {
 }
 
 /**
- * Check if an airbase is active
+ * Check if an airbase is active by name (legacy helper).
  * @param {string} airbaseName - Name of the airbase
  * @returns {boolean} True if active, false otherwise
  */
 export function isAirbaseActive(airbaseName) {
-  // If no status file loaded, default to active (backward compatibility)
+  return isAirportActive({ name: airbaseName });
+}
+
+/**
+ * Check if an airport is coalition-active using status aliases.
+ * @param {Object} airport - Airport config/data object
+ * @returns {boolean}
+ */
+export function isAirportActive(airport) {
+  if (isAirportAlwaysActive(airport)) {
+    return true;
+  }
+
   if (Object.keys(airbaseStatus).length === 0) {
     return true;
   }
 
-  if (Object.prototype.hasOwnProperty.call(airbaseStatus, airbaseName)) {
-    return airbaseStatus[airbaseName] !== false;
+  const statusValue = lookupAirbaseStatusValue(airport);
+  if (statusValue !== undefined) {
+    return statusValue !== false;
   }
 
-  const normalizedName = normalizeAirbaseName(airbaseName);
-  if (Object.prototype.hasOwnProperty.call(normalizedAirbaseStatus, normalizedName)) {
-    return normalizedAirbaseStatus[normalizedName] !== false;
-  }
-
-  // If airbase not in status file, default to active
   return true;
 }
 
@@ -84,15 +123,7 @@ export function getActiveAirports() {
     return airports;
   }
 
-  return airports.filter(airport => {
-    // Main base, carriers and forced-active airbases are always active
-    if (isAirportAlwaysActive(airport)) {
-      return true;
-    }
-
-    // Check if airport is active in status file
-    return isAirbaseActive(airport.name);
-  });
+  return airports.filter((airport) => isAirportActive(airport));
 }
 
 /**
@@ -110,6 +141,7 @@ export default {
   updateAirbaseStatus,
   getAirbaseStatus,
   isAirbaseActive,
+  isAirportActive,
   isAirportAlwaysActive,
   getActiveAirports,
   getActiveAirportById,

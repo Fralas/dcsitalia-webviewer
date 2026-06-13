@@ -121,6 +121,7 @@ function App() {
   const [currentView, setCurrentView] = useState(() => viewFromLocation());
   const [appLanguage, setAppLanguage] = useState(DEFAULT_WIKI_LANGUAGE);
   const [airports, setAirports] = useState({});
+  const [airbaseStatus, setAirbaseStatus] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [frontlineSummary, setFrontlineSummary] = useState({
@@ -183,6 +184,10 @@ function App() {
       setAirports(data);
     });
 
+    const unsubscribeAirbaseStatus = socketService.on('airbase:status', (data) => {
+      setAirbaseStatus(data || {});
+    });
+
     const unsubscribeFrontline = socketService.on('frontline:updated', (data) => {
       const zones = data?.zones || [];
       if (Array.isArray(zones)) {
@@ -193,6 +198,7 @@ function App() {
     return () => {
       unsubscribeInitial();
       unsubscribeUpdated();
+      unsubscribeAirbaseStatus();
       unsubscribeFrontline();
       socketService.disconnect();
     };
@@ -202,12 +208,14 @@ function App() {
     try {
       setLoading(true);
       setError(null);
-      const [airportsData, zonesData] = await Promise.all([
+      const [airportsData, zonesData, airbaseStatusData] = await Promise.all([
         api.getAirports(),
         api.getFrontlineZones(),
+        api.getAirbaseStatus().catch(() => ({})),
       ]);
 
       setAirports(airportsData);
+      setAirbaseStatus(airbaseStatusData || {});
 
       const zones = zonesData?.zones || zonesData;
       if (Array.isArray(zones)) {
@@ -391,7 +399,7 @@ function App() {
 
       <main className={`flex-1 ${(currentView === 'frontline' || currentView === 'lidc' || currentView === 'atc') ? 'overflow-hidden' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
         {currentView === 'frontline' && (
-          <FrontlineMap airportsData={Object.values(airports)} />
+          <FrontlineMap airportsData={Object.values(airports)} airbaseStatus={airbaseStatus} />
         )}
         {currentView === 'profile' && (
           <UserProfile />

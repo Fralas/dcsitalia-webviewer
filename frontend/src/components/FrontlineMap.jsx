@@ -16,6 +16,7 @@ import kc135ModelUrl from '../assets/3D/kc-135_dcs_world.glb';
 import { Ambulance, Anchor, Blend, Box, Boxes, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChessRook, Clock3, Factory, Forklift, Fuel, Hammer, MapPin, PersonStanding, Satellite, TowerControl, X } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import { buildZoneConnections, getNeighborZoneIds, normalizeZoneId } from '../config/zoneConfini';
+import { isAirportActiveOnMap } from '../utils/airportStatus';
 import airports from '../config/airports';
 import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
 import tankIcon from '../assets/tank-icon.svg';
@@ -4401,7 +4402,7 @@ function MapLibreFlatMapView({
   );
 }
 
-export default function FrontlineMap({ airportsData }) {
+export default function FrontlineMap({ airportsData, airbaseStatus = {} }) {
   const { user } = useUser();
   const canManageLogisticsRouteVisibility = user?.canManageLogisticsRouteVisibility === true;
   const isMapLibreEngine = MAP_ENGINE === 'maplibre';
@@ -4974,10 +4975,30 @@ export default function FrontlineMap({ airportsData }) {
   );
 
   const validAirports = useMemo(() => {
-    const hasDynamicAirports = Array.isArray(airportsData) && airportsData.length > 0;
-    const airportsList = hasDynamicAirports ? airportsData : airports;
-    return airportsList.filter((airport) => airport.coordinates && airport.isActive !== false);
-  }, [airportsData]);
+    const runtimeById = new Map();
+    if (Array.isArray(airportsData)) {
+      airportsData.forEach((airport) => {
+        if (airport?.id) runtimeById.set(airport.id, airport);
+      });
+    }
+
+    const mergedAirports = airports.map((configAirport) => {
+      const runtimeAirport = runtimeById.get(configAirport.id);
+      if (!runtimeAirport) return configAirport;
+
+      return {
+        ...configAirport,
+        ...runtimeAirport,
+        coordinates: runtimeAirport.coordinates || configAirport.coordinates,
+        isMainBase: runtimeAirport.isMainBase ?? configAirport.isMainBase,
+        isCarrier: runtimeAirport.isCarrier ?? configAirport.isCarrier,
+        isHeliport: runtimeAirport.isHeliport ?? configAirport.isHeliport,
+        isAlwaysActive: runtimeAirport.isAlwaysActive ?? configAirport.isAlwaysActive,
+      };
+    });
+
+    return mergedAirports.filter((airport) => isAirportActiveOnMap(airport, airbaseStatus));
+  }, [airportsData, airbaseStatus]);
 
   const combatMissionByZone = useMemo(() => {
     const map = new Map();
