@@ -15,6 +15,7 @@ import t72ModelUrl from '../assets/3D/t90.glb';
 import kc135ModelUrl from '../assets/3D/kc-135_dcs_world.glb';
 import { Ambulance, Anchor, Blend, Box, Boxes, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChessRook, Clock3, Factory, Forklift, Fuel, Hammer, MapPin, PersonStanding, Satellite, TowerControl, X } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
+import { buildZoneConnections, getNeighborZoneIds, normalizeZoneId } from '../config/zoneConfini';
 import airports from '../config/airports';
 import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
 import tankIcon from '../assets/tank-icon.svg';
@@ -42,6 +43,7 @@ const MAPLIBRE_CRATE_BOX_IMAGE_ID = 'crate-box-icon';
 const MAPLIBRE_CRATE_BOXES_IMAGE_ID = 'crate-boxes-icon';
 const MAPLIBRE_PP_FACTORY_WHITE_IMAGE_ID = 'pp-factory-white';
 const MAPLIBRE_PP_FACTORY_BLUE_IMAGE_ID = 'pp-factory-blue';
+const MAPLIBRE_PP_FACTORY_RED_IMAGE_ID = 'pp-factory-red';
 const CRATE_CLUSTER_RADIUS_M = 20;
 const DBUILD_SITE_MATCH_RADIUS_M = 150;
 const MAPLIBRE_AIRPORT_ICON_SIZE = ['interpolate', ['linear'], ['zoom'], 5, 0.78, 8, 0.95, 10, 1.12];
@@ -174,72 +176,6 @@ function getZoneNumber(zone) {
   const source = String(zone?.id || zone?.name || '');
   const match = source.match(/\d+/);
   return match ? match[0] : source || 'Unknown';
-}
-
-function getZoneGridIndex(zone) {
-  const source = String(zone?.id || zone?.name || '');
-  const match = source.match(/(\d{2})(?!\d)/);
-  if (!match) return null;
-  const value = Number.parseInt(match[1], 10);
-  if (!Number.isFinite(value) || value < 0 || value > 99) return null;
-  return value;
-}
-
-function isCyprusZone(zone) {
-  const source = String(zone?.id || zone?.name || '').toUpperCase();
-  return /(^|_)C\d{2}(?!\d)/.test(source);
-}
-
-function buildZoneGridKey(prefix, index) {
-  return `${prefix}${String(index).padStart(2, '0')}`;
-}
-
-function getZoneGridKey(zone) {
-  const index = getZoneGridIndex(zone);
-  if (index === null) return null;
-  const prefix = isCyprusZone(zone) ? 'C' : 'N';
-  return buildZoneGridKey(prefix, index);
-}
-
-function parseZoneGridKey(key) {
-  const match = String(key || '').match(/^([A-Z])(\d{2})$/);
-  if (!match) return null;
-  const index = Number.parseInt(match[2], 10);
-  if (!Number.isFinite(index) || index < 0 || index > 99) return null;
-  return { prefix: match[1], index };
-}
-
-function getNeighborZoneGridKeys(key) {
-  const parsed = parseZoneGridKey(key);
-  if (!parsed) return [];
-
-  const { prefix, index } = parsed;
-  const row = Math.floor(index / 10);
-  const col = index % 10;
-  const result = [];
-  if (row > 0) result.push(buildZoneGridKey(prefix, index - 10));
-  if (row < 9) result.push(buildZoneGridKey(prefix, index + 10));
-  if (col > 0) result.push(buildZoneGridKey(prefix, index - 1));
-  if (col < 9) result.push(buildZoneGridKey(prefix, index + 1));
-  return result;
-}
-
-function getRightZoneGridKey(key) {
-  const parsed = parseZoneGridKey(key);
-  if (!parsed) return null;
-  const { prefix, index } = parsed;
-  const col = index % 10;
-  if (col >= 9) return null;
-  return buildZoneGridKey(prefix, index + 1);
-}
-
-function getDownZoneGridKey(key) {
-  const parsed = parseZoneGridKey(key);
-  if (!parsed) return null;
-  const { prefix, index } = parsed;
-  const row = Math.floor(index / 10);
-  if (row >= 9) return null;
-  return buildZoneGridKey(prefix, index + 10);
 }
 
 function formatDms(value, positiveLabel, negativeLabel) {
@@ -1192,7 +1128,7 @@ function createCrateClusterIcon(kind) {
 }
 
 function buildProductionPointSvgMarkup(kind) {
-  const color = kind === 'pp-blue' ? '#3b82f6' : '#ffffff';
+  const color = kind === 'pp-blue' ? '#3b82f6' : (kind === 'pp-red' ? '#ef4444' : '#ffffff');
   return renderToStaticMarkup(
     <Factory
       size={28}
@@ -1207,6 +1143,7 @@ async function ensureMapLibreProductionPointIconImages(map) {
   const defs = [
     { id: MAPLIBRE_PP_FACTORY_WHITE_IMAGE_ID, kind: 'pp-white' },
     { id: MAPLIBRE_PP_FACTORY_BLUE_IMAGE_ID, kind: 'pp-blue' },
+    { id: MAPLIBRE_PP_FACTORY_RED_IMAGE_ID, kind: 'pp-red' },
   ];
 
   for (const def of defs) {
@@ -1533,14 +1470,21 @@ function getProductionPointColor(owner) {
 }
 
 function getProductionPointFactoryColor(pp) {
-  if (pp?.built && String(pp.owner || '').toUpperCase() === 'BLUE') {
+  const owner = String(pp?.owner || 'NEUTRAL').toUpperCase();
+  if (owner === 'RED' || owner === 'CONTESTED') {
+    return '#ef4444';
+  }
+  if (pp?.built && owner === 'BLUE') {
     return '#3b82f6';
   }
   return '#ffffff';
 }
 
 function getProductionPointFactoryKind(pp) {
-  return getProductionPointFactoryColor(pp) === '#3b82f6' ? 'pp-blue' : 'pp-white';
+  const owner = String(pp?.owner || 'NEUTRAL').toUpperCase();
+  if (owner === 'RED' || owner === 'CONTESTED') return 'pp-red';
+  if (pp?.built && owner === 'BLUE') return 'pp-blue';
+  return 'pp-white';
 }
 
 function formatProductionPointNumber(rawId) {
@@ -3696,6 +3640,7 @@ function MapLibreFlatMapView({
             'match',
             ['get', 'factoryKind'],
             'pp-blue', MAPLIBRE_PP_FACTORY_BLUE_IMAGE_ID,
+            'pp-red', MAPLIBRE_PP_FACTORY_RED_IMAGE_ID,
             MAPLIBRE_PP_FACTORY_WHITE_IMAGE_ID,
           ],
           'icon-size': MAPLIBRE_PP_ICON_SIZE,
@@ -5044,49 +4989,45 @@ export default function FrontlineMap({ airportsData }) {
     return map;
   }, [combatMissions]);
 
-  const zoneByGridKey = useMemo(() => {
+  const zoneById = useMemo(() => {
     const map = new Map();
     validZones.forEach((zone) => {
-      const key = getZoneGridKey(zone);
-      if (!key) return;
-      map.set(key, zone);
+      if (!zone?.id) return;
+      map.set(normalizeZoneId(zone.id), zone);
     });
     return map;
   }, [validZones]);
 
   const logisticsFrontlineAirportIds = useMemo(() => {
-    const zoneByKey = new Map();
-    validZones.forEach((zone) => {
-      const key = getZoneGridKey(zone);
-      if (!key) return;
-      zoneByKey.set(key, zone);
-    });
-
-    const firstLineBlueZoneKeys = new Set();
-    zoneByKey.forEach((zone, key) => {
+    const firstLineBlueZoneIds = new Set();
+    zoneById.forEach((zone, zoneId) => {
       if (zone?.status !== 'BLUE') return;
-      const hasRedNeighbor = getNeighborZoneGridKeys(key).some((neighborKey) => zoneByKey.get(neighborKey)?.status === 'RED');
+      const hasRedNeighbor = getNeighborZoneIds(zoneId).some(
+        (neighborId) => zoneById.get(normalizeZoneId(neighborId))?.status === 'RED'
+      );
       if (hasRedNeighbor) {
-        firstLineBlueZoneKeys.add(key);
+        firstLineBlueZoneIds.add(zoneId);
       }
     });
 
-    const secondLineBlueZoneKeys = new Set();
-    zoneByKey.forEach((zone, key) => {
+    const secondLineBlueZoneIds = new Set();
+    zoneById.forEach((zone, zoneId) => {
       if (zone?.status !== 'BLUE') return;
-      if (firstLineBlueZoneKeys.has(key)) return;
-      const linkedToFirstLine = getNeighborZoneGridKeys(key).some((neighborKey) => firstLineBlueZoneKeys.has(neighborKey));
+      if (firstLineBlueZoneIds.has(zoneId)) return;
+      const linkedToFirstLine = getNeighborZoneIds(zoneId).some(
+        (neighborId) => firstLineBlueZoneIds.has(normalizeZoneId(neighborId))
+      );
       if (linkedToFirstLine) {
-        secondLineBlueZoneKeys.add(key);
+        secondLineBlueZoneIds.add(zoneId);
       }
     });
 
-    const eligibleBlueZoneKeys = new Set([
-      ...Array.from(firstLineBlueZoneKeys),
-      ...Array.from(secondLineBlueZoneKeys),
+    const eligibleBlueZoneIds = new Set([
+      ...firstLineBlueZoneIds,
+      ...secondLineBlueZoneIds,
     ]);
 
-    const keyedZones = Array.from(zoneByKey.entries()).filter(([, zone]) => (
+    const zonesWithCoords = Array.from(zoneById.entries()).filter(([, zone]) => (
       Number.isFinite(Number(zone?.coordinates?.lat)) && Number.isFinite(Number(zone?.coordinates?.lon))
     ));
     const eligibleAirportIds = new Set();
@@ -5096,66 +5037,28 @@ export default function FrontlineMap({ airportsData }) {
       const airportLon = Number(airport?.coordinates?.lon);
       if (!Number.isFinite(airportLat) || !Number.isFinite(airportLon)) return;
 
-      let nearestZoneKey = null;
+      let nearestZoneId = null;
       let nearestDistanceNm = Number.POSITIVE_INFINITY;
 
-      keyedZones.forEach(([zoneKey, zone]) => {
+      zonesWithCoords.forEach(([zoneId, zone]) => {
         const zoneLat = Number(zone.coordinates.lat);
         const zoneLon = Number(zone.coordinates.lon);
         const distanceNm = haversineNm(airportLat, airportLon, zoneLat, zoneLon);
         if (distanceNm < nearestDistanceNm) {
           nearestDistanceNm = distanceNm;
-          nearestZoneKey = zoneKey;
+          nearestZoneId = zoneId;
         }
       });
 
-      if (nearestZoneKey !== null && eligibleBlueZoneKeys.has(nearestZoneKey)) {
+      if (nearestZoneId !== null && eligibleBlueZoneIds.has(nearestZoneId)) {
         eligibleAirportIds.add(String(airport.id));
       }
     });
 
     return eligibleAirportIds;
-  }, [validZones, validAirports]);
+  }, [zoneById, validAirports]);
 
-  const gridConnections = useMemo(() => {
-    const zoneByKey = new Map();
-
-    validZones.forEach((zone) => {
-      const key = getZoneGridKey(zone);
-      if (!key || !zone?.coordinates) return;
-      zoneByKey.set(key, zone);
-    });
-
-    const links = [];
-    zoneByKey.forEach((zone, key) => {
-      const rightKey = getRightZoneGridKey(key);
-      const downKey = getDownZoneGridKey(key);
-
-      if (rightKey !== null && zoneByKey.has(rightKey)) {
-        const target = zoneByKey.get(rightKey);
-        links.push({
-          id: `grid-${key}-${rightKey}`,
-          positions: [
-            [zone.coordinates.lat, zone.coordinates.lon],
-            [target.coordinates.lat, target.coordinates.lon],
-          ],
-        });
-      }
-
-      if (downKey !== null && zoneByKey.has(downKey)) {
-        const target = zoneByKey.get(downKey);
-        links.push({
-          id: `grid-${key}-${downKey}`,
-          positions: [
-            [zone.coordinates.lat, zone.coordinates.lon],
-            [target.coordinates.lat, target.coordinates.lon],
-          ],
-        });
-      }
-    });
-
-    return links;
-  }, [validZones]);
+  const gridConnections = useMemo(() => buildZoneConnections(validZones), [validZones]);
 
   const zoneCoordinatesById = useMemo(() => {
     const map = new Map();
@@ -5452,14 +5355,12 @@ export default function FrontlineMap({ airportsData }) {
       ].filter(Boolean)
     : [];
   const selectedZoneDetailsRedNeighbors = useMemo(() => {
-    if (!selectedZoneDetails) return [];
-    const gridKey = getZoneGridKey(selectedZoneDetails);
-    if (!gridKey) return [];
+    if (!selectedZoneDetails?.id) return [];
 
-    return getNeighborZoneGridKeys(gridKey)
-      .map((key) => zoneByGridKey.get(key))
+    return getNeighborZoneIds(selectedZoneDetails.id)
+      .map((neighborId) => zoneById.get(normalizeZoneId(neighborId)))
       .filter((zone) => zone && zone.status === 'RED');
-  }, [selectedZoneDetails, zoneByGridKey]);
+  }, [selectedZoneDetails, zoneById]);
   const selectedZoneDetailsHasTasks = Array.isArray(selectedZoneDetails?.tasks) && selectedZoneDetails.tasks.length > 0;
   const selectedZoneDetailsAcceptedByOther = Boolean(
     selectedZoneDetails?.operation_assigned &&
