@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Activity, AlertCircle, BookOpen, CalendarSync, TowerControl, Users } from 'lucide-react';
 import FrontlineMap from './components/FrontlineMap';
+import LandingPage from './components/landing/LandingPage';
 import UserMenu from './components/UserMenu';
 import UserProfile from './components/UserProfile';
 import ChangelogPage from './components/ChangelogPage';
@@ -9,7 +10,7 @@ import LidcPage from './components/LidcPage';
 import AtcStripPage from './components/atc/AtcStripPage';
 import * as api from './services/api';
 import socketService from './services/socket';
-import { t } from './utils/locale';
+import { t, getActiveLocale, setActiveLocale } from './utils/locale';
 import bannerImg from '../img/DCS_ITALIA_ICON.png';
 import gbFlagImg from '../img/flags/gb.svg';
 import itFlagImg from '../img/flags/it.svg';
@@ -17,17 +18,17 @@ import { useUser } from './contexts/UserContext';
 import { canAccessAtc, canAccessLidc } from './config/featureAccess';
 
 const VIEW_TO_PATH = Object.freeze({
-  frontline: '/',
+  landing: '/',
+  frontline: '/map',
   profile: '/profile',
   changelogs: '/changelogs',
   wiki: '/wiki',
   lidc: '/lidc',
   atc: '/atc',
 });
-const DEFAULT_WIKI_LANGUAGE = 'en';
 
 function normalizeView(view) {
-  return Object.prototype.hasOwnProperty.call(VIEW_TO_PATH, view) ? view : 'frontline';
+  return Object.prototype.hasOwnProperty.call(VIEW_TO_PATH, view) ? view : 'landing';
 }
 
 function normalizePath(pathname = '/') {
@@ -37,11 +38,14 @@ function normalizePath(pathname = '/') {
 
 function viewFromLocation() {
   if (typeof window === 'undefined') {
-    return 'frontline';
+    return 'landing';
   }
 
   const currentPath = normalizePath(window.location.pathname);
 
+  if (currentPath === '/map') {
+    return 'frontline';
+  }
   if (currentPath === '/changelogs') {
     return 'changelogs';
   }
@@ -57,6 +61,9 @@ function viewFromLocation() {
   if (currentPath === '/atc') {
     return 'atc';
   }
+  if (currentPath === '/') {
+    return 'landing';
+  }
 
   const params = new URLSearchParams(window.location.search);
   const viewFromQuery = params.get('view');
@@ -69,7 +76,7 @@ function viewFromLocation() {
     return normalizeView(hashView);
   }
 
-  return 'frontline';
+  return 'landing';
 }
 
 function syncUrlWithView(view, { replace = false } = {}) {
@@ -119,7 +126,7 @@ function buildFrontlineSummary(zones = []) {
 
 function App() {
   const [currentView, setCurrentView] = useState(() => viewFromLocation());
-  const [appLanguage, setAppLanguage] = useState(DEFAULT_WIKI_LANGUAGE);
+  const [appLanguage, setAppLanguage] = useState(() => getActiveLocale());
   const [airports, setAirports] = useState({});
   const [airportCatalog, setAirportCatalog] = useState([]);
   const [airbaseStatus, setAirbaseStatus] = useState({});
@@ -144,7 +151,11 @@ function App() {
   const isItalian = appLanguage === 'it';
 
   const toggleLanguage = () => {
-    setAppLanguage((prev) => (prev === 'it' ? 'en' : 'it'));
+    setAppLanguage((prev) => {
+      const next = prev === 'it' ? 'en' : 'it';
+      setActiveLocale(next);
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -269,9 +280,9 @@ function App() {
             <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
-                onClick={() => goToView('frontline')}
+                onClick={() => goToView('landing')}
                 className="flex items-center gap-2 text-left transition-opacity hover:opacity-90"
-                title="Frontline"
+                title="Home"
               >
                 <img
                   src={bannerImg}
@@ -400,7 +411,13 @@ function App() {
         </div>
       </header>
 
-      <main className={`flex-1 ${(currentView === 'frontline' || currentView === 'lidc' || currentView === 'atc') ? 'overflow-hidden' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
+      <main className={`flex-1 ${(currentView === 'landing' || currentView === 'frontline' || currentView === 'lidc' || currentView === 'atc') ? 'overflow-hidden' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
+        {currentView === 'landing' && (
+          <LandingPage
+            language={appLanguage}
+            onOpenCampaign={(view) => goToView(view)}
+          />
+        )}
         {currentView === 'frontline' && (
           <FrontlineMap
             airportsData={Object.values(airports)}
@@ -425,7 +442,7 @@ function App() {
         )}
       </main>
 
-      {currentView !== 'frontline' && currentView !== 'lidc' && currentView !== 'atc' && (
+      {currentView !== 'landing' && currentView !== 'frontline' && currentView !== 'lidc' && currentView !== 'atc' && (
         <footer className="bg-yt-bg-secondary border-t border-yt-border mt-8">
           <div className="container mx-auto px-4 py-3 text-center text-xs text-yt-text-secondary">
             <p>DCS Italia Warehouse Viewer v1.0 - Real-time logistics management</p>

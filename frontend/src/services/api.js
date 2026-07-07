@@ -957,6 +957,46 @@ export async function cancelAtcHandoff(stripId, { airportId, role, targetBay }) 
   });
 }
 
+/**
+ * Get NOE events (public). Optionally filter by campaign id.
+ */
+export async function getNoeEvents(campaignId) {
+  const query = campaignId ? `?campaignId=${encodeURIComponent(campaignId)}` : '';
+  return fetchAPI(`/noe/events${query}`);
+}
+
+/**
+ * Create a NOE event (admin only).
+ */
+export async function createNoeEvent(event) {
+  return fetchAPI('/noe/events', {
+    method: 'POST',
+    body: JSON.stringify(event),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Update a NOE event (admin only).
+ */
+export async function updateNoeEvent(eventId, event) {
+  return fetchAPI(`/noe/events/${encodeURIComponent(eventId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(event),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Delete a NOE event (admin only).
+ */
+export async function deleteNoeEvent(eventId) {
+  return fetchAPI(`/noe/events/${encodeURIComponent(eventId)}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+}
+
 export default {
   getServerTime,
   getAirports,
@@ -987,6 +1027,10 @@ export default {
   getFrontlineZones,
   acceptFrontlineZone,
   getFeed,
+  getNoeEvents,
+  createNoeEvent,
+  updateNoeEvent,
+  deleteNoeEvent,
   getConvoys,
   getDcsar,
   getAirliftPlayers,

@@ -13,6 +13,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "cobe": "^0.6.5",
+    "globe.gl": "^2.46.1",
     "jspdf": "^3.0.4",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.555.0",

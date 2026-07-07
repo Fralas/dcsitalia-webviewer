@@ -1,0 +1,565 @@
+.landing {
+  --landing-bg: #0b0b0d;
+  --landing-card: rgba(20, 21, 26, 0.82);
+  --landing-card-border: rgba(255, 255, 255, 0.08);
+  --landing-accent: #f5821f;
+  --landing-accent-soft: rgba(245, 130, 31, 0.16);
+  --landing-text: #f2f4f8;
+  --landing-text-dim: #9aa3b2;
+
+  position: relative;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 45%, #15161c 0%, var(--landing-bg) 60%);
+  color: var(--landing-text);
+  font-family: inherit;
+}
+
+/* ---------- Top campaign switcher ---------- */
+.landing__topbar {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  width: max-content;
+  max-width: calc(100% - 32px);
+}
+
+.landing-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.landing-switcher__btn {
+  padding: 7px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 130, 31, 0.35);
+  background: rgba(18, 18, 22, 0.7);
+  color: var(--landing-text-dim);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  white-space: nowrap;
+}
+
+.landing-switcher__btn:hover {
+  color: var(--landing-text);
+  border-color: var(--landing-accent);
+}
+
+.landing-switcher__btn.is-active {
+  color: #fff;
+  background: var(--landing-accent-soft);
+  border-color: var(--landing-accent);
+  box-shadow: 0 0 16px rgba(245, 130, 31, 0.25);
+}
+
+/* ---------- Globe ---------- */
+.landing__globe {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.landing-globe__canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.landing-globe__canvas canvas {
+  display: block;
+  margin: 0 auto;
+}
+
+/* ---------- Side cards shared ---------- */
+.landing__left,
+.landing__right {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 15;
+}
+
+.landing__left {
+  left: 28px;
+  width: 300px;
+  max-width: calc(50% - 24px);
+}
+
+.landing__right {
+  right: 28px;
+  width: 360px;
+  max-width: calc(50% - 24px);
+}
+
+/* ---------- NOE events card ---------- */
+.noe-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 22px 24px;
+  border-radius: 16px;
+  border: 1px solid var(--landing-card-border);
+  background: var(--landing-card);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+.noe-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.noe-card__title {
+  margin: 0;
+  color: var(--landing-accent);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.noe-card__manage {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--landing-card-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--landing-text-dim);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.noe-card__manage:hover {
+  color: var(--landing-accent);
+  border-color: var(--landing-accent);
+}
+
+.noe-card__date {
+  font-size: 52px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #fff;
+}
+
+.noe-card__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--landing-card-border);
+  padding-top: 14px;
+}
+
+.noe-card__row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.noe-card__day {
+  font-weight: 800;
+  color: #fff;
+  min-width: 54px;
+}
+
+.noe-card__dash {
+  color: var(--landing-text-dim);
+}
+
+.noe-card__label {
+  color: var(--landing-accent);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.noe-card__label--accent {
+  text-transform: uppercase;
+}
+
+.noe-card__operation {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--landing-text-dim);
+  letter-spacing: 0.03em;
+}
+
+.noe-card__empty {
+  font-size: 13px;
+  color: var(--landing-text-dim);
+  padding: 8px 0;
+}
+
+.noe-card__discord {
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--landing-accent);
+  color: #1a1206;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.noe-card__discord:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+/* ---------- Campaign info card ---------- */
+.info-card {
+  display: flex;
+  flex-direction: column;
+  max-height: min(74vh, 640px);
+  padding: 22px 8px 22px 22px;
+  border-radius: 16px;
+  border: 1px solid var(--landing-card-border);
+  background: var(--landing-card);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+.info-card__scroll {
+  overflow-y: auto;
+  padding-right: 14px;
+  min-height: 0;
+}
+
+.info-card__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--landing-text);
+  letter-spacing: 0.02em;
+}
+
+.info-card__theater {
+  margin: 4px 0 14px;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--landing-accent);
+  text-transform: uppercase;
+}
+
+.info-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.info-card__heading {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.info-card__text {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--landing-text-dim);
+}
+
+.info-card__cta {
+  margin: 18px 14px 0 0;
+  padding: 13px 16px;
+  border: none;
+  border-radius: 10px;
+  background: var(--landing-accent);
+  color: #1a1206;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.info-card__cta:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.info-card__cta:disabled {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--landing-text-dim);
+  cursor: not-allowed;
+}
+
+/* ---------- Admin modal ---------- */
+.noe-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.noe-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 4, 8, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.noe-modal__panel {
+  position: relative;
+  z-index: 1;
+  width: min(760px, 100%);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  border: 1px solid var(--landing-card-border);
+  background: #101116;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.noe-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--landing-card-border);
+}
+
+.noe-modal__header h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--landing-accent);
+}
+
+.noe-modal__close {
+  display: inline-flex;
+  padding: 6px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--landing-text-dim);
+  cursor: pointer;
+}
+
+.noe-modal__close:hover {
+  color: #fff;
+}
+
+.noe-modal__content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.noe-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.noe-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--landing-text-dim);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.noe-modal__field input,
+.noe-modal__field select {
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--landing-card-border);
+  background: #191a21;
+  color: var(--landing-text);
+  font-size: 13px;
+}
+
+.noe-modal__field input:focus,
+.noe-modal__field select:focus {
+  outline: none;
+  border-color: var(--landing-accent);
+}
+
+.noe-modal__error {
+  color: #ff8f8f;
+  font-size: 12px;
+}
+
+.noe-modal__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.noe-modal__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 14px;
+  border-radius: 9px;
+  border: 1px solid var(--landing-card-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--landing-text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.noe-modal__btn--primary {
+  background: var(--landing-accent);
+  border-color: var(--landing-accent);
+  color: #1a1206;
+}
+
+.noe-modal__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.noe-modal__spin {
+  animation: noe-spin 0.9s linear infinite;
+}
+
+@keyframes noe-spin {
+  to { transform: rotate(360deg); }
+}
+
+.noe-modal__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.noe-modal__list h3 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--landing-text-dim);
+}
+
+.noe-modal__empty {
+  font-size: 13px;
+  color: var(--landing-text-dim);
+}
+
+.noe-modal__item {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  border-radius: 9px;
+  border: 1px solid var(--landing-card-border);
+  background: #16171d;
+  overflow: hidden;
+}
+
+.noe-modal__item.is-editing {
+  border-color: var(--landing-accent);
+}
+
+.noe-modal__item-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 11px;
+  border: none;
+  background: transparent;
+  color: var(--landing-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.noe-modal__item-op {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.noe-modal__item-meta {
+  font-size: 11px;
+  color: var(--landing-text-dim);
+}
+
+.noe-modal__item-del {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 11px;
+  border: none;
+  background: transparent;
+  color: var(--landing-text-dim);
+  cursor: pointer;
+}
+
+.noe-modal__item-del:hover {
+  color: #ff8f8f;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1024px) {
+  .landing {
+    overflow-y: auto;
+  }
+
+  .landing__topbar {
+    position: static;
+    transform: none;
+    width: auto;
+    max-width: none;
+    padding: 16px 12px 8px;
+  }
+
+  .landing__globe {
+    position: relative;
+    height: 46vh;
+    min-height: 320px;
+  }
+
+  .landing__left,
+  .landing__right {
+    position: static;
+    transform: none;
+    width: auto;
+    max-width: none;
+    margin: 12px;
+  }
+
+  .info-card {
+    max-height: none;
+  }
+
+  .noe-modal__content {
+    grid-template-columns: 1fr;
+  }
+}

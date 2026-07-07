@@ -36,6 +36,7 @@ import * as feedService from './services/feed.js';
 import * as dbuildPlacementsService from './services/dbuildPlacements.js';
 import * as convoysService from './services/convoys.js';
 import * as changelogsService from './services/changelogs.js';
+import * as noeEventsService from './services/noeEvents.js';
 import * as changelogTranslator from './services/changelogTranslator.js';
 import * as wikiService from './services/wiki.js';
 import * as achievementsService from './services/achievements.js';
@@ -93,6 +94,16 @@ const DISCORD_BOT_TOKEN = String(process.env.DISCORD_BOT_TOKEN || '').trim();
 const DISCORD_LOGISTICS_ROUTE_ROLE_ID = String(process.env.DISCORD_LOGISTICS_ROUTE_ROLE_ID || '1447684923518484500').trim();
 const DISCORD_ROLE_CACHE_TTL_MS = 10 * 60 * 1000;
 const CHANGELOG_AUTHOR_IDS = new Set([
+  '153370631772045313',
+  '371212324054237206',
+  '453594416863641600',
+  '675706661570347041',
+  '714087060343881778',
+  '812070579888848988',
+  '1026508512152518708',
+  '1385701793345962035',
+]);
+const NOE_AUTHOR_IDS = new Set([
   '153370631772045313',
   '371212324054237206',
   '453594416863641600',
@@ -2717,6 +2728,69 @@ app.get('/api/changelogs/media/:fileName', (req, res) => {
     return res.status(404).json({ error: 'Media not found' });
   }
   return res.sendFile(absolutePath);
+});
+
+// ==================== NOE EVENTS ====================
+
+function requireNoeAdmin(req, res) {
+  const userId = req.session?.user?.id;
+  if (!userId) {
+    res.status(401).json({ error: 'Not authenticated' });
+    return null;
+  }
+  if (!NOE_AUTHOR_IDS.has(String(userId))) {
+    res.status(403).json({ error: 'Only allowed admins can manage NOE events' });
+    return null;
+  }
+  return String(userId);
+}
+
+/**
+ * GET /api/noe/events - List NOE events (public). Optional ?campaignId= filter.
+ */
+app.get('/api/noe/events', (req, res) => {
+  const campaignId = req.query?.campaignId ? String(req.query.campaignId) : '';
+  const events = noeEventsService.getEvents(campaignId);
+  res.json({ events });
+});
+
+/**
+ * POST /api/noe/events - Create a NOE event (admin only)
+ */
+app.post('/api/noe/events', (req, res) => {
+  if (!requireNoeAdmin(req, res)) return undefined;
+  try {
+    const event = noeEventsService.createEvent(req.body || {});
+    return res.json({ event });
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'Failed to create event' });
+  }
+});
+
+/**
+ * PUT /api/noe/events/:id - Update a NOE event (admin only)
+ */
+app.put('/api/noe/events/:id', (req, res) => {
+  if (!requireNoeAdmin(req, res)) return undefined;
+  try {
+    const event = noeEventsService.updateEvent(req.params.id, req.body || {});
+    return res.json({ event });
+  } catch (error) {
+    const status = String(error?.message || '').toLowerCase().includes('not found') ? 404 : 400;
+    return res.status(status).json({ error: error.message || 'Failed to update event' });
+  }
+});
+
+/**
+ * DELETE /api/noe/events/:id - Delete a NOE event (admin only)
+ */
+app.delete('/api/noe/events/:id', (req, res) => {
+  if (!requireNoeAdmin(req, res)) return undefined;
+  const removed = noeEventsService.removeEvent(req.params.id);
+  if (!removed) {
+    return res.status(404).json({ error: 'Event not found' });
+  }
+  return res.json({ success: true });
 });
 
 /**
