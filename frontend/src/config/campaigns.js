@@ -3,7 +3,8 @@
  *
  * This file is intentionally simple to edit:
  * - Add / remove entries in the `CAMPAIGNS` array to change the globe pointers.
- * - `pointerAnchor` is the lat/lng on the globe where the campaign pointer line starts.
+ * - `pointerAnchor` is the lat/lng on the globe where the pointer line starts.
+ * - `pointerSide` fixes label direction: 'left' | 'right' | 'top' | 'bottom'
  * - `globeRegions` are ISO_A2 country codes (from the Natural Earth GeoJSON,
  *   see frontend/public/geo/ne_110m_admin_0_countries.geojson) used to
  *   highlight the theater on the globe. `highlightColor` is the hex color
@@ -27,6 +28,7 @@ export const CAMPAIGNS = [
     highlightColor: '#FF6B01',
     globeRegions: ['SY'],
     pointerAnchor: { lat: 35.0, lng: 38.5 },
+    pointerSide: 'right',
     openTarget: 'frontline',
     description: {
       en: [
@@ -68,6 +70,7 @@ export const CAMPAIGNS = [
     highlightColor: '#4ec5ff',
     globeRegions: ['DE'],
     pointerAnchor: { lat: 51.2, lng: 10.5 },
+    pointerSide: 'left',
     openTarget: null,
     description: {
       en: [
@@ -99,6 +102,7 @@ export const CAMPAIGNS = [
     highlightColor: '#8bd450',
     globeRegions: ['RS', 'BA', 'HR', 'ME', 'MK', 'AL', 'XK', 'SI'],
     pointerAnchor: { lat: 44.0, lng: 20.5 },
+    pointerSide: 'left',
     openTarget: null,
     description: {
       en: [
@@ -130,6 +134,7 @@ export const CAMPAIGNS = [
     highlightColor: '#FFD500',
     globeRegions: ['IR', 'IQ', 'KW', 'SA', 'AE', 'QA', 'BH', 'OM'],
     pointerAnchor: { lat: 26.5, lng: 51.0 },
+    pointerSide: 'right',
     openTarget: null,
     description: {
       en: [
@@ -161,6 +166,7 @@ export const CAMPAIGNS = [
     highlightColor: '#FFD500',
     globeRegions: ['AF'],
     pointerAnchor: { lat: 34.5, lng: 66.0 },
+    pointerSide: 'right',
     openTarget: 'lidc',
     description: {
       en: [

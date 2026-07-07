@@ -12,10 +12,16 @@
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 50% 45%, #15161c 0%, var(--landing-bg) 60%);
+  background: var(--landing-bg);
   color: var(--landing-text);
   font-family: inherit;
+}
+
+.landing__stars {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
 }
 
 /* ---------- Globe + campaign pointers ---------- */
@@ -69,51 +75,60 @@
 
 .campaign-pointers__label {
   position: absolute;
-  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 1px;
+  align-items: flex-start;
+  gap: 2px;
   min-width: 0;
-  max-width: 140px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: rgba(12, 13, 18, 0.78);
-  backdrop-filter: blur(8px);
+  padding: 0 0 2px;
+  border: none;
+  background: transparent;
   color: #fff;
   cursor: pointer;
   pointer-events: auto;
-  text-align: center;
   will-change: left, top, opacity;
-  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
 }
 
-.campaign-pointers__label:hover {
-  border-color: var(--pointer-accent, var(--landing-accent));
-  background: rgba(18, 19, 26, 0.92);
+.campaign-pointers__label--right {
+  transform: translate(0, -100%);
+  text-align: left;
 }
 
-.campaign-pointers__label.is-active {
-  border-color: var(--pointer-accent, var(--landing-accent));
-  background: rgba(255, 107, 1, 0.12);
-  box-shadow: 0 0 18px color-mix(in srgb, var(--pointer-accent, var(--landing-accent)) 35%, transparent);
+.campaign-pointers__label--left {
+  transform: translate(0, -100%);
+  text-align: left;
+}
+
+.campaign-pointers__label--top,
+.campaign-pointers__label--bottom {
+  transform: translate(0, -100%);
+  text-align: left;
+}
+
+.campaign-pointers__label:hover .campaign-pointers__label-name,
+.campaign-pointers__label.is-active .campaign-pointers__label-name {
+  color: #fff;
 }
 
 .campaign-pointers__label-type {
   font-size: 9px;
   font-weight: 800;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
+  line-height: 1;
   color: var(--pointer-accent, var(--landing-accent));
   text-transform: uppercase;
+  transition: color 0.18s ease;
 }
 
 .campaign-pointers__label-name {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.05em;
-  line-height: 1.2;
+  line-height: 1;
   text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.88);
+  white-space: nowrap;
+  transition: color 0.18s ease;
 }
 
 .landing-globe-wrap {
@@ -167,21 +182,29 @@
 }
 
 .noe-card__header {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  min-height: 36px;
 }
 
 .noe-card__title {
   margin: 0;
+  width: 100%;
+  text-align: center;
   color: var(--landing-accent);
-  font-size: 15px;
+  font-size: 22px;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .noe-card__manage {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -295,6 +318,12 @@
   overflow-y: auto;
   padding-right: 14px;
   min-height: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.info-card__scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .info-card__title {
@@ -588,13 +617,12 @@
     min-height: 360px;
   }
 
-  .campaign-pointers__label {
-    max-width: 110px;
-    padding: 5px 8px;
+  .campaign-pointers__label-type {
+    font-size: 8px;
   }
 
   .campaign-pointers__label-name {
-    font-size: 10px;
+    font-size: 9px;
   }
 
   .landing__left,

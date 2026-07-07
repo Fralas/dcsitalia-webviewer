@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { CAMPAIGNS } from '../../config/campaigns';
 
 const POINTER_ALTITUDE = 0.02;
-const OUTWARD_PX = 30;
-const ARM_PX = 72;
+const OUTWARD_PX = 22;
+const ARM_PX = 8;
 const SMOOTHING = 0.12;
 const MAX_STEP_PX = 22;
 const FADE_IN_STEP = 0.1;
@@ -25,7 +25,12 @@ function isFacingCamera(lat, lng, pov) {
   return point.x * cam.x + point.y * cam.y + point.z * cam.z > 0.08;
 }
 
-function computePointerGeometry(anchor, center) {
+function underlineWidthForCampaign(campaign) {
+  const text = campaign.theaterName || '';
+  return Math.min(120, Math.max(36, Math.round(text.length * 6.5)));
+}
+
+function computePointerGeometry(anchor, center, side = 'right', underlineWidth = 72) {
   const dx = anchor.x - center.x;
   const dy = anchor.y - center.y;
   const len = Math.hypot(dx, dy) || 1;
@@ -37,17 +42,35 @@ function computePointerGeometry(anchor, center) {
     y: anchor.y + uy * OUTWARD_PX,
   };
 
-  const horizontal = Math.abs(ux) >= Math.abs(uy);
+  let underlineStart;
+  let underlineEnd;
   let label;
-  if (horizontal) {
-    const dir = ux >= 0 ? 1 : -1;
-    label = { x: elbow.x + dir * ARM_PX, y: elbow.y };
-  } else {
-    const dir = uy >= 0 ? 1 : -1;
-    label = { x: elbow.x, y: elbow.y + dir * 40 };
+
+  switch (side) {
+    case 'left':
+      underlineEnd = { x: elbow.x - ARM_PX, y: elbow.y };
+      underlineStart = { x: underlineEnd.x - underlineWidth, y: elbow.y };
+      label = { ...underlineStart };
+      break;
+    case 'top':
+      underlineEnd = { x: elbow.x, y: elbow.y - ARM_PX };
+      underlineStart = { x: underlineEnd.x - underlineWidth / 2, y: underlineEnd.y };
+      label = { x: underlineStart.x, y: underlineEnd.y };
+      break;
+    case 'bottom':
+      underlineEnd = { x: elbow.x, y: elbow.y + ARM_PX };
+      underlineStart = { x: underlineEnd.x - underlineWidth / 2, y: underlineEnd.y };
+      label = { x: underlineStart.x, y: underlineEnd.y };
+      break;
+    case 'right':
+    default:
+      underlineStart = { x: elbow.x + ARM_PX, y: elbow.y };
+      underlineEnd = { x: underlineStart.x + underlineWidth, y: elbow.y };
+      label = { ...underlineStart };
+      break;
   }
 
-  return { anchor, elbow, label };
+  return { anchor, elbow, underlineStart, underlineEnd, label, side };
 }
 
 function buildPointerTargets(globe, container, campaigns) {
@@ -82,7 +105,8 @@ function buildPointerTargets(globe, container, campaigns) {
       const maxRadius = Math.min(width, height) * 0.46;
       if (distFromCenter > maxRadius) return null;
 
-      const geometry = computePointerGeometry(anchor, center);
+      const underlineWidth = underlineWidthForCampaign(campaign);
+      const geometry = computePointerGeometry(anchor, center, campaign.pointerSide || 'right', underlineWidth);
       return {
         campaign,
         ...geometry,
@@ -121,7 +145,10 @@ function smoothPointerFrame(previous, targets) {
       campaign: target.campaign,
       anchor: smoothPoint(prev?.anchor, target.anchor, SMOOTHING),
       elbow: smoothPoint(prev?.elbow, target.elbow, SMOOTHING),
+      underlineStart: smoothPoint(prev?.underlineStart, target.underlineStart, SMOOTHING),
+      underlineEnd: smoothPoint(prev?.underlineEnd, target.underlineEnd, SMOOTHING),
       label: smoothPoint(prev?.label, target.label, SMOOTHING),
+      side: target.side,
       opacity,
     };
     previous.set(id, smoothed);
@@ -181,7 +208,7 @@ export default function CampaignPointers({ globe, selectedCampaignId, onSelect }
   return (
     <div ref={overlayRef} className="campaign-pointers" role="tablist" aria-label="Campaigns">
       <svg className="campaign-pointers__svg">
-        {pointers.map(({ campaign, anchor, elbow, label, opacity }) => {
+        {pointers.map(({ campaign, anchor, elbow, underlineStart, underlineEnd, label, opacity }) => {
           const isActive = campaign.id === selectedCampaignId;
           const accent = campaign.highlightColor || '#FF6B01';
           return (
@@ -200,23 +227,24 @@ export default function CampaignPointers({ globe, selectedCampaignId, onSelect }
             />
             <path
               className={`campaign-pointers__line${isActive ? ' is-active' : ''}`}
-              d={`M ${anchor.x} ${anchor.y} L ${elbow.x} ${elbow.y} L ${label.x} ${label.y}`}
+              d={`M ${anchor.x} ${anchor.y} L ${elbow.x} ${elbow.y} L ${underlineStart.x} ${underlineStart.y} L ${underlineEnd.x} ${underlineEnd.y}`}
             />
           </g>
           );
         })}
       </svg>
 
-      {pointers.map(({ campaign, label, opacity }) => {
+      {pointers.map(({ campaign, label, side, opacity }) => {
         const isActive = campaign.id === selectedCampaignId;
         const accent = campaign.highlightColor || '#FF6B01';
+        const sideClass = side || campaign.pointerSide || 'right';
         return (
           <button
             key={campaign.id}
             type="button"
             role="tab"
             aria-selected={isActive}
-            className={`campaign-pointers__label${isActive ? ' is-active' : ''}`}
+            className={`campaign-pointers__label campaign-pointers__label--${sideClass}${isActive ? ' is-active' : ''}`}
             style={{
               left: `${label.x}px`,
               top: `${label.y}px`,
