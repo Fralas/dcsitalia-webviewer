@@ -18,7 +18,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  height: 52px;
+  height: 56px;
   padding: 0 20px;
 }
 
@@ -39,8 +39,8 @@
 }
 
 .app-header__logo {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   object-fit: contain;
 }
 
