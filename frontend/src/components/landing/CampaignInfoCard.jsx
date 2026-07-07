@@ -1,3 +1,5 @@
+import { getTacticalMapByCampaignId } from '../../config/tacticalMaps';
+
 const LABELS = {
   en: { openMap: 'OPEN MAP', comingSoon: 'COMING SOON' },
   it: { openMap: 'APRI MAPPA', comingSoon: 'PROSSIMAMENTE' },
@@ -8,7 +10,23 @@ export default function CampaignInfoCard({ campaign, language = 'en', onOpenCamp
 
   const L = LABELS[language] || LABELS.en;
   const sections = campaign.description?.[language] || campaign.description?.en || [];
-  const canOpen = Boolean(campaign.openTarget);
+  const tacticalMap = campaign.tacticalMapId
+    ? getTacticalMapByCampaignId(campaign.tacticalMapId)
+    : null;
+  const canOpenTactical = Boolean(tacticalMap?.enabled);
+  const canOpenLidc = campaign.openTarget === 'lidc';
+  const canOpen = canOpenTactical || canOpenLidc;
+
+  const handleOpen = () => {
+    if (!canOpen) return;
+    if (canOpenTactical) {
+      onOpenCampaign?.({ type: 'hidc', tacticalMapId: campaign.tacticalMapId });
+      return;
+    }
+    if (canOpenLidc) {
+      onOpenCampaign?.({ type: 'lidc' });
+    }
+  };
 
   return (
     <section className="info-card" aria-label={campaign.title}>
@@ -30,7 +48,7 @@ export default function CampaignInfoCard({ campaign, language = 'en', onOpenCamp
         type="button"
         className="info-card__cta"
         disabled={!canOpen}
-        onClick={() => canOpen && onOpenCampaign?.(campaign.openTarget)}
+        onClick={handleOpen}
       >
         {canOpen ? L.openMap : L.comingSoon}
       </button>

@@ -15,6 +15,7 @@ import t72ModelUrl from '../assets/3D/t90.glb';
 import kc135ModelUrl from '../assets/3D/kc-135_dcs_world.glb';
 import { Ambulance, Anchor, Blend, Box, Boxes, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChessRook, Clock3, Factory, Forklift, Fuel, Hammer, MapPin, PersonStanding, Satellite, TowerControl, X } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
+import { getDefaultTacticalMap, getTacticalMapByCampaignId } from '../config/tacticalMaps';
 import { buildZoneConnections, getNeighborZoneIds, normalizeZoneId } from '../config/zoneConfini';
 import { isAirportActiveOnMap } from '../utils/airportStatus';
 import airports from '../config/airports';
@@ -220,13 +221,21 @@ function toGlobeAngles(coordinates) {
   if (!coordinates) {
     return { phi: 0, theta: 0 };
   }
-  const lon = Number(coordinates.lon || 0);
+  const lon = Number(coordinates.lon ?? coordinates.lng ?? 0);
   const lat = Number(coordinates.lat || 0);
   return {
     // cobe uses phi as globe rotation around vertical axis; negative lon centers the area.
     phi: (-lon * Math.PI) / 180,
     theta: (lat * Math.PI) / 180,
   };
+}
+
+function normalizeMapCoordinates(coordinates) {
+  if (!coordinates) return null;
+  const lat = Number(coordinates.lat);
+  const lon = Number(coordinates.lon ?? coordinates.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  return { lat, lon };
 }
 
 function getControlText(status) {
@@ -1777,7 +1786,7 @@ function FlatMapView({
   tankerWp1,
   tankerRoutes,
 }) {
-  const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
+  const center = normalizeMapCoordinates(focusCoordinates) || { lat: 35.5, lon: 37.5 };
   const activeBasemap = BASEMAP_CONFIG[basemapMode] || BASEMAP_CONFIG[BASEMAP_MODE_DARK];
   const effectiveMaxZoom = mapMaxZoom || MAP_ZOOM_DEFAULT_MAX;
   const placementActive = spawnPlacementActive || retrievePlacementActive || tankerPlacementActive;
@@ -2320,7 +2329,7 @@ function MapLibreFlatMapView({
   const lastUserInputAtRef = useRef(0);
   const prevCameraRef = useRef(null);
   const lastStableCameraRef = useRef(null);
-  const center = focusCoordinates || { lat: 35.5, lon: 37.5 };
+  const center = normalizeMapCoordinates(focusCoordinates) || { lat: 35.5, lon: 37.5 };
   const mapDebugEnabled = typeof window !== 'undefined' && window.localStorage.getItem('map-debug') === '1';
 
   const logMapDebug = useCallback((event, payload = {}) => {
@@ -4402,7 +4411,14 @@ function MapLibreFlatMapView({
   );
 }
 
-export default function FrontlineMap({ airportsData, airportCatalog = [], airbaseStatus = {} }) {
+export default function FrontlineMap({ tacticalMapId, airportsData, airportCatalog = [], airbaseStatus = {} }) {
+  const tacticalMap = getTacticalMapByCampaignId(tacticalMapId) || getDefaultTacticalMap();
+  const startInTacticalMode = tacticalMap?.startInTacticalMode === true;
+  const theaterFocus = normalizeMapCoordinates(tacticalMap?.focusCoordinates);
+  const initialZones = Array.isArray(tacticalMap?.defaultZones) && tacticalMap.defaultZones.length > 0
+    ? tacticalMap.defaultZones
+    : frontlineZones;
+
   const { user } = useUser();
   const canManageLogisticsRouteVisibility = user?.canManageLogisticsRouteVisibility === true;
   const isMapLibreEngine = MAP_ENGINE === 'maplibre';
@@ -4433,7 +4449,7 @@ export default function FrontlineMap({ airportsData, airportCatalog = [], airbas
   const [updatingDcsarId, setUpdatingDcsarId] = useState(null);
   const [updatingMissionId, setUpdatingMissionId] = useState(null);
   const [animationTick, setAnimationTick] = useState(Date.now());
-  const [zones, setZones] = useState(frontlineZones);
+  const [zones, setZones] = useState(initialZones);
   const [combatMissions, setCombatMissions] = useState([]);
   const [logisticsMissions, setLogisticsMissions] = useState([]);
   const [convoys, setConvoys] = useState([]);
@@ -4443,7 +4459,7 @@ export default function FrontlineMap({ airportsData, airportCatalog = [], airbas
   const [overlayCollapsed, setOverlayCollapsed] = useState(false);
   const [feedCollapsed, setFeedCollapsed] = useState(false);
   const [zoneStatusMeta, setZoneStatusMeta] = useState({});
-  const [mapMode, setMapMode] = useState(false);
+  const [mapMode, setMapMode] = useState(startInTacticalMode);
   const [basemapMode, setBasemapMode] = useState(BASEMAP_MODE_DARK);
   const [forcedGlobeScale, setForcedGlobeScale] = useState(null);
   const [launchTargetUtcMs, setLaunchTargetUtcMs] = useState(LAUNCH_TARGET_UTC_MS);
@@ -4465,7 +4481,15 @@ export default function FrontlineMap({ airportsData, airportCatalog = [], airbas
     showDcsar: true,
     showProductionPoints: true,
   });
-  const mapModeRef = useRef(false);
+  const mapModeRef = useRef(startInTacticalMode);
+
+  useEffect(() => {
+    const map = getTacticalMapByCampaignId(tacticalMapId) || getDefaultTacticalMap();
+    const nextStartInTactical = map?.startInTacticalMode === true;
+    mapModeRef.current = nextStartInTactical;
+    setMapMode(nextStartInTactical);
+    setZones(Array.isArray(map?.defaultZones) && map.defaultZones.length > 0 ? map.defaultZones : frontlineZones);
+  }, [tacticalMapId]);
 
   // DCORE bridge state (Production Points + web-initiated spawns)
   const [productionPoints, setProductionPoints] = useState([]);
@@ -4962,12 +4986,12 @@ export default function FrontlineMap({ airportsData, airportCatalog = [], airbas
   }, [isCountdownEncrypted, countdownParts, countdownTick, scrambleTick]);
 
   useEffect(() => {
-    if (!isPreLaunchCountdownActive) return;
+    if (!isPreLaunchCountdownActive || startInTacticalMode) return;
     if (mapModeRef.current || mapMode) {
       mapModeRef.current = false;
       setMapMode(false);
     }
-  }, [isPreLaunchCountdownActive, mapMode]);
+  }, [isPreLaunchCountdownActive, mapMode, startInTacticalMode]);
 
   const validZones = useMemo(
     () => zones.filter((zone) => zone.coordinates && Number.isFinite(zone.coordinates.lat) && Number.isFinite(zone.coordinates.lon)),
@@ -5298,7 +5322,7 @@ export default function FrontlineMap({ airportsData, airportCatalog = [], airbas
     return { lat, lon };
   }, [selectedDcsarId, dcsarPoints]);
 
-  const focusCoordinates = selectedDcsarFocus || focusedZone?.coordinates || zoneTheaterCenter || fallbackCenter || null;
+  const focusCoordinates = selectedDcsarFocus || focusedZone?.coordinates || theaterFocus || zoneTheaterCenter || fallbackCenter || null;
   const spawnAirportCenter = useMemo(() => {
     if (!spawnMode) return null;
     const airport = airportsById.get(spawnMode.airportId);
@@ -5313,7 +5337,7 @@ export default function FrontlineMap({ airportsData, airportCatalog = [], airbas
 
   const mapMaxZoom = (spawnMode || retrieveMode || tankerMode || selectedAirportId) ? MAP_ZOOM_AIRPORT_MAX : MAP_ZOOM_DEFAULT_MAX;
 
-  const tacticalFocusCoordinates = spawnAirportCenter || retrievePpCenter || selectedDcsarFocus || focusedZone?.coordinates || null;
+  const tacticalFocusCoordinates = spawnAirportCenter || retrievePpCenter || selectedDcsarFocus || theaterFocus || focusedZone?.coordinates || null;
   const tacticalFocusTargetKey = spawnMode
     ? `spawn:${spawnMode.airportId}`
     : retrieveMode
@@ -6317,7 +6341,7 @@ export default function FrontlineMap({ airportsData, airportCatalog = [], airbas
                 isPreLaunchCountdownActive ? 'pointer-events-none select-none blur-[8px]' : ''
               }`}
             >
-              {isDesktopDevice && !mapMode && (
+              {isDesktopDevice && !mapMode && !startInTacticalMode && (
                 <div className={`${mapMode ? 'pointer-events-none absolute inset-0 opacity-0' : 'relative h-full w-full opacity-100'} transition-opacity duration-300`}>
                   <GlobeCanvas
                     points={globePoints}

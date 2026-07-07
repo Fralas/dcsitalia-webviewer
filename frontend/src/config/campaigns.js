@@ -7,10 +7,11 @@
  * - `pointerSide` fixes label direction: 'left' | 'right' | 'top' | 'bottom'
  * - `globeRegions` (legacy) — see `globeRegionSpecs.js` for the actual theater
  *   polygons (full countries + partial bbox zones) used by the globe.
- * - `openTarget` controls the "OPEN MAP" button:
- *     'frontline' -> tactical map (/map)
- *     'lidc'      -> LIDC section (/lidc)
- *     null        -> button disabled ("coming soon").
+ * - `tacticalMapId` links a HIDC campaign to its tactical map (see `tacticalMaps.js`).
+ *   When the map is `enabled`, "OPEN MAP" opens the flat tactical view directly.
+ * - `openTarget` for non-HIDC routes:
+ *     'lidc' -> LIDC section (/lidc)
+ *     null   -> button disabled ("coming soon").
  * - `description` supports two locales (en/it); each is a list of sections
  *   rendered in the right-hand info card. A section may have an optional
  *   `title` heading and a `body` paragraph.
@@ -28,7 +29,7 @@ export const CAMPAIGNS = [
     highlightColor: '#FF6B01',
     pointerAnchor: { lat: 35.0, lng: 38.5 },
     pointerSide: 'right',
-    openTarget: 'frontline',
+    tacticalMapId: 'hidc-modern-syria',
     description: {
       en: [
         {
@@ -69,7 +70,7 @@ export const CAMPAIGNS = [
     highlightColor: '#4ec5ff',
     pointerAnchor: { lat: 51.2, lng: 10.5 },
     pointerSide: 'left',
-    openTarget: null,
+    tacticalMapId: 'hidc-cw84-germany',
     description: {
       en: [
         {
@@ -100,7 +101,7 @@ export const CAMPAIGNS = [
     highlightColor: '#8bd450',
     pointerAnchor: { lat: 44.0, lng: 20.5 },
     pointerSide: 'left',
-    openTarget: null,
+    tacticalMapId: 'hidc-2000-balkans',
     description: {
       en: [
         {

@@ -15,6 +15,11 @@ import bannerImg from '../img/DCS_ITALIA_ICON.png';
 import gbFlagImg from '../img/flags/gb.svg';
 import itFlagImg from '../img/flags/it.svg';
 import { useUser } from './contexts/UserContext';
+import {
+  DEFAULT_TACTICAL_MAP_ID,
+  getTacticalMapByCampaignId,
+  resolveTacticalMapFromPath,
+} from './config/tacticalMaps';
 import { canAccessAtc, canAccessLidc } from './config/featureAccess';
 import './AppHeader.css';
 
@@ -39,54 +44,62 @@ function normalizePath(pathname = '/') {
 
 function viewFromLocation() {
   if (typeof window === 'undefined') {
-    return 'landing';
+    return { view: 'landing', tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
   }
 
   const currentPath = normalizePath(window.location.pathname);
 
-  if (currentPath === '/map') {
-    return 'frontline';
+  if (currentPath === '/map' || currentPath.startsWith('/map/')) {
+    const tacticalMap = resolveTacticalMapFromPath(currentPath);
+    return {
+      view: 'frontline',
+      tacticalMapId: tacticalMap?.campaignId || DEFAULT_TACTICAL_MAP_ID,
+    };
   }
   if (currentPath === '/changelogs') {
-    return 'changelogs';
+    return { view: 'changelogs', tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
   }
   if (currentPath === '/wiki') {
-    return 'wiki';
+    return { view: 'wiki', tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
   }
   if (currentPath === '/profile') {
-    return 'profile';
+    return { view: 'profile', tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
   }
   if (currentPath === '/lidc') {
-    return 'lidc';
+    return { view: 'lidc', tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
   }
   if (currentPath === '/atc') {
-    return 'atc';
+    return { view: 'atc', tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
   }
   if (currentPath === '/') {
-    return 'landing';
+    return { view: 'landing', tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
   }
 
   const params = new URLSearchParams(window.location.search);
   const viewFromQuery = params.get('view');
   if (viewFromQuery) {
-    return normalizeView(viewFromQuery);
+    return { view: normalizeView(viewFromQuery), tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
   }
 
   const hashView = window.location.hash.replace(/^#\/?/, '').replace(/\/+$/, '');
   if (hashView) {
-    return normalizeView(hashView);
+    return { view: normalizeView(hashView), tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
   }
 
-  return 'landing';
+  return { view: 'landing', tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
 }
 
-function syncUrlWithView(view, { replace = false } = {}) {
+function syncUrlWithView(view, { replace = false, tacticalMapId = null } = {}) {
   if (typeof window === 'undefined') {
     return;
   }
 
   const targetView = normalizeView(view);
-  const targetPath = VIEW_TO_PATH[targetView];
+  let targetPath = VIEW_TO_PATH[targetView];
+  if (targetView === 'frontline') {
+    const map = getTacticalMapByCampaignId(tacticalMapId || DEFAULT_TACTICAL_MAP_ID);
+    targetPath = map?.path || VIEW_TO_PATH.frontline;
+  }
   const url = new URL(window.location.href);
   url.pathname = targetPath;
   url.searchParams.delete('view');
@@ -126,7 +139,9 @@ function buildFrontlineSummary(zones = []) {
 }
 
 function App() {
-  const [currentView, setCurrentView] = useState(() => viewFromLocation());
+  const initialRoute = viewFromLocation();
+  const [currentView, setCurrentView] = useState(() => initialRoute.view);
+  const [activeTacticalMapId, setActiveTacticalMapId] = useState(() => initialRoute.tacticalMapId);
   const [appLanguage, setAppLanguage] = useState(() => getActiveLocale());
   const [airports, setAirports] = useState({});
   const [airportCatalog, setAirportCatalog] = useState([]);
@@ -144,10 +159,29 @@ function App() {
   const showLidc = canAccessLidc(user?.id);
   const showAtc = canAccessAtc(user?.id);
 
-  const goToView = (view) => {
+  const goToView = (view, options = {}) => {
     const normalized = normalizeView(view);
+    if (normalized === 'frontline') {
+      const nextMapId = options.tacticalMapId || activeTacticalMapId || DEFAULT_TACTICAL_MAP_ID;
+      setActiveTacticalMapId(nextMapId);
+      setCurrentView('frontline');
+      syncUrlWithView('frontline', { tacticalMapId: nextMapId, ...options });
+      return;
+    }
     setCurrentView(normalized);
-    syncUrlWithView(normalized);
+    syncUrlWithView(normalized, options);
+  };
+
+  const openCampaignTarget = (target) => {
+    if (target?.type === 'hidc' && target.tacticalMapId) {
+      const map = getTacticalMapByCampaignId(target.tacticalMapId);
+      if (!map?.enabled) return;
+      goToView('frontline', { tacticalMapId: target.tacticalMapId });
+      return;
+    }
+    if (target?.type === 'lidc') {
+      goToView('lidc');
+    }
   };
   const isItalian = appLanguage === 'it';
 
@@ -165,8 +199,8 @@ function App() {
 
   useEffect(() => {
     // Canonicalize URL (supports old ?view=changelogs links and unknown paths).
-    syncUrlWithView(currentView, { replace: true });
-  }, [currentView]);
+    syncUrlWithView(currentView, { replace: true, tacticalMapId: activeTacticalMapId });
+  }, [currentView, activeTacticalMapId]);
 
   useEffect(() => {
     if ((currentView === 'lidc' && !showLidc) || (currentView === 'atc' && !showAtc)) {
@@ -177,7 +211,9 @@ function App() {
 
   useEffect(() => {
     const handlePopState = () => {
-      setCurrentView(viewFromLocation());
+      const route = viewFromLocation();
+      setCurrentView(route.view);
+      setActiveTacticalMapId(route.tacticalMapId);
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -393,11 +429,12 @@ function App() {
         {currentView === 'landing' && (
           <LandingPage
             language={appLanguage}
-            onOpenCampaign={(view) => goToView(view)}
+            onOpenCampaign={openCampaignTarget}
           />
         )}
         {currentView === 'frontline' && (
           <FrontlineMap
+            tacticalMapId={activeTacticalMapId}
             airportsData={Object.values(airports)}
             airportCatalog={airportCatalog}
             airbaseStatus={airbaseStatus}
