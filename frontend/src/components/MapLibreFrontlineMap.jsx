@@ -143,11 +143,10 @@ export default function MapLibreFrontlineMap({ airportsData }) {
       maxPitch: MAX_PITCH,
       minZoom: 4,
       maxZoom: 14,
-      attributionControl: true,
+      attributionControl: false,
     });
 
     mapRef.current = map;
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
 
     map.on('load', () => {
       map.addSource('frontline-zones', {

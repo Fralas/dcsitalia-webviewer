@@ -32,7 +32,6 @@ const MAP_ENGINE = String(import.meta.env.VITE_MAP_ENGINE || 'leaflet').trim().t
 const LOGISTICS_ROUTE_TOGGLE_ROLE_ID = '1447684923518484500';
 const BASEMAP_MODE_DARK = 'dark';
 const BASEMAP_MODE_SATELLITE = 'satellite';
-const MAPLIBRE_NAV_CONTROL_POSITION = 'bottom-right';
 const MAPLIBRE_FOCUS_Y_OFFSET_PX = 132;
 const MAPLIBRE_DCSAR_ICON_PENDING_IMAGE_ID = 'dcsar-person-icon-pending';
 const MAPLIBRE_DCSAR_ICON_ACCEPTED_IMAGE_ID = 'dcsar-person-icon-accepted';
@@ -3250,9 +3249,9 @@ function MapLibreFlatMapView({
       bearing: initialCamera ? initialCamera.bearing : 0,
       minPitch: MIN_PITCH,
       maxPitch: MAX_PITCH,
+      attributionControl: false,
     });
     mapRef.current = map;
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), MAPLIBRE_NAV_CONTROL_POSITION);
     // Reduce zoom aggressiveness from fast wheel input to avoid unstable camera states.
     map.scrollZoom.setWheelZoomRate(1 / 1500);
     map.scrollZoom.setZoomRate(1 / 220);

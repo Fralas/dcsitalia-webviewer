@@ -105,3 +105,13 @@ code {
   border-left-color: rgba(12, 18, 30, 0.96) !important;
   border-right-color: rgba(12, 18, 30, 0.96) !important;
 }
+
+/* MapLibre: hide zoom/navigation icons and attribution badge */
+.maplibregl-ctrl-icon,
+.maplibregl-ctrl.maplibregl-ctrl-attrib,
+.maplibregl-ctrl-attrib.maplibregl-compact,
+.maplibregl-ctrl-attrib.maplibregl-compact-show {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
