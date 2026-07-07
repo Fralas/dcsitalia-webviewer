@@ -1,4 +1,4 @@
-import { ChevronDown, Factory, X } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 import './ProductionPointPanel.css';
 
 function pad2(value) {
@@ -47,11 +47,6 @@ function clampQuantity(quantity, maxStock) {
 function PanelHeader({ pp, productionPoints, onSelectPp, onClose }) {
   return (
     <div className="pp-panel__header">
-      <div className="pp-panel__header-chip" aria-hidden="true">
-        <Factory strokeWidth={1.8} className="pp-panel__chip-factory" />
-        <ChevronDown strokeWidth={3} className="pp-panel__chip-chevron" />
-      </div>
-
       <div className="pp-panel__title-select">
         <span className={`pp-panel__dot ${getDotClass(pp?.owner, pp?.built)}`} aria-hidden="true" />
         <select
@@ -79,38 +74,37 @@ function PanelHeader({ pp, productionPoints, onSelectPp, onClose }) {
 function PanelMeta({ pp, variant = 'main' }) {
   return (
     <div className="pp-panel__meta">
-      <div>
-        <p className="pp-panel__meta-line">
-          Owner:{' '}
-          <span className={getOwnerClass(pp?.owner)}>{pp?.owner || '-'}</span>
-        </p>
-        <p className="pp-panel__meta-line">
-          Level:{' '}
-          <span>LIV {pad2(pp?.level)} / {pad2(pp?.max_level)}</span>
-        </p>
-      </div>
-      <div>
-        <p className="pp-panel__meta-line">
-          Status:{' '}
-          <span>{getStatusLabel(pp, variant)}</span>
-        </p>
-        <p className="pp-panel__meta-line">
-          Stock:{' '}
-          <span>{pad2(pp?.stock)} / {pad2(pp?.max_stock)}</span>
-        </p>
-      </div>
+      <p className="pp-panel__meta-line">
+        Owner:{' '}
+        <span className={getOwnerClass(pp?.owner)}>{pp?.owner || '-'}</span>
+      </p>
+      <p className="pp-panel__meta-line">
+        Level:{' '}
+        <span>LIV {pad2(pp?.level)} / {pad2(pp?.max_level)}</span>
+      </p>
+      <p className="pp-panel__meta-line">
+        Status:{' '}
+        <span>{getStatusLabel(pp, variant)}</span>
+      </p>
+      <p className="pp-panel__meta-line">
+        Stock:{' '}
+        <span>{pad2(pp?.stock)} / {pad2(pp?.max_stock)}</span>
+      </p>
     </div>
   );
 }
 
-function RequestedCrateSection({ pp }) {
+function RequestedCrateSection({ pp, standalone = false }) {
   const categories = Object.entries(pp?.required_categories || {});
   if (categories.length === 0) return null;
 
   return (
-    <>
-      <div className="pp-panel__divider" />
-      <p className="pp-panel__section-title">REQUESTED CRATE</p>
+    <div className={`pp-panel__requested-body${standalone ? ' pp-panel__requested-body--standalone' : ''}`}>
+      {!standalone && <div className="pp-panel__divider" />}
+      <div className="pp-panel__requested-head">
+        <p className="pp-panel__section-title">REQUESTED CRATE</p>
+        <span className="pp-panel__requested-status">{getStatusLabel(pp, 'requested')}</span>
+      </div>
       <div className="pp-panel__crate-grid">
         {categories.map(([category, need]) => {
           const have = Number(pp?.build_counts?.[category] || 0);
@@ -126,7 +120,7 @@ function RequestedCrateSection({ pp }) {
           );
         })}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -277,10 +271,7 @@ export default function ProductionPointPanel({
 
       {showBottomRequestedPanel && (
         <section className="pp-panel pp-panel--requested" aria-label="Production point requested crate">
-          <PanelHeader pp={pp} productionPoints={productionPoints} onSelectPp={onSelectPp} onClose={onClose} />
-          <div className="pp-panel__divider" />
-          <PanelMeta pp={pp} variant="requested" />
-          <RequestedCrateSection pp={pp} />
+          <RequestedCrateSection pp={pp} standalone />
         </section>
       )}
     </div>
