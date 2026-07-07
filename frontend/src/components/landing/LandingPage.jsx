@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import HexGlobe from './HexGlobe';
-import CampaignSwitcher from './CampaignSwitcher';
 import NoeEventsCard from './NoeEventsCard';
 import CampaignInfoCard from './CampaignInfoCard';
 import NoeEventAdminModal from './NoeEventAdminModal';
@@ -50,15 +49,11 @@ export default function LandingPage({ language = 'en', onOpenCampaign }) {
 
   return (
     <div className="landing">
-      <div className="landing__topbar">
-        <CampaignSwitcher
-          selectedCampaignId={selectedCampaignId}
-          onSelect={setSelectedCampaignId}
-        />
-      </div>
-
       <div className="landing__globe">
-        <HexGlobe selectedCampaignId={selectedCampaignId} />
+        <HexGlobe
+          selectedCampaignId={selectedCampaignId}
+          onSelectCampaign={setSelectedCampaignId}
+        />
       </div>
 
       <div className="landing__left">

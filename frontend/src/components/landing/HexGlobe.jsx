@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Globe from 'globe.gl';
 import * as THREE from 'three';
 import { CAMPAIGNS } from '../../config/campaigns';
+import CampaignPointers from './CampaignPointers';
 
 const GEOJSON_URL = '/geo/ne_110m_admin_0_countries.geojson';
 const BASE_HEX_COLOR = 'rgba(150, 165, 185, 0.35)';
@@ -62,13 +63,14 @@ function featureCentroid(feature) {
   return { lat: sumLat / count, lng: sumLng / count };
 }
 
-export default function HexGlobe({ selectedCampaignId }) {
+export default function HexGlobe({ selectedCampaignId, onSelectCampaign }) {
   const containerRef = useRef(null);
   const globeRef = useRef(null);
   const featuresRef = useRef([]);
   const ownerByFeatureRef = useRef(new WeakMap());
   const centroidByCampaignRef = useRef(new Map());
   const selectedRef = useRef(selectedCampaignId);
+  const [pointersReady, setPointersReady] = useState(false);
 
   selectedRef.current = selectedCampaignId;
 
@@ -89,9 +91,10 @@ export default function HexGlobe({ selectedCampaignId }) {
   };
 
   useEffect(() => {
-    if (!containerRef.current) return undefined;
+    const container = containerRef.current;
+    if (!container) return undefined;
 
-    const world = Globe()(containerRef.current)
+    const world = Globe()(container)
       .backgroundColor('rgba(0,0,0,0)')
       .showAtmosphere(true)
       .atmosphereColor('#2a3346')
@@ -119,6 +122,10 @@ export default function HexGlobe({ selectedCampaignId }) {
     globeRef.current = world;
 
     let cancelled = false;
+    const readyFrame = requestAnimationFrame(() => {
+      if (!cancelled) setPointersReady(true);
+    });
+
     fetch(GEOJSON_URL)
       .then((res) => res.json())
       .then((geo) => {
@@ -160,14 +167,13 @@ export default function HexGlobe({ selectedCampaignId }) {
 
     return () => {
       cancelled = true;
+      cancelAnimationFrame(readyFrame);
+      setPointersReady(false);
       resizeObserver.disconnect();
       try {
         world._destructor?.();
       } catch (_) {
         // ignore teardown errors
-      }
-      if (containerRef.current) {
-        containerRef.current.innerHTML = '';
       }
       globeRef.current = null;
     };
@@ -182,5 +188,16 @@ export default function HexGlobe({ selectedCampaignId }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCampaignId]);
 
-  return <div ref={containerRef} className="landing-globe__canvas" />;
+  return (
+    <div className="landing-globe-wrap">
+      <div ref={containerRef} className="landing-globe__canvas" />
+      {pointersReady && globeRef.current && (
+        <CampaignPointers
+          globe={globeRef.current}
+          selectedCampaignId={selectedCampaignId}
+          onSelect={onSelectCampaign}
+        />
+      )}
+    </div>
+  );
 }
