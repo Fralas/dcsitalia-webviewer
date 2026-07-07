@@ -6300,10 +6300,7 @@ export default function FrontlineMap({ tacticalMapId, airportsData, airportCatal
     : 1;
 
   return (
-    <div className="h-full overflow-hidden bg-yt-bg-primary p-3">
-      <div className="h-full">
-        <div className="min-h-0 h-full">
-          <section className="relative flex h-full min-h-[320px] min-w-0 flex-col overflow-hidden rounded-2xl border border-yt-border bg-yt-bg-secondary/75 backdrop-blur">
+    <section className="relative flex h-full min-h-0 w-full flex-col overflow-hidden">
             <div
               ref={mapSectionRef}
               className={`relative min-h-0 flex-1 transition-[filter] duration-300 ${
@@ -7623,9 +7620,6 @@ export default function FrontlineMap({ tacticalMapId, airportsData, airportCatal
                 </div>
               </div>
             )}
-          </section>
-        </div>
-      </div>
-    </div>
+    </section>
   );
 }
