@@ -64,16 +64,30 @@ export const MAP_CONTEXT_MENU_ROOT = {
       icon: 'tank',
       children: [
         {
-          id: 'ground',
-          label: 'GROUND',
+          id: 'ground-armor',
+          label: 'ARMOR',
           icon: 'tank',
           children: [
             { id: 'mbt', label: 'MBT', cost: 90, icon: 'tank', action: { type: 'ground-asset', keyword: 'MBT' } },
             { id: 'lav25', label: 'LAV25', cost: 90, icon: 'tank', action: { type: 'ground-asset', keyword: 'LAV25' } },
+            { id: 'scorpion', label: 'SCORPION', cost: 50, icon: 'tank', action: { type: 'ground-asset', keyword: 'SCORPION' } },
+          ],
+        },
+        {
+          id: 'ground-wheeled',
+          label: 'WHEELED',
+          icon: 'truck',
+          children: [
             { id: 'tow', label: 'TOW', cost: 50, icon: 'crosshair', action: { type: 'ground-asset', keyword: 'TOW' } },
             { id: 'hmmwv', label: 'HMMWV', cost: 50, icon: 'truck', action: { type: 'ground-asset', keyword: 'HMMWV' } },
-            { id: 'scorpion', label: 'SCORPION', cost: 50, icon: 'tank', action: { type: 'ground-asset', keyword: 'SCORPION' } },
             { id: 'scimitar', label: 'SCIMITAR', cost: 50, icon: 'tank', action: { type: 'ground-asset', keyword: 'SCIMITAR' } },
+          ],
+        },
+        {
+          id: 'ground-artillery',
+          label: 'ARTILLERY',
+          icon: 'rocket',
+          children: [
             { id: 'firtina', label: 'FIRTINA', cost: 50, icon: 'tank', action: { type: 'ground-asset', keyword: 'FIRTINA' } },
             { id: 'atacms', label: 'ATACMS', cost: 50, icon: 'rocket', action: { type: 'ground-asset', keyword: 'ATACMS' } },
             { id: 'gmlrs', label: 'GMRLS', cost: 50, icon: 'rocket', action: { type: 'ground-asset', keyword: 'GMRLS' } },

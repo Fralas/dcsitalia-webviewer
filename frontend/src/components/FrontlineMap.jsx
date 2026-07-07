@@ -6369,6 +6369,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
 
               <MapActionContextMenu
                 menu={mapContextMenu}
+                onClose={() => setMapContextMenu(null)}
                 onSelectDbuild={handleCreateDbuildDraft}
                 onSelectTanker={handleStartTankerMode}
                 onSelectMapAction={handleSelectMapAction}

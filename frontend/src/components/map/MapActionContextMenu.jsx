@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 import {
   MAP_CONTEXT_MENU_ROOT,
-  formatContextMenuTooltip,
   resolveContextMenuNode,
 } from '../../config/mapContextMenuConfig';
 import { FlowerMenu } from '../ui/flower-menu';
@@ -49,6 +48,7 @@ function resolveIcon(entry) {
 
 export default function MapActionContextMenu({
   menu,
+  onClose,
   onSelectDbuild,
   onSelectTanker,
   onSelectMapAction,
@@ -97,7 +97,6 @@ export default function MapActionContextMenu({
     id: entry.id,
     icon: resolveIcon(entry),
     label: entry.label,
-    title: formatContextMenuTooltip(entry),
     onClick: () => handleItemClick(entry),
   })), [currentItems, handleItemClick]);
 
@@ -119,8 +118,11 @@ export default function MapActionContextMenu({
         defaultOpen
         centerIcon={centerIcon}
         centerOnClick={atRoot ? null : handleBack}
+        onClose={atRoot ? onClose : null}
+        closeDelay={200}
         togglerSize={36}
-        petalOffset={22}
+        petalOffset={28}
+        labelMaxLength={11}
         animationDuration={380}
         iconColor="#f8fafc"
         backgroundColor="rgba(21, 25, 37, 0.88)"
