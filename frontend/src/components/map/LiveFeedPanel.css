@@ -1,16 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@600;700&display=swap');
 
 .live-feed-dock {
-  position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 1000;
-  height: 100%;
-  max-height: 100%;
-  pointer-events: none;
-}
-
-.live-feed-panel {
   --lf-scale: 0.35;
   --lf-text-extra: 3px;
   --lf-item-scale: 0.78;
@@ -18,13 +8,28 @@
   --lf-item-min-h: calc(72px * var(--lf-item-scale));
   --lf-item-gap: calc(6px * var(--lf-item-scale));
   --lf-expanded-width: calc(1128.26px * var(--lf-scale));
-  --lf-collapsed-width: calc(72px * var(--lf-scale));
-  --lf-anim: 360ms cubic-bezier(0.22, 1, 0.36, 1);
+  --lf-toggle-width: calc(61.25px * var(--lf-scale) + 2px);
+  --lf-toggle-height: calc(54px * var(--lf-scale) + 2px);
+  --lf-anim: 420ms cubic-bezier(0.22, 1, 0.36, 1);
   --lf-pad-x: calc(23px * var(--lf-scale));
+  --lf-toggle-offset-top: calc(11px * var(--lf-scale));
+  --lf-toggle-offset-right: calc(14px * var(--lf-scale));
 
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1000;
+  height: 100%;
+  max-height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.live-feed-panel {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   width: var(--lf-expanded-width);
   height: 100%;
   max-width: min(var(--lf-expanded-width), 100%);
@@ -40,29 +45,60 @@
   pointer-events: auto;
   transition:
     width var(--lf-anim),
-    max-height var(--lf-anim),
-    border-color var(--lf-anim);
+    border-color var(--lf-anim),
+    background-color var(--lf-anim);
+}
+
+.live-feed-panel__inner {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: var(--lf-expanded-width);
+  height: 100%;
+  min-height: 0;
 }
 
 .live-feed-panel--collapsed {
-  width: var(--lf-collapsed-width);
-  height: auto;
-  max-height: calc(76px * var(--lf-scale) + 2px);
+  width: 0;
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+  background: transparent;
+  pointer-events: none;
 }
 
 .live-feed-panel__header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: calc(12px * var(--lf-scale));
-  padding: calc(11px * var(--lf-scale)) var(--lf-pad-x) calc(10px * var(--lf-scale));
-  padding-right: calc(14px * var(--lf-scale));
+  padding: var(--lf-toggle-offset-top) var(--lf-pad-x) calc(10px * var(--lf-scale));
+  padding-right: calc(var(--lf-toggle-width) + var(--lf-toggle-offset-right) + 8px);
   flex: 0 0 auto;
 }
 
-.live-feed-panel--collapsed .live-feed-panel__header {
+.live-feed-panel__toggle {
+  box-sizing: border-box;
+  position: absolute;
+  top: var(--lf-toggle-offset-top);
+  right: var(--lf-toggle-offset-right);
+  z-index: 1002;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
-  padding: calc(11px * var(--lf-scale)) calc(8px * var(--lf-scale));
+  width: var(--lf-toggle-width);
+  height: var(--lf-toggle-height);
+  background: #0e0e0e;
+  border: 1px solid #515151;
+  border-radius: calc(15px * var(--lf-scale));
+  color: #ffffff;
+  cursor: pointer;
+  flex-shrink: 0;
+  pointer-events: auto;
+  transition: border-color 0.15s ease;
+}
+
+.live-feed-panel__toggle:hover {
+  border-color: #575757;
 }
 
 .live-feed-panel__title {
@@ -78,35 +114,13 @@
   max-width: 24rem;
   opacity: 1;
   transition:
-    opacity 220ms ease,
-    max-width var(--lf-anim),
-    margin var(--lf-anim);
+    opacity 160ms ease,
+    max-width var(--lf-anim);
 }
 
 .live-feed-panel--collapsed .live-feed-panel__title {
   max-width: 0;
-  margin: 0;
   opacity: 0;
-}
-
-.live-feed-panel__toggle {
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: calc(61.25px * var(--lf-scale) + 2px);
-  height: calc(54px * var(--lf-scale) + 2px);
-  background: #0e0e0e;
-  border: 1px solid #515151;
-  border-radius: calc(15px * var(--lf-scale));
-  color: #ffffff;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: border-color 0.15s ease, transform var(--lf-anim);
-}
-
-.live-feed-panel__toggle:hover {
-  border-color: #575757;
 }
 
 .live-feed-panel__toggle-icon {
@@ -127,16 +141,12 @@
   min-height: 0;
   overflow: hidden;
   opacity: 1;
-  transition:
-    opacity 260ms ease,
-    flex-grow var(--lf-anim),
-    max-height var(--lf-anim);
+  transition: opacity 180ms ease 120ms;
 }
 
 .live-feed-panel--collapsed .live-feed-panel__body {
-  flex: 0 0 0;
   opacity: 0;
-  max-height: 0;
+  transition: opacity 120ms ease;
   pointer-events: none;
 }
 
@@ -255,7 +265,7 @@
 }
 
 @media (max-width: 720px) {
-  .live-feed-panel {
+  .live-feed-dock {
     --lf-scale: 0.62;
     --lf-expanded-width: min(calc(1128.26px * var(--lf-scale)), calc(100vw - 1.5rem));
   }

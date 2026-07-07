@@ -73,30 +73,32 @@ export default function LiveFeedPanel({
 
   return (
     <div className="live-feed-dock">
+      <button
+        type="button"
+        className="live-feed-panel__toggle"
+        onClick={onToggleCollapsed}
+        aria-label={collapsed ? t('map.rightPanel.openSidebar') : t('map.rightPanel.closeSidebar')}
+        title={collapsed ? t('map.rightPanel.openSidebar') : t('map.rightPanel.closeSidebar')}
+      >
+        <ChevronRight
+          className={`live-feed-panel__toggle-icon${collapsed ? ' live-feed-panel__toggle-icon--collapsed' : ''}`}
+          strokeWidth={3}
+        />
+      </button>
+
       <aside
         className={`live-feed-panel${collapsed ? ' live-feed-panel--collapsed' : ''}`}
         aria-label={t('map.rightPanel.ariaLabel')}
         aria-expanded={!collapsed}
       >
-        <div className="live-feed-panel__header">
-          <h2 className="live-feed-panel__title">{t('map.rightPanel.liveFeed')}</h2>
-          <button
-            type="button"
-            className="live-feed-panel__toggle"
-            onClick={onToggleCollapsed}
-            aria-label={collapsed ? t('map.rightPanel.openSidebar') : t('map.rightPanel.closeSidebar')}
-            title={collapsed ? t('map.rightPanel.openSidebar') : t('map.rightPanel.closeSidebar')}
-          >
-            <ChevronRight
-              className={`live-feed-panel__toggle-icon${collapsed ? ' live-feed-panel__toggle-icon--collapsed' : ''}`}
-              strokeWidth={3}
-            />
-          </button>
-        </div>
+        <div className="live-feed-panel__inner">
+          <div className="live-feed-panel__header">
+            <h2 className="live-feed-panel__title">{t('map.rightPanel.liveFeed')}</h2>
+          </div>
 
-        <div className="live-feed-panel__body" aria-hidden={collapsed}>
-          <div className="live-feed-panel__feed">
-            <div className="live-feed-panel__list">
+          <div className="live-feed-panel__body" aria-hidden={collapsed}>
+            <div className="live-feed-panel__feed">
+              <div className="live-feed-panel__list">
               {events.length === 0 ? (
                 <div className="live-feed-item live-feed-item--empty">
                   <p className="live-feed-item__title">{t('map.rightPanel.emptyEventsTitle')}</p>
@@ -140,6 +142,7 @@ export default function LiveFeedPanel({
             onSelectLogisticsMission={onSelectLogisticsMission}
             onSelectProductionPoint={onSelectProductionPoint}
           />
+        </div>
         </div>
       </aside>
     </div>
