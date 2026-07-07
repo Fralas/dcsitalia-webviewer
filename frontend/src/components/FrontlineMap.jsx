@@ -28,6 +28,7 @@ import LiveFeedPanel from './map/LiveFeedPanel';
 import MapFilterBar from './map/MapFilterBar';
 import MapActionContextMenu from './map/MapActionContextMenu';
 import ProductionPointPanel from './map/ProductionPointPanel';
+import ProductionPointRetrieveBanner from './map/ProductionPointRetrieveBanner';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
@@ -1365,33 +1366,6 @@ function PanelCloseButton({ onClick, className = '' }) {
     >
       <X className="h-4 w-4" strokeWidth={2.5} />
     </button>
-  );
-}
-
-function RetrieveQuantitySlider({ value, max, onChange, disabled = false, tone = 'panel' }) {
-  const safeMax = Math.max(1, Math.floor(Number(max)) || 1);
-  const safeValue = clampRetrieveQuantity(value, safeMax);
-  const accentClass = tone === 'banner' ? 'accent-blue-300' : 'accent-blue-400';
-  const labelClass = tone === 'banner' ? 'text-blue-100/80' : 'text-yt-text-secondary';
-  const valueClass = tone === 'banner' ? 'text-blue-100' : 'text-yt-text-primary';
-
-  return (
-    <div>
-      <div className={`flex items-center justify-between text-[11px] ${labelClass}`}>
-        <span>Quantity</span>
-        <span className={`font-semibold ${valueClass}`}>{safeValue} / {safeMax}</span>
-      </div>
-      <input
-        type="range"
-        min={1}
-        max={safeMax}
-        step={1}
-        value={safeValue}
-        onChange={(event) => onChange(Number(event.target.value))}
-        disabled={disabled}
-        className={`mt-1.5 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-yt-border/80 ${accentClass} disabled:cursor-not-allowed disabled:opacity-50`}
-      />
-    </div>
   );
 }
 
@@ -6351,28 +6325,15 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
               )}
 
               {retrieveMode && (
-                <div className="absolute left-1/2 top-4 z-[1100] -translate-x-1/2 rounded-lg border border-blue-400/60 bg-[#0f1528f2] px-4 py-2 text-center shadow-2xl backdrop-blur">
-                  <div className="text-sm font-semibold text-blue-200">
-                    Place {retrieveMode.quantity || 1}x production crate{retrieveMode.quantity > 1 ? 's' : ''} within {PP_RETRIEVE_RADIUS_M} m of the production point
-                  </div>
-                  <div className="mt-2 w-56">
-                    <RetrieveQuantitySlider
-                      tone="banner"
-                      value={retrieveMode.quantity || 1}
-                      max={retrieveBannerMaxQuantity}
-                      onChange={handleSetRetrieveQuantity}
-                    />
-                  </div>
-                  <div className="mt-1 text-[11px] text-blue-100/80">
-                    {submittingCommand ? 'Sending...' : 'Click the highlighted area on the map'}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleCancelRetrieveMode}
-                    className="mt-1 rounded border border-blue-400/60 px-2 py-0.5 text-[11px] font-semibold text-blue-200 hover:bg-blue-400/15"
-                  >
-                    Cancel
-                  </button>
+                <div className="absolute left-1/2 top-4 z-[1100] -translate-x-1/2">
+                  <ProductionPointRetrieveBanner
+                    quantity={retrieveMode.quantity || 1}
+                    maxQuantity={retrieveBannerMaxQuantity}
+                    radiusM={PP_RETRIEVE_RADIUS_M}
+                    submitting={submittingCommand}
+                    onQuantityChange={handleSetRetrieveQuantity}
+                    onCancel={handleCancelRetrieveMode}
+                  />
                 </div>
               )}
 
