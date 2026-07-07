@@ -24,6 +24,7 @@ import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
 import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, declineFrontlineZone, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getLogisticsRouteVisibility, getMissions, getServerTime, getTankerOptions, getTankerRoutes, setAirportLogisticsRoutePriority, getProductionPoints, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate, spawnTanker } from '../services/api';
 import ZoneMissionCard from './map/ZoneMissionCard';
+import LiveFeedPanel from './map/LiveFeedPanel';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
@@ -246,31 +247,6 @@ function getControlText(status) {
   return 'no control';
 }
 
-function getFeedTypeStyle(type) {
-  if (type === 'zone.status_changed') return 'border-red-500/40 bg-red-500/10 text-red-200';
-  if (type?.startsWith('logistics.')) return 'border-sky-500/40 bg-sky-500/10 text-sky-200';
-  if (type?.startsWith('ato.')) return 'border-orange-500/40 bg-orange-500/10 text-orange-200';
-  if (type?.startsWith('convoy.')) return 'border-yellow-500/40 bg-yellow-500/10 text-yellow-200';
-  if (type?.startsWith('dcsar.')) return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
-  if (type?.startsWith('user.')) return 'border-green-500/40 bg-green-500/10 text-green-200';
-  if (type?.startsWith('dcore.pp_upgrade') || type?.startsWith('dcore.pp_retrieve')) return 'border-blue-500/40 bg-blue-500/10 text-blue-200';
-  if (type?.startsWith('dcore.spawn')) return 'border-amber-500/40 bg-amber-500/10 text-amber-200';
-  if (type?.startsWith('dcore.dbuild')) return 'border-violet-500/40 bg-violet-500/10 text-violet-200';
-  return 'border-slate-500/40 bg-slate-500/10 text-slate-200';
-}
-
-function getFeedTypeLabel(type) {
-  if (type === 'zone.status_changed') return 'Zone';
-  if (type?.startsWith('logistics.')) return 'Logistics';
-  if (type?.startsWith('ato.')) return 'ATO';
-  if (type?.startsWith('convoy.')) return 'Convoy';
-  if (type?.startsWith('dcsar.')) return 'CSAR';
-  if (type?.startsWith('user.')) return 'User';
-  if (type?.startsWith('dcore.pp_upgrade') || type?.startsWith('dcore.pp_retrieve')) return 'Production';
-  if (type?.startsWith('dcore.spawn')) return 'Spawn';
-  if (type?.startsWith('dcore.dbuild')) return 'Build';
-  return 'System';
-}
 
 function getConvoyStyle(status) {
   if (status === 'arrived') {
@@ -6543,60 +6519,12 @@ export default function FrontlineMap({ tacticalMapId, airportsData, airportCatal
                 </div>
               </div>
 
-              <div
-                className={`absolute right-3 top-3 z-[1000] rounded-xl border border-yt-border bg-[#151925f2] shadow-2xl backdrop-blur transition-all duration-200 ${
-                  feedCollapsed ? 'w-[46px] p-1.5' : 'w-[360px] p-3'
-                }`}
-              >
-                <div className={`flex items-center ${feedCollapsed ? 'justify-center' : 'mb-2 justify-between'}`}>
-                  {!feedCollapsed && (
-                    <>
-                      <div className="text-[11px] uppercase tracking-[0.18em] text-yt-text-secondary">Feed</div>
-                      <div className="flex items-center gap-2">
-                        <div className="rounded bg-yt-bg-tertiary px-2 py-0.5 text-[10px] font-semibold text-yt-text-secondary">
-                          {feedEvents.length}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setFeedCollapsed((value) => !value)}
-                    className="rounded border border-yt-border bg-yt-bg-tertiary/60 p-1 text-yt-text-secondary transition-colors hover:text-yt-text-primary"
-                    aria-label={feedCollapsed ? 'Open feed' : 'Close feed'}
-                    title={feedCollapsed ? 'Open feed' : 'Close feed'}
-                  >
-                    {feedCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                  </button>
-                </div>
-
-                {!feedCollapsed && (
-                  <div className="max-h-[48vh] space-y-2 overflow-y-auto pr-1">
-                    {feedEvents.length === 0 && (
-                      <div className="rounded border border-dashed border-yt-border px-3 py-3 text-xs text-yt-text-secondary">
-                        No events yet.
-                      </div>
-                    )}
-                    {feedEvents.map((event) => (
-                      <div key={event.id || `${event.type}-${event.timestamp}`} className="rounded-lg border border-yt-border bg-yt-bg-tertiary/40 p-2">
-                        <div className="mb-1 flex items-start justify-between gap-2">
-                          <span className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase ${getFeedTypeStyle(event.type)}`}>
-                            {getFeedTypeLabel(event.type)}
-                          </span>
-                          <span className="text-[10px] text-yt-text-secondary">{formatRelativeTime(event.timestamp)}</span>
-                        </div>
-                        <div className="text-xs font-semibold text-yt-text-primary">
-                          {event.title || 'Activity update'}
-                        </div>
-                        {event.message && (
-                          <div className="mt-0.5 text-[11px] text-yt-text-secondary">
-                            {event.message}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <div className="absolute right-3 top-3 z-[1000]">
+                <LiveFeedPanel
+                  events={feedEvents}
+                  collapsed={feedCollapsed}
+                  onToggleCollapsed={() => setFeedCollapsed((value) => !value)}
+                />
               </div>
 
               {filters.showAto && selectedZone && (
