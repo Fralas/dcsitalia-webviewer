@@ -516,6 +516,54 @@ export default {
     missionStatus: {
       pending: 'Pending',
       accepted: 'Accepted'
+    },
+    rightPanel: {
+      ariaLabel: 'Map sidebar',
+      liveFeed: 'Live Feed',
+      openSidebar: 'Open sidebar',
+      closeSidebar: 'Close sidebar',
+      emptyEventsTitle: 'No events yet',
+      emptyEventsMessage: 'Activity will appear here as it happens.',
+      activityUpdate: 'Activity update',
+      timeAgo: {
+        justNow: 'just now',
+        seconds: '{{count}}s ago',
+        minutes: '{{count}}m ago',
+        hours: '{{count}}h ago',
+        days: '{{count}}d ago'
+      },
+      feedTypes: {
+        zone: 'Zone',
+        logistics: 'Logistics',
+        ato: 'ATO',
+        convoy: 'Convoy',
+        dcsar: 'CSAR',
+        user: 'User',
+        production: 'Production',
+        spawn: 'Spawn',
+        build: 'Build',
+        system: 'System'
+      },
+      ops: {
+        ariaLabel: 'Operations panel',
+        tabs: {
+          mission: 'Mission',
+          logistic: 'Logistic',
+          production: 'Production Point'
+        },
+        fixedWing: 'Fixed wing',
+        rotaryWing: 'Rotary wing',
+        airport: 'Airport',
+        departure: 'Departure',
+        arrival: 'Arrival',
+        radius: 'Radius in nautical miles',
+        reset: 'Reset filters',
+        noResults: 'No results in range',
+        zone: 'Zone {{number}}',
+        nm: '{{value}} NM',
+        neutral: 'Neutral',
+        stock: 'Stock {{count}}'
+      }
     }
   },
   weaponChart: {

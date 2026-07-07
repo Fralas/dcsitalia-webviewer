@@ -366,6 +366,7 @@ function App() {
         )}
         {currentView === 'frontline' && (
           <FrontlineMap
+            language={appLanguage}
             tacticalMapId={activeTacticalMapId}
             airportsData={Object.values(airports)}
             airportCatalog={airportCatalog}

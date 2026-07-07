@@ -4388,7 +4388,7 @@ function MapLibreFlatMapView({
   );
 }
 
-export default function FrontlineMap({ tacticalMapId, airportsData, airportCatalog = [], airbaseStatus = {} }) {
+export default function FrontlineMap({ language = 'en', tacticalMapId, airportsData, airportCatalog = [], airbaseStatus = {} }) {
   const tacticalMap = getTacticalMapByCampaignId(tacticalMapId) || getDefaultTacticalMap();
   const startInTacticalMode = tacticalMap?.startInTacticalMode === true;
   const theaterFocus = normalizeMapCoordinates(tacticalMap?.focusCoordinates);
@@ -6517,9 +6517,21 @@ export default function FrontlineMap({ tacticalMapId, airportsData, airportCatal
               </div>
 
               <LiveFeedPanel
+                language={language}
                 events={feedEvents}
                 collapsed={feedCollapsed}
                 onToggleCollapsed={() => setFeedCollapsed((value) => !value)}
+                zones={validZones}
+                combatMissionByZone={combatMissionByZone}
+                logisticsMissions={filteredLogisticsMissions}
+                productionPoints={productionPoints}
+                airports={validAirports}
+                onSelectZone={setSelectedZoneId}
+                onSelectLogisticsMission={(mission) => {
+                  setSelectedLogisticsMission(mission);
+                  if (mission?.airport_id) setSelectedAirportId(mission.airport_id);
+                }}
+                onSelectProductionPoint={setSelectedProductionPointId}
               />
 
               {filters.showAto && selectedZone && (
