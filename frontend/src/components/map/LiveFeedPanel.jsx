@@ -46,56 +46,59 @@ export default function LiveFeedPanel({
   onToggleCollapsed,
 }) {
   return (
-    <aside
-      className={`live-feed-panel${collapsed ? ' live-feed-panel--collapsed' : ''}`}
-      aria-label="Live feed"
-    >
-      <div className="live-feed-panel__header">
-        {!collapsed && <h2 className="live-feed-panel__title">Live Feed</h2>}
-        <button
-          type="button"
-          className="live-feed-panel__toggle"
-          onClick={onToggleCollapsed}
-          aria-label={collapsed ? 'Open feed' : 'Close feed'}
-          title={collapsed ? 'Open feed' : 'Close feed'}
-        >
-          <ChevronRight
-            className={`live-feed-panel__toggle-icon${collapsed ? ' live-feed-panel__toggle-icon--collapsed' : ''}`}
-            strokeWidth={3}
-          />
-        </button>
-      </div>
-
-      {!collapsed && (
-        <div className="live-feed-panel__list">
-          {events.length === 0 ? (
-            <div className="live-feed-item live-feed-item--empty">
-              <p className="live-feed-item__title">No events yet</p>
-              <p className="live-feed-item__message">Activity will appear here as it happens.</p>
-            </div>
-          ) : (
-            events.map((event) => (
-              <article
-                key={event.id || `${event.type}-${event.timestamp}`}
-                className="live-feed-item"
-              >
-                <div className="live-feed-item__top">
-                  <span className={`live-feed-item__badge ${getFeedTypeClass(event.type)}`}>
-                    {getFeedTypeLabel(event.type)}
-                  </span>
-                  <time className="live-feed-item__time" dateTime={new Date(event.timestamp || 0).toISOString()}>
-                    {formatRelativeTime(event.timestamp)}
-                  </time>
-                </div>
-                <h3 className="live-feed-item__title">{event.title || 'Activity update'}</h3>
-                {event.message && (
-                  <p className="live-feed-item__message">{event.message}</p>
-                )}
-              </article>
-            ))
-          )}
+    <div className="live-feed-dock">
+      <aside
+        className={`live-feed-panel${collapsed ? ' live-feed-panel--collapsed' : ''}`}
+        aria-label="Live feed"
+        aria-expanded={!collapsed}
+      >
+        <div className="live-feed-panel__header">
+          <h2 className="live-feed-panel__title">Live Feed</h2>
+          <button
+            type="button"
+            className="live-feed-panel__toggle"
+            onClick={onToggleCollapsed}
+            aria-label={collapsed ? 'Open feed' : 'Close feed'}
+            title={collapsed ? 'Open feed' : 'Close feed'}
+          >
+            <ChevronRight
+              className={`live-feed-panel__toggle-icon${collapsed ? ' live-feed-panel__toggle-icon--collapsed' : ''}`}
+              strokeWidth={3}
+            />
+          </button>
         </div>
-      )}
-    </aside>
+
+        <div className="live-feed-panel__body" aria-hidden={collapsed}>
+          <div className="live-feed-panel__list">
+            {events.length === 0 ? (
+              <div className="live-feed-item live-feed-item--empty">
+                <p className="live-feed-item__title">No events yet</p>
+                <p className="live-feed-item__message">Activity will appear here as it happens.</p>
+              </div>
+            ) : (
+              events.map((event) => (
+                <article
+                  key={event.id || `${event.type}-${event.timestamp}`}
+                  className="live-feed-item"
+                >
+                  <div className="live-feed-item__top">
+                    <span className={`live-feed-item__badge ${getFeedTypeClass(event.type)}`}>
+                      {getFeedTypeLabel(event.type)}
+                    </span>
+                    <time className="live-feed-item__time" dateTime={new Date(event.timestamp || 0).toISOString()}>
+                      {formatRelativeTime(event.timestamp)}
+                    </time>
+                  </div>
+                  <h3 className="live-feed-item__title">{event.title || 'Activity update'}</h3>
+                  {event.message && (
+                    <p className="live-feed-item__message">{event.message}</p>
+                  )}
+                </article>
+              ))
+            )}
+          </div>
+        </div>
+      </aside>
+    </div>
   );
 }

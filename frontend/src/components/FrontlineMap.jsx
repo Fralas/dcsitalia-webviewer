@@ -6519,13 +6519,11 @@ export default function FrontlineMap({ tacticalMapId, airportsData, airportCatal
                 </div>
               </div>
 
-              <div className="absolute right-3 top-3 z-[1000]">
-                <LiveFeedPanel
-                  events={feedEvents}
-                  collapsed={feedCollapsed}
-                  onToggleCollapsed={() => setFeedCollapsed((value) => !value)}
-                />
-              </div>
+              <LiveFeedPanel
+                events={feedEvents}
+                collapsed={feedCollapsed}
+                onToggleCollapsed={() => setFeedCollapsed((value) => !value)}
+              />
 
               {filters.showAto && selectedZone && (
                 <div className="absolute bottom-4 left-4 z-[1000]">

@@ -1,5 +1,14 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@600;700&display=swap');
 
+.live-feed-dock {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1000;
+  max-height: 100%;
+  pointer-events: none;
+}
+
 .live-feed-panel {
   --lf-scale: 0.35;
   --lf-text-extra: 3px;
@@ -7,28 +16,41 @@
   --lf-item-min-h: calc(72px * var(--lf-item-scale));
   --lf-item-gap: calc(6px * var(--lf-item-scale));
   --lf-visible-items: 4;
+  --lf-expanded-width: calc(1131px * var(--lf-scale));
+  --lf-collapsed-width: calc(72px * var(--lf-scale));
+  --lf-anim: 360ms cubic-bezier(0.22, 1, 0.36, 1);
 
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  width: calc(1131px * var(--lf-scale));
-  max-width: calc(100vw - 1.5rem);
-  max-height: calc(
-    (var(--lf-item-min-h) * var(--lf-visible-items))
-    + (var(--lf-item-gap) * (var(--lf-visible-items) - 1))
-    + 58px
+  width: var(--lf-expanded-width);
+  max-width: min(var(--lf-expanded-width), 100%);
+  max-height: min(
+    calc(
+      (var(--lf-item-min-h) * var(--lf-visible-items))
+      + (var(--lf-item-gap) * (var(--lf-visible-items) - 1))
+      + 58px
+    ),
+    100%
   );
   background: #0e0e0e;
   border: 1px solid #4e4e4e;
-  border-radius: calc(25px * var(--lf-scale));
+  border-right: none;
+  border-top: none;
+  border-radius: 0 0 0 calc(25px * var(--lf-scale));
   color: #ffffff;
   font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
   overflow: hidden;
+  pointer-events: auto;
+  transition:
+    width var(--lf-anim),
+    max-height var(--lf-anim),
+    border-color var(--lf-anim);
 }
 
 .live-feed-panel--collapsed {
-  width: calc(78px * var(--lf-scale));
-  max-height: none;
+  width: var(--lf-collapsed-width);
+  max-height: calc(76px * var(--lf-scale));
 }
 
 .live-feed-panel__header {
@@ -37,6 +59,7 @@
   justify-content: space-between;
   gap: calc(12px * var(--lf-scale));
   padding: calc(11px * var(--lf-scale)) calc(23px * var(--lf-scale)) calc(10px * var(--lf-scale));
+  padding-right: calc(14px * var(--lf-scale));
   flex-shrink: 0;
 }
 
@@ -54,6 +77,19 @@
   text-transform: uppercase;
   letter-spacing: 0.02em;
   white-space: nowrap;
+  overflow: hidden;
+  max-width: 24rem;
+  opacity: 1;
+  transition:
+    opacity 220ms ease,
+    max-width var(--lf-anim),
+    margin var(--lf-anim);
+}
+
+.live-feed-panel--collapsed .live-feed-panel__title {
+  max-width: 0;
+  margin: 0;
+  opacity: 0;
 }
 
 .live-feed-panel__toggle {
@@ -69,7 +105,7 @@
   color: #ffffff;
   cursor: pointer;
   flex-shrink: 0;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, transform var(--lf-anim);
 }
 
 .live-feed-panel__toggle:hover {
@@ -79,12 +115,34 @@
 .live-feed-panel__toggle-icon {
   width: calc(22px * var(--lf-scale));
   height: calc(22px * var(--lf-scale));
-  transform: rotate(-90deg);
-  transition: transform 0.2s ease;
+  transform: rotate(0deg);
+  transition: transform var(--lf-anim);
 }
 
 .live-feed-panel__toggle-icon--collapsed {
-  transform: rotate(90deg);
+  transform: rotate(180deg);
+}
+
+.live-feed-panel__body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  opacity: 1;
+  max-height: calc(
+    (var(--lf-item-min-h) * var(--lf-visible-items))
+    + (var(--lf-item-gap) * (var(--lf-visible-items) - 1))
+    + calc(12px * var(--lf-scale))
+  );
+  transition:
+    opacity 260ms ease,
+    max-height var(--lf-anim);
+}
+
+.live-feed-panel--collapsed .live-feed-panel__body {
+  opacity: 0;
+  max-height: 0;
+  pointer-events: none;
 }
 
 .live-feed-panel__list {
@@ -92,10 +150,7 @@
   flex-direction: column;
   gap: var(--lf-item-gap);
   padding: 0 calc(23px * var(--lf-scale)) calc(12px * var(--lf-scale));
-  max-height: calc(
-    (var(--lf-item-min-h) * var(--lf-visible-items))
-    + (var(--lf-item-gap) * (var(--lf-visible-items) - 1))
-  );
+  padding-right: calc(14px * var(--lf-scale));
   overflow-y: auto;
   min-height: 0;
   scrollbar-width: none;
@@ -191,6 +246,15 @@
 @media (max-width: 720px) {
   .live-feed-panel {
     --lf-scale: 0.62;
-    width: min(calc(1131px * var(--lf-scale)), calc(100vw - 1.5rem));
+    --lf-expanded-width: min(calc(1131px * var(--lf-scale)), calc(100vw - 1.5rem));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-feed-panel,
+  .live-feed-panel__title,
+  .live-feed-panel__body,
+  .live-feed-panel__toggle-icon {
+    transition: none;
   }
 }
