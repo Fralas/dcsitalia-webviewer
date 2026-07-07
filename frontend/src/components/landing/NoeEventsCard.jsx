@@ -48,16 +48,16 @@ export default function NoeEventsCard({
 
       {event ? (
         <>
-          <div className="noe-card__date">{formatEventDate(event.missionDate, language)}</div>
+          <div className="noe-card__date">{formatEventDate(event.missionDate)}</div>
 
           <div className="noe-card__rows">
             <div className="noe-card__row">
-              <span className="noe-card__day">{formatEventDate(event.registrationEndsDate, language)}</span>
+              <span className="noe-card__day">{formatEventDate(event.registrationEndsDate)}</span>
               <span className="noe-card__dash">-</span>
               <span className="noe-card__label">{L.registrationEnds}</span>
             </div>
             <div className="noe-card__row">
-              <span className="noe-card__day">{formatEventDate(event.tacticalDayDate, language)}</span>
+              <span className="noe-card__day">{formatEventDate(event.tacticalDayDate)}</span>
               <span className="noe-card__dash">-</span>
               <span className="noe-card__label noe-card__label--accent">{L.tacticalDay}</span>
             </div>

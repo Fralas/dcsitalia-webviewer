@@ -2746,11 +2746,10 @@ function requireNoeAdmin(req, res) {
 }
 
 /**
- * GET /api/noe/events - List NOE events (public). Optional ?campaignId= filter.
+ * GET /api/noe/events - List NOE events (public).
  */
 app.get('/api/noe/events', (req, res) => {
-  const campaignId = req.query?.campaignId ? String(req.query.campaignId) : '';
-  const events = noeEventsService.getEvents(campaignId);
+  const events = noeEventsService.getEvents();
   res.json({ events });
 });
 

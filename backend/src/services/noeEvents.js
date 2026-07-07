@@ -45,7 +45,6 @@ function normalizeEvent(event) {
   const createdAt = Number.isFinite(event?.createdAt) ? event.createdAt : Date.now();
   return {
     id: sanitizeText(event?.id, 80) || `noe_${createdAt}_${crypto.randomBytes(4).toString('hex')}`,
-    campaignId: sanitizeText(event?.campaignId, 80),
     missionDate: sanitizeDate(event?.missionDate),
     registrationEndsDate: sanitizeDate(event?.registrationEndsDate),
     tacticalDayDate: sanitizeDate(event?.tacticalDayDate),
@@ -66,18 +65,11 @@ function writeEvents(events) {
 
 ensureStorage();
 
-export function getEvents(campaignId) {
-  const events = readEvents().sort((a, b) => String(a.missionDate).localeCompare(String(b.missionDate)));
-  if (!campaignId) return events;
-  const target = sanitizeText(campaignId, 80);
-  return events.filter((event) => event.campaignId === target);
+export function getEvents() {
+  return readEvents().sort((a, b) => String(a.missionDate).localeCompare(String(b.missionDate)));
 }
 
 function validateEventInput(input) {
-  const campaignId = sanitizeText(input?.campaignId, 80);
-  if (!campaignId) {
-    throw new Error('campaignId is required');
-  }
   const missionDate = sanitizeDate(input?.missionDate);
   if (!missionDate) {
     throw new Error('A valid mission date (YYYY-MM-DD) is required');
@@ -87,7 +79,6 @@ function validateEventInput(input) {
     throw new Error('operationName is required');
   }
   return {
-    campaignId,
     missionDate,
     registrationEndsDate: sanitizeDate(input?.registrationEndsDate),
     tacticalDayDate: sanitizeDate(input?.tacticalDayDate),

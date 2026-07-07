@@ -37,6 +37,12 @@ export default {
       logout: 'Logout',
       verify: 'Verifying...'
     },
+    auth: {
+      signInTitle: 'Sign in',
+      signInHint: 'Authenticate to accept and manage missions',
+      discordButton: 'Continue with Discord',
+      close: 'Close',
+    },
     prompts: {
       confirmComplete: 'Mark this mission as completed?',
       confirmCancel: 'Cancel this mission?',

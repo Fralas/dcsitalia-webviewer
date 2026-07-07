@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react';
 import { X, Trash2, Save, Plus, Loader2 } from 'lucide-react';
-import { CAMPAIGNS, DEFAULT_CAMPAIGN_ID, getCampaignById } from '../../config/campaigns';
+import { formatEventDate, parseEventDateInput, toApiDateField } from './dateFormat';
 import * as api from '../../services/api';
 
 const LABELS = {
   en: {
     heading: 'Manage NOE Events',
-    campaign: 'Campaign',
     missionDate: 'Mission date',
     registrationEnds: 'Registration ends',
     tacticalDay: 'Tactical day',
@@ -18,10 +17,11 @@ const LABELS = {
     close: 'Close',
     none: 'No events yet',
     required: 'Mission date and operation name are required.',
+    datePlaceholder: 'DD/MM/YYYY',
+    invalidDate: 'Use the DD/MM/YYYY format for dates.',
   },
   it: {
     heading: 'Gestione Eventi NOE',
-    campaign: 'Campagna',
     missionDate: 'Data missione',
     registrationEnds: 'Chiusura iscrizioni',
     tacticalDay: 'Tactical day',
@@ -33,11 +33,12 @@ const LABELS = {
     close: 'Chiudi',
     none: 'Nessun evento',
     required: 'Data missione e nome operazione sono obbligatori.',
+    datePlaceholder: 'GG/MM/YYYY',
+    invalidDate: 'Usa il formato GG/MM/YYYY per le date.',
   },
 };
 
 const EMPTY_FORM = {
-  campaignId: DEFAULT_CAMPAIGN_ID,
   missionDate: '',
   registrationEndsDate: '',
   tacticalDayDate: '',
@@ -67,10 +68,9 @@ export default function NoeEventAdminModal({ events = [], language = 'en', onClo
   const startEdit = (event) => {
     setEditingId(event.id);
     setForm({
-      campaignId: event.campaignId || DEFAULT_CAMPAIGN_ID,
-      missionDate: event.missionDate || '',
-      registrationEndsDate: event.registrationEndsDate || '',
-      tacticalDayDate: event.tacticalDayDate || '',
+      missionDate: formatEventDate(event.missionDate),
+      registrationEndsDate: formatEventDate(event.registrationEndsDate),
+      tacticalDayDate: formatEventDate(event.tacticalDayDate),
       operationName: event.operationName || '',
     });
     setError('');
@@ -78,17 +78,37 @@ export default function NoeEventAdminModal({ events = [], language = 'en', onClo
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.missionDate || !form.operationName.trim()) {
+    if (!form.missionDate.trim() || !form.operationName.trim()) {
       setError(L.required);
       return;
     }
+
+    const payload = {
+      missionDate: parseEventDateInput(form.missionDate),
+      registrationEndsDate: toApiDateField(form.registrationEndsDate),
+      tacticalDayDate: toApiDateField(form.tacticalDayDate),
+      operationName: form.operationName.trim(),
+    };
+
+    if (!payload.missionDate) {
+      setError(L.invalidDate);
+      return;
+    }
+    if (
+      (form.registrationEndsDate.trim() && !payload.registrationEndsDate)
+      || (form.tacticalDayDate.trim() && !payload.tacticalDayDate)
+    ) {
+      setError(L.invalidDate);
+      return;
+    }
+
     setBusy(true);
     setError('');
     try {
       if (editingId) {
-        await api.updateNoeEvent(editingId, form);
+        await api.updateNoeEvent(editingId, payload);
       } else {
-        await api.createNoeEvent(form);
+        await api.createNoeEvent(payload);
       }
       await onSaved?.();
       resetForm();
@@ -127,21 +147,12 @@ export default function NoeEventAdminModal({ events = [], language = 'en', onClo
         <div className="noe-modal__content">
           <form className="noe-modal__form" onSubmit={handleSubmit}>
             <label className="noe-modal__field">
-              <span>{L.campaign}</span>
-              <select
-                value={form.campaignId}
-                onChange={(e) => setField('campaignId', e.target.value)}
-              >
-                {CAMPAIGNS.map((c) => (
-                  <option key={c.id} value={c.id}>{c.label}</option>
-                ))}
-              </select>
-            </label>
-
-            <label className="noe-modal__field">
               <span>{L.missionDate}</span>
               <input
-                type="date"
+                type="text"
+                inputMode="numeric"
+                placeholder={L.datePlaceholder}
+                pattern="\d{1,2}/\d{1,2}/\d{4}"
                 value={form.missionDate}
                 onChange={(e) => setField('missionDate', e.target.value)}
                 required
@@ -151,7 +162,10 @@ export default function NoeEventAdminModal({ events = [], language = 'en', onClo
             <label className="noe-modal__field">
               <span>{L.registrationEnds}</span>
               <input
-                type="date"
+                type="text"
+                inputMode="numeric"
+                placeholder={L.datePlaceholder}
+                pattern="\d{1,2}/\d{1,2}/\d{4}"
                 value={form.registrationEndsDate}
                 onChange={(e) => setField('registrationEndsDate', e.target.value)}
               />
@@ -160,7 +174,10 @@ export default function NoeEventAdminModal({ events = [], language = 'en', onClo
             <label className="noe-modal__field">
               <span>{L.tacticalDay}</span>
               <input
-                type="date"
+                type="text"
+                inputMode="numeric"
+                placeholder={L.datePlaceholder}
+                pattern="\d{1,2}/\d{1,2}/\d{4}"
                 value={form.tacticalDayDate}
                 onChange={(e) => setField('tacticalDayDate', e.target.value)}
               />
@@ -195,31 +212,28 @@ export default function NoeEventAdminModal({ events = [], language = 'en', onClo
           <div className="noe-modal__list">
             <h3>{L.existing}</h3>
             {sortedEvents.length === 0 && <p className="noe-modal__empty">{L.none}</p>}
-            {sortedEvents.map((event) => {
-              const campaign = getCampaignById(event.campaignId);
-              return (
-                <div
-                  key={event.id}
-                  className={`noe-modal__item${editingId === event.id ? ' is-editing' : ''}`}
+            {sortedEvents.map((event) => (
+              <div
+                key={event.id}
+                className={`noe-modal__item${editingId === event.id ? ' is-editing' : ''}`}
+              >
+                <button type="button" className="noe-modal__item-main" onClick={() => startEdit(event)}>
+                  <span className="noe-modal__item-op">{event.operationName || '—'}</span>
+                  <span className="noe-modal__item-meta">
+                    {formatEventDate(event.missionDate)}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="noe-modal__item-del"
+                  onClick={() => handleDelete(event.id)}
+                  disabled={busy}
+                  aria-label="Delete"
                 >
-                  <button type="button" className="noe-modal__item-main" onClick={() => startEdit(event)}>
-                    <span className="noe-modal__item-op">{event.operationName || '—'}</span>
-                    <span className="noe-modal__item-meta">
-                      {(campaign?.label || event.campaignId)} · {event.missionDate}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="noe-modal__item-del"
-                    onClick={() => handleDelete(event.id)}
-                    disabled={busy}
-                    aria-label="Delete"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              );
-            })}
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       </div>

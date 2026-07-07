@@ -224,7 +224,7 @@
 }
 
 .noe-card__date {
-  font-size: 52px;
+  font-size: 40px;
   line-height: 1;
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -249,7 +249,7 @@
 .noe-card__day {
   font-weight: 800;
   color: #fff;
-  min-width: 54px;
+  min-width: 88px;
 }
 
 .noe-card__dash {

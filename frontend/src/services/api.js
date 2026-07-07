@@ -958,11 +958,10 @@ export async function cancelAtcHandoff(stripId, { airportId, role, targetBay }) 
 }
 
 /**
- * Get NOE events (public). Optionally filter by campaign id.
+ * Get NOE events (public).
  */
-export async function getNoeEvents(campaignId) {
-  const query = campaignId ? `?campaignId=${encodeURIComponent(campaignId)}` : '';
-  return fetchAPI(`/noe/events${query}`);
+export async function getNoeEvents() {
+  return fetchAPI('/noe/events');
 }
 
 /**

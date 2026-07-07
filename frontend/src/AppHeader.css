@@ -286,3 +286,116 @@
 .app-header__user-wrap {
   position: relative;
 }
+
+/* ---------- Login modal ---------- */
+.login-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.login-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: rgba(3, 4, 8, 0.72);
+  backdrop-filter: blur(4px);
+  cursor: pointer;
+}
+
+.login-modal__panel {
+  position: relative;
+  z-index: 1;
+  width: min(440px, 100%);
+  border-radius: 16px;
+  border: 1px solid var(--header-border);
+  background: #101116;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.login-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 22px 18px;
+  border-bottom: 1px solid var(--header-border);
+}
+
+.login-modal__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--header-accent);
+}
+
+.login-modal__subtitle {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--header-text-dim);
+}
+
+.login-modal__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  border: 1px solid var(--header-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--header-text-dim);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.login-modal__close:hover {
+  color: var(--header-text);
+  border-color: rgba(255, 107, 1, 0.45);
+  background: var(--header-accent-soft);
+}
+
+.login-modal__body {
+  padding: 22px;
+}
+
+.login-modal__discord {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: 1px solid #4752c4;
+  background: #5865f2;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.login-modal__discord:hover {
+  background: #4752c4;
+  border-color: #3c45a5;
+  transform: translateY(-1px);
+}
+
+.login-modal__discord-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}

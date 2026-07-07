@@ -1,8 +1,3 @@
-const MONTHS = {
-  en: ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'],
-  it: ['GEN', 'FEB', 'MAR', 'APR', 'MAG', 'GIU', 'LUG', 'AGO', 'SET', 'OTT', 'NOV', 'DIC'],
-};
-
 /**
  * Parse a date value into a local Date, treating a plain YYYY-MM-DD string as a
  * local calendar date (no timezone shift).
@@ -22,11 +17,47 @@ function parseLocalDate(value) {
 }
 
 /**
- * Format a date as "27 SET" (day + localized 3-letter uppercase month).
+ * Format a date as DD/MM/YYYY (local calendar).
  */
-export function formatEventDate(value, language = 'en') {
+export function formatEventDate(value) {
   const date = parseLocalDate(value);
   if (!date) return '';
-  const months = MONTHS[language] || MONTHS.en;
-  return `${date.getDate()} ${months[date.getMonth()]}`;
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+/**
+ * Parse a DD/MM/YYYY (or D/M/YYYY) string into YYYY-MM-DD for the API.
+ */
+export function parseEventDateInput(value) {
+  const str = String(value || '').trim();
+  const match = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!match) return '';
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1000) return '';
+
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year
+    || date.getMonth() !== month - 1
+    || date.getDate() !== day
+  ) {
+    return '';
+  }
+
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/**
+ * Convert an optional date field to API format (empty string if blank/invalid).
+ */
+export function toApiDateField(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  return parseEventDateInput(text);
 }

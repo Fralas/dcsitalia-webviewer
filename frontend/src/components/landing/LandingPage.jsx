@@ -35,10 +35,10 @@ export default function LandingPage({ language = 'en', onOpenCampaign }) {
     loadEvents();
   }, []);
 
-  const campaignEvent = useMemo(() => {
+  const noeEvent = useMemo(() => {
     const now = Date.now();
     const list = events
-      .filter((event) => event.campaignId === selectedCampaignId && event.missionDate)
+      .filter((event) => event.missionDate)
       .sort((a, b) => String(a.missionDate).localeCompare(String(b.missionDate)));
     if (!list.length) return null;
     const upcoming = list.find((event) => {
@@ -46,7 +46,7 @@ export default function LandingPage({ language = 'en', onOpenCampaign }) {
       return Number.isFinite(time) && time >= now - 24 * 60 * 60 * 1000;
     });
     return upcoming || list[list.length - 1];
-  }, [events, selectedCampaignId]);
+  }, [events]);
 
   return (
     <div className="landing">
@@ -68,7 +68,7 @@ export default function LandingPage({ language = 'en', onOpenCampaign }) {
 
       <div className="landing__left">
         <NoeEventsCard
-          event={campaignEvent}
+          event={noeEvent}
           language={language}
           canManage={canManage}
           onManage={() => setAdminOpen(true)}
