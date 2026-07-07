@@ -1,28 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import Globe from 'globe.gl';
 import * as THREE from 'three';
-import { CAMPAIGNS } from '../../config/campaigns';
 import CampaignPointers from './CampaignPointers';
+import { buildGlobeRegionFeatures } from '../../utils/buildGlobeRegionFeatures';
 
 const GEOJSON_URL = '/geo/ne_110m_admin_0_countries.geojson';
 const BASE_HEX_COLOR = 'rgba(150, 165, 185, 0.35)';
 const GLOBE_COLOR = '#0a0d12';
-
-function featureCodes(feature) {
-  const props = feature?.properties || {};
-  return [props.ISO_A2, props.ISO_A2_EH, props.ISO_A3, props.ADM0_A3]
-    .filter(Boolean)
-    .map((code) => String(code).toUpperCase());
-}
-
-function findOwnerCampaign(feature) {
-  const codes = new Set(featureCodes(feature));
-  return (
-    CAMPAIGNS.find((campaign) =>
-      (campaign.globeRegions || []).some((region) => codes.has(String(region).toUpperCase())),
-    ) || null
-  );
-}
 
 function hexToRgba(hex, alpha) {
   const clean = String(hex || '').replace('#', '');
@@ -35,39 +19,11 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-/**
- * Rough centroid of a GeoJSON feature (average of the first outer ring),
- * good enough to orient the globe toward a theater.
- */
-function featureCentroid(feature) {
-  const geometry = feature?.geometry;
-  if (!geometry) return null;
-  const rings = geometry.type === 'Polygon'
-    ? geometry.coordinates
-    : geometry.type === 'MultiPolygon'
-      ? geometry.coordinates.map((poly) => poly[0])
-      : null;
-  if (!rings || !rings.length) return null;
-
-  let sumLng = 0;
-  let sumLat = 0;
-  let count = 0;
-  rings.forEach((ring) => {
-    (ring || []).forEach(([lng, lat]) => {
-      sumLng += lng;
-      sumLat += lat;
-      count += 1;
-    });
-  });
-  if (!count) return null;
-  return { lat: sumLat / count, lng: sumLng / count };
-}
-
 export default function HexGlobe({ selectedCampaignId, onSelectCampaign }) {
   const containerRef = useRef(null);
   const globeRef = useRef(null);
   const featuresRef = useRef([]);
-  const ownerByFeatureRef = useRef(new WeakMap());
+  const getOwnerRef = useRef(() => null);
   const centroidByCampaignRef = useRef(new Map());
   const selectedRef = useRef(selectedCampaignId);
   const [pointersReady, setPointersReady] = useState(false);
@@ -75,11 +31,15 @@ export default function HexGlobe({ selectedCampaignId, onSelectCampaign }) {
   selectedRef.current = selectedCampaignId;
 
   const colorAccessor = (feature) => {
-    const owner = ownerByFeatureRef.current.get(feature) || null;
+    const owner = getOwnerRef.current(feature);
     if (!owner) return BASE_HEX_COLOR;
     if (owner.id === selectedRef.current) return owner.highlightColor;
     return hexToRgba(owner.highlightColor, 0.45);
   };
+
+  const altitudeAccessor = (feature) => (
+    feature?.properties?._partialRegion ? 0.018 : 0.01
+  );
 
   const focusSelectedCampaign = (animateMs = 900) => {
     const world = globeRef.current;
@@ -110,7 +70,7 @@ export default function HexGlobe({ selectedCampaignId, onSelectCampaign }) {
       .hexPolygonResolution(3)
       .hexPolygonMargin(0.3)
       .hexPolygonUseDots(true)
-      .hexPolygonAltitude(0.01)
+      .hexPolygonAltitude(altitudeAccessor)
       .hexPolygonColor(colorAccessor);
 
     const globeMaterial = world.globeMaterial();
@@ -142,24 +102,16 @@ export default function HexGlobe({ selectedCampaignId, onSelectCampaign }) {
       .then((geo) => {
         if (cancelled) return;
         const features = Array.isArray(geo?.features) ? geo.features : [];
-        featuresRef.current = features;
+        const regionData = buildGlobeRegionFeatures(features);
 
-        const ownerMap = new WeakMap();
-        const centroidMap = new Map();
-        features.forEach((feature) => {
-          const owner = findOwnerCampaign(feature);
-          if (owner) {
-            ownerMap.set(feature, owner);
-            if (!centroidMap.has(owner.id)) {
-              const centroid = featureCentroid(feature);
-              if (centroid) centroidMap.set(owner.id, centroid);
-            }
-          }
-        });
-        ownerByFeatureRef.current = ownerMap;
-        centroidByCampaignRef.current = centroidMap;
+        featuresRef.current = regionData.features;
+        getOwnerRef.current = regionData.getOwner;
+        centroidByCampaignRef.current = regionData.centroidByCampaign;
 
-        world.hexPolygonsData(features).hexPolygonColor(colorAccessor);
+        world
+          .hexPolygonsData(regionData.features)
+          .hexPolygonAltitude(altitudeAccessor)
+          .hexPolygonColor(colorAccessor);
         focusSelectedCampaign();
       })
       .catch((error) => {
@@ -195,6 +147,7 @@ export default function HexGlobe({ selectedCampaignId, onSelectCampaign }) {
     const world = globeRef.current;
     if (!world) return;
     world.hexPolygonColor(colorAccessor);
+    world.hexPolygonAltitude(altitudeAccessor);
     focusSelectedCampaign(1200);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCampaignId]);

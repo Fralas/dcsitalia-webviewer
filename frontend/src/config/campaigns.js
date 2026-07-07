@@ -5,10 +5,8 @@
  * - Add / remove entries in the `CAMPAIGNS` array to change the globe pointers.
  * - `pointerAnchor` is the lat/lng on the globe where the pointer line starts.
  * - `pointerSide` fixes label direction: 'left' | 'right' | 'top' | 'bottom'
- * - `globeRegions` are ISO_A2 country codes (from the Natural Earth GeoJSON,
- *   see frontend/public/geo/ne_110m_admin_0_countries.geojson) used to
- *   highlight the theater on the globe. `highlightColor` is the hex color
- *   applied to those regions.
+ * - `globeRegions` (legacy) — see `globeRegionSpecs.js` for the actual theater
+ *   polygons (full countries + partial bbox zones) used by the globe.
  * - `openTarget` controls the "OPEN MAP" button:
  *     'frontline' -> tactical map (/map)
  *     'lidc'      -> LIDC section (/lidc)
@@ -18,6 +16,8 @@
  *   `title` heading and a `body` paragraph.
  */
 
+import { GLOBE_REGION_SPECS } from './globeRegionSpecs';
+
 export const CAMPAIGNS = [
   {
     id: 'hidc-modern-syria',
@@ -26,7 +26,6 @@ export const CAMPAIGNS = [
     theaterName: 'MODERN SYRIA',
     title: 'HIDC - High Intensity Dynamic Campaign',
     highlightColor: '#FF6B01',
-    globeRegions: ['SY'],
     pointerAnchor: { lat: 35.0, lng: 38.5 },
     pointerSide: 'right',
     openTarget: 'frontline',
@@ -68,7 +67,6 @@ export const CAMPAIGNS = [
     theaterName: 'CW84 GERMANY',
     title: 'HIDC - High Intensity Dynamic Campaign',
     highlightColor: '#4ec5ff',
-    globeRegions: ['DE'],
     pointerAnchor: { lat: 51.2, lng: 10.5 },
     pointerSide: 'left',
     openTarget: null,
@@ -100,7 +98,6 @@ export const CAMPAIGNS = [
     theaterName: '2000 BALKANS',
     title: 'HIDC - High Intensity Dynamic Campaign',
     highlightColor: '#8bd450',
-    globeRegions: ['RS', 'BA', 'HR', 'ME', 'MK', 'AL', 'XK', 'SI'],
     pointerAnchor: { lat: 44.0, lng: 20.5 },
     pointerSide: 'left',
     openTarget: null,
@@ -132,7 +129,6 @@ export const CAMPAIGNS = [
     theaterName: 'PERSIAN GULF',
     title: 'LIDC - Low Intensity Dynamic Campaign',
     highlightColor: '#FFD500',
-    globeRegions: ['IR', 'IQ', 'KW', 'SA', 'AE', 'QA', 'BH', 'OM'],
     pointerAnchor: { lat: 26.5, lng: 51.0 },
     pointerSide: 'right',
     openTarget: null,
@@ -164,7 +160,6 @@ export const CAMPAIGNS = [
     theaterName: 'AFGHANISTAN',
     title: 'LIDC - Low Intensity Dynamic Campaign',
     highlightColor: '#FFD500',
-    globeRegions: ['AF'],
     pointerAnchor: { lat: 34.5, lng: 66.0 },
     pointerSide: 'right',
     openTarget: 'lidc',
@@ -200,12 +195,13 @@ export function getCampaignById(id) {
 }
 
 /**
- * Map of ISO_A2 region code -> campaign, used by the globe to color theaters.
+ * Map of ISO_A2 region code -> campaign (full countries only).
  */
 export function buildRegionCampaignMap() {
   const map = new Map();
   CAMPAIGNS.forEach((campaign) => {
-    (campaign.globeRegions || []).forEach((code) => {
+    const spec = GLOBE_REGION_SPECS[campaign.id];
+    (spec?.countries || []).forEach((code) => {
       map.set(String(code).toUpperCase(), campaign);
     });
   });
