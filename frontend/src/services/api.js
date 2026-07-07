@@ -288,6 +288,16 @@ export async function acceptFrontlineZone(zoneId, userId) {
 }
 
 /**
+ * Decline / release a frontline zone operation
+ */
+export async function declineFrontlineZone(zoneId, userId) {
+  return fetchAPI(`/frontline-zones/${encodeURIComponent(zoneId)}/decline`, {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  });
+}
+
+/**
  * Get shared activity feed
  */
 export async function getFeed(limit = 200) {

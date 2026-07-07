@@ -22,7 +22,8 @@ import airports from '../config/airports';
 import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
 import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
-import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getLogisticsRouteVisibility, getMissions, getServerTime, getTankerOptions, getTankerRoutes, setAirportLogisticsRoutePriority, getProductionPoints, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate, spawnTanker } from '../services/api';
+import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, declineFrontlineZone, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getLogisticsRouteVisibility, getMissions, getServerTime, getTankerOptions, getTankerRoutes, setAirportLogisticsRoutePriority, getProductionPoints, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate, spawnTanker } from '../services/api';
+import ZoneMissionCard from './map/ZoneMissionCard';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
@@ -4424,11 +4425,9 @@ export default function FrontlineMap({ tacticalMapId, airportsData, airportCatal
   const isMapLibreEngine = MAP_ENGINE === 'maplibre';
   const [isDesktopDevice, setIsDesktopDevice] = useState(() => isDesktopGlobeDevice());
   const [selectedZoneId, setSelectedZoneId] = useState(null);
-  const [selectedZoneDetailsId, setSelectedZoneDetailsId] = useState(null);
   const [hoveredZoneId, setHoveredZoneId] = useState(null);
   const [hoveredDcsarId, setHoveredDcsarId] = useState(null);
   const [selectedDcsarId, setSelectedDcsarId] = useState(null);
-  const [zoneCoordinatesFormat, setZoneCoordinatesFormat] = useState('dms');
   const [dcsarCoordinatesFormat, setDcsarCoordinatesFormat] = useState('dms');
   const [selectedAirportId, setSelectedAirportId] = useState(null);
   const [selectedLogisticsMission, setSelectedLogisticsMission] = useState(null);
@@ -4444,6 +4443,7 @@ export default function FrontlineMap({ tacticalMapId, airportsData, airportCatal
   const [hiddenLogisticsRouteAirportIds, setHiddenLogisticsRouteAirportIds] = useState(new Set());
   const [updatingRoutePriorityAirportId, setUpdatingRoutePriorityAirportId] = useState(null);
   const [acceptingZoneOperationId, setAcceptingZoneOperationId] = useState(null);
+  const [decliningZoneOperationId, setDecliningZoneOperationId] = useState(null);
   const [acceptingMissionId, setAcceptingMissionId] = useState(null);
   const [acceptingDcsarId, setAcceptingDcsarId] = useState(null);
   const [updatingDcsarId, setUpdatingDcsarId] = useState(null);
@@ -5368,21 +5368,6 @@ export default function FrontlineMap({ tacticalMapId, airportsData, airportCatal
     }
   };
 
-  const selectedMission = selectedZone ? combatMissionByZone.get(selectedZone.id) : null;
-  const selectedPriority = selectedZone ? getZonePriority(selectedZone, selectedMission) : null;
-  const selectedChangedAt = selectedZone ? zoneStatusMeta[selectedZone.id]?.changedAt : null;
-  const selectedTags = selectedZone
-    ? [
-        getStatusLabel(selectedZone.status),
-        selectedMission?.mission_status ? `Mission ${selectedMission.mission_status}` : 'No Mission',
-        selectedPriority ? getPriorityLabel(selectedPriority) : null,
-        selectedZone.isActive ? 'Active' : 'Inactive',
-        ...new Set([...(selectedZone.tasks || []), ...(selectedMission?.tasks || [])]),
-      ].filter(Boolean)
-    : [];
-  const selectedZoneCoordinates = selectedZone
-    ? formatZoneCoordinates(selectedZone.coordinates, zoneCoordinatesFormat)
-    : '-';
   const currentUserName = user?.globalName || user?.username || user?.id || '';
   const activeAcceptedZonesByCurrentUser = useMemo(() => {
     if (!currentUserName) return [];
@@ -5392,46 +5377,33 @@ export default function FrontlineMap({ tacticalMapId, airportsData, airportCatal
       Number(zone.operation_remaining_ms || 0) > 0
     );
   }, [validZones, currentUserName]);
-  const selectedZoneDetails = useMemo(() => {
-    if (!selectedZoneDetailsId) return null;
-    return validZones.find((zone) => zone.id === selectedZoneDetailsId) || null;
-  }, [selectedZoneDetailsId, validZones]);
-  const selectedZoneDetailsMission = selectedZoneDetails ? combatMissionByZone.get(selectedZoneDetails.id) : null;
-  const selectedZoneDetailsPriority = selectedZoneDetails
-    ? getZonePriority(selectedZoneDetails, selectedZoneDetailsMission)
-    : null;
-  const selectedZoneDetailsChangedAt = selectedZoneDetails
-    ? zoneStatusMeta[selectedZoneDetails.id]?.changedAt
-    : null;
-  const selectedZoneDetailsTags = selectedZoneDetails
-    ? [
-        getStatusLabel(selectedZoneDetails.status),
-        selectedZoneDetailsMission?.mission_status ? `Mission ${selectedZoneDetailsMission.mission_status}` : 'No Mission',
-        selectedZoneDetailsPriority ? getPriorityLabel(selectedZoneDetailsPriority) : null,
-        selectedZoneDetails.isActive ? 'Active' : 'Inactive',
-        ...new Set([...(selectedZoneDetails.tasks || []), ...(selectedZoneDetailsMission?.tasks || [])]),
-      ].filter(Boolean)
-    : [];
-  const selectedZoneDetailsRedNeighbors = useMemo(() => {
-    if (!selectedZoneDetails?.id) return [];
-
-    return getNeighborZoneIds(selectedZoneDetails.id)
-      .map((neighborId) => zoneById.get(normalizeZoneId(neighborId)))
-      .filter((zone) => zone && zone.status === 'RED');
-  }, [selectedZoneDetails, zoneById]);
-  const selectedZoneDetailsHasTasks = Array.isArray(selectedZoneDetails?.tasks) && selectedZoneDetails.tasks.length > 0;
-  const selectedZoneDetailsAcceptedByOther = Boolean(
-    selectedZoneDetails?.operation_assigned &&
-    selectedZoneDetails?.operation_assigned_to &&
-    selectedZoneDetails.operation_assigned_to !== currentUserName &&
-    Number(selectedZoneDetails?.operation_remaining_ms || 0) > 0
-  );
-  const selectedZoneDetailsAcceptedByCurrentUser = Boolean(
-    selectedZoneDetails?.operation_assigned &&
-    selectedZoneDetails?.operation_assigned_to === currentUserName &&
-    Number(selectedZoneDetails?.operation_remaining_ms || 0) > 0
-  );
   const canCurrentUserAcceptMoreZones = activeAcceptedZonesByCurrentUser.length < 2;
+  const zoneOptionsForCard = useMemo(
+    () => [...validZones]
+      .map((entry) => ({ ...entry, zoneNumber: getZoneNumber(entry) }))
+      .sort((a, b) => Number(a.zoneNumber) - Number(b.zoneNumber)),
+    [validZones],
+  );
+  const selectedZoneNeighbors = useMemo(() => {
+    if (!selectedZone?.id) return [];
+    return getNeighborZoneIds(selectedZone.id)
+      .map((neighborId) => zoneById.get(normalizeZoneId(neighborId)))
+      .filter(Boolean)
+      .map((entry) => ({ ...entry, zoneNumber: getZoneNumber(entry) }));
+  }, [selectedZone, zoneById]);
+  const selectedZoneHasTasks = Array.isArray(selectedZone?.tasks) && selectedZone.tasks.length > 0;
+  const selectedZoneAcceptedByOther = Boolean(
+    selectedZone?.operation_assigned &&
+    selectedZone?.operation_assigned_to &&
+    selectedZone.operation_assigned_to !== currentUserName &&
+    Number(selectedZone?.operation_remaining_ms || 0) > 0
+  );
+  const selectedZoneAcceptedByCurrentUser = Boolean(
+    selectedZone?.operation_assigned &&
+    selectedZone?.operation_assigned_to === currentUserName &&
+    Number(selectedZone?.operation_remaining_ms || 0) > 0
+  );
+  const selectedChangedAt = selectedZone ? zoneStatusMeta[selectedZone.id]?.changedAt : null;
 
   const airportLogistics = useMemo(() => {
     if (!selectedAirportId) return [];
@@ -5616,7 +5588,6 @@ export default function FrontlineMap({ tacticalMapId, airportsData, airportCatal
   useEffect(() => {
     if (!filters.showAto) {
       setHoveredZoneId(null);
-      setSelectedZoneDetailsId(null);
     }
   }, [filters.showAto]);
 
@@ -5632,10 +5603,6 @@ export default function FrontlineMap({ tacticalMapId, airportsData, airportCatal
       setSelectedProductionPointId(null);
     }
   }, [filters.showProductionPoints]);
-
-  useEffect(() => {
-    setZoneCoordinatesFormat('dms');
-  }, [selectedZone?.id]);
 
   useEffect(() => {
     setDcsarCoordinatesFormat('dms');
@@ -5877,6 +5844,34 @@ export default function FrontlineMap({ tacticalMapId, airportsData, airportCatal
     }
   };
 
+  const handleDeclineZoneOperation = async (zone) => {
+    if (!zone?.id) return;
+    if (!user) {
+      window.location.href = '/api/auth/discord';
+      return;
+    }
+    if (!currentUserName) return;
+
+    setDecliningZoneOperationId(zone.id);
+    try {
+      const payload = await declineFrontlineZone(zone.id, currentUserName);
+      if (Array.isArray(payload?.zones)) {
+        setZones(payload.zones);
+      } else {
+        const refreshed = await getFrontlineZones();
+        const fetchedZones = refreshed?.zones || refreshed;
+        if (Array.isArray(fetchedZones)) {
+          setZones(fetchedZones);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to decline zone operation:', error);
+      alert(`Failed to decline zone: ${error.message}`);
+    } finally {
+      setDecliningZoneOperationId(null);
+    }
+  };
+
   const handleAcceptZoneOperation = async (zone) => {
     if (!zone?.id) return;
     if (!user) {
@@ -5932,7 +5927,6 @@ export default function FrontlineMap({ tacticalMapId, airportsData, airportCatal
     const normalizedAirportId = String(airportId);
     setSelectedAirportId(normalizedAirportId);
     setSelectedZoneId(null);
-    setSelectedZoneDetailsId(null);
     setSelectedProductionPointId(null);
     setRetrieveMode(null);
   }, []);
@@ -5970,7 +5964,6 @@ export default function FrontlineMap({ tacticalMapId, airportsData, airportCatal
     setSelectedProductionPointId(ppId);
     setSelectedAirportId(null);
     setSelectedZoneId(null);
-    setSelectedZoneDetailsId(null);
     setSpawnMode(null);
     setRetrieveMode(null);
   }, []);
@@ -6607,51 +6600,30 @@ export default function FrontlineMap({ tacticalMapId, airportsData, airportCatal
               </div>
 
               {filters.showAto && selectedZone && (
-                <div className="absolute bottom-4 left-4 z-[1000] w-[330px] rounded-xl border border-yt-border bg-[#1b1d2af0] p-3 shadow-2xl backdrop-blur">
-                  <div className="mb-2 flex flex-wrap gap-1.5">
-                    {selectedTags.slice(0, 8).map((tag) => (
-                      <span key={tag} className="rounded bg-[#2f3a24] px-2 py-0.5 text-[11px] font-semibold text-[#d8f08c]">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="text-xl font-semibold leading-6 text-yt-text-primary">
-                    {`Zone: '${getZoneNumber(selectedZone)}' under ${getControlText(selectedZone.status)}`}
-                  </div>
-
-                  <div className="mt-3 flex items-center gap-2 text-sm text-yt-text-secondary">
-                    <Clock3 className="h-4 w-4" />
-                    <span>{formatRelativeTime(selectedChangedAt)}</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setZoneCoordinatesFormat((current) => (current === 'dms' ? 'mgrs' : 'dms'))}
-                    className="mt-2 flex w-full items-center gap-2 text-left text-sm text-yt-text-secondary transition-colors hover:text-yt-text-primary"
-                    title={zoneCoordinatesFormat === 'dms' ? 'Click to switch to MGRS' : 'Click to switch to DMS'}
-                  >
-                    <MapPin className="h-4 w-4" />
-                    <span className="font-mono">{selectedZoneCoordinates}</span>
-                    <span className="ml-auto rounded border border-yt-border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">
-                      {zoneCoordinatesFormat}
-                    </span>
-                  </button>
-
-                  <div className="mt-3 border-t border-yt-border pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedZoneDetailsId(selectedZone.id)}
-                      className="inline-flex items-center gap-2 text-sm font-semibold text-[#4ca3ff] transition-colors hover:text-[#7cbcff]"
-                    >
-                      View Details
-                    </button>
-                  </div>
+                <div className="absolute bottom-4 left-4 z-[1000]">
+                  <ZoneMissionCard
+                    zone={selectedZone}
+                    zones={zoneOptionsForCard}
+                    neighborZones={selectedZoneNeighbors}
+                    changedAt={selectedChangedAt}
+                    zoneNumber={getZoneNumber(selectedZone)}
+                    coordinatesDms={formatZoneCoordinates(selectedZone.coordinates, 'dms')}
+                    coordinatesMgrs={formatZoneCoordinates(selectedZone.coordinates, 'mgrs')}
+                    acceptedByCurrentUser={selectedZoneAcceptedByCurrentUser}
+                    acceptedByOther={selectedZoneAcceptedByOther}
+                    hasTasks={selectedZoneHasTasks}
+                    canAcceptMore={canCurrentUserAcceptMoreZones}
+                    accepting={acceptingZoneOperationId === selectedZone.id}
+                    declining={decliningZoneOperationId === selectedZone.id}
+                    onSelectZone={setSelectedZoneId}
+                    onAccept={handleAcceptZoneOperation}
+                    onDecline={handleDeclineZoneOperation}
+                  />
                 </div>
               )}
 
               {mapMode && filters.showDcsar && hoveredDcsarPoint && (
-                <div className={`absolute bottom-4 z-[1000] w-[360px] rounded-xl border border-yt-border bg-[#1b1d2af0] p-3 shadow-2xl backdrop-blur ${filters.showAto && selectedZone ? 'left-[348px]' : 'left-4'}`}>
+                <div className={`absolute bottom-4 z-[1000] w-[360px] rounded-xl border border-yt-border bg-[#1b1d2af0] p-3 shadow-2xl backdrop-blur ${filters.showAto && selectedZone ? 'left-[344px]' : 'left-4'}`}>
                   <div className="mb-2 flex flex-wrap gap-1.5">
                     <span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${hoveredDcsarPoint.accepted ? 'bg-green-500/20 text-green-200' : 'bg-slate-200/20 text-slate-100'}`}>
                       {hoveredDcsarPoint.accepted ? 'Accepted' : 'Awaiting Rescue'}
@@ -7607,136 +7579,6 @@ export default function FrontlineMap({ tacticalMapId, airportsData, airportCatal
                           </div>
                         );
                       })}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {selectedZoneDetails && (
-                <div className="fixed inset-0 z-[1200] flex items-center justify-center">
-                  <button
-                    type="button"
-                    className="absolute inset-0 bg-black/70"
-                    onClick={() => setSelectedZoneDetailsId(null)}
-                    aria-label="Close zone details"
-                  />
-                  <div className="relative w-[min(860px,92vw)] max-h-[84vh] overflow-y-auto rounded-2xl border border-yt-border bg-[#0f1727] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
-                    <div className="mb-3 flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-semibold text-yt-text-primary">
-                          Zone {getZoneNumber(selectedZoneDetails)} Details
-                        </div>
-                        <div className="text-xs text-yt-text-secondary">
-                          {`Zone: '${getZoneNumber(selectedZoneDetails)}' under ${getControlText(selectedZoneDetails.status)}`}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {selectedZoneDetailsAcceptedByCurrentUser && (
-                          <span className="rounded border border-green-500/50 bg-green-500/15 px-2.5 py-1 text-xs font-semibold text-green-300">
-                            Accepted • {formatDurationMmSs(selectedZoneDetails.operation_remaining_ms)}
-                          </span>
-                        )}
-                        {!selectedZoneDetailsAcceptedByCurrentUser && selectedZoneDetails?.operation_assigned_to && (
-                          <span className="rounded border border-blue-500/50 bg-blue-500/15 px-2.5 py-1 text-xs font-semibold text-blue-300">
-                            Accepted by {selectedZoneDetails.operation_assigned_to}
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => handleAcceptZoneOperation(selectedZoneDetails)}
-                          disabled={
-                            acceptingZoneOperationId === selectedZoneDetails.id ||
-                            !selectedZoneDetailsHasTasks ||
-                            selectedZoneDetailsAcceptedByCurrentUser ||
-                            selectedZoneDetailsAcceptedByOther ||
-                            (!selectedZoneDetailsAcceptedByCurrentUser && !canCurrentUserAcceptMoreZones)
-                          }
-                          className="rounded border border-green-500/50 bg-green-500/15 px-2.5 py-1 text-xs font-semibold text-green-300 hover:bg-green-500/25 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {acceptingZoneOperationId === selectedZoneDetails.id ? 'Accepting...' : 'Accept'}
-                        </button>
-                        <PanelCloseButton onClick={() => setSelectedZoneDetailsId(null)} />
-                      </div>
-                    </div>
-
-                    <div className="mb-3 flex flex-wrap gap-1.5">
-                      {selectedZoneDetailsTags.map((tag) => (
-                        <span key={`zone-detail-tag-${tag}`} className="rounded bg-[#2f3a24] px-2 py-0.5 text-[11px] font-semibold text-[#d8f08c]">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="rounded-lg border border-yt-border/70 bg-yt-bg-tertiary/60 p-3">
-                      <div className="mb-2 text-xs font-semibold text-yt-text-primary">Zone Data</div>
-                      <div className="grid grid-cols-1 gap-2 text-[11px] text-yt-text-secondary md:grid-cols-2">
-                        <div>
-                          Status: <span className="font-semibold text-yt-text-primary">{selectedZoneDetails.status || '-'}</span>
-                        </div>
-                        <div>
-                          Control: <span className="font-semibold text-yt-text-primary">{getControlText(selectedZoneDetails.status)}</span>
-                        </div>
-                        <div>
-                          Priority: <span className="font-semibold text-yt-text-primary">{selectedZoneDetailsPriority ? getPriorityLabel(selectedZoneDetailsPriority) : '-'}</span>
-                        </div>
-                        <div>
-                          Mission: <span className="font-semibold text-yt-text-primary">{selectedZoneDetailsMission?.mission_status || 'none'}</span>
-                        </div>
-                        <div>
-                          Activity: <span className="font-semibold text-yt-text-primary">{selectedZoneDetails.isActive ? 'Active' : 'Inactive'}</span>
-                        </div>
-                        <div>
-                          Last Change: <span className="font-semibold text-yt-text-primary">{formatRelativeTime(selectedZoneDetailsChangedAt)}</span>
-                        </div>
-                        <div>
-                          Zone Acceptance: <span className="font-semibold text-yt-text-primary">{selectedZoneDetails.operation_assigned ? 'Accepted' : 'Available'}</span>
-                        </div>
-                        <div>
-                          Accepted by: <span className="font-semibold text-yt-text-primary">{selectedZoneDetails.operation_assigned_to || '-'}</span>
-                        </div>
-                        <div>
-                          Acceptance Timer: <span className="font-semibold text-yt-text-primary">{selectedZoneDetails.operation_assigned ? formatDurationMmSs(selectedZoneDetails.operation_remaining_ms) : '-'}</span>
-                        </div>
-                        <div className="md:col-span-2">
-                          Tasks: <span className="font-semibold text-yt-text-primary">{(selectedZoneDetails.tasks || []).length > 0 ? selectedZoneDetails.tasks.join(', ') : 'none'}</span>
-                        </div>
-                        <div className="md:col-span-2">
-                          Coordinates DMS: <span className="font-mono text-yt-text-primary">{formatZoneCoordinates(selectedZoneDetails.coordinates, 'dms')}</span>
-                        </div>
-                        <div className="md:col-span-2">
-                          Coordinates MGRS: <span className="font-mono text-yt-text-primary">{formatZoneCoordinates(selectedZoneDetails.coordinates, 'mgrs')}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 rounded-lg border border-yt-border/70 bg-yt-bg-tertiary/60 p-3">
-                      <div className="mb-2 text-xs font-semibold text-yt-text-primary">Surrounded By RED Zones</div>
-                      {selectedZoneDetailsRedNeighbors.length === 0 ? (
-                        <div className="text-[11px] text-yt-text-secondary">No adjacent RED zones.</div>
-                      ) : (
-                        <div className="flex flex-wrap gap-1.5">
-                          {selectedZoneDetailsRedNeighbors.map((zone) => (
-                            <span key={`zone-red-neighbor-${zone.id}`} className="rounded border border-red-500/50 bg-red-500/15 px-2 py-0.5 text-[11px] font-semibold text-red-200">
-                              Zone {getZoneNumber(zone)} ({zone.id})
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-3 rounded-lg border border-yt-border/70 bg-yt-bg-tertiary/60 p-3 text-[11px] text-yt-text-secondary">
-                      {!selectedZoneDetailsHasTasks && (
-                        <div>Zone is not acceptable: it has no tasks.</div>
-                      )}
-                      {!selectedZoneDetailsAcceptedByCurrentUser && !canCurrentUserAcceptMoreZones && selectedZoneDetailsHasTasks && (
-                        <div>User limit reached: you can accept at most 2 zones.</div>
-                      )}
-                      {selectedZoneDetailsAcceptedByOther && (
-                        <div>This zone is currently locked by another pilot.</div>
-                      )}
-                      {selectedZoneDetailsAcceptedByCurrentUser && (
-                        <div>You are operating on this zone.</div>
-                      )}
                     </div>
                   </div>
                 </div>

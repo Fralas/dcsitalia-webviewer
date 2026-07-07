@@ -3786,6 +3786,59 @@ app.post('/api/frontline-zones/:id/accept', (req, res) => {
 });
 
 /**
+ * POST /api/frontline-zones/:id/decline - Release a frontline zone operation
+ */
+app.post('/api/frontline-zones/:id/decline', (req, res) => {
+  const zoneId = String(req.params.id || '').trim();
+  const userId = String(req.body?.userId || '').trim();
+
+  if (!zoneId) {
+    return res.status(400).json({ error: 'zone id is required' });
+  }
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  const zonesFromFile = loadFrontlineZonesFromFile();
+  const zone = zonesFromFile.find((entry) => String(entry?.id || '') === zoneId);
+  if (!zone) {
+    return res.status(404).json({ error: 'Zone not found' });
+  }
+
+  const now = Date.now();
+  cleanupExpiredZoneOperations(now);
+  pruneZoneOperationsForMissingZones(zonesFromFile);
+
+  const current = zoneOperationsById.get(zoneId);
+  if (!current || current.user_id !== userId) {
+    return res.status(400).json({ error: 'Zone is not assigned to this user' });
+  }
+
+  zoneOperationsById.delete(zoneId);
+
+  const zones = emitFrontlineUpdate(zonesFromFile);
+  const updatedZone = zones.find((entry) => entry.id === zoneId) || null;
+
+  pushFeedEvent({
+    type: 'zone.operation.declined',
+    title: 'Zone operation declined',
+    message: `${userId} released ${zone.name || zone.id}`,
+    actor: userId,
+    zone_id: zone.id || zoneId,
+    metadata: {
+      zone_id: zone.id || zoneId,
+      declined_by: userId,
+    },
+  });
+
+  res.json({
+    success: true,
+    zone: updatedZone,
+    zones,
+  });
+});
+
+/**
  * GET /api/feed - Get shared activity feed
  */
 app.get('/api/feed', (req, res) => {

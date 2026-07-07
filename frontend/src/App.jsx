@@ -119,24 +119,6 @@ function syncUrlWithView(view, { replace = false, tacticalMapId = null } = {}) {
   window.history.pushState({}, '', nextUrl);
 }
 
-function buildFrontlineSummary(zones = []) {
-  const summary = {
-    total: 0,
-    RED: 0,
-    BLUE: 0,
-    NEUTRAL: 0,
-    UNDER_ATTACK: 0,
-  };
-
-  zones.forEach((zone) => {
-    summary.total += 1;
-    if (summary[zone.status] !== undefined) {
-      summary[zone.status] += 1;
-    }
-  });
-
-  return summary;
-}
 
 function App() {
   const initialRoute = viewFromLocation();
@@ -148,13 +130,6 @@ function App() {
   const [airbaseStatus, setAirbaseStatus] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [frontlineSummary, setFrontlineSummary] = useState({
-    total: 0,
-    RED: 0,
-    BLUE: 0,
-    NEUTRAL: 0,
-    UNDER_ATTACK: 0,
-  });
   const { user } = useUser();
   const showLidc = canAccessLidc(user?.id);
   const showAtc = canAccessAtc(user?.id);
@@ -237,18 +212,10 @@ function App() {
       setAirbaseStatus(data || {});
     });
 
-    const unsubscribeFrontline = socketService.on('frontline:updated', (data) => {
-      const zones = data?.zones || [];
-      if (Array.isArray(zones)) {
-        setFrontlineSummary(buildFrontlineSummary(zones));
-      }
-    });
-
     return () => {
       unsubscribeInitial();
       unsubscribeUpdated();
       unsubscribeAirbaseStatus();
-      unsubscribeFrontline();
       socketService.disconnect();
     };
   }, []);
@@ -257,9 +224,8 @@ function App() {
     try {
       setLoading(true);
       setError(null);
-      const [airportsData, zonesData, airbaseStatusData, airportCatalogData] = await Promise.all([
+      const [airportsData, airbaseStatusData, airportCatalogData] = await Promise.all([
         api.getAirports(),
-        api.getFrontlineZones(),
         api.getAirbaseStatus().catch(() => ({})),
         api.getAirportCatalog().catch(() => []),
       ]);
@@ -267,11 +233,6 @@ function App() {
       setAirports(airportsData);
       setAirbaseStatus(airbaseStatusData || {});
       setAirportCatalog(Array.isArray(airportCatalogData) ? airportCatalogData : []);
-
-      const zones = zonesData?.zones || zonesData;
-      if (Array.isArray(zones)) {
-        setFrontlineSummary(buildFrontlineSummary(zones));
-      }
     } catch (err) {
       setError(err.message);
       console.error('Failed to load data:', err);
@@ -327,35 +288,6 @@ function App() {
               />
               <span className="app-header__title">DCS ITALIA</span>
             </button>
-
-            {currentView === 'frontline' && (
-              <div className="app-header__summary">
-                <span className="app-header__summary-badge" style={{ color: '#86efac' }}>
-                  <span className="app-header__summary-dot" style={{ background: '#4ade80' }} />
-                  Live
-                </span>
-                <span className="app-header__summary-badge" style={{ color: '#e2e8f0' }}>
-                  <span className="app-header__summary-dot" style={{ background: '#cbd5e1' }} />
-                  {frontlineSummary.total}
-                </span>
-                <span className="app-header__summary-badge" style={{ color: '#fca5a5' }}>
-                  <span className="app-header__summary-dot" style={{ background: '#f87171' }} />
-                  {frontlineSummary.RED}
-                </span>
-                <span className="app-header__summary-badge" style={{ color: '#93c5fd' }}>
-                  <span className="app-header__summary-dot" style={{ background: '#60a5fa' }} />
-                  {frontlineSummary.BLUE}
-                </span>
-                <span className="app-header__summary-badge" style={{ color: '#cbd5e1' }}>
-                  <span className="app-header__summary-dot" style={{ background: '#94a3b8' }} />
-                  {frontlineSummary.NEUTRAL}
-                </span>
-                <span className="app-header__summary-badge" style={{ color: '#fdba74' }}>
-                  <span className="app-header__summary-dot" style={{ background: '#fb923c' }} />
-                  {frontlineSummary.UNDER_ATTACK}
-                </span>
-              </div>
-            )}
           </div>
 
           <div className="app-header__right">
