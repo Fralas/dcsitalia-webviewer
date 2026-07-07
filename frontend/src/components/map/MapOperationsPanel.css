@@ -14,11 +14,13 @@
   display: flex;
   flex-wrap: nowrap;
   align-items: stretch;
-  gap: calc(6px * var(--ops-s));
-  padding: calc(8px * var(--ops-s)) var(--lf-pad-x) calc(8px * var(--ops-s));
-  padding-right: calc(14px * var(--lf-scale));
+  gap: 0;
+  margin: calc(8px * var(--ops-s)) var(--lf-pad-x) calc(8px * var(--ops-s));
+  margin-right: calc(14px * var(--lf-scale));
+  border: 1px solid #424242;
   flex: 0 0 auto;
   min-width: 0;
+  overflow: hidden;
 }
 
 .map-ops-section__tab {
@@ -31,21 +33,24 @@
   min-width: 0;
   height: calc(46px * var(--ops-s));
   padding: 0 calc(8px * var(--ops-s));
-  border: 1px solid #424242;
-  border-radius: calc(15px * var(--ops-s));
+  border: 0;
+  border-radius: 0;
   background: #0e0e0e;
   color: #ffffff;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease;
+}
+
+.map-ops-section__tab:not(:last-child) {
+  border-right: 1px solid #515151;
 }
 
 .map-ops-section__tab.is-active {
   background: #575757;
-  border-color: #575757;
 }
 
 .map-ops-section__tab--wide {
-  flex: 1.35 1 0;
+  flex: 1 1 0;
 }
 
 .map-ops-section__tab-icon {
@@ -78,27 +83,49 @@
   display: flex;
   flex-wrap: nowrap;
   align-items: stretch;
-  gap: calc(6px * var(--ops-s));
-  width: 100%;
-  box-sizing: border-box;
-  padding: calc(8px * var(--ops-s)) var(--lf-pad-x) calc(8px * var(--ops-s));
-  padding-right: calc(14px * var(--lf-scale));
-  border-top: 1px solid #515151;
+  gap: 0;
+  margin: 0 var(--lf-pad-x) calc(8px * var(--ops-s));
+  margin-right: calc(14px * var(--lf-scale));
+  border: 1px solid #424242;
   flex: 0 0 auto;
   min-width: 0;
+  overflow: hidden;
 }
 
-.map-ops-section__aircraft {
+.map-ops-section__aircraft,
+.map-ops-section__task-filters,
+.map-ops-section__route-selects {
+  display: contents;
+}
+
+.map-ops-section__aircraft-btn,
+.map-ops-section__pill,
+.map-ops-section__select-wrap,
+.map-ops-section__radius-wrap,
+.map-ops-section__reset {
   box-sizing: border-box;
+  border: 0;
+  border-radius: 0;
+  background: #0e0e0e;
+}
+
+.map-ops-section__aircraft-btn,
+.map-ops-section__pill,
+.map-ops-section__select-wrap,
+.map-ops-section__radius-wrap {
+  border-right: 1px solid #515151;
+}
+
+.map-ops-section__aircraft-btn {
   display: inline-flex;
-  align-items: stretch;
+  align-items: center;
+  justify-content: center;
   flex: 1 1 0;
   min-width: 0;
-  height: auto;
   min-height: calc(46px * var(--ops-s));
-  border: 1px solid #575757;
-  border-radius: calc(10px * var(--ops-s));
-  overflow: hidden;
+  color: #ffffff;
+  cursor: pointer;
+  padding: 0;
 }
 
 .map-ops-section__aircraft-btn svg {
@@ -106,44 +133,24 @@
   height: calc(24px * var(--ops-s));
 }
 
-.map-ops-section__aircraft-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1 1 50%;
-  border: 0;
-  background: #0e0e0e;
-  color: #ffffff;
-  cursor: pointer;
-  padding: 0;
-}
-
-.map-ops-section__aircraft-btn.is-active {
+.map-ops-section__aircraft-btn.is-active,
+.map-ops-section__pill.is-active {
   background: #575757;
 }
 
 .map-ops-section__task-filters {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: stretch;
-  gap: calc(6px * var(--ops-s));
   flex: 3 1 0;
   min-width: 0;
 }
 
 .map-ops-section__pill {
-  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 1 1 0;
   min-width: 0;
   min-height: calc(46px * var(--ops-s));
-  height: auto;
   padding: 0 calc(8px * var(--ops-s));
-  border: 1px solid #575757;
-  border-radius: calc(10px * var(--ops-s));
-  background: #0e0e0e;
   color: #ffffff;
   font-size: calc(18px * var(--ops-s));
   font-weight: 700;
@@ -151,20 +158,11 @@
   letter-spacing: 0.01em;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-
-.map-ops-section__pill.is-active {
-  background: #575757;
-  border-color: #575757;
+  transition: background 0.15s ease;
 }
 
 .map-ops-section__route-selects {
-  display: flex;
   flex: 1 1 0;
-  flex-wrap: nowrap;
-  align-items: stretch;
-  gap: calc(6px * var(--ops-s));
   min-width: 0;
 }
 
@@ -186,8 +184,8 @@
   min-height: calc(46px * var(--ops-s));
   height: 100%;
   padding: 0 calc(28px * var(--ops-s)) 0 calc(10px * var(--ops-s));
-  border: 1px solid #575757;
-  border-radius: calc(10px * var(--ops-s));
+  border: 0;
+  border-radius: 0;
   background: #0e0e0e;
   color: #ffffff;
   font-family: inherit;
@@ -226,10 +224,7 @@
   flex: 1 1 0;
   min-width: 0;
   min-height: calc(46px * var(--ops-s));
-  height: auto;
   padding: 0 calc(8px * var(--ops-s));
-  border: 1px solid #575757;
-  border-radius: calc(10px * var(--ops-s));
   background: #0e0e0e;
 }
 
@@ -274,10 +269,6 @@
   justify-content: center;
   flex: 0 0 calc(48px * var(--ops-s));
   min-height: calc(46px * var(--ops-s));
-  height: auto;
-  border: 1px solid #575757;
-  border-radius: calc(10px * var(--ops-s));
-  background: #0e0e0e;
   color: #ba2c2c;
   cursor: pointer;
   padding: 0;
@@ -291,10 +282,10 @@
 .map-ops-section__list {
   display: flex;
   flex-direction: column;
-  gap: calc(10px * var(--ops-s));
+  gap: var(--lf-item-gap);
   flex: 1 1 auto;
   min-height: 0;
-  padding: calc(8px * var(--ops-s)) var(--lf-pad-x) calc(12px * var(--ops-s));
+  padding: calc(8px * var(--lf-item-scale)) var(--lf-pad-x) calc(12px * var(--lf-item-scale));
   padding-right: calc(14px * var(--lf-scale));
   overflow-y: auto;
   scrollbar-width: none;
@@ -310,11 +301,11 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: calc(6px * var(--ops-s));
-  min-height: calc(72px * var(--ops-s));
-  padding: calc(12px * var(--ops-s)) calc(14px * var(--ops-s));
+  gap: calc(5px * var(--lf-item-scale));
+  min-height: var(--lf-item-min-h);
+  padding: calc(8px * var(--lf-item-scale)) calc(12px * var(--lf-item-scale));
   border: 0;
-  border-radius: calc(15px * var(--ops-s));
+  border-radius: calc(15px * var(--lf-scale));
   background: #1b1b1b;
   color: #ffffff;
   text-align: left;
@@ -331,8 +322,9 @@
   align-items: center;
   justify-content: center;
   color: #949494;
-  font-size: calc(16px * var(--ops-s));
+  font-size: calc(13px * var(--lf-item-scale));
   font-weight: 600;
+  line-height: 1.3;
   cursor: default;
 }
 
@@ -340,21 +332,22 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: calc(10px * var(--ops-s));
+  gap: calc(6px * var(--lf-item-scale));
   min-width: 0;
 }
 
 .map-ops-section__row-title {
-  font-size: calc(16px * var(--ops-s));
+  font-size: calc(13px * var(--lf-item-scale));
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.3;
+  color: #ffffff;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .map-ops-section__row-meta {
-  font-size: calc(14px * var(--ops-s));
+  font-size: calc(11px * var(--lf-item-scale));
   font-weight: 600;
   line-height: 1.2;
   color: #949494;
@@ -363,9 +356,10 @@
 }
 
 .map-ops-section__row-sub {
-  font-size: calc(13px * var(--ops-s));
+  margin-top: calc(1px * var(--lf-item-scale));
+  font-size: calc(12px * var(--lf-item-scale));
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.3;
   color: #949494;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -375,25 +369,25 @@
 .map-ops-section__row-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: calc(6px * var(--ops-s));
+  gap: calc(6px * var(--lf-item-scale));
 }
 
 .map-ops-section__tag {
   display: inline-flex;
   align-items: center;
-  min-height: calc(28px * var(--ops-s));
-  padding: 0 calc(10px * var(--ops-s));
-  border-radius: calc(8px * var(--ops-s));
+  min-height: calc(18px * var(--lf-item-scale));
+  padding: calc(2px * var(--lf-item-scale)) calc(7px * var(--lf-item-scale));
+  border-radius: calc(5px * var(--lf-scale) * var(--lf-item-scale));
   background: #0e0e0e;
   border: 1px solid #575757;
-  font-size: calc(13px * var(--ops-s));
+  font-size: calc(12px * var(--lf-item-scale));
   font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0.02em;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
 }
 
 @media (max-width: 720px) {
   .map-ops-section__toolbar {
-    gap: calc(4px * var(--ops-s));
+    margin-right: calc(14px * var(--lf-scale));
   }
 }

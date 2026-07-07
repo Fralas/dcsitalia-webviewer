@@ -120,31 +120,24 @@ export default function MapOperationsPanel({
   }, [zones, combatMissionByZone, missionAirport, missionAirportId, radiusNm, taskFilter]);
 
   const logisticRows = useMemo(() => {
-    const airportCoords = getCoords(logisticAirport);
-    if (!airportCoords || !logisticAirportId) return [];
+    const arrivalCoords = getCoords(logisticAirport);
+    if (!arrivalCoords || !logisticAirportId) return [];
 
     return logisticsMissions
       .map((mission) => {
-        const source = airports.find((entry) => entry.id === mission.source_airport_id);
-        const destination = airports.find((entry) => entry.id === mission.airport_id);
-        const sourceCoords = getCoords(source);
-        const destinationCoords = getCoords(destination);
-        if (!sourceCoords || !destinationCoords) return null;
+        if (String(mission.airport_id) !== String(logisticAirportId)) return null;
 
-        const distanceToSource = haversineNm(
-          airportCoords.lat,
-          airportCoords.lon,
+        const source = airports.find((entry) => entry.id === mission.source_airport_id);
+        const destination = logisticAirport;
+        const sourceCoords = getCoords(source);
+        if (!sourceCoords) return null;
+
+        const distanceNm = haversineNm(
           sourceCoords.lat,
           sourceCoords.lon,
+          arrivalCoords.lat,
+          arrivalCoords.lon,
         );
-        const distanceToDestination = haversineNm(
-          airportCoords.lat,
-          airportCoords.lon,
-          destinationCoords.lat,
-          destinationCoords.lon,
-        );
-        const distanceToRoute = distanceToRouteNm(airportCoords, sourceCoords, destinationCoords);
-        const distanceNm = Math.min(distanceToSource, distanceToDestination, distanceToRoute);
         if (distanceNm > radiusNm) return null;
 
         return {
