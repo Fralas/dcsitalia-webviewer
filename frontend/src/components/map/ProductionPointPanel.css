@@ -31,7 +31,7 @@
 }
 
 .pp-panel--requested {
-  min-height: calc(309px * var(--pp-scale));
+  height: fit-content;
 }
 
 .pp-panel__header {
@@ -325,7 +325,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: calc(10px * var(--pp-scale));
-  padding: 0 calc(14px * var(--pp-scale)) calc(16px * var(--pp-scale));
+  padding: 0 calc(14px * var(--pp-scale)) calc(12px * var(--pp-scale));
 }
 
 .pp-panel__crate-pill {

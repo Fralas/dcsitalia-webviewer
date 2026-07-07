@@ -103,14 +103,14 @@ function PanelMeta({ pp, variant = 'main' }) {
   );
 }
 
-function RequestedCreateSection({ pp }) {
+function RequestedCrateSection({ pp }) {
   const categories = Object.entries(pp?.required_categories || {});
   if (categories.length === 0) return null;
 
   return (
     <>
       <div className="pp-panel__divider" />
-      <p className="pp-panel__section-title">REQUESTED CREATE</p>
+      <p className="pp-panel__section-title">REQUESTED CRATE</p>
       <div className="pp-panel__crate-grid">
         {categories.map(([category, need]) => {
           const have = Number(pp?.build_counts?.[category] || 0);
@@ -121,7 +121,7 @@ function RequestedCreateSection({ pp }) {
               key={category}
               className={`pp-panel__crate-pill${done ? ' pp-panel__crate-pill--done' : ''}`}
             >
-              {category} CREATE {have}/{required}
+              {category} CRATE {have}/{required}
             </div>
           );
         })}
@@ -177,10 +177,10 @@ export default function ProductionPointPanel({
 
   const isUpgrading = Boolean(pp.upgrading);
   const isBuilt = Boolean(pp.built);
-  const hasRequestedCreate = Object.keys(pp.required_categories || {}).length > 0;
+  const hasRequestedCrates = Object.keys(pp.required_categories || {}).length > 0;
   const showActions = !isUpgrading;
   const showQty = showActions && (canRetrieve || Number(pp?.stock) > 0);
-  const showBottomRequestedPanel = hasRequestedCreate && !isBuilt && !isUpgrading;
+  const showBottomRequestedPanel = hasRequestedCrates && !isBuilt && !isUpgrading;
 
   const upgradeLabel = isUpgrading
     ? 'UPGRADING...'
@@ -221,7 +221,7 @@ export default function ProductionPointPanel({
             />
           )}
 
-          <RequestedCreateSection pp={pp} />
+          <RequestedCrateSection pp={pp} />
 
           {!isAuthenticated && (
             <p className="pp-panel__footer-note">Login to interact</p>
@@ -276,11 +276,11 @@ export default function ProductionPointPanel({
       </section>
 
       {showBottomRequestedPanel && (
-        <section className="pp-panel pp-panel--requested" aria-label="Production point requested create">
+        <section className="pp-panel pp-panel--requested" aria-label="Production point requested crate">
           <PanelHeader pp={pp} productionPoints={productionPoints} onSelectPp={onSelectPp} onClose={onClose} />
           <div className="pp-panel__divider" />
           <PanelMeta pp={pp} variant="requested" />
-          <RequestedCreateSection pp={pp} />
+          <RequestedCrateSection pp={pp} />
         </section>
       )}
     </div>
