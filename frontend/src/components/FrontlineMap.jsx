@@ -25,6 +25,7 @@ import socketService from '../services/socket';
 import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, declineFrontlineZone, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getLogisticsRouteVisibility, getMissions, getServerTime, getTankerOptions, getTankerRoutes, setAirportLogisticsRoutePriority, getProductionPoints, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate, spawnTanker } from '../services/api';
 import ZoneMissionCard from './map/ZoneMissionCard';
 import LiveFeedPanel from './map/LiveFeedPanel';
+import MapFilterBar from './map/MapFilterBar';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
@@ -4431,7 +4432,6 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   const [airliftPlayers, setAirliftPlayers] = useState([]);
   const [dcsarPoints, setDcsarPoints] = useState([]);
   const [feedEvents, setFeedEvents] = useState([]);
-  const [overlayCollapsed, setOverlayCollapsed] = useState(false);
   const [feedCollapsed, setFeedCollapsed] = useState(false);
   const [zoneStatusMeta, setZoneStatusMeta] = useState({});
   const [mapMode, setMapMode] = useState(startInTacticalMode);
@@ -6421,99 +6421,15 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                   )}
                 </div>
               )}
-              <div
-                className={`absolute left-3 top-3 z-[1000] rounded-xl border border-yt-border bg-[#151925f2] shadow-2xl backdrop-blur transition-all duration-[360ms] ease-in-out ${
-                  overlayCollapsed ? 'w-[46px] p-1.5' : 'w-[52px] p-1.5'
-                }`}
-              >
-                <div className="flex flex-col items-center">
-                  <div
-                    className={`flex flex-col gap-2 overflow-hidden transition-[max-height,opacity,transform,margin-bottom] duration-[360ms] ease-in-out ${
-                      overlayCollapsed
-                        ? 'mb-0 max-h-0 -translate-y-1 opacity-0 pointer-events-none'
-                        : 'mb-2 max-h-56 translate-y-0 opacity-100'
-                    }`}
-                    aria-hidden={overlayCollapsed}
-                  >
-                    <button
-                      type="button"
-                      aria-label="Toggle ATO overlays"
-                      title="ATO"
-                      onClick={() => setFilters((current) => ({ ...current, showAto: !current.showAto }))}
-                      className={`rounded-md border p-2 transition-colors ${
-                        filters.showAto
-                          ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
-                          : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
-                      }`}
-                    >
-                      <Blend className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Toggle Logistics overlays"
-                      title="Logistics"
-                      onClick={() => setFilters((current) => ({ ...current, showLogistics: !current.showLogistics }))}
-                      className={`rounded-md border p-2 transition-colors ${
-                        filters.showLogistics
-                          ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
-                          : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
-                      }`}
-                    >
-                      <Forklift className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Toggle CSAR overlays"
-                      title="CSAR"
-                      onClick={() => setFilters((current) => ({ ...current, showDcsar: !current.showDcsar }))}
-                      className={`rounded-md border p-2 transition-colors ${
-                        filters.showDcsar
-                          ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
-                          : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
-                      }`}
-                    >
-                      <Ambulance className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Toggle Production Points"
-                      title="Production Points"
-                      onClick={() => setFilters((current) => ({ ...current, showProductionPoints: !current.showProductionPoints }))}
-                      className={`rounded-md border p-2 transition-colors ${
-                        filters.showProductionPoints
-                          ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
-                          : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
-                      }`}
-                    >
-                      <Factory className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Toggle satellite basemap"
-                      title="Satellite"
-                      className={`rounded-md border p-2 transition-colors ${
-                        basemapMode === BASEMAP_MODE_SATELLITE
-                          ? 'border-yt-accent bg-yt-accent/25 text-yt-text-primary'
-                          : 'border-yt-border bg-yt-bg-tertiary text-yt-text-secondary'
-                      }`}
-                      onClick={() => setBasemapMode((current) => (
-                        current === BASEMAP_MODE_SATELLITE ? BASEMAP_MODE_DARK : BASEMAP_MODE_SATELLITE
-                      ))}
-                    >
-                      <Satellite className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setOverlayCollapsed((value) => !value)}
-                    className="rounded-md border border-yt-border bg-yt-bg-tertiary/60 p-2 text-yt-text-secondary transition-colors hover:text-yt-text-primary"
-                    aria-label={overlayCollapsed ? 'Open overlays' : 'Close overlays'}
-                    title={overlayCollapsed ? 'Open overlays' : 'Close overlays'}
-                  >
-                    {overlayCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
+              <MapFilterBar
+                filters={filters}
+                basemapMode={basemapMode}
+                basemapModeSatellite={BASEMAP_MODE_SATELLITE}
+                onToggleFilter={(key) => setFilters((current) => ({ ...current, [key]: !current[key] }))}
+                onToggleBasemap={() => setBasemapMode((current) => (
+                  current === BASEMAP_MODE_SATELLITE ? BASEMAP_MODE_DARK : BASEMAP_MODE_SATELLITE
+                ))}
+              />
 
               <LiveFeedPanel
                 language={language}

@@ -290,6 +290,12 @@ function App() {
             </button>
           </div>
 
+          <div
+            id="app-header-map-filters"
+            className="app-header__center"
+            aria-hidden={currentView !== 'frontline'}
+          />
+
           <div className="app-header__right">
             <button
               type="button"

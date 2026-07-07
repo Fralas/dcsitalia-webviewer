@@ -14,12 +14,26 @@
 }
 
 .app-header__inner {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   height: 56px;
   padding: 0 20px;
+}
+
+.app-header__center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.app-header__center:not(:empty) {
+  pointer-events: auto;
 }
 
 .app-header__brand {
