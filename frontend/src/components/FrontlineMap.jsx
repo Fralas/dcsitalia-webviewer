@@ -27,6 +27,7 @@ import ZoneMissionCard from './map/ZoneMissionCard';
 import LiveFeedPanel from './map/LiveFeedPanel';
 import MapFilterBar from './map/MapFilterBar';
 import MapActionContextMenu from './map/MapActionContextMenu';
+import ProductionPointPanel from './map/ProductionPointPanel';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
@@ -1405,6 +1406,39 @@ function isProductionPointZone(zone, productionPoints = []) {
   return candidates.some((value) => /^PP[_\s-]/i.test(value));
 }
 
+function buildZoneCoordinatesByName(zones = []) {
+  const map = new Map();
+  zones.forEach((zone) => {
+    const coords = zone?.coordinates;
+    if (!coords || !Number.isFinite(coords.lat) || !Number.isFinite(coords.lon)) return;
+    [zone?.id, zone?.name, zone?.zone_name].forEach((key) => {
+      const normalized = String(key || '').trim();
+      if (normalized) map.set(normalized, coords);
+    });
+  });
+  return map;
+}
+
+function withResolvedProductionPointCoordinates(pp, zoneCoordsByName) {
+  if (!pp || typeof pp !== 'object') return pp;
+  if (Number.isFinite(pp?.coordinates?.lat) && Number.isFinite(pp?.coordinates?.lon)) {
+    return pp;
+  }
+  const lat = Number(pp?.lat);
+  const lon = Number(pp?.lon);
+  if (Number.isFinite(lat) && Number.isFinite(lon)) {
+    return { ...pp, coordinates: { lat, lon } };
+  }
+  const keys = [pp?.id, pp?.zone_name].map((value) => String(value || '').trim()).filter(Boolean);
+  for (const key of keys) {
+    const coords = zoneCoordsByName.get(key);
+    if (coords) {
+      return { ...pp, coordinates: coords };
+    }
+  }
+  return pp;
+}
+
 function getDbuildIconKind(status) {
   if (status === 'built') return 'rook-blue';
   if (status === 'draft') return 'hammer-white';
@@ -2426,6 +2460,17 @@ function MapLibreFlatMapView({
       }];
     }),
   }), [productionPoints, showProductionPoints, selectedProductionPointId]);
+
+  const fcProductionPointsRef = useRef(fcProductionPoints);
+  fcProductionPointsRef.current = fcProductionPoints;
+
+  const applyProductionPointSourceData = useCallback((map) => {
+    if (!map) return false;
+    const source = map.getSource('production-points-src');
+    if (!source?.setData) return false;
+    source.setData(fcProductionPointsRef.current);
+    return true;
+  }, []);
 
   const fcCrateClusters = useMemo(() => ({
     type: 'FeatureCollection',
@@ -3468,6 +3513,8 @@ function MapLibreFlatMapView({
         hideHoverPopup();
       });
 
+      applyProductionPointSourceData(map);
+
       addGeoSource('crate-clusters-src', fcCrateClusters);
       addGeoSource('spawn-radius-src', fcSpawnRadius);
 
@@ -3900,32 +3947,47 @@ function MapLibreFlatMapView({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
-    const visibility = showProductionPoints ? 'visible' : 'none';
-    if (map.getLayer('production-points-layer')) {
-      map.setLayoutProperty('production-points-layer', 'visibility', visibility);
+    if (!map) return undefined;
+
+    const applyVisibility = () => {
+      const visibility = showProductionPoints ? 'visible' : 'none';
+      if (map.getLayer('production-points-layer')) {
+        map.setLayoutProperty('production-points-layer', 'visibility', visibility);
+      }
+      if (map.getLayer('production-points-hit-layer')) {
+        map.setLayoutProperty('production-points-hit-layer', 'visibility', visibility);
+      }
+    };
+
+    if (map.isStyleLoaded()) {
+      applyVisibility();
+      return undefined;
     }
-    if (map.getLayer('production-points-hit-layer')) {
-      map.setLayoutProperty('production-points-hit-layer', 'visibility', visibility);
-    }
+
+    map.once('load', applyVisibility);
+    return () => {
+      map.off('load', applyVisibility);
+    };
   }, [showProductionPoints]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
-    const applyProductionPointData = () => {
-      const source = map.getSource('production-points-src');
-      if (source?.setData) source.setData(fcProductionPoints);
+    if (!map) return undefined;
+
+    const syncProductionPoints = () => {
+      applyProductionPointSourceData(map);
     };
+
     if (map.isStyleLoaded()) {
-      applyProductionPointData();
+      syncProductionPoints();
       return undefined;
     }
-    map.once('load', applyProductionPointData);
+
+    map.once('load', syncProductionPoints);
     return () => {
-      map.off('load', applyProductionPointData);
+      map.off('load', syncProductionPoints);
     };
-  }, [fcProductionPoints]);
+  }, [fcProductionPoints, applyProductionPointSourceData]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -4731,6 +4793,16 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     [zones]
   );
 
+  const zoneCoordinatesByName = useMemo(
+    () => buildZoneCoordinatesByName(validZones),
+    [validZones]
+  );
+
+  const productionPointsForMap = useMemo(
+    () => (productionPoints || []).map((pp) => withResolvedProductionPointCoordinates(pp, zoneCoordinatesByName)),
+    [productionPoints, zoneCoordinatesByName]
+  );
+
   const validAirports = useMemo(() => {
     const runtimeById = new Map();
     if (Array.isArray(airportsData)) {
@@ -4961,7 +5033,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   }, [validZones, combatMissionByZone, filters]);
 
   const zonesForMap = useMemo(() => {
-    if (filters.showProductionPoints) return filteredZones;
+    if (!filters.showProductionPoints) return filteredZones;
     return filteredZones.filter((zone) => !isProductionPointZone(zone, productionPoints));
   }, [filteredZones, filters.showProductionPoints, productionPoints]);
 
@@ -5009,7 +5081,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       size: airport.isMainBase ? 0.11 : 0.08,
     })) : [];
     const productionPointMarkers = filters.showProductionPoints
-      ? (productionPoints || []).flatMap((pp) => {
+      ? productionPointsForMap.flatMap((pp) => {
         if (!Number.isFinite(pp?.coordinates?.lat) || !Number.isFinite(pp?.coordinates?.lon)) return [];
         return [{
           lat: pp.coordinates.lat,
@@ -5019,7 +5091,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       })
       : [];
     return [...zonePoints, ...airportPoints, ...productionPointMarkers];
-  }, [zonesForMap, validAirports, productionPoints, selectedZoneId, selectedProductionPointId, filters.showAto, filters.showAirports, filters.showProductionPoints]);
+  }, [zonesForMap, validAirports, productionPointsForMap, selectedZoneId, selectedProductionPointId, filters.showAto, filters.showAirports, filters.showProductionPoints]);
 
   const zoneTheaterCenter = useMemo(() => {
     if (validZones.length === 0) return null;
@@ -6106,7 +6178,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       showDcsar={filters.showDcsar}
                       basemapMode={basemapMode}
                       focusTargetKey={tacticalFocusTargetKey}
-                      productionPoints={productionPoints}
+                      productionPoints={productionPointsForMap}
                       showProductionPoints={filters.showProductionPoints}
                       selectedProductionPointId={selectedProductionPointId}
                       onProductionPointSelect={handleProductionPointSelect}
@@ -6154,7 +6226,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       animationTick={animationTick}
                       basemapMode={basemapMode}
                       focusTargetKey={tacticalFocusTargetKey}
-                      productionPoints={productionPoints}
+                      productionPoints={productionPointsForMap}
                       showProductionPoints={filters.showProductionPoints}
                       selectedProductionPointId={selectedProductionPointId}
                       onProductionPointSelect={handleProductionPointSelect}
@@ -6466,106 +6538,32 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
               )}
 
               {filters.showProductionPoints && selectedProductionPoint && (
-                <div className="absolute left-4 bottom-4 z-[1000] w-[320px] rounded-xl border border-yt-border bg-[#101827f2] p-3 shadow-2xl backdrop-blur">
-                  <div className="mb-2 flex items-center justify-between">
-                    <div className="text-sm font-semibold text-yt-text-primary">
-                      {formatProductionPointPanelLabel(selectedProductionPoint)}
-                    </div>
-                    <PanelCloseButton onClick={() => { setSelectedProductionPointId(null); setRetrieveMode(null); }} />
-                  </div>
-                  <div className="space-y-1 text-[12px] text-yt-text-secondary">
-                    <div className="flex items-center justify-between">
-                      <span>Owner</span>
-                      <span className="font-semibold" style={{ color: getProductionPointColor(selectedProductionPoint.owner) }}>
-                        {selectedProductionPoint.owner}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Level</span>
-                      <span className="font-semibold text-yt-text-primary">
-                        LV{selectedProductionPoint.level} / {selectedProductionPoint.max_level}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Status</span>
-                      <span className="font-semibold text-yt-text-primary">
-                        {selectedProductionPoint.built ? (selectedProductionPoint.upgrading ? 'Upgrading' : 'Built') : 'Building'}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Stock</span>
-                      <span className="font-semibold text-yt-text-primary">
-                        {selectedProductionPoint.stock} / {selectedProductionPoint.max_stock}
-                      </span>
-                    </div>
-                    {Object.keys(selectedProductionPoint.required_categories || {}).length > 0 && (
-                      <div className="border-t border-yt-border/60 pt-1">
-                        <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">
-                          {selectedProductionPoint.upgrading ? 'Upgrade crates' : 'Build crates'}
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {Object.entries(selectedProductionPoint.required_categories).map(([cat, need]) => {
-                            const have = Number(selectedProductionPoint.build_counts?.[cat] || 0);
-                            const ok = have >= Number(need);
-                            return (
-                              <span
-                                key={cat}
-                                className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${
-                                  ok ? 'border-green-500/50 text-green-300' : 'border-yt-border text-yt-text-secondary'
-                                }`}
-                              >
-                                {cat} {have}/{need}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  {canRetrieveSelectedPp && (
-                    <div className="mt-3 border-t border-yt-border/60 pt-3">
-                      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">
-                        Retrieve crates
-                      </div>
-                      <RetrieveQuantitySlider
-                        value={panelRetrieveQuantity}
-                        max={maxRetrieveQuantity}
-                        disabled={!isAuthenticated}
-                        onChange={(quantity) => {
-                          if (retrieveMode && retrieveMode.ppId === selectedProductionPoint.id) {
-                            handleSetRetrieveQuantity(quantity);
-                            return;
-                          }
-                          setPpRetrieveDraftQty(clampRetrieveQuantity(quantity, maxRetrieveQuantity));
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleEnterRetrieveMode(selectedProductionPoint.id, panelRetrieveQuantity)}
-                        disabled={!isAuthenticated || Boolean(retrieveMode)}
-                        className="mt-2 w-full rounded border border-emerald-500/50 bg-emerald-500/15 px-2.5 py-1.5 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-50"
-                        title={!isAuthenticated ? 'Login required' : 'Place retrieve marker on map (500 m range)'}
-                      >
-                        {retrieveMode && retrieveMode.ppId === selectedProductionPoint.id ? 'Click map to place...' : 'Retrieve'}
-                      </button>
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => handleRequestUpgrade(selectedProductionPoint.id)}
-                    disabled={!isAuthenticated || !canUpgradeSelectedPp || upgradingPpId === selectedProductionPoint.id}
-                    className="mt-3 w-full rounded border border-blue-500/50 bg-blue-500/15 px-2.5 py-1.5 text-xs font-semibold text-blue-200 hover:bg-blue-500/25 disabled:cursor-not-allowed disabled:opacity-50"
-                    title={!isAuthenticated ? 'Login required' : (!canUpgradeSelectedPp ? 'Upgrade not available' : 'Start upgrade')}
-                  >
-                    {selectedProductionPoint.upgrading
-                      ? 'Upgrade in progress...'
-                      : upgradingPpId === selectedProductionPoint.id
-                        ? 'Sending...'
-                        : 'Start Upgrade'}
-                  </button>
-                  {!isAuthenticated && (
-                    <div className="mt-1 text-center text-[10px] text-yt-text-secondary">Login to interact</div>
-                  )}
+                <div className="absolute bottom-4 left-4 z-[1000]">
+                  <ProductionPointPanel
+                    pp={selectedProductionPoint}
+                    productionPoints={productionPoints}
+                    onSelectPp={handleProductionPointSelect}
+                    onClose={() => {
+                      setSelectedProductionPointId(null);
+                      setRetrieveMode(null);
+                    }}
+                    onUpgrade={() => handleRequestUpgrade(selectedProductionPoint.id)}
+                    onGetStock={() => handleEnterRetrieveMode(selectedProductionPoint.id, panelRetrieveQuantity)}
+                    retrieveQuantity={panelRetrieveQuantity}
+                    maxRetrieveQuantity={maxRetrieveQuantity}
+                    onRetrieveQuantityChange={(quantity) => {
+                      if (retrieveMode && retrieveMode.ppId === selectedProductionPoint.id) {
+                        handleSetRetrieveQuantity(quantity);
+                        return;
+                      }
+                      setPpRetrieveDraftQty(clampRetrieveQuantity(quantity, maxRetrieveQuantity));
+                    }}
+                    canUpgrade={canUpgradeSelectedPp}
+                    canRetrieve={canRetrieveSelectedPp}
+                    upgradingSending={upgradingPpId === selectedProductionPoint.id}
+                    retrieveModeActive={Boolean(retrieveMode && retrieveMode.ppId === selectedProductionPoint.id)}
+                    isAuthenticated={isAuthenticated}
+                  />
                 </div>
               )}
 
