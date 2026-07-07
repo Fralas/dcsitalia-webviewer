@@ -1,4 +1,4 @@
-import { ChevronDown, Circle, CircleHelp } from 'lucide-react';
+import { ChevronDown, CircleHelp } from 'lucide-react';
 import './ZoneMissionCard.css';
 
 function formatShortRelativeTime(timestamp) {
@@ -18,14 +18,14 @@ function getOwnerClass(status) {
   if (status === 'BLUE') return 'zone-mission-card__meta-value--blue';
   if (status === 'RED') return 'zone-mission-card__meta-value--red';
   if (status === 'UNDER_ATTACK') return 'zone-mission-card__meta-value--attack';
-  return 'zone-mission-card__meta-value--muted';
+  return '';
 }
 
 function getDotClass(status) {
   if (status === 'BLUE') return 'zone-mission-card__dot--blue';
   if (status === 'RED') return 'zone-mission-card__dot--red';
   if (status === 'UNDER_ATTACK') return 'zone-mission-card__dot--attack';
-  return 'zone-mission-card__dot--muted';
+  return 'zone-mission-card__dot--neutral';
 }
 
 export default function ZoneMissionCard({
@@ -62,8 +62,8 @@ export default function ZoneMissionCard({
     <section className="zone-mission-card" aria-label={`Zone ${zoneNumber} mission card`}>
       <div className="zone-mission-card__header">
         <div className="zone-mission-card__header-chip" aria-hidden="true">
-          <Circle size={10} strokeWidth={2.5} className="zone-mission-card__chip-icon" />
-          <ChevronDown size={10} className="zone-mission-card__chip-chevron" />
+          <span className="zone-mission-card__chip-ring" />
+          <ChevronDown strokeWidth={3} className="zone-mission-card__chip-chevron" />
         </div>
 
         <div className="zone-mission-card__zone-select">
@@ -80,44 +80,46 @@ export default function ZoneMissionCard({
               </option>
             ))}
           </select>
-          <ChevronDown size={10} className="zone-mission-card__select-chevron" aria-hidden="true" />
+          <ChevronDown strokeWidth={3} className="zone-mission-card__select-chevron" aria-hidden="true" />
         </div>
 
         <button type="button" className="zone-mission-card__help" aria-label="Zone help">
-          <CircleHelp size={12} />
+          <CircleHelp strokeWidth={2} />
         </button>
       </div>
 
+      <div className="zone-mission-card__divider" />
+
       <div className="zone-mission-card__meta">
-        <p className="zone-mission-card__meta-line">
-          <span className="zone-mission-card__meta-label">Owner:</span>
-          <span className={`zone-mission-card__meta-value ${getOwnerClass(zone.status)}`}>
-            {zone.status || '-'}
-          </span>
-        </p>
-        <p className="zone-mission-card__meta-line">
-          <span className="zone-mission-card__meta-label">Coordinate DMS:</span>
-          <span className="zone-mission-card__meta-value zone-mission-card__meta-value--muted zone-mission-card__meta-value--mono">
-            {coordinatesDms}
-          </span>
-        </p>
-        <p className="zone-mission-card__meta-line">
-          <span className="zone-mission-card__meta-label">Last Change:</span>
-          <span className="zone-mission-card__meta-value zone-mission-card__meta-value--muted">
-            {formatShortRelativeTime(changedAt)}
-          </span>
-        </p>
-        <p className="zone-mission-card__meta-line">
-          <span className="zone-mission-card__meta-label">Coordinate MGRS:</span>
-          <span className="zone-mission-card__meta-value zone-mission-card__meta-value--muted zone-mission-card__meta-value--mono">
-            {coordinatesMgrs}
-          </span>
-        </p>
+        <div className="zone-mission-card__meta-col">
+          <p className="zone-mission-card__meta-line">
+            Owner:{' '}
+            <span className={`zone-mission-card__meta-value ${getOwnerClass(zone.status)}`}>
+              {zone.status || '-'}
+            </span>
+          </p>
+          <p className="zone-mission-card__meta-line">
+            Last Change:{' '}
+            <span className="zone-mission-card__meta-value">{formatShortRelativeTime(changedAt)}</span>
+          </p>
+        </div>
+        <div className="zone-mission-card__meta-col zone-mission-card__meta-col--coords">
+          <p className="zone-mission-card__meta-line">
+            Coordinate DMS:{' '}
+            <span className="zone-mission-card__meta-value">{coordinatesDms}</span>
+          </p>
+          <p className="zone-mission-card__meta-line">
+            Coordinate MGRS:{' '}
+            <span className="zone-mission-card__meta-value">{coordinatesMgrs}</span>
+          </p>
+        </div>
       </div>
+
+      <div className="zone-mission-card__divider" />
 
       <div className="zone-mission-card__section">
         <p className="zone-mission-card__section-title">Task</p>
-        <div className="zone-mission-card__pills">
+        <div className="zone-mission-card__pills zone-mission-card__pills--task">
           {tasks.length > 0 ? tasks.map((task) => (
             <span key={task} className="zone-mission-card__pill">{task}</span>
           )) : (
@@ -126,9 +128,11 @@ export default function ZoneMissionCard({
         </div>
       </div>
 
+      <div className="zone-mission-card__divider" />
+
       <div className="zone-mission-card__section">
         <p className="zone-mission-card__section-title">Surrounded</p>
-        <div className="zone-mission-card__pills">
+        <div className="zone-mission-card__pills zone-mission-card__pills--neighbor">
           {neighborZones.length > 0 ? neighborZones.map((neighbor) => (
             <span key={neighbor.id} className="zone-mission-card__pill">
               ZONE {neighbor.zoneNumber}
@@ -138,6 +142,8 @@ export default function ZoneMissionCard({
           )}
         </div>
       </div>
+
+      <div className="zone-mission-card__divider" />
 
       <div className="zone-mission-card__footer">
         {acceptedByCurrentUser ? (

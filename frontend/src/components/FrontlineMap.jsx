@@ -6623,7 +6623,7 @@ export default function FrontlineMap({ tacticalMapId, airportsData, airportCatal
               )}
 
               {mapMode && filters.showDcsar && hoveredDcsarPoint && (
-                <div className={`absolute bottom-4 z-[1000] w-[360px] rounded-xl border border-yt-border bg-[#1b1d2af0] p-3 shadow-2xl backdrop-blur ${filters.showAto && selectedZone ? 'left-[292px]' : 'left-4'}`}>
+                <div className={`absolute bottom-4 z-[1000] w-[360px] rounded-xl border border-yt-border bg-[#1b1d2af0] p-3 shadow-2xl backdrop-blur ${filters.showAto && selectedZone ? 'left-[366px]' : 'left-4'}`}>
                   <div className="mb-2 flex flex-wrap gap-1.5">
                     <span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${hoveredDcsarPoint.accepted ? 'bg-green-500/20 text-green-200' : 'bg-slate-200/20 text-slate-100'}`}>
                       {hoveredDcsarPoint.accepted ? 'Accepted' : 'Awaiting Rescue'}
