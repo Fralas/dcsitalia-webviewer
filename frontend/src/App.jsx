@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Activity, AlertCircle, BookOpen, CalendarSync, TowerControl, Users } from 'lucide-react';
+import { Activity, AlertCircle, BookOpen, CalendarSync, ChevronDown, TowerControl, Users } from 'lucide-react';
 import FrontlineMap from './components/FrontlineMap';
 import LandingPage from './components/landing/LandingPage';
 import UserMenu from './components/UserMenu';
@@ -16,6 +16,7 @@ import gbFlagImg from '../img/flags/gb.svg';
 import itFlagImg from '../img/flags/it.svg';
 import { useUser } from './contexts/UserContext';
 import { canAccessAtc, canAccessLidc } from './config/featureAccess';
+import './AppHeader.css';
 
 const VIEW_TO_PATH = Object.freeze({
   landing: '/',
@@ -273,140 +274,117 @@ function App() {
   }
 
   return (
-    <div className="app-shell h-screen bg-yt-bg-primary flex flex-col overflow-hidden">
-      <header className="sticky top-0 z-50 border-b border-yt-border/80 bg-[#0b1119f2] shadow-[0_8px_28px_rgba(0,0,0,0.35)] backdrop-blur-md">
-        <div className="mx-auto w-full px-4 py-1.5">
-          <div className="flex h-10 items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <button
-                type="button"
-                onClick={() => goToView('landing')}
-                className="flex items-center gap-2 text-left transition-opacity hover:opacity-90"
-                title="Home"
-              >
-                <img
-                  src={bannerImg}
-                  alt="DCS Italia"
-                  className="h-7 w-7 object-contain"
-                />
-                <div className="leading-tight">
-                  <div className="text-[13px] font-bold uppercase tracking-[0.12em] text-yt-text-primary">Monitor DCS Frontline</div>
-                  <div className="text-[10px] uppercase tracking-[0.12em] text-yt-text-secondary">Realtime theater status</div>
-                </div>
-              </button>
+    <div className={`app-shell h-screen flex flex-col overflow-hidden ${currentView === 'landing' ? 'bg-[#0b0b0d]' : 'bg-yt-bg-primary'}`}>
+      <header className="app-header">
+        <div className="app-header__inner">
+          <div className="app-header__left">
+            <button
+              type="button"
+              onClick={() => goToView('landing')}
+              className="app-header__brand"
+              title="Home"
+            >
+              <img
+                src={bannerImg}
+                alt="DCS Italia"
+                className="app-header__logo"
+              />
+              <span className="app-header__title">DCS ITALIA</span>
+            </button>
 
-              {currentView === 'frontline' && (
-                <div className="hidden lg:flex items-center gap-1.5 rounded-md border border-yt-border/80 bg-[#141b25] px-2 py-1">
-                  <span className="inline-flex items-center gap-1 rounded-sm bg-green-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-green-300">
-                    <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
-                    Live
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-200">
-                    <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
-                    {frontlineSummary.total}
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-300">
-                    <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
-                    {frontlineSummary.RED}
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-300">
-                    <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-                    {frontlineSummary.BLUE}
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-300">
-                    <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-                    {frontlineSummary.NEUTRAL}
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-orange-300">
-                    <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
-                    {frontlineSummary.UNDER_ATTACK}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={toggleLanguage}
-                className="inline-flex h-[34px] w-[84px] items-center justify-center bg-transparent p-0 transition-opacity hover:opacity-95"
-                role="switch"
-                aria-checked={isItalian}
-                aria-label={isItalian ? 'Switch language to English' : 'Switch language to Italian'}
-                title={isItalian ? 'Switch language to English' : 'Switch language to Italian'}
-              >
-                <span className="relative flex h-7 w-[84px] items-center rounded-md border border-yt-border/80 bg-[#101a29]">
-                  <span
-                    className={`pointer-events-none absolute top-0.5 h-6 w-[38px] rounded-sm border border-yt-accent/50 bg-yt-accent/20 shadow-[0_0_10px_rgba(78,197,255,0.2)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                      isItalian ? 'translate-x-[43px]' : 'translate-x-0.5'
-                    }`}
-                  />
-                  <span className="relative z-10 inline-flex w-1/2 items-center justify-center" aria-hidden="true">
-                    <img src={gbFlagImg} alt="" className="h-2.5 w-4 rounded-[2px] object-cover" />
-                  </span>
-                  <span className="relative z-10 inline-flex w-1/2 items-center justify-center" aria-hidden="true">
-                    <img src={itFlagImg} alt="" className="h-2.5 w-4 rounded-[2px] object-cover" />
-                  </span>
+            {currentView === 'frontline' && (
+              <div className="app-header__summary">
+                <span className="app-header__summary-badge" style={{ color: '#86efac' }}>
+                  <span className="app-header__summary-dot" style={{ background: '#4ade80' }} />
+                  Live
                 </span>
-              </button>
+                <span className="app-header__summary-badge" style={{ color: '#e2e8f0' }}>
+                  <span className="app-header__summary-dot" style={{ background: '#cbd5e1' }} />
+                  {frontlineSummary.total}
+                </span>
+                <span className="app-header__summary-badge" style={{ color: '#fca5a5' }}>
+                  <span className="app-header__summary-dot" style={{ background: '#f87171' }} />
+                  {frontlineSummary.RED}
+                </span>
+                <span className="app-header__summary-badge" style={{ color: '#93c5fd' }}>
+                  <span className="app-header__summary-dot" style={{ background: '#60a5fa' }} />
+                  {frontlineSummary.BLUE}
+                </span>
+                <span className="app-header__summary-badge" style={{ color: '#cbd5e1' }}>
+                  <span className="app-header__summary-dot" style={{ background: '#94a3b8' }} />
+                  {frontlineSummary.NEUTRAL}
+                </span>
+                <span className="app-header__summary-badge" style={{ color: '#fdba74' }}>
+                  <span className="app-header__summary-dot" style={{ background: '#fb923c' }} />
+                  {frontlineSummary.UNDER_ATTACK}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="app-header__right">
+            <button
+              type="button"
+              onClick={toggleLanguage}
+              className="app-header__lang"
+              aria-label={isItalian ? 'Switch language to English' : 'Switch language to Italian'}
+              title={isItalian ? 'Switch language to English' : 'Switch language to Italian'}
+            >
+              <img
+                src={isItalian ? itFlagImg : gbFlagImg}
+                alt=""
+                className="app-header__lang-flag"
+                aria-hidden="true"
+              />
+              <span className="app-header__lang-code">{isItalian ? 'IT' : 'EN'}</span>
+              <ChevronDown className="app-header__lang-chevron" aria-hidden="true" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => goToView('changelogs')}
+              className={`app-header__nav-btn${currentView === 'changelogs' ? ' is-active' : ''}`}
+              title="Apri changelog"
+              aria-label="Apri changelog"
+            >
+              <CalendarSync className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => goToView('wiki')}
+              className={`app-header__nav-btn${currentView === 'wiki' ? ' is-active' : ''}`}
+              title="Apri wiki"
+              aria-label="Apri wiki"
+            >
+              <BookOpen className="w-4 h-4" />
+            </button>
+
+            {showLidc && (
               <button
                 type="button"
-                onClick={() => goToView('changelogs')}
-                className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] transition-colors ${
-                  currentView === 'changelogs'
-                    ? 'border-yt-accent bg-yt-accent/20 text-yt-accent'
-                    : 'border-yt-border/80 bg-[#151b25] text-yt-text-primary hover:border-yt-accent hover:text-white'
-                }`}
-                title="Apri changelog"
-                aria-label="Apri changelog"
+                onClick={() => goToView('lidc')}
+                className={`app-header__nav-btn${currentView === 'lidc' ? ' is-active' : ''}`}
+                title="Apri LIDC"
+                aria-label="Apri LIDC"
               >
-                <CalendarSync className="w-4 h-4" />
+                <Users className="w-4 h-4" />
               </button>
+            )}
+
+            {showAtc && (
               <button
                 type="button"
-                onClick={() => goToView('wiki')}
-                className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] transition-colors ${
-                  currentView === 'wiki'
-                    ? 'border-yt-accent bg-yt-accent/20 text-yt-accent'
-                    : 'border-yt-border/80 bg-[#151b25] text-yt-text-primary hover:border-yt-accent hover:text-white'
-                }`}
-                title="Apri wiki"
-                aria-label="Apri wiki"
+                onClick={() => goToView('atc')}
+                className={`app-header__nav-btn${currentView === 'atc' ? ' is-active' : ''}`}
+                title="ATC Strips"
+                aria-label="ATC Strips"
               >
-                <BookOpen className="w-4 h-4" />
+                <TowerControl className="w-4 h-4" />
               </button>
-              {showLidc && (
-                <button
-                  type="button"
-                  onClick={() => goToView('lidc')}
-                  className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] transition-colors ${
-                    currentView === 'lidc'
-                      ? 'border-yt-accent bg-yt-accent/20 text-yt-accent'
-                      : 'border-yt-border/80 bg-[#151b25] text-yt-text-primary hover:border-yt-accent hover:text-white'
-                  }`}
-                  title="Apri LIDC"
-                  aria-label="Apri LIDC"
-                >
-                  <Users className="w-4 h-4" />
-                </button>
-              )}
-              {showAtc && (
-                <button
-                  type="button"
-                  onClick={() => goToView('atc')}
-                  className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] transition-colors ${
-                    currentView === 'atc'
-                      ? 'border-yt-accent bg-yt-accent/20 text-yt-accent'
-                      : 'border-yt-border/80 bg-[#151b25] text-yt-text-primary hover:border-yt-accent hover:text-white'
-                  }`}
-                  title="ATC Strips"
-                  aria-label="ATC Strips"
-                >
-                  <TowerControl className="w-4 h-4" />
-                </button>
-              )}
-              <UserMenu onOpenProfile={() => goToView('profile')} />
-            </div>
+            )}
+
+            <UserMenu onOpenProfile={() => goToView('profile')} variant="brand" />
           </div>
         </div>
       </header>

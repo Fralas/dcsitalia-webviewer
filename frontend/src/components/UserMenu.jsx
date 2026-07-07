@@ -6,10 +6,11 @@ import { useUser } from '../contexts/UserContext';
 /**
  * User Menu Component - Discord Authentication
  */
-export default function UserMenu({ onOpenProfile }) {
+export default function UserMenu({ onOpenProfile, variant = 'default' }) {
   const { user, loading, setUser } = useUser();
   const [menuOpen, setMenuOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const isBrand = variant === 'brand';
 
   const handleLogin = () => {
     window.location.href = '/api/auth/discord';
@@ -45,8 +46,8 @@ export default function UserMenu({ onOpenProfile }) {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 px-3 py-1.5">
-        <div className="w-6 h-6 rounded-full bg-yt-bg-tertiary animate-pulse"></div>
+      <div className={`flex items-center gap-2 ${isBrand ? 'app-header__user-wrap' : 'px-3 py-1.5'}`}>
+        <div className={`rounded-full bg-yt-bg-tertiary animate-pulse ${isBrand ? 'app-header__user-avatar' : 'w-6 h-6'}`} />
       </div>
     );
   }
@@ -92,7 +93,9 @@ export default function UserMenu({ onOpenProfile }) {
         <button
           onClick={() => setLoginModalOpen(true)}
           aria-label="Open login window"
-          className="rounded border border-yt-border/80 bg-[#151b25] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-yt-text-primary transition-colors hover:border-yt-accent hover:text-white"
+          className={isBrand
+            ? 'app-header__login-btn'
+            : 'rounded border border-yt-border/80 bg-[#151b25] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-yt-text-primary transition-colors hover:border-yt-accent hover:text-white'}
         >
           Login
         </button>
@@ -103,59 +106,68 @@ export default function UserMenu({ onOpenProfile }) {
   }
 
   return (
-    <div className="relative">
+    <div className={isBrand ? 'app-header__user-wrap' : 'relative'}>
       <button
         onClick={() => setMenuOpen(!menuOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-yt-bg-tertiary hover:bg-yt-border text-yt-text-primary transition-all"
+        className={isBrand
+          ? 'app-header__user-btn'
+          : 'flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-yt-bg-tertiary hover:bg-yt-border text-yt-text-primary transition-all'}
       >
         {getAvatarUrl() ? (
           <img
             src={getAvatarUrl()}
             alt={user.globalName || user.username}
-            className="w-6 h-6 rounded-full"
+            className={isBrand ? 'app-header__user-avatar' : 'w-6 h-6 rounded-full'}
           />
         ) : (
-          <User className="w-4 h-4" />
+          <User className={isBrand ? 'app-header__user-avatar' : 'w-4 h-4'} />
         )}
-        <span className="hidden sm:inline">{user.globalName || user.username}</span>
-        <ChevronDown className={`w-4 h-4 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
+        <span className={isBrand ? 'app-header__user-name hidden sm:inline' : 'hidden sm:inline'}>
+          {user.globalName || user.username}
+        </span>
+        <ChevronDown className={isBrand
+          ? `app-header__user-chevron transition-transform ${menuOpen ? 'rotate-180' : ''}`
+          : `w-4 h-4 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {/* Dropdown Menu */}
       {menuOpen && (
         <>
-          {/* Backdrop to close menu */}
           <div
             className="fixed inset-0 z-10"
             onClick={() => setMenuOpen(false)}
-          ></div>
+          />
 
-          {/* Menu */}
-          <div className="absolute right-0 mt-2 w-48 bg-yt-bg-secondary border border-yt-border rounded-lg shadow-lg z-20">
+          <div className={isBrand
+            ? 'app-header__menu'
+            : 'absolute right-0 mt-2 w-48 bg-yt-bg-secondary border border-yt-border rounded-lg shadow-lg z-20'}>
             <button
               type="button"
               onClick={handleOpenProfile}
-              className="w-full p-3 border-b border-yt-border text-left hover:bg-yt-bg-tertiary transition-colors"
+              className={isBrand ? 'app-header__menu-head' : 'w-full p-3 border-b border-yt-border text-left hover:bg-yt-bg-tertiary transition-colors'}
             >
-              <div className="text-sm font-semibold text-yt-text-primary">
+              <div className={isBrand ? 'app-header__menu-name' : 'text-sm font-semibold text-yt-text-primary'}>
                 {user.globalName || user.username}
               </div>
               {user.discriminator && user.discriminator !== '0' && (
-                <div className="text-xs text-yt-text-secondary">
+                <div className={isBrand ? 'app-header__menu-disc' : 'text-xs text-yt-text-secondary'}>
                   #{user.discriminator}
                 </div>
               )}
             </button>
             <button
               onClick={handleOpenProfile}
-              className="w-full px-3 py-2 text-left text-sm text-yt-text-primary hover:bg-yt-bg-tertiary flex items-center gap-2 transition-all"
+              className={isBrand
+                ? 'app-header__menu-item'
+                : 'w-full px-3 py-2 text-left text-sm text-yt-text-primary hover:bg-yt-bg-tertiary flex items-center gap-2 transition-all'}
             >
               <UserCircle2 className="w-4 h-4" />
               Profilo
             </button>
             <button
               onClick={handleLogout}
-              className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-yt-bg-tertiary flex items-center gap-2 transition-all rounded-b-lg"
+              className={isBrand
+                ? 'app-header__menu-item app-header__menu-item--danger'
+                : 'w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-yt-bg-tertiary flex items-center gap-2 transition-all rounded-b-lg'}
             >
               <LogOut className="w-4 h-4" />
               Logout

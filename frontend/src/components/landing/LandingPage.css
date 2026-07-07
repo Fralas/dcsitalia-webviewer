@@ -2,8 +2,9 @@
   --landing-bg: #0b0b0d;
   --landing-card: rgba(20, 21, 26, 0.82);
   --landing-card-border: rgba(255, 255, 255, 0.08);
-  --landing-accent: #f5821f;
-  --landing-accent-soft: rgba(245, 130, 31, 0.16);
+  --landing-accent: #FF6B01;
+  --landing-accent-soft: rgba(255, 107, 1, 0.16);
+  --landing-yellow: #FFD500;
   --landing-text: #f2f4f8;
   --landing-text-dim: #9aa3b2;
 
@@ -38,7 +39,7 @@
 .landing-switcher__btn {
   padding: 7px 16px;
   border-radius: 999px;
-  border: 1px solid rgba(245, 130, 31, 0.35);
+  border: 1px solid rgba(255, 107, 1, 0.35);
   background: rgba(18, 18, 22, 0.7);
   color: var(--landing-text-dim);
   font-size: 12px;
@@ -59,7 +60,7 @@
   color: #fff;
   background: var(--landing-accent-soft);
   border-color: var(--landing-accent);
-  box-shadow: 0 0 16px rgba(245, 130, 31, 0.25);
+  box-shadow: 0 0 16px rgba(255, 107, 1, 0.25);
 }
 
 /* ---------- Globe ---------- */

@@ -23,7 +23,7 @@ export const CAMPAIGNS = [
     label: 'HIDC - MODERN SYRIA',
     theaterName: 'MODERN SYRIA',
     title: 'HIDC - High Intensity Dynamic Campaign',
-    highlightColor: '#ff8c1a',
+    highlightColor: '#FF6B01',
     globeRegions: ['SY'],
     openTarget: 'frontline',
     description: {
@@ -123,7 +123,7 @@ export const CAMPAIGNS = [
     label: 'LIDC - PERSIAN GULF',
     theaterName: 'PERSIAN GULF',
     title: 'LIDC - Low Intensity Dynamic Campaign',
-    highlightColor: '#ffd23f',
+    highlightColor: '#FFD500',
     globeRegions: ['IR', 'IQ', 'KW', 'SA', 'AE', 'QA', 'BH', 'OM'],
     openTarget: null,
     description: {
@@ -153,7 +153,7 @@ export const CAMPAIGNS = [
     label: 'LIDC - AFGHANISTAN',
     theaterName: 'AFGHANISTAN',
     title: 'LIDC - Low Intensity Dynamic Campaign',
-    highlightColor: '#ffd23f',
+    highlightColor: '#FFD500',
     globeRegions: ['AF'],
     openTarget: 'lidc',
     description: {
