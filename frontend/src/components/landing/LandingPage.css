@@ -55,7 +55,7 @@
 }
 
 .campaign-pointers__line.is-active {
-  stroke: var(--landing-accent);
+  stroke: var(--pointer-accent, var(--landing-accent));
   stroke-width: 2;
 }
 
@@ -64,7 +64,7 @@
 }
 
 .campaign-pointers__dot.is-active {
-  fill: var(--landing-accent);
+  fill: var(--pointer-accent, var(--landing-accent));
 }
 
 .campaign-pointers__label {

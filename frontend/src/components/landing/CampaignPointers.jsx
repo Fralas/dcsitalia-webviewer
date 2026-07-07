@@ -181,20 +181,30 @@ export default function CampaignPointers({ globe, selectedCampaignId, onSelect }
   return (
     <div ref={overlayRef} className="campaign-pointers" role="tablist" aria-label="Campaigns">
       <svg className="campaign-pointers__svg">
-        {pointers.map(({ campaign, anchor, elbow, label, opacity }) => (
-          <g key={campaign.id} style={{ opacity }}>
+        {pointers.map(({ campaign, anchor, elbow, label, opacity }) => {
+          const isActive = campaign.id === selectedCampaignId;
+          const accent = campaign.highlightColor || '#FF6B01';
+          return (
+          <g
+            key={campaign.id}
+            style={{
+              opacity,
+              ...(isActive ? { '--pointer-accent': accent } : {}),
+            }}
+          >
             <circle
-              className={`campaign-pointers__dot${campaign.id === selectedCampaignId ? ' is-active' : ''}`}
+              className={`campaign-pointers__dot${isActive ? ' is-active' : ''}`}
               cx={anchor.x}
               cy={anchor.y}
               r={3}
             />
             <path
-              className={`campaign-pointers__line${campaign.id === selectedCampaignId ? ' is-active' : ''}`}
+              className={`campaign-pointers__line${isActive ? ' is-active' : ''}`}
               d={`M ${anchor.x} ${anchor.y} L ${elbow.x} ${elbow.y} L ${label.x} ${label.y}`}
             />
           </g>
-        ))}
+          );
+        })}
       </svg>
 
       {pointers.map(({ campaign, label, opacity }) => {
