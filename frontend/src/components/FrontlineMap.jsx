@@ -26,6 +26,7 @@ import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacem
 import ZoneMissionCard from './map/ZoneMissionCard';
 import LiveFeedPanel from './map/LiveFeedPanel';
 import MapFilterBar from './map/MapFilterBar';
+import MapActionContextMenu from './map/MapActionContextMenu';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
@@ -525,152 +526,6 @@ function buildTankerRouteFeatures(routes) {
   });
 
   return { lineFeatures };
-}
-
-const TANKER_OPTIONS_FALLBACK = [
-  { keyword: 'BOOM', label: 'BOOM', min_dist_nm: TANKER_MIN_DIST_NM },
-  { keyword: 'BASKET', label: 'BASKET', min_dist_nm: TANKER_MIN_DIST_NM },
-];
-
-const DBUILD_CATALOG_FALLBACK = [
-  { id: 'mortar', label: 'Mortar' },
-  { id: 'ewr', label: 'EWR' },
-  { id: 'nasams', label: 'NASAMS' },
-  { id: 'rapier', label: 'Rapier' },
-  { id: 'farp', label: 'FARP' },
-];
-
-function MapActionContextMenu({
-  menu,
-  collapsed,
-  onToggleCollapsed,
-  activePanel,
-  onSetActivePanel,
-  catalog,
-  tankerOptions,
-  onSelectDbuild,
-  onSelectTanker,
-}) {
-  if (!menu) return null;
-
-  const entries = catalog.length > 0 ? catalog : DBUILD_CATALOG_FALLBACK;
-  const tankers = tankerOptions.length > 0 ? tankerOptions : TANKER_OPTIONS_FALLBACK;
-  const panel = activePanel || 'root';
-
-  return (
-    <div
-      className="absolute z-[1200]"
-      style={{ left: menu.x, top: menu.y }}
-      onClick={(event) => event.stopPropagation()}
-      onContextMenu={(event) => event.preventDefault()}
-    >
-      <div
-        className={`rounded-xl border border-yt-border bg-[#151925f2] shadow-2xl backdrop-blur transition-all duration-[360ms] ease-in-out ${
-          collapsed ? 'w-[46px] p-1.5' : 'w-[228px] p-2'
-        }`}
-      >
-        <div
-          className={`overflow-hidden transition-[max-height,opacity,transform,margin-bottom] duration-[360ms] ease-in-out ${
-            collapsed
-              ? 'mb-0 max-h-0 -translate-y-1 opacity-0 pointer-events-none'
-              : 'mb-2 max-h-96 translate-y-0 opacity-100'
-          }`}
-          aria-hidden={collapsed}
-        >
-          {panel !== 'root' && (
-            <button
-              type="button"
-              onClick={() => onSetActivePanel('root')}
-              className="mb-1.5 flex w-full items-center gap-1 rounded-md px-1 py-1 text-[11px] font-semibold text-yt-text-secondary transition-colors hover:text-yt-text-primary"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-              Back
-            </button>
-          )}
-
-          {panel === 'root' && (
-            <div className="flex flex-col gap-1">
-              <button
-                type="button"
-                onClick={() => onSetActivePanel('dbuild')}
-                className="flex w-full items-center gap-2 rounded-md border border-yt-border bg-yt-bg-tertiary/60 px-2 py-2 text-left text-[12px] font-semibold text-yt-text-primary transition-colors hover:border-yt-accent/50 hover:bg-yt-accent/10"
-              >
-                <Hammer className="h-4 w-4 shrink-0 text-amber-200" />
-                <span>DBUILD</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onSetActivePanel('tanker')}
-                className="flex w-full items-center gap-2 rounded-md border border-yt-border bg-yt-bg-tertiary/60 px-2 py-2 text-left text-[12px] font-semibold text-yt-text-primary transition-colors hover:border-cyan-400/50 hover:bg-cyan-400/10"
-              >
-                <Fuel className="h-4 w-4 shrink-0 text-cyan-300" />
-                <span>Tanker</span>
-              </button>
-            </div>
-          )}
-
-          {panel === 'dbuild' && (
-            <>
-              <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] uppercase tracking-[0.18em] text-yt-text-secondary">
-                <Hammer className="h-3.5 w-3.5 text-amber-200" />
-                DBUILD
-              </div>
-              <div className="flex flex-col gap-1">
-                {entries.map((entry) => (
-                  <button
-                    key={entry.id}
-                    type="button"
-                    onClick={() => onSelectDbuild(entry.id)}
-                    className="flex w-full items-center justify-between rounded-md border border-yt-border bg-yt-bg-tertiary/60 px-2 py-1.5 text-left text-[12px] font-semibold text-yt-text-primary transition-colors hover:border-yt-accent/50 hover:bg-yt-accent/10"
-                  >
-                    <span>{entry.label || entry.id}</span>
-                    {Number.isFinite(entry.estimated_fp_cost) && (
-                      <span className="text-[10px] font-semibold text-yt-text-secondary">
-                        {entry.estimated_fp_cost} fp
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-
-          {panel === 'tanker' && (
-            <>
-              <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] uppercase tracking-[0.18em] text-yt-text-secondary">
-                <Fuel className="h-3.5 w-3.5 text-cyan-300" />
-                Tanker
-              </div>
-              <div className="flex flex-col gap-1">
-                {tankers.map((entry) => (
-                  <button
-                    key={entry.keyword}
-                    type="button"
-                    onClick={() => onSelectTanker(entry.keyword, entry.label || entry.keyword)}
-                    className="flex w-full flex-col rounded-md border border-yt-border bg-yt-bg-tertiary/60 px-2 py-1.5 text-left transition-colors hover:border-cyan-400/50 hover:bg-cyan-400/10"
-                  >
-                    <span className="text-[12px] font-semibold text-yt-text-primary">{entry.label || entry.keyword}</span>
-                    {entry.platform && (
-                      <span className="text-[10px] text-yt-text-secondary">{entry.platform}</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={onToggleCollapsed}
-          className="flex w-full items-center justify-center rounded-md border border-yt-border bg-yt-bg-tertiary/60 p-2 text-yt-text-secondary transition-colors hover:text-yt-text-primary"
-          aria-label={collapsed ? 'Open map actions menu' : 'Close map actions menu'}
-          title={collapsed ? 'Open map actions menu' : 'Close map actions menu'}
-        >
-          {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-        </button>
-      </div>
-    </div>
-  );
 }
 
 const SPAWN_MENU_SECTIONS = [
@@ -4481,8 +4336,6 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   const [dbuildSites, setDbuildSites] = useState([]);
   const [selectedDbuildPlacementId, setSelectedDbuildPlacementId] = useState(null);
   const [mapContextMenu, setMapContextMenu] = useState(null);
-  const [contextMenuPanel, setContextMenuPanel] = useState('root');
-  const [dbuildMenuCollapsed, setDbuildMenuCollapsed] = useState(false);
   const [tankerOptions, setTankerOptions] = useState([]);
   const [tankerRoutes, setTankerRoutes] = useState([]);
   const [tankerMode, setTankerMode] = useState(null);
@@ -6013,7 +5866,6 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   const handleStartTankerMode = useCallback((keyword, label) => {
     if (!keyword) return;
     setMapContextMenu(null);
-    setContextMenuPanel('root');
     setTankerMode({
       keyword: String(keyword).toUpperCase(),
       label: label || keyword,
@@ -6199,8 +6051,6 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       x: payload.clientX - rect.left + DBUILD_CONTEXT_MENU_OFFSET_X,
       y: payload.clientY - rect.top + DBUILD_CONTEXT_MENU_OFFSET_Y,
     });
-    setDbuildMenuCollapsed(false);
-    setContextMenuPanel('root');
     setSelectedDbuildPlacementId(null);
   }, [mapContextMenuEnabled]);
 
@@ -6611,10 +6461,6 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
 
               <MapActionContextMenu
                 menu={mapContextMenu}
-                collapsed={dbuildMenuCollapsed}
-                onToggleCollapsed={() => setDbuildMenuCollapsed((value) => !value)}
-                activePanel={contextMenuPanel}
-                onSetActivePanel={setContextMenuPanel}
                 catalog={dbuildCatalog}
                 tankerOptions={tankerOptions}
                 onSelectDbuild={handleCreateDbuildDraft}
