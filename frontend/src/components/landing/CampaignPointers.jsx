@@ -1,9 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CAMPAIGNS } from '../../config/campaigns';
 
 const POINTER_ALTITUDE = 0.02;
 const OUTWARD_PX = 30;
 const ARM_PX = 72;
+const SMOOTHING = 0.12;
+const MAX_STEP_PX = 22;
+const FADE_IN_STEP = 0.1;
+const FADE_OUT_STEP = 0.14;
 
 function latLngToUnit(lat, lng) {
   const phi = ((90 - lat) * Math.PI) / 180;
@@ -46,7 +50,7 @@ function computePointerGeometry(anchor, center) {
   return { anchor, elbow, label };
 }
 
-function buildPointerState(globe, container, campaigns) {
+function buildPointerTargets(globe, container, campaigns) {
   if (!globe || !container) return [];
 
   const { width, height } = container.getBoundingClientRect();
@@ -87,47 +91,98 @@ function buildPointerState(globe, container, campaigns) {
     .filter(Boolean);
 }
 
+function smoothPoint(current, target, alpha) {
+  if (!current) return { ...target };
+  let dx = target.x - current.x;
+  let dy = target.y - current.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist > MAX_STEP_PX) {
+    const scale = MAX_STEP_PX / dist;
+    dx *= scale;
+    dy *= scale;
+    return { x: current.x + dx, y: current.y + dy };
+  }
+  return {
+    x: current.x + dx * alpha,
+    y: current.y + dy * alpha,
+  };
+}
+
+function smoothPointerFrame(previous, targets) {
+  const targetById = new Map(targets.map((entry) => [entry.campaign.id, entry]));
+  const next = [];
+  const seen = new Set();
+
+  targetById.forEach((target, id) => {
+    seen.add(id);
+    const prev = previous.get(id);
+    const opacity = Math.min(1, (prev?.opacity ?? 0) + FADE_IN_STEP);
+    const smoothed = {
+      campaign: target.campaign,
+      anchor: smoothPoint(prev?.anchor, target.anchor, SMOOTHING),
+      elbow: smoothPoint(prev?.elbow, target.elbow, SMOOTHING),
+      label: smoothPoint(prev?.label, target.label, SMOOTHING),
+      opacity,
+    };
+    previous.set(id, smoothed);
+    next.push(smoothed);
+  });
+
+  previous.forEach((prev, id) => {
+    if (seen.has(id)) return;
+    const opacity = Math.max(0, (prev.opacity ?? 1) - FADE_OUT_STEP);
+    if (opacity <= 0.02) {
+      previous.delete(id);
+      return;
+    }
+    const faded = { ...prev, opacity };
+    previous.set(id, faded);
+    next.push(faded);
+  });
+
+  return next;
+}
+
 export default function CampaignPointers({ globe, selectedCampaignId, onSelect }) {
   const overlayRef = useRef(null);
+  const smoothedRef = useRef(new Map());
   const [pointers, setPointers] = useState([]);
   const rafRef = useRef(0);
-
-  const updatePointers = useCallback(() => {
-    const container = overlayRef.current?.parentElement;
-    if (!container || !globe) return;
-    setPointers(buildPointerState(globe, container, CAMPAIGNS));
-  }, [globe]);
 
   useEffect(() => {
     if (!globe) return undefined;
 
     const tick = () => {
-      updatePointers();
+      const container = overlayRef.current?.parentElement;
+      if (container) {
+        const targets = buildPointerTargets(globe, container, CAMPAIGNS);
+        const next = smoothPointerFrame(smoothedRef.current, targets);
+        setPointers(next);
+      }
       rafRef.current = requestAnimationFrame(tick);
     };
+
     rafRef.current = requestAnimationFrame(tick);
 
-    const controls = globe.controls?.();
-    const onControlChange = () => updatePointers();
-    controls?.addEventListener?.('change', onControlChange);
-
-    const resizeObserver = new ResizeObserver(updatePointers);
+    const resizeObserver = new ResizeObserver(() => {
+      smoothedRef.current.clear();
+    });
     if (overlayRef.current?.parentElement) {
       resizeObserver.observe(overlayRef.current.parentElement);
     }
 
     return () => {
       cancelAnimationFrame(rafRef.current);
-      controls?.removeEventListener?.('change', onControlChange);
       resizeObserver.disconnect();
+      smoothedRef.current.clear();
     };
-  }, [globe, updatePointers]);
+  }, [globe]);
 
   return (
     <div ref={overlayRef} className="campaign-pointers" role="tablist" aria-label="Campaigns">
       <svg className="campaign-pointers__svg">
-        {pointers.map(({ campaign, anchor, elbow, label }) => (
-          <g key={campaign.id}>
+        {pointers.map(({ campaign, anchor, elbow, label, opacity }) => (
+          <g key={campaign.id} style={{ opacity }}>
             <circle
               className={`campaign-pointers__dot${campaign.id === selectedCampaignId ? ' is-active' : ''}`}
               cx={anchor.x}
@@ -142,7 +197,7 @@ export default function CampaignPointers({ globe, selectedCampaignId, onSelect }
         ))}
       </svg>
 
-      {pointers.map(({ campaign, label }) => {
+      {pointers.map(({ campaign, label, opacity }) => {
         const isActive = campaign.id === selectedCampaignId;
         const accent = campaign.highlightColor || '#FF6B01';
         return (
@@ -155,6 +210,7 @@ export default function CampaignPointers({ globe, selectedCampaignId, onSelect }
             style={{
               left: `${label.x}px`,
               top: `${label.y}px`,
+              opacity,
               '--pointer-accent': accent,
             }}
             onClick={() => onSelect(campaign.id)}

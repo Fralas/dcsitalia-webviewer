@@ -85,13 +85,13 @@
   cursor: pointer;
   pointer-events: auto;
   text-align: center;
-  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  will-change: left, top, opacity;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
 }
 
 .campaign-pointers__label:hover {
   border-color: var(--pointer-accent, var(--landing-accent));
   background: rgba(18, 19, 26, 0.92);
-  transform: translate(-50%, -50%) scale(1.04);
 }
 
 .campaign-pointers__label.is-active {

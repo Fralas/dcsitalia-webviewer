@@ -81,13 +81,21 @@ export default function HexGlobe({ selectedCampaignId, onSelectCampaign }) {
     return hexToRgba(owner.highlightColor, 0.45);
   };
 
-  const focusSelectedCampaign = () => {
+  const focusSelectedCampaign = (animateMs = 900) => {
     const world = globeRef.current;
     if (!world) return;
     const centroid = centroidByCampaignRef.current.get(selectedRef.current);
     if (centroid) {
-      world.pointOfView({ lat: centroid.lat, lng: centroid.lng, altitude: 2.1 }, 900);
+      world.pointOfView({ lat: centroid.lat, lng: centroid.lng, altitude: 2.1 }, animateMs);
     }
+  };
+
+  const handleSelectCampaign = (campaignId) => {
+    const controls = globeRef.current?._orbitControls || globeRef.current?.controls?.();
+    if (controls) {
+      controls.autoRotate = false;
+    }
+    onSelectCampaign?.(campaignId);
   };
 
   useEffect(() => {
@@ -116,6 +124,9 @@ export default function HexGlobe({ selectedCampaignId, onSelectCampaign }) {
     controls.autoRotateSpeed = 0.55;
     controls.enableZoom = false;
     controls.enablePan = false;
+    controls.enableRotate = true;
+
+    world._orbitControls = controls;
 
     world.pointOfView({ lat: 30, lng: 40, altitude: 2.4 });
 
@@ -184,7 +195,7 @@ export default function HexGlobe({ selectedCampaignId, onSelectCampaign }) {
     const world = globeRef.current;
     if (!world) return;
     world.hexPolygonColor(colorAccessor);
-    focusSelectedCampaign();
+    focusSelectedCampaign(1200);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCampaignId]);
 
@@ -195,7 +206,7 @@ export default function HexGlobe({ selectedCampaignId, onSelectCampaign }) {
         <CampaignPointers
           globe={globeRef.current}
           selectedCampaignId={selectedCampaignId}
-          onSelect={onSelectCampaign}
+          onSelect={handleSelectCampaign}
         />
       )}
     </div>
