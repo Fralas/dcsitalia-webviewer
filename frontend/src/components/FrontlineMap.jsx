@@ -442,7 +442,6 @@ function formatSpawnBannerName(keyword) {
 
 const DBUILD_CONTEXT_MENU_OFFSET_X = 16;
 const DBUILD_CONTEXT_MENU_OFFSET_Y = -12;
-const DBUILD_CONTEXT_HIGHLIGHT_RADIUS_M = 35;
 const TANKER_MIN_DIST_NM = 45;
 const TANKER_EXCLUSION_RADIUS_M = TANKER_MIN_DIST_NM * 1852;
 const TANKER_ROUTE_COLOR = '#22d3ee';
@@ -1612,7 +1611,6 @@ function FlatMapView({
   onDbuildPlacementSelect,
   mapContextMenuEnabled,
   onMapContextMenu,
-  dbuildContextPoint,
   tankerPlacementActive,
   onTankerPlace,
   tankerWp1,
@@ -1943,32 +1941,6 @@ function FlatMapView({
           />
         )}
 
-        {dbuildContextPoint && Number.isFinite(dbuildContextPoint.lat) && Number.isFinite(dbuildContextPoint.lon) && (
-          <>
-            <Circle
-              center={[dbuildContextPoint.lat, dbuildContextPoint.lon]}
-              radius={DBUILD_CONTEXT_HIGHLIGHT_RADIUS_M}
-              pathOptions={{
-                color: '#facc15',
-                fillColor: '#facc15',
-                fillOpacity: 0.1,
-                weight: 2,
-                dashArray: '6,6',
-              }}
-            />
-            <CircleMarker
-              center={[dbuildContextPoint.lat, dbuildContextPoint.lon]}
-              radius={9}
-              pathOptions={{
-                color: '#facc15',
-                fillColor: '#facc15',
-                fillOpacity: 0.92,
-                weight: 3,
-              }}
-            />
-          </>
-        )}
-
         {tankerWp1 && Number.isFinite(tankerWp1.lat) && Number.isFinite(tankerWp1.lon) && (
           <>
             <Circle
@@ -2107,7 +2079,6 @@ function MapLibreFlatMapView({
   onDbuildPlacementSelect,
   mapContextMenuEnabled,
   onMapContextMenu,
-  dbuildContextPoint,
   tankerPlacementActive,
   onTankerPlace,
   tankerWp1,
@@ -2515,33 +2486,6 @@ function MapLibreFlatMapView({
       }];
     }),
   }), [dbuildMapMarkers, selectedDbuildPlacementId]);
-
-  const fcDbuildContextPoint = useMemo(() => {
-    if (!dbuildContextPoint || !Number.isFinite(dbuildContextPoint.lat) || !Number.isFinite(dbuildContextPoint.lon)) {
-      return { type: 'FeatureCollection', features: [] };
-    }
-    return {
-      type: 'FeatureCollection',
-      features: [{
-        type: 'Feature',
-        geometry: {
-          type: 'Point',
-          coordinates: [dbuildContextPoint.lon, dbuildContextPoint.lat],
-        },
-        properties: { id: 'dbuild-context-point' },
-      }],
-    };
-  }, [dbuildContextPoint]);
-
-  const fcDbuildContextRing = useMemo(() => {
-    if (!dbuildContextPoint || !Number.isFinite(dbuildContextPoint.lat) || !Number.isFinite(dbuildContextPoint.lon)) {
-      return { type: 'FeatureCollection', features: [] };
-    }
-    return {
-      type: 'FeatureCollection',
-      features: [circlePolygon(dbuildContextPoint.lat, dbuildContextPoint.lon, DBUILD_CONTEXT_HIGHLIGHT_RADIUS_M)],
-    };
-  }, [dbuildContextPoint]);
 
   const fcTankerWp1Point = useMemo(() => {
     if (!tankerWp1 || !Number.isFinite(tankerWp1.lat) || !Number.isFinite(tankerWp1.lon)) {
@@ -3587,45 +3531,10 @@ function MapLibreFlatMapView({
         hideHoverPopup();
       });
 
-      addGeoSource('dbuild-context-ring-src', fcDbuildContextRing);
-      addGeoSource('dbuild-context-point-src', fcDbuildContextPoint);
       addGeoSource('tanker-exclusion-ring-src', fcTankerExclusionRing);
       addGeoSource('tanker-wp1-point-src', fcTankerWp1Point);
       addGeoSource('tanker-routes-src', fcTankerRoutes);
       addGeoSource('dbuild-markers-src', fcDbuildMarkers);
-
-      map.addLayer({
-        id: 'dbuild-context-ring-fill-layer',
-        type: 'fill',
-        source: 'dbuild-context-ring-src',
-        paint: {
-          'fill-color': '#facc15',
-          'fill-opacity': 0.1,
-        },
-      });
-      map.addLayer({
-        id: 'dbuild-context-ring-line-layer',
-        type: 'line',
-        source: 'dbuild-context-ring-src',
-        paint: {
-          'line-color': '#facc15',
-          'line-width': 2,
-          'line-dasharray': [2, 2],
-          'line-opacity': 0.9,
-        },
-      });
-      map.addLayer({
-        id: 'dbuild-context-point-layer',
-        type: 'circle',
-        source: 'dbuild-context-point-src',
-        paint: {
-          'circle-radius': 9,
-          'circle-color': '#facc15',
-          'circle-opacity': 0.92,
-          'circle-stroke-color': '#ffffff',
-          'circle-stroke-width': 2,
-        },
-      });
 
       map.addLayer({
         id: 'tanker-exclusion-ring-fill-layer',
@@ -4062,15 +3971,11 @@ function MapLibreFlatMapView({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    const ringSource = map.getSource('dbuild-context-ring-src');
-    if (ringSource?.setData) ringSource.setData(fcDbuildContextRing);
-    const pointSource = map.getSource('dbuild-context-point-src');
-    if (pointSource?.setData) pointSource.setData(fcDbuildContextPoint);
     const tankerRingSource = map.getSource('tanker-exclusion-ring-src');
     if (tankerRingSource?.setData) tankerRingSource.setData(fcTankerExclusionRing);
     const tankerPointSource = map.getSource('tanker-wp1-point-src');
     if (tankerPointSource?.setData) tankerPointSource.setData(fcTankerWp1Point);
-  }, [fcDbuildContextRing, fcDbuildContextPoint, fcTankerExclusionRing, fcTankerWp1Point]);
+  }, [fcTankerExclusionRing, fcTankerWp1Point]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -6054,11 +5959,16 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     setSelectedDbuildPlacementId(null);
   }, [mapContextMenuEnabled]);
 
-  const dbuildContextPoint = mapContextMenu
-    ? { lat: mapContextMenu.lat, lon: mapContextMenu.lon }
-    : null;
-
   const tankerWp1 = tankerMode?.wp1 || null;
+
+  const handleSelectMapAction = useCallback((action) => {
+    setMapContextMenu(null);
+    showCommandToast({
+      ok: false,
+      message: `${action.label}${action.subtitle ? ` (${action.subtitle})` : ''} is not available from the map yet.`,
+      balance: null,
+    });
+  }, [showCommandToast]);
 
   const handleCreateDbuildDraft = useCallback(async (buildType) => {
     if (!mapContextMenu || !buildType) return;
@@ -6213,7 +6123,6 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       onDbuildPlacementSelect={handleDbuildPlacementSelect}
                       mapContextMenuEnabled={mapContextMenuEnabled}
                       onMapContextMenu={handleMapContextMenu}
-                      dbuildContextPoint={dbuildContextPoint}
                       tankerPlacementActive={Boolean(tankerMode)}
                       onTankerPlace={handleTankerPlace}
                       tankerWp1={tankerWp1}
@@ -6262,7 +6171,6 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       onDbuildPlacementSelect={handleDbuildPlacementSelect}
                       mapContextMenuEnabled={mapContextMenuEnabled}
                       onMapContextMenu={handleMapContextMenu}
-                      dbuildContextPoint={dbuildContextPoint}
                       tankerPlacementActive={Boolean(tankerMode)}
                       onTankerPlace={handleTankerPlace}
                       tankerWp1={tankerWp1}
@@ -6461,10 +6369,9 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
 
               <MapActionContextMenu
                 menu={mapContextMenu}
-                catalog={dbuildCatalog}
-                tankerOptions={tankerOptions}
                 onSelectDbuild={handleCreateDbuildDraft}
                 onSelectTanker={handleStartTankerMode}
+                onSelectMapAction={handleSelectMapAction}
               />
 
               {selectedDbuildPlacement && (

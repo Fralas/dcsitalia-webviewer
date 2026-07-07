@@ -1,57 +1,110 @@
-import { useMemo } from 'react';
-import { Crosshair, Fuel, Hammer, PlaneLanding, Radar, Shield, Target } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Anchor,
+  Boxes,
+  ChevronLeft,
+  Crosshair,
+  Factory,
+  Fuel,
+  Hammer,
+  Plane,
+  PlaneLanding,
+  Radar,
+  Radio,
+  Rocket,
+  Shield,
+  Target,
+  Truck,
+} from 'lucide-react';
+import {
+  MAP_CONTEXT_MENU_ROOT,
+  formatContextMenuTooltip,
+  resolveContextMenuNode,
+} from '../../config/mapContextMenuConfig';
 import { FlowerMenu } from '../ui/flower-menu';
 
-const DBUILD_CATALOG_FALLBACK = [
-  { id: 'mortar', label: 'Mortar' },
-  { id: 'ewr', label: 'EWR' },
-  { id: 'nasams', label: 'NASAMS' },
-  { id: 'rapier', label: 'Rapier' },
-  { id: 'farp', label: 'FARP' },
-];
-
-const TANKER_OPTIONS_FALLBACK = [
-  { keyword: 'BOOM', label: 'BOOM' },
-  { keyword: 'BASKET', label: 'BASKET' },
-];
-
-const DBUILD_ICON_BY_ID = {
-  mortar: Target,
-  ewr: Radar,
-  nasams: Shield,
-  rapier: Crosshair,
-  farp: PlaneLanding,
+const ICON_BY_KEY = {
+  hammer: Hammer,
+  shield: Shield,
+  crosshair: Crosshair,
+  factory: Factory,
+  'plane-landing': PlaneLanding,
+  radar: Radar,
+  target: Target,
+  plane: Plane,
+  fuel: Fuel,
+  radio: Radio,
+  drone: Radio,
+  tank: Truck,
+  truck: Truck,
+  rocket: Rocket,
+  bomb: Rocket,
+  anchor: Anchor,
+  boxes: Boxes,
 };
+
+function resolveIcon(entry) {
+  return ICON_BY_KEY[entry.icon] || Target;
+}
 
 export default function MapActionContextMenu({
   menu,
-  catalog,
-  tankerOptions,
   onSelectDbuild,
   onSelectTanker,
+  onSelectMapAction,
 }) {
-  const menuItems = useMemo(() => {
-    const entries = catalog.length > 0 ? catalog : DBUILD_CATALOG_FALLBACK;
-    const tankers = tankerOptions.length > 0 ? tankerOptions : TANKER_OPTIONS_FALLBACK;
+  const [path, setPath] = useState([]);
 
-    return [
-      ...entries.map((entry) => ({
-        id: `dbuild-${entry.id}`,
-        icon: DBUILD_ICON_BY_ID[entry.id] || Hammer,
-        label: entry.label || entry.id,
-        onClick: () => onSelectDbuild(entry.id),
-      })),
-      ...tankers.map((entry) => ({
-        id: `tanker-${entry.keyword}`,
-        icon: Fuel,
-        label: entry.label || entry.keyword,
-        title: entry.platform ? `${entry.label || entry.keyword} · ${entry.platform}` : undefined,
-        onClick: () => onSelectTanker(entry.keyword, entry.label || entry.keyword),
-      })),
-    ];
-  }, [catalog, tankerOptions, onSelectDbuild, onSelectTanker]);
+  useEffect(() => {
+    if (menu) setPath([]);
+  }, [menu?.x, menu?.y, menu?.lat, menu?.lon]);
+
+  const currentNode = useMemo(() => resolveContextMenuNode(path), [path]);
+  const currentItems = currentNode?.children || MAP_CONTEXT_MENU_ROOT.children || [];
+
+  const handleBack = useCallback(() => {
+    setPath((current) => current.slice(0, -1));
+  }, []);
+
+  const handleItemClick = useCallback((entry) => {
+    if (entry.action) {
+      const { type, buildType, keyword } = entry.action;
+      if (type === 'dbuild' && buildType) {
+        onSelectDbuild(buildType);
+        return;
+      }
+      if (type === 'tanker' && keyword) {
+        onSelectTanker(keyword, entry.label || keyword);
+        return;
+      }
+      onSelectMapAction?.({
+        type,
+        keyword,
+        label: entry.label,
+        subtitle: entry.subtitle,
+        cost: entry.cost,
+        lat: menu?.lat,
+        lon: menu?.lon,
+      });
+      return;
+    }
+    if (entry.children?.length) {
+      setPath((current) => [...current, entry.id]);
+    }
+  }, [menu, onSelectDbuild, onSelectMapAction, onSelectTanker]);
+
+  const flowerItems = useMemo(() => currentItems.map((entry) => ({
+    id: entry.id,
+    icon: resolveIcon(entry),
+    label: entry.label,
+    title: formatContextMenuTooltip(entry),
+    onClick: () => handleItemClick(entry),
+  })), [currentItems, handleItemClick]);
 
   if (!menu) return null;
+
+  const atRoot = path.length === 0;
+  const centerIcon = atRoot ? Hammer : ChevronLeft;
 
   return (
     <div
@@ -61,14 +114,17 @@ export default function MapActionContextMenu({
       onContextMenu={(event) => event.preventDefault()}
     >
       <FlowerMenu
-        menuItems={menuItems}
+        key={path.join('/') || 'root'}
+        menuItems={flowerItems}
         defaultOpen
-        centerIcon={Hammer}
-        togglerSize={44}
-        animationDuration={420}
+        centerIcon={centerIcon}
+        centerOnClick={atRoot ? null : handleBack}
+        togglerSize={36}
+        petalOffset={22}
+        animationDuration={380}
         iconColor="#f8fafc"
         backgroundColor="rgba(21, 25, 37, 0.88)"
-        className="drop-shadow-[0_12px_32px_rgba(0,0,0,0.55)]"
+        className="drop-shadow-[0_10px_26px_rgba(0,0,0,0.5)]"
       />
     </div>
   );

@@ -11,6 +11,7 @@ const MenuToggler = ({
   togglerSize,
   iconSize,
   centerIcon: CenterIcon,
+  centerOnClick,
 }) => {
   const lineHeight = iconSize * 0.1;
   const lineWidth = iconSize * 0.8;
@@ -18,53 +19,78 @@ const MenuToggler = ({
 
   return (
     <>
-      <input
-        id={togglerId}
-        type="checkbox"
-        checked={isOpen}
-        onChange={onChange}
-        className="absolute inset-0 z-10 m-auto cursor-pointer opacity-0"
-        style={{ width: togglerSize, height: togglerSize }}
-      />
-      <label
-        htmlFor={togglerId}
-        className="absolute inset-0 z-20 m-auto flex cursor-pointer items-center justify-center rounded-full border border-transparent transition-all"
-        style={{
-          backgroundColor,
-          color: iconColor,
-          transitionDuration: `${animationDuration}ms`,
-          width: togglerSize,
-          height: togglerSize,
-        }}
-      >
-        {CenterIcon && !isOpen ? (
-          <CenterIcon style={{ width: iconSize, height: iconSize }} aria-hidden="true" />
-        ) : (
-          <span
-            className="relative flex flex-col items-center justify-center"
-            style={{ width: iconSize, height: iconSize }}
-          >
-            {[0, 1, 2].map((i) => (
-              <span
-                key={i}
-                className={cn('absolute bg-current transition-all', {
-                  'opacity-0': isOpen && i === 0,
-                  'rotate-45': isOpen && i === 1,
-                  '-rotate-45': isOpen && i === 2,
-                })}
-                style={{
-                  transitionDuration: `${animationDuration}ms`,
-                  width: lineWidth,
-                  height: lineHeight,
-                  top: isOpen
-                    ? `calc(50% - ${lineHeight / 2}px)`
-                    : `calc(50% + ${(i - 1) * lineSpacing}px - ${lineHeight / 2}px)`,
-                }}
-              />
-            ))}
-          </span>
-        )}
-      </label>
+      {!centerOnClick && (
+        <input
+          id={togglerId}
+          type="checkbox"
+          checked={isOpen}
+          onChange={onChange}
+          className="absolute inset-0 z-10 m-auto cursor-pointer opacity-0"
+          style={{ width: togglerSize, height: togglerSize }}
+        />
+      )}
+      {centerOnClick ? (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            centerOnClick();
+          }}
+          className="absolute inset-0 z-20 m-auto flex cursor-pointer items-center justify-center rounded-full border border-transparent transition-all"
+          style={{
+            backgroundColor,
+            color: iconColor,
+            transitionDuration: `${animationDuration}ms`,
+            width: togglerSize,
+            height: togglerSize,
+          }}
+          aria-label="Back"
+        >
+          {CenterIcon ? (
+            <CenterIcon style={{ width: iconSize, height: iconSize }} aria-hidden="true" />
+          ) : null}
+        </button>
+      ) : (
+        <label
+          htmlFor={togglerId}
+          className="absolute inset-0 z-20 m-auto flex cursor-pointer items-center justify-center rounded-full border border-transparent transition-all"
+          style={{
+            backgroundColor,
+            color: iconColor,
+            transitionDuration: `${animationDuration}ms`,
+            width: togglerSize,
+            height: togglerSize,
+          }}
+        >
+          {CenterIcon && !isOpen ? (
+            <CenterIcon style={{ width: iconSize, height: iconSize }} aria-hidden="true" />
+          ) : (
+            <span
+              className="relative flex flex-col items-center justify-center"
+              style={{ width: iconSize, height: iconSize }}
+            >
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className={cn('absolute bg-current transition-all', {
+                    'opacity-0': isOpen && i === 0,
+                    'rotate-45': isOpen && i === 1,
+                    '-rotate-45': isOpen && i === 2,
+                  })}
+                  style={{
+                    transitionDuration: `${animationDuration}ms`,
+                    width: lineWidth,
+                    height: lineHeight,
+                    top: isOpen
+                      ? `calc(50% - ${lineHeight / 2}px)`
+                      : `calc(50% + ${(i - 1) * lineSpacing}px - ${lineHeight / 2}px)`,
+                  }}
+                />
+              ))}
+            </span>
+          )}
+        </label>
+      )}
     </>
   );
 };
@@ -79,6 +105,7 @@ const FlowerMenuItem = ({
   itemCount,
   itemSize,
   iconSize,
+  petalOffset,
 }) => {
   const Icon = item.icon;
 
@@ -92,14 +119,14 @@ const FlowerMenuItem = ({
         width: itemSize,
         height: itemSize,
         transform: isOpen
-          ? `rotate(${(360 / itemCount) * index}deg) translateX(-${itemSize + 30}px)`
+          ? `rotate(${(360 / itemCount) * index}deg) translateX(-${itemSize + petalOffset}px)`
           : 'none',
         transitionDuration: `${animationDuration}ms`,
       }}
     >
       <button
         type="button"
-        title={item.label || item.title || ''}
+        title={item.title || item.label || ''}
         aria-label={item.label || item.title || `Action ${index + 1}`}
         onClick={(event) => {
           event.stopPropagation();
@@ -135,20 +162,23 @@ export function FlowerMenu({
   backgroundColor = 'rgba(255, 255, 255, 0.2)',
   animationDuration = 500,
   togglerSize = 40,
+  petalOffset = 30,
   defaultOpen = false,
   centerIcon = null,
+  centerOnClick = null,
   className,
 }) {
   const togglerId = useId();
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const [isOpen, setIsOpen] = useState(defaultOpen || Boolean(centerOnClick));
   const itemCount = menuItems.length;
-  const itemSize = togglerSize * 2;
-  const iconSize = Math.max(24, Math.floor(togglerSize * 0.6));
+  const itemSize = Math.round(togglerSize * 1.75);
+  const iconSize = Math.max(20, Math.floor(togglerSize * 0.55));
+  const menuSpan = togglerSize * 2.6;
 
   return (
     <nav
       className={cn('relative', className)}
-      style={{ width: togglerSize * 3, height: togglerSize * 3, minHeight: togglerSize * 3 }}
+      style={{ width: menuSpan, height: menuSpan, minHeight: menuSpan }}
       aria-label="Radial action menu"
     >
       <MenuToggler
@@ -161,6 +191,7 @@ export function FlowerMenu({
         togglerSize={togglerSize}
         iconSize={iconSize}
         centerIcon={centerIcon}
+        centerOnClick={centerOnClick}
       />
       <ul className="absolute inset-0 m-0 h-full w-full list-none p-0">
         {menuItems.map((item, index) => (
@@ -175,6 +206,7 @@ export function FlowerMenu({
             itemCount={itemCount}
             itemSize={itemSize}
             iconSize={iconSize}
+            petalOffset={petalOffset}
           />
         ))}
       </ul>
