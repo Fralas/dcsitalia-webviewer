@@ -5,7 +5,8 @@
   top: 0;
   right: 0;
   z-index: 1000;
-  max-height: 100%;
+  height: 50%;
+  max-height: 50%;
   pointer-events: none;
 }
 
@@ -15,7 +16,6 @@
   --lf-item-scale: 0.78;
   --lf-item-min-h: calc(72px * var(--lf-item-scale));
   --lf-item-gap: calc(6px * var(--lf-item-scale));
-  --lf-visible-items: 4;
   --lf-expanded-width: calc(1131px * var(--lf-scale));
   --lf-collapsed-width: calc(72px * var(--lf-scale));
   --lf-anim: 360ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -24,15 +24,9 @@
   display: flex;
   flex-direction: column;
   width: var(--lf-expanded-width);
+  height: 100%;
   max-width: min(var(--lf-expanded-width), 100%);
-  max-height: min(
-    calc(
-      (var(--lf-item-min-h) * var(--lf-visible-items))
-      + (var(--lf-item-gap) * (var(--lf-visible-items) - 1))
-      + 58px
-    ),
-    100%
-  );
+  max-height: 100%;
   background: #0e0e0e;
   border: 1px solid #4e4e4e;
   border-right: none;
@@ -50,7 +44,8 @@
 
 .live-feed-panel--collapsed {
   width: var(--lf-collapsed-width);
-  max-height: calc(76px * var(--lf-scale));
+  height: auto;
+  max-height: calc(76px * var(--lf-scale) + 2px);
 }
 
 .live-feed-panel__header {
@@ -60,7 +55,7 @@
   gap: calc(12px * var(--lf-scale));
   padding: calc(11px * var(--lf-scale)) calc(23px * var(--lf-scale)) calc(10px * var(--lf-scale));
   padding-right: calc(14px * var(--lf-scale));
-  flex-shrink: 0;
+  flex: 0 0 auto;
 }
 
 .live-feed-panel--collapsed .live-feed-panel__header {
@@ -70,9 +65,9 @@
 
 .live-feed-panel__title {
   margin: 0;
-  font-size: calc(32px * var(--lf-scale) + var(--lf-text-extra));
+  font-size: calc(32px * var(--lf-scale) + var(--lf-text-extra) + 2px);
   font-weight: 700;
-  line-height: calc(39px * var(--lf-scale) + var(--lf-text-extra));
+  line-height: calc(39px * var(--lf-scale) + var(--lf-text-extra) + 2px);
   color: #ffffff;
   text-transform: uppercase;
   letter-spacing: 0.02em;
@@ -97,8 +92,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: calc(61.25px * var(--lf-scale));
-  height: calc(54px * var(--lf-scale));
+  width: calc(61.25px * var(--lf-scale) + 2px);
+  height: calc(54px * var(--lf-scale) + 2px);
   background: #0e0e0e;
   border: 1px solid #515151;
   border-radius: calc(15px * var(--lf-scale));
@@ -113,8 +108,8 @@
 }
 
 .live-feed-panel__toggle-icon {
-  width: calc(22px * var(--lf-scale));
-  height: calc(22px * var(--lf-scale));
+  width: calc(22px * var(--lf-scale) + 2px);
+  height: calc(22px * var(--lf-scale) + 2px);
   transform: rotate(0deg);
   transition: transform var(--lf-anim);
 }
@@ -126,20 +121,18 @@
 .live-feed-panel__body {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
   opacity: 1;
-  max-height: calc(
-    (var(--lf-item-min-h) * var(--lf-visible-items))
-    + (var(--lf-item-gap) * (var(--lf-visible-items) - 1))
-    + calc(12px * var(--lf-scale))
-  );
   transition:
     opacity 260ms ease,
+    flex-grow var(--lf-anim),
     max-height var(--lf-anim);
 }
 
 .live-feed-panel--collapsed .live-feed-panel__body {
+  flex: 0 0 0;
   opacity: 0;
   max-height: 0;
   pointer-events: none;
@@ -149,6 +142,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--lf-item-gap);
+  flex: 1 1 auto;
   padding: 0 calc(23px * var(--lf-scale)) calc(12px * var(--lf-scale));
   padding-right: calc(14px * var(--lf-scale));
   overflow-y: auto;
