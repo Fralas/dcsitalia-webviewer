@@ -22,6 +22,27 @@
   overflow: visible;
 }
 
+.app-header--landing {
+  border-bottom-color: transparent;
+}
+
+.app-header--landing::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 72px;
+  background: linear-gradient(
+    to bottom,
+    var(--header-bg) 0%,
+    rgba(15, 15, 15, 0.55) 42%,
+    rgba(15, 15, 15, 0) 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
 .app-header__inner {
   position: relative;
   display: grid;

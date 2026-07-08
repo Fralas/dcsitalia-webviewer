@@ -305,7 +305,7 @@ function App() {
 
   return (
     <div className={`app-shell h-screen flex flex-col overflow-hidden ${currentView === 'landing' ? 'bg-[#0F0F0F]' : 'bg-yt-bg-primary'}`}>
-      <header className="app-header">
+      <header className={`app-header${currentView === 'landing' ? ' app-header--landing' : ''}`}>
         <div className="app-header__inner">
           <div className="app-header__left">
             <button
