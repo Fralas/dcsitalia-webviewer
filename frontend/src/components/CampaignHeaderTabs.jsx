@@ -31,7 +31,7 @@ export default function CampaignHeaderTabs({ activeCampaignId, onSelectCampaign 
           >
             <span className="app-header__tab-label">{campaign.label}</span>
             {hasComingSoon && (
-              <span className="app-header__tab-subtitle">COOMING SOON</span>
+              <span className="app-header__tab-subtitle">COMING SOON</span>
             )}
           </button>
         );
