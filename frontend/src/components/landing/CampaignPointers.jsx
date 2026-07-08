@@ -4,10 +4,8 @@ import { CAMPAIGNS } from '../../config/campaigns';
 const POINTER_CAMPAIGNS = CAMPAIGNS.filter((campaign) => campaign.showPointer !== false);
 
 const POINTER_ALTITUDE = 0.02;
-const OUTWARD_PX = 34;
-const ARM_PX = 14;
-const SMOOTHING = 0.12;
-const MAX_STEP_PX = 22;
+const OUTWARD_PX = 52;
+const ARM_PX = 22;
 const FADE_IN_STEP = 0.1;
 const FADE_OUT_STEP = 0.14;
 const DOT_RADIUS = 5;
@@ -118,24 +116,7 @@ function buildPointerTargets(globe, container, campaigns) {
     .filter(Boolean);
 }
 
-function smoothPoint(current, target, alpha) {
-  if (!current) return { ...target };
-  let dx = target.x - current.x;
-  let dy = target.y - current.y;
-  const dist = Math.hypot(dx, dy);
-  if (dist > MAX_STEP_PX) {
-    const scale = MAX_STEP_PX / dist;
-    dx *= scale;
-    dy *= scale;
-    return { x: current.x + dx, y: current.y + dy };
-  }
-  return {
-    x: current.x + dx * alpha,
-    y: current.y + dy * alpha,
-  };
-}
-
-function smoothPointerFrame(previous, targets) {
+function applyPointerOpacity(previous, targets) {
   const targetById = new Map(targets.map((entry) => [entry.campaign.id, entry]));
   const next = [];
   const seen = new Set();
@@ -144,18 +125,9 @@ function smoothPointerFrame(previous, targets) {
     seen.add(id);
     const prev = previous.get(id);
     const opacity = Math.min(1, (prev?.opacity ?? 0) + FADE_IN_STEP);
-    const smoothed = {
-      campaign: target.campaign,
-      anchor: smoothPoint(prev?.anchor, target.anchor, SMOOTHING),
-      elbow: smoothPoint(prev?.elbow, target.elbow, SMOOTHING),
-      underlineStart: smoothPoint(prev?.underlineStart, target.underlineStart, SMOOTHING),
-      underlineEnd: smoothPoint(prev?.underlineEnd, target.underlineEnd, SMOOTHING),
-      label: smoothPoint(prev?.label, target.label, SMOOTHING),
-      side: target.side,
-      opacity,
-    };
-    previous.set(id, smoothed);
-    next.push(smoothed);
+    const frame = { ...target, opacity };
+    previous.set(id, frame);
+    next.push(frame);
   });
 
   previous.forEach((prev, id) => {
@@ -186,7 +158,7 @@ export default function CampaignPointers({ globe, selectedCampaignId, onSelect }
       const container = overlayRef.current?.parentElement;
       if (container) {
         const targets = buildPointerTargets(globe, container, POINTER_CAMPAIGNS);
-        const next = smoothPointerFrame(smoothedRef.current, targets);
+        const next = applyPointerOpacity(smoothedRef.current, targets);
         setPointers(next);
       }
       rafRef.current = requestAnimationFrame(tick);
