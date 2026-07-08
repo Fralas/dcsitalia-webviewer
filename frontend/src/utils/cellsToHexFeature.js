@@ -11,7 +11,10 @@ export function cellsToHexFeature(cells, properties) {
 
   return {
     type: 'Feature',
-    properties,
+    properties: {
+      ...properties,
+      ...(properties?.theaterHighlight ? { theaterCellIds: cellList } : {}),
+    },
     geometry: polygons.length === 1
       ? { type: 'Polygon', coordinates: polygons[0] }
       : { type: 'MultiPolygon', coordinates: polygons },

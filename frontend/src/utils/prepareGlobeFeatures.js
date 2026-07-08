@@ -1,11 +1,45 @@
 import { cellsToHexFeature } from './cellsToHexFeature';
 import { buildTheaterHexCellSet, getCellsFromCountryFeature } from './buildTheaterHexCells';
+import { GLOBE_THEATER_CAMPAIGN } from './globeTheaterColor';
 
 const AFGHANISTAN_PAKISTAN_COLOR = '#E32C2C';
 const RED_COUNTRY_ISO_A2 = new Set(['AF', 'PK']);
 
-export function prepareGlobeCountryFeatures(rawFeatures) {
+export function buildTheaterClickAreasFromRawFeatures(rawFeatures) {
   if (!Array.isArray(rawFeatures) || rawFeatures.length === 0) {
+    return [];
+  }
+
+  const theaterCells = buildTheaterHexCellSet(rawFeatures);
+  const redCells = new Set();
+
+  rawFeatures.forEach((feature) => {
+    const isoA2 = String(feature?.properties?.ISO_A2 || '').toUpperCase();
+    if (RED_COUNTRY_ISO_A2.has(isoA2)) {
+      getCellsFromCountryFeature(feature).forEach((cell) => redCells.add(cell));
+    }
+  });
+
+  redCells.forEach((cell) => theaterCells.delete(cell));
+
+  const areas = [];
+  if (theaterCells.size) {
+    areas.push({
+      campaignId: GLOBE_THEATER_CAMPAIGN.THEATER,
+      cells: theaterCells,
+    });
+  }
+  if (redCells.size) {
+    areas.push({
+      campaignId: GLOBE_THEATER_CAMPAIGN.AF_PK,
+      cells: redCells,
+    });
+  }
+
+  return areas;
+}
+
+export function prepareGlobeCountryFeatures(rawFeatures) {  if (!Array.isArray(rawFeatures) || rawFeatures.length === 0) {
     return [];
   }
 
@@ -41,7 +75,6 @@ export function prepareGlobeCountryFeatures(rawFeatures) {
     theaterHighlight: true,
     ADMIN: 'Syria Theater',
     ISO_A3: 'THEATER',
-    theaterCellIds: [...theaterCells],
   });
   if (theaterFeature) features.push(theaterFeature);
 

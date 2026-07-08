@@ -12,6 +12,8 @@ const FADE_OUT_STEP = 0.14;
 const DOT_RADIUS = 5;
 const SNAP_ANGLE_DEG = 60;
 const MIN_ELBOW_ANGLE_DEG = SNAP_ANGLE_DEG;
+const VERTICAL_DOWN_SNAP_FROM_BOTTOM = 0.35;
+const VERTICAL_UP_SNAP_FROM_BOTTOM = 0.4;
 
 function latLngToUnit(lat, lng) {
   const phi = ((90 - lat) * Math.PI) / 180;
@@ -97,19 +99,17 @@ function buildLayoutForVertical(anchor, center, vertical, side) {
   return scorePointerLayout(anchor, stems[0], side);
 }
 
-function resolvePreferredVertical(anchor, center, previousVertical, previousOffsetY) {
-  const offsetY = anchor.y - center.y;
+function resolvePreferredVertical(anchor, containerHeight, previousVertical) {
+  const downSnapY = containerHeight * (1 - VERTICAL_DOWN_SNAP_FROM_BOTTOM);
+  const upSnapY = containerHeight * (1 - VERTICAL_UP_SNAP_FROM_BOTTOM);
 
-  if (Number.isFinite(previousOffsetY)) {
-    if (previousOffsetY > 0 && offsetY <= 0) return 'down';
-    if (previousOffsetY < 0 && offsetY >= 0) return 'up';
+  if (previousVertical === 'down') {
+    if (anchor.y < upSnapY) return 'up';
+    return 'down';
   }
 
-  if (Math.abs(offsetY) < 0.75 && previousVertical) {
-    return previousVertical;
-  }
-
-  return offsetY <= 0 ? 'down' : 'up';
+  if (anchor.y > downSnapY) return 'down';
+  return 'up';
 }
 
 function resolvePointerSide(anchor, center, vertical, preferredSide, previousSide) {
@@ -127,12 +127,11 @@ function resolvePointerSide(anchor, center, vertical, preferredSide, previousSid
   return preferred;
 }
 
-function resolvePointerLayout(anchor, center, preferredSide, previousLayout) {
+function resolvePointerLayout(anchor, center, containerHeight, preferredSide, previousLayout) {
   const prevVertical = previousLayout?.vertical === 'down' ? 'down' : 'up';
   const prevSide = previousLayout?.side === 'left' ? 'left' : 'right';
-  const prevOffsetY = previousLayout?.offsetY;
   const offsetY = anchor.y - center.y;
-  const vertical = resolvePreferredVertical(anchor, center, prevVertical, prevOffsetY);
+  const vertical = resolvePreferredVertical(anchor, containerHeight, prevVertical);
   const verticalChanged = vertical !== prevVertical;
   const side = resolvePointerSide(
     anchor,
@@ -207,7 +206,7 @@ function buildPointerTargets(globe, container, campaigns, layoutByCampaign) {
       const underlineWidth = underlineWidthForCampaign(campaign);
       const preferredSide = campaign.pointerSide || 'right';
       const previousLayout = layoutByCampaign.get(campaign.id) || null;
-      const layout = resolvePointerLayout(anchor, center, preferredSide, previousLayout);
+      const layout = resolvePointerLayout(anchor, center, height, preferredSide, previousLayout);
       layoutByCampaign.set(campaign.id, {
         vertical: layout.vertical,
         side: layout.side,
@@ -319,13 +318,8 @@ function paintPointerEntry(entry, frame, isActive) {
   entry.path.setAttribute('class', `campaign-pointers__line${isActive ? ' is-active' : ''}`);
   entry.button.setAttribute('aria-selected', isActive ? 'true' : 'false');
 
-  if (isActive) {
-    entry.g.style.setProperty('--pointer-accent', accent);
-    entry.button.style.setProperty('--pointer-accent', accent);
-  } else {
-    entry.g.style.removeProperty('--pointer-accent');
-    entry.button.style.removeProperty('--pointer-accent');
-  }
+  entry.g.style.setProperty('--pointer-accent', accent);
+  entry.button.style.setProperty('--pointer-accent', accent);
 }
 
 export default function CampaignPointers({ globe, selectedCampaignId, onSelect }) {

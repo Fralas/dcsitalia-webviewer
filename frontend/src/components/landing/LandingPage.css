@@ -130,6 +130,11 @@
   height: 100%;
 }
 
+.landing-globe-wrap.is-theater-clickable,
+.landing-globe-wrap.is-theater-clickable canvas {
+  cursor: pointer;
+}
+
 .landing-globe__canvas {
   width: 100%;
   height: 100%;

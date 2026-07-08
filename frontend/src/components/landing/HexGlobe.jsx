@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import Globe from 'globe.gl';
 import * as THREE from 'three';
 import CampaignPointers from './CampaignPointers';
-import { resolveGlobeHexColor, resolveTheaterCampaignId } from '../../utils/globeTheaterColor';
-import { prepareGlobeCountryFeatures } from '../../utils/prepareGlobeFeatures';
+import { resolveGlobeHexColor } from '../../utils/globeTheaterColor';
+import { prepareGlobeCountryFeatures, buildTheaterClickAreasFromRawFeatures } from '../../utils/prepareGlobeFeatures';
 import { buildExtraHexFeatures, collectCountryHexCells } from '../../utils/buildExtraHexFeatures';
-import { expandHidcTheaterHitboxes } from '../../utils/expandHidcTheaterHitboxes';
+import { attachTheaterAreaInteraction } from '../../utils/theaterClickAreas';
 import { industrialDark } from '../../config/industrialDarkTokens';
 import { GLOBE_EXTRA_DOTS } from '../../config/globeMarkers';
 
@@ -15,7 +15,6 @@ const GLOBE_POV_ALTITUDE = 2.4 / 1.3 / 1.2;
 const AUTO_ROTATE_RESUME_MS = 30_000;
 const HEX_POLYGON_MARGIN = 0.3;
 const HEX_POLYGON_ALTITUDE = 0.001;
-const HIDC_HITBOX_RADIUS_MULTIPLIER = 2;
 
 function applyUnlitMaterials(world) {
   world.scene().traverse((obj) => {
@@ -37,6 +36,7 @@ function applyUnlitMaterials(world) {
 }
 
 export default function HexGlobe({ selectedCampaignId, onCampaignSelect }) {
+  const wrapRef = useRef(null);
   const containerRef = useRef(null);
   const globeRef = useRef(null);
   const onCampaignSelectRef = useRef(onCampaignSelect);
@@ -57,6 +57,7 @@ export default function HexGlobe({ selectedCampaignId, onCampaignSelect }) {
     if (!container) return undefined;
 
     let cancelled = false;
+    let detachTheaterInteraction = () => {};
 
     const world = Globe()(container)
       .backgroundColor(industrialDark.bgDeep)
@@ -66,15 +67,7 @@ export default function HexGlobe({ selectedCampaignId, onCampaignSelect }) {
       .hexPolygonMargin(HEX_POLYGON_MARGIN)
       .hexPolygonAltitude(HEX_POLYGON_ALTITUDE)
       .hexPolygonUseDots(true)
-      .hexPolygonColor(resolveGlobeHexColor)
-      .onHexPolygonClick((feature, event) => {
-        event?.stopPropagation?.();
-        const campaignId = resolveTheaterCampaignId(feature);
-        if (campaignId) onCampaignSelectRef.current?.(campaignId);
-      })
-      .showPointerCursor((objType, objData) => (
-        Boolean(resolveTheaterCampaignId(objData))
-      ));
+      .hexPolygonColor(resolveGlobeHexColor);
 
     world.lights([new THREE.AmbientLight(0xffffff, Math.PI)]);
 
@@ -114,21 +107,26 @@ export default function HexGlobe({ selectedCampaignId, onCampaignSelect }) {
       .then((geo) => {
         if (cancelled) return;
         const rawFeatures = Array.isArray(geo?.features) ? geo.features : [];
+        const theaterAreas = buildTheaterClickAreasFromRawFeatures(rawFeatures);
         const features = prepareGlobeCountryFeatures(rawFeatures);
         const occupiedCells = collectCountryHexCells(rawFeatures);
         const italyMarkers = GLOBE_EXTRA_DOTS.filter(
           (marker) => !String(marker.ISO_A3).startsWith('CY-'),
         );
         const extraFeatures = buildExtraHexFeatures(italyMarkers, occupiedCells);
-        world.hexPolygonsData([...features, ...extraFeatures]);
+        const globeFeatures = [...features, ...extraFeatures];
+        world.hexPolygonsData(globeFeatures);
         requestAnimationFrame(() => {
           if (cancelled) return;
           applyUnlitMaterials(world);
-          expandHidcTheaterHitboxes(world, {
-            margin: HEX_POLYGON_MARGIN,
-            altitude: HEX_POLYGON_ALTITUDE,
-            multiplier: HIDC_HITBOX_RADIUS_MULTIPLIER,
-          });
+          if (wrapRef.current) {
+            detachTheaterInteraction = attachTheaterAreaInteraction(
+              world,
+              theaterAreas,
+              wrapRef.current,
+              (campaignId) => onCampaignSelectRef.current?.(campaignId),
+            );
+          }
         });
       })
       .catch((error) => {
@@ -147,6 +145,7 @@ export default function HexGlobe({ selectedCampaignId, onCampaignSelect }) {
 
     return () => {
       cancelled = true;
+      detachTheaterInteraction();
       cancelAnimationFrame(readyFrame);
       setPointersReady(false);
       if (resumeTimer) clearTimeout(resumeTimer);
@@ -163,7 +162,7 @@ export default function HexGlobe({ selectedCampaignId, onCampaignSelect }) {
   }, []);
 
   return (
-    <div className="landing-globe-wrap">
+    <div ref={wrapRef} className="landing-globe-wrap">
       <div ref={containerRef} className="landing-globe__canvas" />
       {pointersReady && globeRef.current && (
         <CampaignPointers
