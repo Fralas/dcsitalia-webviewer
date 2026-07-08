@@ -9,6 +9,7 @@ const ARM_PX = 22;
 const FADE_IN_STEP = 0.1;
 const FADE_OUT_STEP = 0.14;
 const DOT_RADIUS = 5;
+const SNAP_ANGLE_DEG = 60;
 
 function latLngToUnit(lat, lng) {
   const phi = ((90 - lat) * Math.PI) / 180;
@@ -31,16 +32,65 @@ function underlineWidthForCampaign(campaign) {
   return Math.min(160, Math.max(48, Math.round(text.length * 8.5)));
 }
 
-function computePointerGeometry(anchor, center, side = 'right', underlineWidth = 72) {
+function normalizeVector(vector) {
+  const len = Math.hypot(vector.x, vector.y) || 1;
+  return { x: vector.x / len, y: vector.y / len };
+}
+
+function computeStemDirection(anchor, center) {
   const dx = anchor.x - center.x;
   const dy = anchor.y - center.y;
   const len = Math.hypot(dx, dy) || 1;
-  const ux = dx / len;
-  const uy = dy / len;
+  const upward = Math.max(Math.abs(dy), len * 0.25) / len;
+  return normalizeVector({
+    x: dx / len,
+    y: -upward,
+  });
+}
 
+function elbowInternalAngleDeg(anchor, elbow, armEnd) {
+  const ax = anchor.x - elbow.x;
+  const ay = anchor.y - elbow.y;
+  const bx = armEnd.x - elbow.x;
+  const by = armEnd.y - elbow.y;
+  const dot = ax * bx + ay * by;
+  const cross = ax * by - ay * bx;
+  return Math.atan2(Math.abs(cross), dot) * (180 / Math.PI);
+}
+
+function armEndForSide(elbow, side) {
+  return side === 'left'
+    ? { x: elbow.x - ARM_PX, y: elbow.y }
+    : { x: elbow.x + ARM_PX, y: elbow.y };
+}
+
+function resolvePointerSide(anchor, elbow, preferredSide, previousSide) {
+  const preferred = preferredSide === 'left' ? 'left' : 'right';
+  const opposite = preferred === 'left' ? 'right' : 'left';
+
+  const angleFor = (side) => (
+    elbowInternalAngleDeg(anchor, elbow, armEndForSide(elbow, side))
+  );
+
+  const preferredAngle = angleFor(preferred);
+  const oppositeAngle = angleFor(opposite);
+
+  if (previousSide === 'left' || previousSide === 'right') {
+    const activeAngle = angleFor(previousSide);
+    if (activeAngle >= SNAP_ANGLE_DEG) return previousSide;
+    return previousSide === 'left' ? 'right' : 'left';
+  }
+
+  if (preferredAngle >= SNAP_ANGLE_DEG) return preferred;
+  if (oppositeAngle >= SNAP_ANGLE_DEG) return opposite;
+  return oppositeAngle > preferredAngle ? opposite : preferred;
+}
+
+function computePointerGeometry(anchor, center, side = 'right', underlineWidth = 72) {
+  const stemDir = computeStemDirection(anchor, center);
   const elbow = {
-    x: anchor.x + ux * OUTWARD_PX,
-    y: anchor.y + uy * OUTWARD_PX,
+    x: anchor.x + stemDir.x * OUTWARD_PX,
+    y: anchor.y + stemDir.y * OUTWARD_PX,
   };
 
   let underlineStart;
@@ -53,16 +103,6 @@ function computePointerGeometry(anchor, center, side = 'right', underlineWidth =
       underlineStart = { x: underlineEnd.x - underlineWidth, y: elbow.y };
       label = { ...underlineStart };
       break;
-    case 'top':
-      underlineEnd = { x: elbow.x, y: elbow.y - ARM_PX };
-      underlineStart = { x: underlineEnd.x - underlineWidth / 2, y: underlineEnd.y };
-      label = { x: underlineStart.x, y: underlineEnd.y };
-      break;
-    case 'bottom':
-      underlineEnd = { x: elbow.x, y: elbow.y + ARM_PX };
-      underlineStart = { x: underlineEnd.x - underlineWidth / 2, y: underlineEnd.y };
-      label = { x: underlineStart.x, y: underlineEnd.y };
-      break;
     case 'right':
     default:
       underlineStart = { x: elbow.x + ARM_PX, y: elbow.y };
@@ -74,7 +114,7 @@ function computePointerGeometry(anchor, center, side = 'right', underlineWidth =
   return { anchor, elbow, underlineStart, underlineEnd, label, side };
 }
 
-function buildPointerTargets(globe, container, campaigns) {
+function buildPointerTargets(globe, container, campaigns, sideByCampaign) {
   if (!globe || !container) return [];
 
   const { width, height } = container.getBoundingClientRect();
@@ -89,6 +129,7 @@ function buildPointerTargets(globe, container, campaigns) {
       if (!anchorCoords) return null;
 
       if (!isFacingCamera(anchorCoords.lat, anchorCoords.lng, pov)) {
+        sideByCampaign.delete(campaign.id);
         return null;
       }
 
@@ -104,10 +145,23 @@ function buildPointerTargets(globe, container, campaigns) {
       const anchor = { x: screen.x, y: screen.y };
       const distFromCenter = Math.hypot(anchor.x - center.x, anchor.y - center.y);
       const maxRadius = Math.min(width, height) * 0.46;
-      if (distFromCenter > maxRadius) return null;
+      if (distFromCenter > maxRadius) {
+        sideByCampaign.delete(campaign.id);
+        return null;
+      }
 
       const underlineWidth = underlineWidthForCampaign(campaign);
-      const geometry = computePointerGeometry(anchor, center, campaign.pointerSide || 'right', underlineWidth);
+      const preferredSide = campaign.pointerSide || 'right';
+      const previousSide = sideByCampaign.get(campaign.id) || null;
+      const stemDir = computeStemDirection(anchor, center);
+      const elbow = {
+        x: anchor.x + stemDir.x * OUTWARD_PX,
+        y: anchor.y + stemDir.y * OUTWARD_PX,
+      };
+      const side = resolvePointerSide(anchor, elbow, preferredSide, previousSide);
+      sideByCampaign.set(campaign.id, side);
+
+      const geometry = computePointerGeometry(anchor, center, side, underlineWidth);
       return {
         campaign,
         ...geometry,
@@ -148,6 +202,7 @@ function applyPointerOpacity(previous, targets) {
 export default function CampaignPointers({ globe, selectedCampaignId, onSelect }) {
   const overlayRef = useRef(null);
   const smoothedRef = useRef(new Map());
+  const sideByCampaignRef = useRef(new Map());
   const [pointers, setPointers] = useState([]);
   const rafRef = useRef(0);
 
@@ -157,7 +212,12 @@ export default function CampaignPointers({ globe, selectedCampaignId, onSelect }
     const tick = () => {
       const container = overlayRef.current?.parentElement;
       if (container) {
-        const targets = buildPointerTargets(globe, container, POINTER_CAMPAIGNS);
+        const targets = buildPointerTargets(
+          globe,
+          container,
+          POINTER_CAMPAIGNS,
+          sideByCampaignRef.current,
+        );
         const next = applyPointerOpacity(smoothedRef.current, targets);
         setPointers(next);
       }
@@ -168,6 +228,7 @@ export default function CampaignPointers({ globe, selectedCampaignId, onSelect }
 
     const resizeObserver = new ResizeObserver(() => {
       smoothedRef.current.clear();
+      sideByCampaignRef.current.clear();
     });
     if (overlayRef.current?.parentElement) {
       resizeObserver.observe(overlayRef.current.parentElement);
@@ -177,34 +238,35 @@ export default function CampaignPointers({ globe, selectedCampaignId, onSelect }
       cancelAnimationFrame(rafRef.current);
       resizeObserver.disconnect();
       smoothedRef.current.clear();
+      sideByCampaignRef.current.clear();
     };
   }, [globe]);
 
   return (
     <div ref={overlayRef} className="campaign-pointers" role="tablist" aria-label="Campaigns">
       <svg className="campaign-pointers__svg">
-        {pointers.map(({ campaign, anchor, elbow, underlineStart, underlineEnd, label, opacity }) => {
+        {pointers.map(({ campaign, anchor, elbow, underlineStart, underlineEnd, opacity }) => {
           const isActive = campaign.id === selectedCampaignId;
           const accent = campaign.highlightColor || '#FF6B01';
           return (
-          <g
-            key={campaign.id}
-            style={{
-              opacity,
-              ...(isActive ? { '--pointer-accent': accent } : {}),
-            }}
-          >
-            <circle
-              className={`campaign-pointers__dot${isActive ? ' is-active' : ''}`}
-              cx={anchor.x}
-              cy={anchor.y}
+            <g
+              key={campaign.id}
+              style={{
+                opacity,
+                ...(isActive ? { '--pointer-accent': accent } : {}),
+              }}
+            >
+              <circle
+                className={`campaign-pointers__dot${isActive ? ' is-active' : ''}`}
+                cx={anchor.x}
+                cy={anchor.y}
                 r={DOT_RADIUS}
-            />
-            <path
-              className={`campaign-pointers__line${isActive ? ' is-active' : ''}`}
-              d={`M ${anchor.x} ${anchor.y} L ${elbow.x} ${elbow.y} L ${underlineStart.x} ${underlineStart.y} L ${underlineEnd.x} ${underlineEnd.y}`}
-            />
-          </g>
+              />
+              <path
+                className={`campaign-pointers__line${isActive ? ' is-active' : ''}`}
+                d={`M ${anchor.x} ${anchor.y} L ${elbow.x} ${elbow.y} L ${underlineStart.x} ${underlineStart.y} L ${underlineEnd.x} ${underlineEnd.y}`}
+              />
+            </g>
           );
         })}
       </svg>
