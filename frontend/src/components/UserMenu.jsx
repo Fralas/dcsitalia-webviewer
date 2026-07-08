@@ -117,7 +117,8 @@ export default function UserMenu({ onOpenProfile, variant = 'default' }) {
             ? 'app-header__login-btn'
             : 'rounded border border-yt-border/80 bg-[#151b25] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-yt-text-primary transition-colors hover:border-yt-accent hover:text-white'}
         >
-          {t('general.buttons.login')}
+          {isBrand && <DiscordIcon className="app-header__login-discord" />}
+          <span>{t('general.buttons.login')}</span>
         </button>
 
         {typeof document !== 'undefined' && createPortal(loginModal, document.body)}

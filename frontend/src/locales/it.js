@@ -549,20 +549,30 @@ export default {
         tabs: {
           mission: 'Missione',
           logistic: 'Logistica',
-          production: 'Production Point'
+          production: 'Punti di Produzione'
         },
         fixedWing: 'Aereo',
         rotaryWing: 'Elicottero',
+        aircraft: 'Mezzo',
         airport: 'Aeroporto',
         departure: 'Partenza',
         arrival: 'Arrivo',
         radius: 'Raggio in miglia nautiche',
+        weight: 'Peso carico in chilogrammi',
+        side: 'Fazione',
+        sideAll: 'Tutti',
+        sideBlue: 'Blue',
+        minStock: 'Stock minimo',
+        stockLabel: 'Scorte',
+        productionPoint: 'Production point',
+        dropZone: 'Zona di scarico',
         reset: 'Reimposta filtri',
         noResults: 'Nessun risultato nel raggio',
         zone: 'Zona {{number}}',
         nm: '{{value}} NM',
         neutral: 'Neutrale',
-        stock: 'Scorte {{count}}'
+        stock: 'Scorte {{count}}',
+        airdropUnit: 'Airdrop unit'
       }
     }
   },

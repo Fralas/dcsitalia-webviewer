@@ -22,8 +22,6 @@ export const GLOBE_REGION_SPECS = {
   'hidc-modern-syria': {
     countries: ['LB', 'SY', 'IL', 'JO', 'PS'],
     zones: [
-      // Southern Turkey (east of Gazipaşa, border with Syria)
-      { countries: ['TR'], bbox: [32.3, 36.0, 44.5, 39.1] },
       // Western Iraq (border strip with Syria and Jordan)
       { countries: ['IQ'], bbox: [38.8, 32.2, 42.8, 35.8] },
     ],

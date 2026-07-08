@@ -897,16 +897,16 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
         <table className="w-full border-collapse text-sm text-yt-text-secondary" {...props} />
       </div>
     ),
-    thead: ({ node, ...props }) => <thead className="bg-[#0f1a2a]" {...props} />,
+    thead: ({ node, ...props }) => <thead className="bg-yt-bg-tertiary" {...props} />,
     th: ({ node, ...props }) => <th className="border border-yt-border/80 px-3 py-2 text-left font-bold text-yt-text-primary" {...props} />,
     td: ({ node, ...props }) => <td className="border border-yt-border/70 px-3 py-2 align-top" {...props} />,
     blockquote: ({ node, ...props }) => <blockquote className="mb-3 border-l-2 border-yt-accent/60 pl-3 text-yt-text-secondary/95" {...props} />,
     a: ({ node, ...props }) => <a className="text-yt-accent underline" target="_blank" rel="noreferrer" {...props} />,
-    img: ({ node, ...props }) => <img className="my-3 max-h-[420px] w-auto max-w-full rounded border border-yt-border/80 bg-[#0b121d] p-1" loading="lazy" {...props} />,
+    img: ({ node, ...props }) => <img className="my-3 max-h-[420px] w-auto max-w-full rounded border border-yt-border/80 bg-yt-bg-primary p-1" loading="lazy" {...props} />,
     code: ({ inline, className, children, ...props }) => (
       inline
-        ? <code className="rounded bg-[#0e1827] px-1.5 py-0.5 text-[0.95em] text-yt-accent" {...props}>{children}</code>
-        : <code className="block overflow-x-auto rounded-xl border border-yt-border/80 bg-[#0b121d] p-3 text-sm text-yt-text-primary" {...props}>{children}</code>
+        ? <code className="rounded bg-yt-bg-tertiary px-1.5 py-0.5 text-[0.95em] text-yt-accent" {...props}>{children}</code>
+        : <code className="block overflow-x-auto rounded-xl border border-yt-border/80 bg-yt-bg-primary p-3 text-sm text-yt-text-primary" {...props}>{children}</code>
     ),
   }), []);
 
@@ -1494,7 +1494,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
     const DraftIcon = resolveGameplayIcon(wikiDraft.iconKey, Layers3);
 
     return (
-      <article className="flex h-full flex-col rounded-2xl border border-yt-border/80 bg-[#0f1723] p-4 sm:p-5">
+      <article className="flex h-full flex-col rounded-2xl border border-yt-border/80 bg-yt-bg-secondary p-4 sm:p-5">
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="inline-flex items-center gap-2 text-xl font-extrabold uppercase tracking-[0.05em] text-yt-text-primary">
@@ -1523,7 +1523,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                   }
                   setEditorOpen((prev) => !prev);
                 }}
-                className="inline-flex items-center gap-2 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary transition-colors hover:border-yt-accent hover:text-yt-accent"
+                className="inline-flex items-center gap-2 rounded border border-yt-border/80 bg-yt-bg-tertiary px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary transition-colors hover:border-yt-accent hover:text-yt-accent"
               >
                 <PenSquare className="h-3.5 w-3.5" />
                 {editorOpen ? ui.closeEditor : ui.editArticle}
@@ -1532,7 +1532,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
             <button
               type="button"
               onClick={closeGameplayArticleFullscreen}
-              className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary transition-colors hover:border-yt-accent hover:text-yt-accent"
+              className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-yt-bg-tertiary px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary transition-colors hover:border-yt-accent hover:text-yt-accent"
               aria-label={ui.closeArticle}
             >
               <X className="h-3.5 w-3.5" />
@@ -1542,7 +1542,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
         </div>
 
         <div
-          className={`overflow-auto rounded-xl border border-yt-border/75 bg-[#0c1320] px-4 py-3 ${
+          className={`overflow-auto rounded-xl border border-yt-border/75 bg-yt-bg-primary px-4 py-3 ${
             canEditWiki && editorOpen ? 'max-h-[40vh] sm:max-h-[46vh]' : 'min-h-0 flex-1'
           }`}
         >
@@ -1552,7 +1552,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
         </div>
 
         {canEditWiki && editorOpen && (
-          <div className="mt-4 rounded-xl border border-yt-border/80 bg-[#0b121d] p-3">
+          <div className="mt-4 rounded-xl border border-yt-border/80 bg-yt-bg-primary p-3">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.1em] text-yt-text-secondary">
                 <Eye className="h-3.5 w-3.5" />
@@ -1575,7 +1575,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                       <button
                         type="button"
                         onClick={() => setWikiDraftIconPickerOpen((prev) => !prev)}
-                        className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-yt-text-primary hover:border-yt-accent hover:text-yt-accent"
+                        className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-yt-bg-tertiary px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-yt-text-primary hover:border-yt-accent hover:text-yt-accent"
                       >
                         <DraftIcon className="h-3.5 w-3.5 text-yt-accent" />
                         {wikiDraftIconPickerOpen ? ui.hideIcons : ui.chooseIcon}
@@ -1585,7 +1585,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                       </span>
                     </div>
                     {wikiDraftIconPickerOpen && (
-                      <div className="mt-2 space-y-2 rounded border border-yt-border/70 bg-[#0f1725] p-2.5">
+                      <div className="mt-2 space-y-2 rounded border border-yt-border/70 bg-yt-bg-secondary p-2.5">
                         <p className="text-[11px] text-yt-text-secondary">
                           {ui.iconSearchHint}
                         </p>
@@ -1594,7 +1594,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                           value={wikiDraftIconSearch}
                           onChange={(event) => setWikiDraftIconSearch(event.target.value)}
                           placeholder={ui.searchIcon}
-                          className="w-full rounded border border-yt-border/80 bg-[#111a28] px-2.5 py-1.5 text-xs text-yt-text-primary outline-none focus:border-yt-accent"
+                          className="w-full rounded border border-yt-border/80 bg-yt-bg-tertiary px-2.5 py-1.5 text-xs text-yt-text-primary outline-none focus:border-yt-accent"
                         />
                         <div className="max-h-56 overflow-y-auto pr-1">
                           <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-8">
@@ -1613,7 +1613,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                                   className={`inline-flex h-9 items-center justify-center rounded border transition-colors ${
                                     selected
                                       ? 'border-yt-accent bg-yt-accent/20 text-yt-accent'
-                                      : 'border-yt-border/80 bg-[#101827] text-yt-text-secondary hover:border-yt-accent/70 hover:text-yt-accent'
+                                      : 'border-yt-border/80 bg-yt-bg-tertiary text-yt-text-secondary hover:border-yt-accent/70 hover:text-yt-accent'
                                   }`}
                                 >
                                   <Icon className="h-4 w-4" />
@@ -1634,7 +1634,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                     value={wikiDraft.titleEn}
                     onChange={(event) => setWikiDraft((prev) => ({ ...prev, titleEn: event.target.value }))}
                     placeholder={ui.titlePlaceholder}
-                    className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                    className="w-full rounded border border-yt-border/80 bg-yt-bg-tertiary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
                   />
                   <textarea
                     rows={3}
@@ -1642,7 +1642,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                     onChange={(event) => setWikiDraft((prev) => ({ ...prev, summaryEn: event.target.value }))}
                     placeholder={ui.summaryPlaceholder}
                     maxLength={WIKI_SHORT_DESCRIPTION_MAX_LENGTH}
-                    className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                    className="w-full rounded border border-yt-border/80 bg-yt-bg-tertiary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
                   />
                   <textarea
                     rows={10}
@@ -1656,7 +1656,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                     onDragOver={handleMarkdownDragOver}
                     onDrop={(event) => handleMarkdownDrop(event, 'wikiDraft', 'contentEn')}
                     placeholder={ui.contentPlaceholder}
-                    className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                    className="w-full rounded border border-yt-border/80 bg-yt-bg-tertiary px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
                   />
 
                   <p className="pt-1 text-[11px] font-bold uppercase tracking-[0.09em] text-yt-text-secondary">{ui.italianTranslation}</p>
@@ -1665,7 +1665,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                     value={wikiDraft.titleIt}
                     onChange={(event) => setWikiDraft((prev) => ({ ...prev, titleIt: event.target.value }))}
                     placeholder={ui.titlePlaceholderIt}
-                    className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                    className="w-full rounded border border-yt-border/80 bg-yt-bg-tertiary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
                   />
                   <textarea
                     rows={3}
@@ -1673,7 +1673,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                     onChange={(event) => setWikiDraft((prev) => ({ ...prev, summaryIt: event.target.value }))}
                     placeholder={ui.summaryPlaceholderIt}
                     maxLength={WIKI_SHORT_DESCRIPTION_MAX_LENGTH}
-                    className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                    className="w-full rounded border border-yt-border/80 bg-yt-bg-tertiary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
                   />
                   <textarea
                     rows={8}
@@ -1687,7 +1687,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                     onDragOver={handleMarkdownDragOver}
                     onDrop={(event) => handleMarkdownDrop(event, 'wikiDraft', 'contentIt')}
                     placeholder={ui.contentPlaceholderIt}
-                    className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                    className="w-full rounded border border-yt-border/80 bg-yt-bg-tertiary px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
                   />
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -1698,7 +1698,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                       <Save className="h-3.5 w-3.5" />
                       {ui.publish}
                     </button>
-                    <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary hover:border-yt-accent hover:text-yt-accent">
+                    <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-yt-border/80 bg-yt-bg-tertiary px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary hover:border-yt-accent hover:text-yt-accent">
                       {uploadingMedia ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
                       {ui.uploadMedia}
                       <input
@@ -1719,7 +1719,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                         }
                         setEditorOpen(false);
                       }}
-                      className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary"
+                      className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-yt-bg-tertiary px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary"
                     >
                       <X className="h-3.5 w-3.5" />
                       {ui.close}
@@ -1727,7 +1727,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                   </div>
                 </div>
 
-                <div className="rounded border border-yt-border/80 bg-[#111a28] p-3">
+                <div className="rounded border border-yt-border/80 bg-yt-bg-tertiary p-3">
                   <h4 className="mb-2 text-xs font-bold uppercase tracking-[0.1em] text-yt-accent">{ui.preview}</h4>
                   <h3 className="inline-flex items-center gap-2 text-lg font-extrabold uppercase tracking-[0.05em] text-yt-text-primary">
                     <DraftIcon className="h-4 w-4 text-yt-accent" />
@@ -1736,7 +1736,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                   <p className="mb-3 mt-1 text-sm text-yt-text-secondary">
                     {getDraftLocalizedField(wikiDraft, 'summary', language) || ui.summaryFallback}
                   </p>
-                  <div className="max-h-[420px] overflow-auto rounded border border-yt-border/70 bg-[#0c1320] px-3 py-2">
+                  <div className="max-h-[420px] overflow-auto rounded border border-yt-border/70 bg-yt-bg-primary px-3 py-2">
                     <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                       {getDraftLocalizedField(wikiDraft, 'content', language) || ui.emptyContentFallback}
                     </ReactMarkdown>
@@ -1757,7 +1757,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
         <p className="mt-1 text-xs text-yt-text-secondary">{ui.vehiclesSubtitle}</p>
       </div>
       <div className="grid items-start gap-4 lg:grid-cols-[64px,minmax(0,1fr)]">
-        <aside className="h-fit self-start rounded-2xl border border-yt-border/80 bg-[#0f1723] p-1.5">
+        <aside className="h-fit self-start rounded-2xl border border-yt-border/80 bg-yt-bg-secondary p-1.5">
           <div className="flex items-center justify-center gap-2 lg:flex-col">
             {vehicleGroups.map((group) => {
               const categoryLabel = localizeText(group.category, language);
@@ -1774,8 +1774,8 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                   aria-pressed={active}
                   className={`inline-flex h-11 w-11 items-center justify-center rounded-xl border transition-all ${
                     active
-                      ? 'border-yt-accent/70 bg-yt-accent/15 text-yt-accent shadow-[0_0_0_1px_rgba(78,197,255,0.24)]'
-                      : 'border-yt-border/80 bg-[#111a28] text-yt-text-secondary hover:border-yt-accent/45 hover:text-yt-accent'
+                      ? 'border-yt-accent/70 bg-yt-accent/15 text-yt-accent shadow-[0_0_0_1px_rgba(255,140,0,0.24)]'
+                      : 'border-yt-border/80 bg-yt-bg-tertiary text-yt-text-secondary hover:border-yt-accent/45 hover:text-yt-accent'
                   }`}
                 >
                   <CategoryIcon className="h-4 w-4" />
@@ -1786,13 +1786,13 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
         </aside>
 
         {!selectedVehicleGroup ? (
-          <p className="flex items-center rounded-xl border border-yt-border/75 bg-[#0f1723] px-4 py-3 text-sm text-yt-text-secondary">
+          <p className="flex items-center rounded-xl border border-yt-border/75 bg-yt-bg-secondary px-4 py-3 text-sm text-yt-text-secondary">
             {ui.noVehicles}
           </p>
         ) : (
           <article
             key={selectedVehicleGroup.key}
-            className={`rounded-2xl border border-yt-border/80 bg-[#0f1723] p-4 transition-all duration-200 ease-out ${
+            className={`rounded-2xl border border-yt-border/80 bg-yt-bg-secondary p-4 transition-all duration-200 ease-out ${
               isVehicleCategoryContentVisible ? 'translate-x-0 opacity-100' : 'translate-x-2 opacity-0'
             }`}
           >
@@ -1801,7 +1801,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
             </h3>
             <div className="max-h-[min(72vh,620px)] overflow-auto rounded-xl border border-yt-border/70">
               <table className="min-w-full border-collapse text-sm">
-                <thead className="bg-[#111b2a]">
+                <thead className="bg-yt-bg-tertiary">
                   <tr>
                     <th className="border border-yt-border/70 px-3 py-2 text-left font-bold uppercase tracking-[0.08em] text-yt-text-primary">
                       {ui.vehicleName}
@@ -1816,7 +1816,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                 </thead>
                 <tbody>
                   {selectedVehicleGroup.vehicles.map((vehicle) => (
-                    <tr key={vehicle.id} className="bg-[#0f1723] align-top">
+                    <tr key={vehicle.id} className="bg-yt-bg-secondary align-top">
                       <td className="border border-yt-border/70 px-3 py-2 font-semibold text-yt-text-primary">
                         {vehicle.name}
                       </td>
@@ -1875,7 +1875,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                 setNewTopicStatus('');
                 setNewTopicOpen(true);
               }}
-              className="inline-flex items-center gap-1.5 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary transition-colors hover:border-yt-accent hover:text-yt-accent"
+              className="inline-flex items-center gap-1.5 rounded border border-yt-border/80 bg-yt-bg-tertiary px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary transition-colors hover:border-yt-accent hover:text-yt-accent"
             >
               <Plus className="h-3.5 w-3.5" />
               {newTopicOpen ? ui.closeNewTopic : ui.newTopic}
@@ -1889,13 +1889,13 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
               type="button"
               key={id}
               onClick={() => handleSelectGameplayItem(id)}
-              className={`rounded-2xl border bg-[#101926] p-4 text-left shadow-[0_8px_18px_rgba(0,0,0,0.26)] transition-all ${
+              className={`rounded-2xl border bg-yt-bg-secondary p-4 text-left shadow-[0_8px_18px_rgba(0,0,0,0.26)] transition-all ${
                 selectedGameplayFeature?.id === id
                   ? 'border-yt-accent/60 ring-1 ring-yt-accent/35'
                   : 'border-yt-border/80 hover:border-yt-accent/45'
               }`}
             >
-              <div className="mb-2 inline-flex items-center gap-2 rounded-lg border border-yt-border/80 bg-[#0b121d] px-2.5 py-1">
+              <div className="mb-2 inline-flex items-center gap-2 rounded-lg border border-yt-border/80 bg-yt-bg-primary px-2.5 py-1">
                 <Icon className="h-4 w-4 text-yt-accent" />
                 <h3 className="text-xs font-bold uppercase tracking-[0.09em] text-yt-accent">{title}</h3>
               </div>
@@ -1905,7 +1905,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
         </div>
 
         {canEditWiki && newTopicOpen && (
-          <div className="mt-4 rounded-2xl border border-yt-border/80 bg-[#0f1723] p-4">
+          <div className="mt-4 rounded-2xl border border-yt-border/80 bg-yt-bg-secondary p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
               <h3 className="text-sm font-bold uppercase tracking-[0.1em] text-yt-accent">{ui.createNewTopic}</h3>
               {newTopicStatus && (
@@ -1919,7 +1919,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                   <button
                     type="button"
                     onClick={() => setNewTopicIconPickerOpen((prev) => !prev)}
-                    className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-yt-text-primary hover:border-yt-accent hover:text-yt-accent"
+                    className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-yt-bg-tertiary px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-yt-text-primary hover:border-yt-accent hover:text-yt-accent"
                   >
                     <NewTopicSelectedIcon className="h-3.5 w-3.5 text-yt-accent" />
                     {newTopicIconPickerOpen ? ui.hideIcons : ui.chooseIcon}
@@ -1929,7 +1929,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                   </span>
                 </div>
                 {newTopicIconPickerOpen && (
-                  <div className="mt-2 space-y-2 rounded border border-yt-border/70 bg-[#0f1725] p-2.5">
+                  <div className="mt-2 space-y-2 rounded border border-yt-border/70 bg-yt-bg-secondary p-2.5">
                     <p className="text-[11px] text-yt-text-secondary">
                       {ui.iconSearchHint}
                     </p>
@@ -1938,7 +1938,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                       value={newTopicIconSearch}
                       onChange={(event) => setNewTopicIconSearch(event.target.value)}
                       placeholder={ui.searchIcon}
-                      className="w-full rounded border border-yt-border/80 bg-[#111a28] px-2.5 py-1.5 text-xs text-yt-text-primary outline-none focus:border-yt-accent"
+                      className="w-full rounded border border-yt-border/80 bg-yt-bg-tertiary px-2.5 py-1.5 text-xs text-yt-text-primary outline-none focus:border-yt-accent"
                     />
                     <div className="max-h-56 overflow-y-auto pr-1">
                       <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-8">
@@ -1957,7 +1957,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                               className={`inline-flex h-9 items-center justify-center rounded border transition-colors ${
                                 selected
                                   ? 'border-yt-accent bg-yt-accent/20 text-yt-accent'
-                                  : 'border-yt-border/80 bg-[#101827] text-yt-text-secondary hover:border-yt-accent/70 hover:text-yt-accent'
+                                  : 'border-yt-border/80 bg-yt-bg-tertiary text-yt-text-secondary hover:border-yt-accent/70 hover:text-yt-accent'
                               }`}
                             >
                               <Icon className="h-4 w-4" />
@@ -1978,7 +1978,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                 value={newTopicDraft.titleEn}
                 onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, titleEn: event.target.value }))}
                 placeholder={ui.topicTitlePlaceholder}
-                className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                className="w-full rounded border border-yt-border/80 bg-yt-bg-tertiary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
               />
               <textarea
                 rows={3}
@@ -1986,7 +1986,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                 onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, summaryEn: event.target.value }))}
                 placeholder={ui.topicSummaryPlaceholder}
                 maxLength={WIKI_SHORT_DESCRIPTION_MAX_LENGTH}
-                className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                className="w-full rounded border border-yt-border/80 bg-yt-bg-tertiary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
               />
               <textarea
                 rows={8}
@@ -2000,7 +2000,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                 onDragOver={handleMarkdownDragOver}
                 onDrop={(event) => handleMarkdownDrop(event, 'newTopicDraft', 'contentEn')}
                 placeholder={ui.topicContentPlaceholder}
-                className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                className="w-full rounded border border-yt-border/80 bg-yt-bg-tertiary px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
               />
 
               <p className="pt-1 text-[11px] font-bold uppercase tracking-[0.09em] text-yt-text-secondary">{ui.italianTranslation}</p>
@@ -2009,7 +2009,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                 value={newTopicDraft.titleIt}
                 onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, titleIt: event.target.value }))}
                 placeholder={ui.topicTitlePlaceholderIt}
-                className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                className="w-full rounded border border-yt-border/80 bg-yt-bg-tertiary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
               />
               <textarea
                 rows={3}
@@ -2017,7 +2017,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                 onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, summaryIt: event.target.value }))}
                 placeholder={ui.topicSummaryPlaceholderIt}
                 maxLength={WIKI_SHORT_DESCRIPTION_MAX_LENGTH}
-                className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                className="w-full rounded border border-yt-border/80 bg-yt-bg-tertiary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
               />
               <textarea
                 rows={6}
@@ -2031,7 +2031,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                 onDragOver={handleMarkdownDragOver}
                 onDrop={(event) => handleMarkdownDrop(event, 'newTopicDraft', 'contentIt')}
                 placeholder={ui.topicContentPlaceholderIt}
-                className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                className="w-full rounded border border-yt-border/80 bg-yt-bg-tertiary px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
               />
               <div className="flex flex-wrap gap-2">
                 <button
@@ -2043,7 +2043,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                   {creatingTopic ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                   {ui.createTopic}
                 </button>
-                <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary hover:border-yt-accent hover:text-yt-accent">
+                <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-yt-border/80 bg-yt-bg-tertiary px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary hover:border-yt-accent hover:text-yt-accent">
                   {uploadingMedia ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
                   {ui.uploadMedia}
                   <input
@@ -2067,13 +2067,13 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                       newTopicMediaInputRef.current.value = '';
                     }
                   }}
-                  className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary"
+                  className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-yt-bg-tertiary px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary"
                 >
                   <X className="h-3.5 w-3.5" />
                   {ui.cancel}
                 </button>
               </div>
-              <div className="rounded border border-yt-border/80 bg-[#111a28] p-3">
+              <div className="rounded border border-yt-border/80 bg-yt-bg-tertiary p-3">
                 <h4 className="mb-2 text-xs font-bold uppercase tracking-[0.1em] text-yt-accent">{ui.preview}</h4>
                 <h3 className="text-lg font-extrabold uppercase tracking-[0.05em] text-yt-text-primary">
                   {getDraftLocalizedField(newTopicDraft, 'title', language) || ui.titleFallback}
@@ -2081,7 +2081,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                 <p className="mb-3 mt-1 text-sm text-yt-text-secondary">
                   {getDraftLocalizedField(newTopicDraft, 'summary', language) || ui.summaryFallback}
                 </p>
-                <div className="max-h-[340px] overflow-auto rounded border border-yt-border/70 bg-[#0c1320] px-3 py-2">
+                <div className="max-h-[340px] overflow-auto rounded border border-yt-border/70 bg-yt-bg-primary px-3 py-2">
                   <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                     {getDraftLocalizedField(newTopicDraft, 'content', language) || ui.emptyContentFallback}
                   </ReactMarkdown>
@@ -2092,7 +2092,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
         )}
 
         {wikiLoading && (
-          <div className="mt-4 rounded-xl border border-yt-border/80 bg-[#0e1520] px-3 py-2 text-sm text-yt-text-secondary">
+          <div className="mt-4 rounded-xl border border-yt-border/80 bg-yt-bg-primary px-3 py-2 text-sm text-yt-text-secondary">
             {ui.loadingArticles}
           </div>
         )}
@@ -2105,7 +2105,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
 
       {isGameplayArticleFullscreen && typeof document !== 'undefined' && createPortal(
         <div
-          className={`fixed inset-0 z-[275] flex items-center justify-center bg-[#03070fe0] p-3 transition-opacity duration-300 sm:p-5 ${
+          className={`fixed inset-0 z-[275] flex items-center justify-center bg-black/88 p-3 transition-opacity duration-300 sm:p-5 ${
             isGameplayArticleFullscreenActive ? 'opacity-100' : 'opacity-0'
           }`}
           onClick={closeGameplayArticleFullscreen}

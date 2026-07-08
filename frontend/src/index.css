@@ -3,22 +3,29 @@
 @tailwind utilities;
 
 :root {
-  --app-bg-0: #050a11;
-  --app-bg-1: #0a1320;
-  --app-glow-red: rgba(239, 68, 68, 0.15);
-  --app-glow-blue: rgba(78, 197, 255, 0.12);
+  --app-bg-0: #0F0F0F;
+  --app-bg-1: #151515;
+  --app-glow-red: rgba(239, 68, 68, 0.1);
+  --app-glow-blue: rgba(255, 140, 0, 0.08);
+  --font-sans: "Inter", "Aptos", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --bg-deep: #0F0F0F;
+  --text-bright: #EDEDED;
+  --text: #D4D4D4;
+  --muted: #9A9A9A;
+  --accent: #FF8C00;
 }
 
 body {
   margin: 0;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background:
     radial-gradient(circle at 10% 10%, var(--app-glow-blue), transparent 35%),
     radial-gradient(circle at 85% 0%, var(--app-glow-red), transparent 45%),
     linear-gradient(180deg, var(--app-bg-1) 0%, var(--app-bg-0) 55%);
-  color: #e9f1ff;
+  color: var(--text-bright);
   min-height: 100vh;
 }
 
@@ -33,8 +40,7 @@ body.wiki-showroom-open .app-shell {
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: var(--font-mono);
 }
 
 /* Custom scrollbar */
@@ -44,17 +50,17 @@ code {
 }
 
 ::-webkit-scrollbar-track {
-  background: #09111b;
+  background: #151515;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #223447;
+  background: #3C3C3C;
   border-radius: 9999px;
-  border: 2px solid #09111b;
+  border: 2px solid #151515;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #33516e;
+  background: #4e4e4e;
 }
 
 /* Animations */

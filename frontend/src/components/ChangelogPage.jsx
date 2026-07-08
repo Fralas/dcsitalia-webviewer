@@ -704,17 +704,17 @@ export default function ChangelogPage({ language = 'en' }) {
                 value={draft.title}
                 onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
                 placeholder="Titolo changelog"
-                className="w-full rounded-lg border border-yt-border bg-[#121b27] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                className="w-full rounded-lg border border-yt-border bg-yt-bg-tertiary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
               />
               <input
                 type="text"
                 value={draft.titleEn}
                 onChange={(event) => setDraft((prev) => ({ ...prev, titleEn: event.target.value }))}
                 placeholder="English title (translation)"
-                className="w-full rounded-lg border border-yt-border bg-[#121b27] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                className="w-full rounded-lg border border-yt-border bg-yt-bg-tertiary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
               />
 
-              <div className="rounded-xl border border-yt-border/80 bg-[#111926] p-2">
+              <div className="rounded-xl border border-yt-border/80 bg-yt-bg-tertiary p-2">
                 <div className="space-y-2">
                   {draft.rows.map((row) => {
                     const style = TAGS[row.tag] || TAGS.UPD;
@@ -749,7 +749,7 @@ export default function ChangelogPage({ language = 'en' }) {
                           onSelect={() => syncActiveEditorSelection(row.id, 'text')}
                           onKeyUp={() => syncActiveEditorSelection(row.id, 'text')}
                           placeholder="Testo riga IT (supporto markdown)"
-                          className="w-full rounded border border-yt-border/80 bg-[#0e1520] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                          className="w-full rounded border border-yt-border/80 bg-yt-bg-primary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
                         />
                         <textarea
                           rows={3}
@@ -761,7 +761,7 @@ export default function ChangelogPage({ language = 'en' }) {
                           onSelect={() => syncActiveEditorSelection(row.id, 'textEn')}
                           onKeyUp={() => syncActiveEditorSelection(row.id, 'textEn')}
                           placeholder="English row translation (markdown supported)"
-                          className="w-full rounded border border-yt-border/80 bg-[#0e1520] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                          className="w-full rounded border border-yt-border/80 bg-yt-bg-primary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
                         />
                       </div>
                     );
@@ -781,7 +781,7 @@ export default function ChangelogPage({ language = 'en' }) {
                 <div className="text-xs uppercase tracking-[0.08em] text-yt-text-secondary">Tag contributor</div>
                 <div className="flex flex-wrap gap-2">
                   {CONTRIBUTORS.map((entry) => (
-                    <label key={entry.id} className="inline-flex items-center gap-2 rounded border border-yt-border bg-[#121b27] px-2 py-1 text-xs text-yt-text-primary">
+                    <label key={entry.id} className="inline-flex items-center gap-2 rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1 text-xs text-yt-text-primary">
                       <input
                         type="checkbox"
                         checked={draft.contributorIds.includes(entry.id)}
@@ -815,7 +815,7 @@ export default function ChangelogPage({ language = 'en' }) {
                 {draft.attachments.length > 0 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {draft.attachments.map((attachment) => (
-                      <div key={attachment.id} className="rounded border border-yt-border/70 bg-[#0d1520] p-2">
+                      <div key={attachment.id} className="rounded border border-yt-border/70 bg-yt-bg-primary p-2">
                         {attachment.type === 'image' ? (
                           <img
                             src={attachment.url}
@@ -979,7 +979,7 @@ export default function ChangelogPage({ language = 'en' }) {
               by {post.author?.name || post.author?.id || 'Unknown'}
             </div>
 
-            <div className="mt-3 rounded-xl border border-yt-border/70 bg-[#0f1723] p-3 space-y-2">
+            <div className="mt-3 rounded-xl border border-yt-border/70 bg-yt-bg-secondary p-3 space-y-2">
               {(Array.isArray(post.rows) ? post.rows : []).map((row) => {
                 const style = TAGS[row.tag] || TAGS.UPD;
                 return (

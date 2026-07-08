@@ -4229,6 +4229,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   const [dcsarPoints, setDcsarPoints] = useState([]);
   const [feedEvents, setFeedEvents] = useState([]);
   const [feedCollapsed, setFeedCollapsed] = useState(false);
+  const [operationsCollapsed, setOperationsCollapsed] = useState(false);
   const [zoneStatusMeta, setZoneStatusMeta] = useState({});
   const [mapMode, setMapMode] = useState(startInTacticalMode);
   const [basemapMode, setBasemapMode] = useState(BASEMAP_MODE_DARK);
@@ -6237,13 +6238,16 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
 
               <LiveFeedPanel
                 language={language}
-                events={feedEvents}
-                collapsed={feedCollapsed}
-                onToggleCollapsed={() => setFeedCollapsed((value) => !value)}
+                feedEvents={feedEvents}
+                feedCollapsed={feedCollapsed}
+                onToggleFeedCollapsed={() => setFeedCollapsed((value) => !value)}
+                operationsCollapsed={operationsCollapsed}
+                onToggleOperationsCollapsed={() => setOperationsCollapsed((value) => !value)}
                 zones={validZones}
                 combatMissionByZone={combatMissionByZone}
                 logisticsMissions={filteredLogisticsMissions}
-                productionPoints={productionPoints}
+                productionPoints={productionPointsForMap}
+                dcsarPoints={dcsarPoints}
                 airports={validAirports}
                 onSelectZone={setSelectedZoneId}
                 onSelectLogisticsMission={(mission) => {
@@ -6251,6 +6255,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                   if (mission?.airport_id) setSelectedAirportId(mission.airport_id);
                 }}
                 onSelectProductionPoint={setSelectedProductionPointId}
+                onSelectDcsar={(point) => setSelectedDcsarId(point?.id || null)}
               />
 
               {filters.showAto && selectedZone && (

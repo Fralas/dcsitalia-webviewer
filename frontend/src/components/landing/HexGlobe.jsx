@@ -1,118 +1,126 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import Globe from 'globe.gl';
 import * as THREE from 'three';
-import CampaignPointers from './CampaignPointers';
-import { buildGlobeRegionFeatures } from '../../utils/buildGlobeRegionFeatures';
+import { HIDC_SYRIA_HOVER_LABEL, isHidcTheaterFeature, resolveGlobeHexColor, resolveTheaterCampaignId } from '../../utils/globeTheaterColor';
+import { prepareGlobeCountryFeatures } from '../../utils/prepareGlobeFeatures';
+import { buildExtraHexFeatures, collectCountryHexCells } from '../../utils/buildExtraHexFeatures';
+import { expandHidcTheaterHitboxes } from '../../utils/expandHidcTheaterHitboxes';
+import { industrialDark } from '../../config/industrialDarkTokens';
+import { GLOBE_EXTRA_DOTS } from '../../config/globeMarkers';
 
 const GEOJSON_URL = '/geo/ne_110m_admin_0_countries.geojson';
-const BASE_HEX_COLOR = 'rgba(150, 165, 185, 0.35)';
-const GLOBE_COLOR = '#0a0d12';
+const CDN = 'https://cdn.jsdelivr.net/npm/three-globe/example/img';
+const GLOBE_POV_ALTITUDE = 2.4 / 1.3 / 1.2;
+const AUTO_ROTATE_RESUME_MS = 30_000;
+const HEX_POLYGON_MARGIN = 0.3;
+const HEX_POLYGON_ALTITUDE = 0.001;
+const HIDC_HITBOX_RADIUS_MULTIPLIER = 2;
 
-function hexToRgba(hex, alpha) {
-  const clean = String(hex || '').replace('#', '');
-  const full = clean.length === 3
-    ? clean.split('').map((c) => c + c).join('')
-    : clean.padEnd(6, '0').slice(0, 6);
-  const r = parseInt(full.slice(0, 2), 16) || 0;
-  const g = parseInt(full.slice(2, 4), 16) || 0;
-  const b = parseInt(full.slice(4, 6), 16) || 0;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+function applyUnlitMaterials(world) {
+  world.scene().traverse((obj) => {
+    const type = obj.__globeObjType;
+    if (!obj.material || type !== 'hexPolygon') return;
+
+    if (!obj.material.isMeshBasicMaterial) {
+      const prev = obj.material;
+      obj.material = new THREE.MeshBasicMaterial({
+        color: prev.color.clone(),
+        transparent: prev.transparent,
+        opacity: prev.opacity,
+      });
+      prev.dispose();
+    }
+
+    obj.material.side = THREE.FrontSide;
+  });
 }
 
-export default function HexGlobe({ selectedCampaignId, onSelectCampaign }) {
+export default function HexGlobe({ onCampaignSelect }) {
   const containerRef = useRef(null);
   const globeRef = useRef(null);
-  const featuresRef = useRef([]);
-  const getOwnerRef = useRef(() => null);
-  const centroidByCampaignRef = useRef(new Map());
-  const selectedRef = useRef(selectedCampaignId);
-  const [pointersReady, setPointersReady] = useState(false);
+  const onCampaignSelectRef = useRef(onCampaignSelect);
 
-  selectedRef.current = selectedCampaignId;
-
-  const colorAccessor = (feature) => {
-    const owner = getOwnerRef.current(feature);
-    if (!owner) return BASE_HEX_COLOR;
-    if (owner.id === selectedRef.current) return owner.highlightColor;
-    return hexToRgba(owner.highlightColor, 0.45);
-  };
-
-  const altitudeAccessor = (feature) => (
-    feature?.properties?._partialRegion ? 0.018 : 0.01
-  );
-
-  const focusSelectedCampaign = (animateMs = 900) => {
-    const world = globeRef.current;
-    if (!world) return;
-    const centroid = centroidByCampaignRef.current.get(selectedRef.current);
-    if (centroid) {
-      world.pointOfView({ lat: centroid.lat, lng: centroid.lng, altitude: 2.1 }, animateMs);
-    }
-  };
-
-  const handleSelectCampaign = (campaignId) => {
-    const controls = globeRef.current?._orbitControls || globeRef.current?.controls?.();
-    if (controls) {
-      controls.autoRotate = false;
-    }
-    onSelectCampaign?.(campaignId);
-  };
+  useEffect(() => {
+    onCampaignSelectRef.current = onCampaignSelect;
+  }, [onCampaignSelect]);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return undefined;
 
-    const world = Globe()(container)
-      .backgroundColor('rgba(0,0,0,0)')
-      .showAtmosphere(true)
-      .atmosphereColor('#2a3346')
-      .atmosphereAltitude(0.18)
-      .hexPolygonResolution(3)
-      .hexPolygonMargin(0.3)
-      .hexPolygonUseDots(true)
-      .hexPolygonAltitude(altitudeAccessor)
-      .hexPolygonColor(colorAccessor);
+    let cancelled = false;
 
-    const globeMaterial = world.globeMaterial();
-    globeMaterial.color = new THREE.Color(GLOBE_COLOR);
-    globeMaterial.emissive = new THREE.Color(GLOBE_COLOR);
-    globeMaterial.emissiveIntensity = 0.35;
-    globeMaterial.shininess = 2;
+    const world = Globe()(container)
+      .backgroundColor(industrialDark.bgDeep)
+      .globeImageUrl(`${CDN}/earth-dark.jpg`)
+      .showAtmosphere(false)
+      .hexPolygonResolution(3)
+      .hexPolygonMargin(HEX_POLYGON_MARGIN)
+      .hexPolygonAltitude(HEX_POLYGON_ALTITUDE)
+      .hexPolygonUseDots(true)
+      .hexPolygonColor(resolveGlobeHexColor)
+      .hexPolygonLabel((feature) => (
+        isHidcTheaterFeature(feature) ? HIDC_SYRIA_HOVER_LABEL : ''
+      ))
+      .onHexPolygonClick((feature, event) => {
+        event?.stopPropagation?.();
+        const campaignId = resolveTheaterCampaignId(feature);
+        if (campaignId) onCampaignSelectRef.current?.(campaignId);
+      })
+      .showPointerCursor((objType, objData) => (
+        Boolean(resolveTheaterCampaignId(objData))
+      ));
+
+    world.lights([new THREE.AmbientLight(0xffffff, Math.PI)]);
 
     const controls = world.controls();
     controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.55;
+    controls.autoRotateSpeed = 0.1925;
     controls.enableZoom = false;
     controls.enablePan = false;
     controls.enableRotate = true;
 
-    world._orbitControls = controls;
+    let resumeTimer = null;
 
-    world.pointOfView({ lat: 30, lng: 40, altitude: 2.4 });
+    const stopAutoRotate = () => {
+      controls.autoRotate = false;
+    };
 
+    const scheduleAutoRotateResume = () => {
+      if (resumeTimer) clearTimeout(resumeTimer);
+      resumeTimer = window.setTimeout(() => {
+        controls.autoRotate = true;
+        resumeTimer = null;
+      }, AUTO_ROTATE_RESUME_MS);
+    };
+
+    controls.addEventListener('start', stopAutoRotate);
+    controls.addEventListener('end', scheduleAutoRotateResume);
+
+    world.pointOfView({ lat: 30, lng: 40, altitude: GLOBE_POV_ALTITUDE });
     globeRef.current = world;
-
-    let cancelled = false;
-    const readyFrame = requestAnimationFrame(() => {
-      if (!cancelled) setPointersReady(true);
-    });
 
     fetch(GEOJSON_URL)
       .then((res) => res.json())
       .then((geo) => {
         if (cancelled) return;
-        const features = Array.isArray(geo?.features) ? geo.features : [];
-        const regionData = buildGlobeRegionFeatures(features);
-
-        featuresRef.current = regionData.features;
-        getOwnerRef.current = regionData.getOwner;
-        centroidByCampaignRef.current = regionData.centroidByCampaign;
-
-        world
-          .hexPolygonsData(regionData.features)
-          .hexPolygonAltitude(altitudeAccessor)
-          .hexPolygonColor(colorAccessor);
-        focusSelectedCampaign();
+        const rawFeatures = Array.isArray(geo?.features) ? geo.features : [];
+        const features = prepareGlobeCountryFeatures(rawFeatures);
+        const occupiedCells = collectCountryHexCells(rawFeatures);
+        const italyMarkers = GLOBE_EXTRA_DOTS.filter(
+          (marker) => !String(marker.ISO_A3).startsWith('CY-'),
+        );
+        const extraFeatures = buildExtraHexFeatures(italyMarkers, occupiedCells);
+        world.hexPolygonsData([...features, ...extraFeatures]);
+        requestAnimationFrame(() => {
+          if (cancelled) return;
+          applyUnlitMaterials(world);
+          expandHidcTheaterHitboxes(world, {
+            margin: HEX_POLYGON_MARGIN,
+            altitude: HEX_POLYGON_ALTITUDE,
+            multiplier: HIDC_HITBOX_RADIUS_MULTIPLIER,
+          });
+        });
       })
       .catch((error) => {
         console.error('Failed to load globe GeoJSON:', error);
@@ -126,12 +134,13 @@ export default function HexGlobe({ selectedCampaignId, onSelectCampaign }) {
     handleResize();
 
     const resizeObserver = new ResizeObserver(handleResize);
-    resizeObserver.observe(containerRef.current);
+    resizeObserver.observe(container);
 
     return () => {
       cancelled = true;
-      cancelAnimationFrame(readyFrame);
-      setPointersReady(false);
+      if (resumeTimer) clearTimeout(resumeTimer);
+      controls.removeEventListener('start', stopAutoRotate);
+      controls.removeEventListener('end', scheduleAutoRotateResume);
       resizeObserver.disconnect();
       try {
         world._destructor?.();
@@ -140,28 +149,11 @@ export default function HexGlobe({ selectedCampaignId, onSelectCampaign }) {
       }
       globeRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    const world = globeRef.current;
-    if (!world) return;
-    world.hexPolygonColor(colorAccessor);
-    world.hexPolygonAltitude(altitudeAccessor);
-    focusSelectedCampaign(1200);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCampaignId]);
 
   return (
     <div className="landing-globe-wrap">
       <div ref={containerRef} className="landing-globe__canvas" />
-      {pointersReady && globeRef.current && (
-        <CampaignPointers
-          globe={globeRef.current}
-          selectedCampaignId={selectedCampaignId}
-          onSelect={handleSelectCampaign}
-        />
-      )}
     </div>
   );
 }

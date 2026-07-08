@@ -15,6 +15,11 @@ import bannerImg from '../img/DCS_ITALIA_ICON.png';
 import gbFlagImg from '../img/flags/gb.svg';
 import itFlagImg from '../img/flags/it.svg';
 import { useUser } from './contexts/UserContext';
+import CampaignHeaderTabs from './components/CampaignHeaderTabs';
+import {
+  DEFAULT_CAMPAIGN_ID,
+  getCampaignNavTarget,
+} from './config/campaigns';
 import {
   DEFAULT_TACTICAL_MAP_ID,
   getTacticalMapByCampaignId,
@@ -124,6 +129,9 @@ function App() {
   const initialRoute = viewFromLocation();
   const [currentView, setCurrentView] = useState(() => initialRoute.view);
   const [activeTacticalMapId, setActiveTacticalMapId] = useState(() => initialRoute.tacticalMapId);
+  const [selectedCampaignId, setSelectedCampaignId] = useState(() => {
+    return null;
+  });
   const [appLanguage, setAppLanguage] = useState(() => getActiveLocale());
   const [airports, setAirports] = useState({});
   const [airportCatalog, setAirportCatalog] = useState([]);
@@ -143,9 +151,31 @@ function App() {
       syncUrlWithView('frontline', { tacticalMapId: nextMapId, ...options });
       return;
     }
+    if (normalized === 'landing') {
+      setSelectedCampaignId(null);
+    }
     setCurrentView(normalized);
     syncUrlWithView(normalized, options);
   };
+
+  const handleSelectCampaign = (campaign) => {
+    if (campaign?.id === 'lidc-afghanistan') {
+      return;
+    }
+    const target = getCampaignNavTarget(campaign);
+    if (target.type === 'hidc' || target.type === 'lidc') {
+      openCampaignTarget(target);
+      return;
+    }
+    setSelectedCampaignId(campaign.id);
+    goToView('landing');
+  };
+
+  const headerActiveCampaignId = currentView === 'frontline'
+    ? activeTacticalMapId
+    : currentView === 'lidc'
+      ? 'lidc-afghanistan'
+      : selectedCampaignId;
 
   const openCampaignTarget = (target) => {
     if (target?.type === 'hidc' && target.tacticalMapId) {
@@ -189,6 +219,9 @@ function App() {
       const route = viewFromLocation();
       setCurrentView(route.view);
       setActiveTacticalMapId(route.tacticalMapId);
+      if (route.view === 'landing') {
+        setSelectedCampaignId(null);
+      }
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -271,7 +304,7 @@ function App() {
   }
 
   return (
-    <div className={`app-shell h-screen flex flex-col overflow-hidden ${currentView === 'landing' ? 'bg-[#0b0b0d]' : 'bg-yt-bg-primary'}`}>
+    <div className={`app-shell h-screen flex flex-col overflow-hidden ${currentView === 'landing' ? 'bg-[#0F0F0F]' : 'bg-yt-bg-primary'}`}>
       <header className="app-header">
         <div className="app-header__inner">
           <div className="app-header__left">
@@ -290,10 +323,9 @@ function App() {
             </button>
           </div>
 
-          <div
-            id="app-header-map-filters"
-            className="app-header__center"
-            aria-hidden={currentView !== 'frontline'}
+          <CampaignHeaderTabs
+            activeCampaignId={headerActiveCampaignId}
+            onSelectCampaign={handleSelectCampaign}
           />
 
           <div className="app-header__right">
@@ -317,7 +349,7 @@ function App() {
             <button
               type="button"
               onClick={() => goToView('changelogs')}
-              className={`app-header__nav-btn${currentView === 'changelogs' ? ' is-active' : ''}`}
+              className={`app-header__nav-btn app-header__nav-btn--lang${currentView === 'changelogs' ? ' is-active' : ''}`}
               title="Apri changelog"
               aria-label="Apri changelog"
             >
@@ -327,7 +359,7 @@ function App() {
             <button
               type="button"
               onClick={() => goToView('wiki')}
-              className={`app-header__nav-btn${currentView === 'wiki' ? ' is-active' : ''}`}
+              className={`app-header__nav-btn app-header__nav-btn--lang${currentView === 'wiki' ? ' is-active' : ''}`}
               title="Apri wiki"
               aria-label="Apri wiki"
             >
@@ -367,6 +399,8 @@ function App() {
         {currentView === 'landing' && (
           <LandingPage
             language={appLanguage}
+            selectedCampaignId={selectedCampaignId}
+            onSelectCampaign={setSelectedCampaignId}
             onOpenCampaign={openCampaignTarget}
           />
         )}

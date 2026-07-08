@@ -1,3 +1,16 @@
+.map-filter-bar-wrap {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 1000;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.map-filter-bar-wrap .map-filter-bar {
+  pointer-events: auto;
+}
+
 .map-filter-bar {
   display: inline-flex;
   align-items: stretch;

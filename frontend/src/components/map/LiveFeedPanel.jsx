@@ -57,93 +57,120 @@ function formatRelativeTime(timestamp) {
 
 export default function LiveFeedPanel({
   language = 'en',
-  events = [],
-  collapsed = false,
-  onToggleCollapsed,
+  feedEvents = [],
+  feedCollapsed = false,
+  onToggleFeedCollapsed,
+  operationsCollapsed = false,
+  onToggleOperationsCollapsed,
   zones,
   combatMissionByZone,
   logisticsMissions,
   productionPoints,
+  dcsarPoints = [],
   airports,
   onSelectZone,
   onSelectLogisticsMission,
   onSelectProductionPoint,
+  onSelectDcsar,
 }) {
   void language;
 
   return (
     <div className="live-feed-dock">
-      <button
-        type="button"
-        className="live-feed-panel__toggle"
-        onClick={onToggleCollapsed}
-        aria-label={collapsed ? t('map.rightPanel.openSidebar') : t('map.rightPanel.closeSidebar')}
-        title={collapsed ? t('map.rightPanel.openSidebar') : t('map.rightPanel.closeSidebar')}
+      <aside
+        className={`live-feed-card live-feed-card--feed${feedCollapsed ? ' is-collapsed' : ''}`}
+        aria-label={t('map.rightPanel.liveFeed')}
       >
-        <ChevronRight
-          className={`live-feed-panel__toggle-icon${collapsed ? ' live-feed-panel__toggle-icon--collapsed' : ''}`}
-          strokeWidth={3}
-        />
-      </button>
+        <div className="live-feed-card__header live-feed-card__header--feed">
+          {!feedCollapsed && (
+            <h2 className="live-feed-card__title">{t('map.rightPanel.liveFeed')}</h2>
+          )}
+          <button
+            type="button"
+            className="live-feed-card__toggle"
+            onClick={onToggleFeedCollapsed}
+            aria-label={feedCollapsed ? t('map.rightPanel.openSidebar') : t('map.rightPanel.closeSidebar')}
+            title={feedCollapsed ? t('map.rightPanel.openSidebar') : t('map.rightPanel.closeSidebar')}
+          >
+            <ChevronRight
+              className={`live-feed-card__toggle-icon${feedCollapsed ? ' is-collapsed' : ''}`}
+              strokeWidth={3}
+            />
+          </button>
+        </div>
+        {!feedCollapsed && (
+          <>
+            <div className="live-feed-card__divider" aria-hidden="true" />
+            <div className="live-feed-card__body">
+              <div className="live-feed-card__list">
+                {feedEvents.length === 0 ? (
+                  <div className="live-feed-item live-feed-item--empty">
+                    <p className="live-feed-item__title">{t('map.rightPanel.emptyEventsTitle')}</p>
+                    <p className="live-feed-item__message">{t('map.rightPanel.emptyEventsMessage')}</p>
+                  </div>
+                ) : (
+                  feedEvents.map((event) => (
+                    <article
+                      key={event.id || `${event.type}-${event.timestamp}`}
+                      className="live-feed-item"
+                    >
+                      <div className="live-feed-item__top">
+                        <span className={`live-feed-item__badge ${getFeedTypeClass(event.type)}`}>
+                          {getFeedTypeLabel(event.type)}
+                        </span>
+                        <time className="live-feed-item__time" dateTime={new Date(event.timestamp || 0).toISOString()}>
+                          {formatRelativeTime(event.timestamp)}
+                        </time>
+                      </div>
+                      <h3 className="live-feed-item__title">{event.title || t('map.rightPanel.activityUpdate')}</h3>
+                      {event.message && (
+                        <p className="live-feed-item__message">{event.message}</p>
+                      )}
+                    </article>
+                  ))
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </aside>
 
       <aside
-        className={`live-feed-panel${collapsed ? ' live-feed-panel--collapsed' : ''}`}
-        aria-label={t('map.rightPanel.ariaLabel')}
-        aria-expanded={!collapsed}
+        className={`live-feed-card live-feed-card--ops${operationsCollapsed ? ' is-collapsed' : ''}`}
+        aria-label={t('map.rightPanel.ops.ariaLabel')}
       >
-        <div className="live-feed-panel__inner">
-          <div className="live-feed-panel__header">
-            <h2 className="live-feed-panel__title">{t('map.rightPanel.liveFeed')}</h2>
-          </div>
-
-          <div className="live-feed-panel__body" aria-hidden={collapsed}>
-            <div className="live-feed-panel__feed">
-              <div className="live-feed-panel__list">
-              {events.length === 0 ? (
-                <div className="live-feed-item live-feed-item--empty">
-                  <p className="live-feed-item__title">{t('map.rightPanel.emptyEventsTitle')}</p>
-                  <p className="live-feed-item__message">{t('map.rightPanel.emptyEventsMessage')}</p>
-                </div>
-              ) : (
-                events.map((event) => (
-                  <article
-                    key={event.id || `${event.type}-${event.timestamp}`}
-                    className="live-feed-item"
-                  >
-                    <div className="live-feed-item__top">
-                      <span className={`live-feed-item__badge ${getFeedTypeClass(event.type)}`}>
-                        {getFeedTypeLabel(event.type)}
-                      </span>
-                      <time className="live-feed-item__time" dateTime={new Date(event.timestamp || 0).toISOString()}>
-                        {formatRelativeTime(event.timestamp)}
-                      </time>
-                    </div>
-                    <h3 className="live-feed-item__title">{event.title || t('map.rightPanel.activityUpdate')}</h3>
-                    {event.message && (
-                      <p className="live-feed-item__message">{event.message}</p>
-                    )}
-                  </article>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="live-feed-panel__divider" aria-hidden="true" />
-
-          <MapOperationsPanel
-            language={language}
-            collapsed={collapsed}
-            zones={zones}
-            combatMissionByZone={combatMissionByZone}
-            logisticsMissions={logisticsMissions}
-            productionPoints={productionPoints}
-            airports={airports}
-            onSelectZone={onSelectZone}
-            onSelectLogisticsMission={onSelectLogisticsMission}
-            onSelectProductionPoint={onSelectProductionPoint}
-          />
+        <div className="live-feed-card__header live-feed-card__header--ops">
+          <button
+            type="button"
+            className="live-feed-card__toggle"
+            onClick={onToggleOperationsCollapsed}
+            aria-label={operationsCollapsed ? t('map.rightPanel.openSidebar') : t('map.rightPanel.closeSidebar')}
+            title={operationsCollapsed ? t('map.rightPanel.openSidebar') : t('map.rightPanel.closeSidebar')}
+          >
+            <ChevronRight
+              className={`live-feed-card__toggle-icon${operationsCollapsed ? ' is-collapsed' : ''}`}
+              strokeWidth={3}
+            />
+          </button>
         </div>
-        </div>
+        {!operationsCollapsed && (
+          <div className="live-feed-card__body live-feed-card__body--ops">
+            <MapOperationsPanel
+              language={language}
+              collapsed={operationsCollapsed}
+              zones={zones}
+              combatMissionByZone={combatMissionByZone}
+              logisticsMissions={logisticsMissions}
+              productionPoints={productionPoints}
+              dcsarPoints={dcsarPoints}
+              airports={airports}
+              onSelectZone={onSelectZone}
+              onSelectLogisticsMission={onSelectLogisticsMission}
+              onSelectProductionPoint={onSelectProductionPoint}
+              onSelectDcsar={onSelectDcsar}
+            />
+          </div>
+        )}
       </aside>
     </div>
   );

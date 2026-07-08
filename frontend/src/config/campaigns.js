@@ -2,11 +2,9 @@
  * Static configuration for the landing page campaigns.
  *
  * This file is intentionally simple to edit:
- * - Add / remove entries in the `CAMPAIGNS` array to change the globe pointers.
- * - `pointerAnchor` is the lat/lng on the globe where the pointer line starts.
- * - `pointerSide` fixes label direction: 'left' | 'right' | 'top' | 'bottom'
- * - `globeRegions` (legacy) — see `globeRegionSpecs.js` for the actual theater
- *   polygons (full countries + partial bbox zones) used by the globe.
+ * - Add / remove entries in the `CAMPAIGNS` array to change available campaigns.
+ * - `pointerAnchor` / `highlightColor` are reserved for future globe UI use.
+ * - `globeRegions` (legacy) — see `globeRegionSpecs.js` for theater polygon specs.
  * - `tacticalMapId` links a HIDC campaign to its tactical map (see `tacticalMaps.js`).
  *   When the map is `enabled`, "OPEN MAP" opens the flat tactical view directly.
  * - `openTarget` for non-HIDC routes:
@@ -18,6 +16,7 @@
  */
 
 import { GLOBE_REGION_SPECS } from './globeRegionSpecs';
+import { getTacticalMapByCampaignId } from './tacticalMaps';
 
 export const CAMPAIGNS = [
   {
@@ -193,6 +192,13 @@ export const DEFAULT_CAMPAIGN_ID = CAMPAIGNS[0].id;
 
 export function getCampaignById(id) {
   return CAMPAIGNS.find((campaign) => campaign.id === id) || null;
+}
+
+export function getCampaignNavTarget(campaign) {
+  const map = getTacticalMapByCampaignId(campaign.tacticalMapId);
+  if (map?.enabled) return { type: 'hidc', tacticalMapId: campaign.id };
+  if (campaign.openTarget === 'lidc') return { type: 'lidc' };
+  return { type: 'landing', campaignId: campaign.id };
 }
 
 /**

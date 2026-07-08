@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { StarsBackground } from '../ui/stars-background';
 import HexGlobe from './HexGlobe';
 import NoeEventsCard from './NoeEventsCard';
 import CampaignInfoCard from './CampaignInfoCard';
 import NoeEventAdminModal from './NoeEventAdminModal';
-import { DEFAULT_CAMPAIGN_ID, getCampaignById } from '../../config/campaigns';
+import { getCampaignById } from '../../config/campaigns';
 import { canManageNoe } from '../../config/featureAccess';
 import { useUser } from '../../contexts/UserContext';
 import * as api from '../../services/api';
@@ -12,15 +11,18 @@ import './LandingPage.css';
 
 const DISCORD_URL = import.meta.env.VITE_DISCORD_INVITE_URL || 'https://discord.gg/dcsitalia';
 
-export default function LandingPage({ language = 'en', onOpenCampaign }) {
+export default function LandingPage({
+  language = 'en',
+  selectedCampaignId = null,
+  onSelectCampaign,
+  onOpenCampaign,
+}) {
   const { user } = useUser();
   const canManage = canManageNoe(user?.id);
 
-  const [selectedCampaignId, setSelectedCampaignId] = useState(DEFAULT_CAMPAIGN_ID);
+  const selectedCampaign = getCampaignById(selectedCampaignId);
   const [events, setEvents] = useState([]);
   const [adminOpen, setAdminOpen] = useState(false);
-
-  const selectedCampaign = getCampaignById(selectedCampaignId);
 
   const loadEvents = async () => {
     try {
@@ -50,20 +52,8 @@ export default function LandingPage({ language = 'en', onOpenCampaign }) {
 
   return (
     <div className="landing">
-      <div className="landing__stars">
-        <StarsBackground
-          starDensity={0.00182}
-          allStarsTwinkle
-          twinkleProbability={0.65}
-          className="pointer-events-none"
-        />
-      </div>
-
       <div className="landing__globe">
-        <HexGlobe
-          selectedCampaignId={selectedCampaignId}
-          onSelectCampaign={setSelectedCampaignId}
-        />
+        <HexGlobe onCampaignSelect={onSelectCampaign} />
       </div>
 
       <div className="landing__left">

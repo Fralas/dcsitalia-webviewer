@@ -553,16 +553,26 @@ export default {
         },
         fixedWing: 'Fixed wing',
         rotaryWing: 'Rotary wing',
+        aircraft: 'Aircraft',
         airport: 'Airport',
         departure: 'Departure',
         arrival: 'Arrival',
         radius: 'Radius in nautical miles',
+        weight: 'Cargo weight in kilograms',
+        side: 'Side',
+        sideAll: 'All',
+        sideBlue: 'Blue',
+        minStock: 'Minimum stock',
+        stockLabel: 'Stock',
+        productionPoint: 'Production point',
+        dropZone: 'Drop zone',
         reset: 'Reset filters',
         noResults: 'No results in range',
         zone: 'Zone {{number}}',
         nm: '{{value}} NM',
         neutral: 'Neutral',
-        stock: 'Stock {{count}}'
+        stock: 'Stock {{count}}',
+        airdropUnit: 'Airdrop unit'
       }
     }
   },

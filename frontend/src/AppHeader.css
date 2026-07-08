@@ -1,39 +1,119 @@
 .app-header {
-  --header-accent: #FF6B01;
-  --header-accent-soft: rgba(255, 107, 1, 0.14);
-  --header-bg: #0b0b0d;
-  --header-border: rgba(255, 255, 255, 0.08);
-  --header-text: #f2f4f8;
-  --header-text-dim: #9aa3b2;
+  --header-accent: #FF8C00;
+  --header-accent-hover: #FFA733;
+  --header-accent-soft: rgba(255, 140, 0, 0.16);
+  --header-accent-border: rgba(255, 140, 0, 0.48);
+  --header-accent-border-active: rgba(255, 140, 0, 0.55);
+  --header-bg: #0F0F0F;
+  --header-font: "Inter", "Aptos", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  --header-surface: #1E1E1E;
+  --header-border: #3C3C3C;
+  --header-text: #EDEDED;
+  --header-text-secondary: #D4D4D4;
+  --header-text-dim: #9A9A9A;
+  --header-nav-default: #a7b0b1;
 
   position: sticky;
   top: 0;
   z-index: 50;
   border-bottom: 1px solid var(--header-border);
   background: var(--header-bg);
+  font-family: var(--header-font);
+  overflow: visible;
 }
 
 .app-header__inner {
   position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 20px;
+  min-height: 56px;
+  padding: 8px 20px;
+  overflow: visible;
+}
+
+.app-header__tabs {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  height: 56px;
-  padding: 0 20px;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: none;
+  background: transparent;
 }
 
-.app-header__center {
+.app-header__tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.app-header__tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 7px 11px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--header-text-dim);
+  font-family: var(--header-font);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, opacity 0.16s ease;
+}
+
+.app-header__tab-label {
+  display: inline-block;
+}
+
+.app-header__tab.has-subtitle .app-header__tab-label {
+  transform: translateY(-5px);
+}
+
+.app-header__tab-subtitle {
   position: absolute;
   left: 50%;
-  top: 50%;
-  z-index: 2;
-  transform: translate(-50%, -50%);
+  bottom: 4px;
+  transform: translateX(-50%);
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: var(--header-text-secondary);
+  white-space: nowrap;
   pointer-events: none;
+  opacity: 0.95;
 }
 
-.app-header__center:not(:empty) {
-  pointer-events: auto;
+.app-header__tab.is-active .app-header__tab-subtitle {
+  color: var(--header-text-secondary);
+}
+
+.app-header__tab:hover:not(.is-disabled) {
+  border-color: #2d3333;
+  background: #151717;
+  color: var(--header-text);
+}
+
+.app-header__tab.is-active {
+  border-color: var(--header-border);
+  background: var(--header-surface);
+  color: var(--header-text-secondary);
+}
+
+.app-header__tab.is-disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 .app-header__brand {
@@ -45,7 +125,7 @@
   padding: 0;
   cursor: pointer;
   text-align: left;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.16s ease;
 }
 
 .app-header__brand:hover {
@@ -70,13 +150,16 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  min-width: 0;
+  flex-shrink: 0;
+  justify-self: start;
 }
 
 .app-header__right {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+  justify-self: end;
 }
 
 .app-header__lang {
@@ -87,18 +170,19 @@
   padding: 0 10px;
   border-radius: 8px;
   border: 1px solid var(--header-border);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--header-text);
+  background: var(--header-surface);
+  color: var(--header-text-secondary);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
 }
 
 .app-header__lang:hover {
-  border-color: rgba(255, 107, 1, 0.45);
-  background: var(--header-accent-soft);
+  border-color: #2d3333;
+  background: #151717;
+  color: var(--header-text);
 }
 
 .app-header__lang-flag {
@@ -122,27 +206,37 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 107, 1, 0.35);
-  background: rgba(18, 18, 22, 0.85);
-  color: var(--header-text-dim);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--header-nav-default);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+.app-header__nav-btn--lang {
+  width: auto;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--header-border);
+  background: var(--header-surface);
+  color: var(--header-text-secondary);
 }
 
 .app-header__nav-btn:hover {
   color: var(--header-text);
-  border-color: var(--header-accent);
-  background: var(--header-accent-soft);
+  border-color: #2d3333;
+  background: #151717;
 }
 
 .app-header__nav-btn.is-active {
-  color: #fff;
-  border-color: var(--header-accent);
+  color: var(--header-accent);
+  border-color: var(--header-accent-border-active);
   background: var(--header-accent-soft);
-  box-shadow: 0 0 12px rgba(255, 107, 1, 0.2);
+  box-shadow: none;
 }
 
 .app-header__summary {
@@ -152,7 +246,7 @@
   padding: 4px 8px;
   border-radius: 8px;
   border: 1px solid var(--header-border);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--header-surface);
 }
 
 @media (min-width: 1024px) {
@@ -185,19 +279,20 @@
   padding: 0 10px 0 4px;
   border-radius: 999px;
   border: 1px solid var(--header-border);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--header-text);
+  background: var(--header-surface);
+  color: var(--header-text-secondary);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
 }
 
 .app-header__user-btn:hover {
-  border-color: rgba(255, 107, 1, 0.45);
-  background: var(--header-accent-soft);
+  border-color: #2d3333;
+  background: #151717;
+  color: var(--header-text);
 }
 
 .app-header__user-avatar {
@@ -221,23 +316,34 @@
 }
 
 .app-header__login-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   height: 34px;
-  padding: 0 14px;
+  padding: 0 10px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 107, 1, 0.35);
-  background: rgba(18, 18, 22, 0.85);
-  color: var(--header-text);
-  font-size: 11px;
+  border: 1px solid var(--header-border);
+  background: var(--header-surface);
+  color: var(--header-text-secondary);
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
 }
 
 .app-header__login-btn:hover {
-  border-color: var(--header-accent);
-  background: var(--header-accent-soft);
+  border-color: #2d3333;
+  background: #151717;
+  color: var(--header-text);
+}
+
+.app-header__login-discord {
+  width: 14px;
+  height: 14px;
+  color: #5865f2;
+  flex-shrink: 0;
 }
 
 .app-header__menu {
@@ -246,10 +352,10 @@
   top: calc(100% + 6px);
   z-index: 60;
   width: 192px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--header-border);
-  background: #14151a;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  background: var(--header-surface);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
   overflow: hidden;
 }
 
@@ -265,7 +371,7 @@
 
 .app-header__menu-head:hover,
 .app-header__menu-item:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: #252526;
 }
 
 .app-header__menu-name {
@@ -287,14 +393,15 @@
   padding: 10px 12px;
   border: none;
   background: transparent;
-  color: var(--header-text);
+  color: var(--header-text-secondary);
   font-size: 13px;
   text-align: left;
   cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
 }
 
 .app-header__menu-item--danger {
-  color: #ff8f8f;
+  color: #ff9a91;
 }
 
 .app-header__user-wrap {
@@ -316,7 +423,7 @@
   position: absolute;
   inset: 0;
   border: none;
-  background: rgba(3, 4, 8, 0.72);
+  background: rgba(0, 0, 0, 0.64);
   backdrop-filter: blur(4px);
   cursor: pointer;
 }
@@ -325,10 +432,10 @@
   position: relative;
   z-index: 1;
   width: min(440px, 100%);
-  border-radius: 16px;
+  border-radius: 12px;
   border: 1px solid var(--header-border);
-  background: #101116;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  background: #252526;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.45);
   overflow: hidden;
 }
 
@@ -366,15 +473,15 @@
   flex-shrink: 0;
   border-radius: 8px;
   border: 1px solid var(--header-border);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--header-surface);
   color: var(--header-text-dim);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  transition: color 0.16s ease, border-color 0.16s ease, background 0.16s ease;
 }
 
 .login-modal__close:hover {
   color: var(--header-text);
-  border-color: rgba(255, 107, 1, 0.45);
+  border-color: var(--header-accent-border);
   background: var(--header-accent-soft);
 }
 
@@ -390,7 +497,7 @@
   width: 100%;
   min-height: 46px;
   padding: 0 18px;
-  border-radius: 10px;
+  border-radius: 9px;
   border: 1px solid #4752c4;
   background: #5865f2;
   color: #fff;
@@ -399,13 +506,12 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  transition: background 0.16s ease, border-color 0.16s ease;
 }
 
 .login-modal__discord:hover {
   background: #4752c4;
   border-color: #3c45a5;
-  transform: translateY(-1px);
 }
 
 .login-modal__discord-icon {

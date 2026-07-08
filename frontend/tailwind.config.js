@@ -7,14 +7,14 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Situation-monitor inspired dark palette
-        'yt-bg-primary': '#050a11',
-        'yt-bg-secondary': '#0f1721',
-        'yt-bg-tertiary': '#162330',
-        'yt-text-primary': '#e9f1ff',
-        'yt-text-secondary': '#9db0ca',
-        'yt-accent': '#4ec5ff',
-        'yt-border': '#243446',
+        // Industrial dark palette (landing + Syria map)
+        'yt-bg-primary': '#0F0F0F',
+        'yt-bg-secondary': '#1E1E1E',
+        'yt-bg-tertiary': '#252526',
+        'yt-text-primary': '#EDEDED',
+        'yt-text-secondary': '#9A9A9A',
+        'yt-accent': '#FF8C00',
+        'yt-border': '#3C3C3C',
         // Legacy colors (keeping for backward compatibility)
         'dcs-dark': '#212121',
         'dcs-darker': '#0f0f0f',
