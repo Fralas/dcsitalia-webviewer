@@ -53,7 +53,10 @@ export default function LandingPage({
   return (
     <div className="landing">
       <div className="landing__globe">
-        <HexGlobe onCampaignSelect={onSelectCampaign} />
+        <HexGlobe
+          selectedCampaignId={selectedCampaignId}
+          onCampaignSelect={onSelectCampaign}
+        />
       </div>
 
       <div className="landing__left">

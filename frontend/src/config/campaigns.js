@@ -3,7 +3,8 @@
  *
  * This file is intentionally simple to edit:
  * - Add / remove entries in the `CAMPAIGNS` array to change available campaigns.
- * - `pointerAnchor` / `highlightColor` are reserved for future globe UI use.
+ * - `pointerAnchor` / `pointerSide` / `highlightColor` drive globe pointer arms.
+ * - `showPointer: false` hides the arm for a campaign (globe click still works).
  * - `globeRegions` (legacy) — see `globeRegionSpecs.js` for theater polygon specs.
  * - `tacticalMapId` links a HIDC campaign to its tactical map (see `tacticalMaps.js`).
  *   When the map is `enabled`, "OPEN MAP" opens the flat tactical view directly.
@@ -69,6 +70,7 @@ export const CAMPAIGNS = [
     highlightColor: '#4ec5ff',
     pointerAnchor: { lat: 51.2, lng: 10.5 },
     pointerSide: 'left',
+    showPointer: false,
     tacticalMapId: 'hidc-cw84-germany',
     description: {
       en: [
@@ -100,6 +102,7 @@ export const CAMPAIGNS = [
     highlightColor: '#8bd450',
     pointerAnchor: { lat: 44.0, lng: 20.5 },
     pointerSide: 'left',
+    showPointer: false,
     tacticalMapId: 'hidc-2000-balkans',
     description: {
       en: [
@@ -131,6 +134,7 @@ export const CAMPAIGNS = [
     highlightColor: '#FFD500',
     pointerAnchor: { lat: 26.5, lng: 51.0 },
     pointerSide: 'right',
+    showPointer: false,
     openTarget: null,
     description: {
       en: [

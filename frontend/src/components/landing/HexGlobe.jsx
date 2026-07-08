@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Globe from 'globe.gl';
 import * as THREE from 'three';
+import CampaignPointers from './CampaignPointers';
 import { HIDC_SYRIA_HOVER_LABEL, isHidcTheaterFeature, resolveGlobeHexColor, resolveTheaterCampaignId } from '../../utils/globeTheaterColor';
 import { prepareGlobeCountryFeatures } from '../../utils/prepareGlobeFeatures';
 import { buildExtraHexFeatures, collectCountryHexCells } from '../../utils/buildExtraHexFeatures';
@@ -35,10 +36,17 @@ function applyUnlitMaterials(world) {
   });
 }
 
-export default function HexGlobe({ onCampaignSelect }) {
+export default function HexGlobe({ selectedCampaignId, onCampaignSelect }) {
   const containerRef = useRef(null);
   const globeRef = useRef(null);
   const onCampaignSelectRef = useRef(onCampaignSelect);
+  const [pointersReady, setPointersReady] = useState(false);
+
+  const handleSelectCampaign = (campaignId) => {
+    const controls = globeRef.current?.controls?.();
+    if (controls) controls.autoRotate = false;
+    onCampaignSelectRef.current?.(campaignId);
+  };
 
   useEffect(() => {
     onCampaignSelectRef.current = onCampaignSelect;
@@ -100,6 +108,10 @@ export default function HexGlobe({ onCampaignSelect }) {
     world.pointOfView({ lat: 30, lng: 40, altitude: GLOBE_POV_ALTITUDE });
     globeRef.current = world;
 
+    const readyFrame = requestAnimationFrame(() => {
+      if (!cancelled) setPointersReady(true);
+    });
+
     fetch(GEOJSON_URL)
       .then((res) => res.json())
       .then((geo) => {
@@ -138,6 +150,8 @@ export default function HexGlobe({ onCampaignSelect }) {
 
     return () => {
       cancelled = true;
+      cancelAnimationFrame(readyFrame);
+      setPointersReady(false);
       if (resumeTimer) clearTimeout(resumeTimer);
       controls.removeEventListener('start', stopAutoRotate);
       controls.removeEventListener('end', scheduleAutoRotateResume);
@@ -154,6 +168,13 @@ export default function HexGlobe({ onCampaignSelect }) {
   return (
     <div className="landing-globe-wrap">
       <div ref={containerRef} className="landing-globe__canvas" />
+      {pointersReady && globeRef.current && (
+        <CampaignPointers
+          globe={globeRef.current}
+          selectedCampaignId={selectedCampaignId}
+          onSelect={handleSelectCampaign}
+        />
+      )}
     </div>
   );
 }
