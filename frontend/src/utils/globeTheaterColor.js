@@ -22,8 +22,6 @@ export function isHidcTheaterFeature(feature) {
   return feature?.properties?.ISO_A3 === 'THEATER' && isTheaterHighlightFeature(feature);
 }
 
-export const HIDC_SYRIA_HOVER_LABEL = 'HIDC - MODERN SYRIA';
-
 /** Maps aggregated theater hex features to landing campaign ids. */
 export const GLOBE_THEATER_CAMPAIGN = {
   THEATER: 'hidc-modern-syria',

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Globe from 'globe.gl';
 import * as THREE from 'three';
 import CampaignPointers from './CampaignPointers';
-import { HIDC_SYRIA_HOVER_LABEL, isHidcTheaterFeature, resolveGlobeHexColor, resolveTheaterCampaignId } from '../../utils/globeTheaterColor';
+import { resolveGlobeHexColor, resolveTheaterCampaignId } from '../../utils/globeTheaterColor';
 import { prepareGlobeCountryFeatures } from '../../utils/prepareGlobeFeatures';
 import { buildExtraHexFeatures, collectCountryHexCells } from '../../utils/buildExtraHexFeatures';
 import { expandHidcTheaterHitboxes } from '../../utils/expandHidcTheaterHitboxes';
@@ -67,9 +67,6 @@ export default function HexGlobe({ selectedCampaignId, onCampaignSelect }) {
       .hexPolygonAltitude(HEX_POLYGON_ALTITUDE)
       .hexPolygonUseDots(true)
       .hexPolygonColor(resolveGlobeHexColor)
-      .hexPolygonLabel((feature) => (
-        isHidcTheaterFeature(feature) ? HIDC_SYRIA_HOVER_LABEL : ''
-      ))
       .onHexPolygonClick((feature, event) => {
         event?.stopPropagation?.();
         const campaignId = resolveTheaterCampaignId(feature);

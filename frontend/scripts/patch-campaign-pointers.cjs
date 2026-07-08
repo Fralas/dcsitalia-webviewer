@@ -3,10 +3,11 @@ const path = require('path');
 
 const target = path.join(__dirname, '../src/components/landing/CampaignPointers.jsx');
 
-const content = `import { useEffect, useRef, useState } from 'react';
+const content = `import { useEffect, useRef } from 'react';
 import { CAMPAIGNS } from '../../config/campaigns';
 
 const POINTER_CAMPAIGNS = CAMPAIGNS.filter((campaign) => campaign.showPointer !== false);
+const SVG_NS = 'http://www.w3.org/2000/svg';
 
 const POINTER_ALTITUDE = 0.02;
 const OUTWARD_PX = 52;
@@ -15,6 +16,7 @@ const FADE_IN_STEP = 0.1;
 const FADE_OUT_STEP = 0.14;
 const DOT_RADIUS = 5;
 const SNAP_ANGLE_DEG = 60;
+const MIN_ELBOW_ANGLE_DEG = SNAP_ANGLE_DEG;
 
 function latLngToUnit(lat, lng) {
   const phi = ((90 - lat) * Math.PI) / 180;
@@ -42,15 +44,8 @@ function normalizeVector(vector) {
   return { x: vector.x / len, y: vector.y / len };
 }
 
-function computeStemDirection(anchor, center) {
-  const dx = anchor.x - center.x;
-  const dy = anchor.y - center.y;
-  const len = Math.hypot(dx, dy) || 1;
-  const upward = Math.max(Math.abs(dy), len * 0.25) / len;
-  return normalizeVector({
-    x: dx / len,
-    y: -upward,
-  });
+function stemVertical(stemDir) {
+  return stemDir.y <= 0 ? 'up' : 'down';
 }
 
 function elbowInternalAngleDeg(anchor, elbow, armEnd) {
@@ -69,34 +64,93 @@ function armEndForSide(elbow, side) {
     : { x: elbow.x + ARM_PX, y: elbow.y };
 }
 
-function resolvePointerSide(anchor, elbow, preferredSide, previousSide) {
-  const preferred = preferredSide === 'left' ? 'left' : 'right';
-  const opposite = preferred === 'left' ? 'right' : 'left';
-
-  const angleFor = (side) => (
-    elbowInternalAngleDeg(anchor, elbow, armEndForSide(elbow, side))
-  );
-
-  const preferredAngle = angleFor(preferred);
-  const oppositeAngle = angleFor(opposite);
-
-  if (previousSide === 'left' || previousSide === 'right') {
-    const activeAngle = angleFor(previousSide);
-    if (activeAngle >= SNAP_ANGLE_DEG) return previousSide;
-    return previousSide === 'left' ? 'right' : 'left';
-  }
-
-  if (preferredAngle >= SNAP_ANGLE_DEG) return preferred;
-  if (oppositeAngle >= SNAP_ANGLE_DEG) return opposite;
-  return oppositeAngle > preferredAngle ? opposite : preferred;
-}
-
-function computePointerGeometry(anchor, center, side = 'right', underlineWidth = 72) {
-  const stemDir = computeStemDirection(anchor, center);
+function scorePointerLayout(anchor, stemDir, side) {
   const elbow = {
     x: anchor.x + stemDir.x * OUTWARD_PX,
     y: anchor.y + stemDir.y * OUTWARD_PX,
   };
+  return {
+    stemDir,
+    vertical: stemVertical(stemDir),
+    side,
+    elbow,
+    angle: elbowInternalAngleDeg(anchor, elbow, armEndForSide(elbow, side)),
+  };
+}
+
+function canonicalStemForVertical(anchor, center, vertical) {
+  const dx = anchor.x - center.x;
+  const leanX = Math.max(-0.45, Math.min(0.45, dx / 220));
+  return vertical === 'down'
+    ? normalizeVector({ x: leanX, y: 1 })
+    : normalizeVector({ x: leanX, y: -1 });
+}
+
+function buildLayoutForVertical(anchor, center, vertical, side) {
+  const stems = [
+    canonicalStemForVertical(anchor, center, vertical),
+    normalizeVector({ x: 0.25, y: vertical === 'down' ? 1 : -1 }),
+  ];
+
+  for (const stemDir of stems) {
+    const layout = scorePointerLayout(anchor, stemDir, side);
+    if (layout.angle >= MIN_ELBOW_ANGLE_DEG && layout.vertical === vertical) {
+      return layout;
+    }
+  }
+
+  return scorePointerLayout(anchor, stems[0], side);
+}
+
+function resolvePreferredVertical(anchor, center, previousVertical, previousOffsetY) {
+  const offsetY = anchor.y - center.y;
+
+  if (Number.isFinite(previousOffsetY)) {
+    if (previousOffsetY > 0 && offsetY <= 0) return 'down';
+    if (previousOffsetY < 0 && offsetY >= 0) return 'up';
+  }
+
+  if (Math.abs(offsetY) < 0.75 && previousVertical) {
+    return previousVertical;
+  }
+
+  return offsetY <= 0 ? 'down' : 'up';
+}
+
+function resolvePointerSide(anchor, center, vertical, preferredSide, previousSide) {
+  const preferred = preferredSide === 'left' ? 'left' : 'right';
+  const opposite = preferred === 'left' ? 'right' : 'left';
+  const angleFor = (side) => buildLayoutForVertical(anchor, center, vertical, side).angle;
+
+  if (previousSide === 'left' || previousSide === 'right') {
+    if (angleFor(previousSide) >= MIN_ELBOW_ANGLE_DEG) return previousSide;
+    return opposite;
+  }
+
+  if (angleFor(preferred) >= MIN_ELBOW_ANGLE_DEG) return preferred;
+  if (angleFor(opposite) >= MIN_ELBOW_ANGLE_DEG) return opposite;
+  return preferred;
+}
+
+function resolvePointerLayout(anchor, center, preferredSide, previousLayout) {
+  const prevVertical = previousLayout?.vertical === 'down' ? 'down' : 'up';
+  const prevSide = previousLayout?.side === 'left' ? 'left' : 'right';
+  const prevOffsetY = previousLayout?.offsetY;
+  const offsetY = anchor.y - center.y;
+  const vertical = resolvePreferredVertical(anchor, center, prevVertical, prevOffsetY);
+  const verticalChanged = vertical !== prevVertical;
+  const side = resolvePointerSide(
+    anchor,
+    center,
+    vertical,
+    preferredSide,
+    verticalChanged ? null : prevSide,
+  );
+  return { ...buildLayoutForVertical(anchor, center, vertical, side), offsetY };
+}
+
+function computePointerGeometry(anchor, layout, underlineWidth = 72) {
+  const { elbow, side, vertical } = layout;
 
   let underlineStart;
   let underlineEnd;
@@ -116,10 +170,10 @@ function computePointerGeometry(anchor, center, side = 'right', underlineWidth =
       break;
   }
 
-  return { anchor, elbow, underlineStart, underlineEnd, label, side };
+  return { anchor, elbow, underlineStart, underlineEnd, label, side, vertical };
 }
 
-function buildPointerTargets(globe, container, campaigns, sideByCampaign) {
+function buildPointerTargets(globe, container, campaigns, layoutByCampaign) {
   if (!globe || !container) return [];
 
   const { width, height } = container.getBoundingClientRect();
@@ -134,7 +188,7 @@ function buildPointerTargets(globe, container, campaigns, sideByCampaign) {
       if (!anchorCoords) return null;
 
       if (!isFacingCamera(anchorCoords.lat, anchorCoords.lng, pov)) {
-        sideByCampaign.delete(campaign.id);
+        layoutByCampaign.delete(campaign.id);
         return null;
       }
 
@@ -151,22 +205,21 @@ function buildPointerTargets(globe, container, campaigns, sideByCampaign) {
       const distFromCenter = Math.hypot(anchor.x - center.x, anchor.y - center.y);
       const maxRadius = Math.min(width, height) * 0.46;
       if (distFromCenter > maxRadius) {
-        sideByCampaign.delete(campaign.id);
+        layoutByCampaign.delete(campaign.id);
         return null;
       }
 
       const underlineWidth = underlineWidthForCampaign(campaign);
       const preferredSide = campaign.pointerSide || 'right';
-      const previousSide = sideByCampaign.get(campaign.id) || null;
-      const stemDir = computeStemDirection(anchor, center);
-      const elbow = {
-        x: anchor.x + stemDir.x * OUTWARD_PX,
-        y: anchor.y + stemDir.y * OUTWARD_PX,
-      };
-      const side = resolvePointerSide(anchor, elbow, preferredSide, previousSide);
-      sideByCampaign.set(campaign.id, side);
+      const previousLayout = layoutByCampaign.get(campaign.id) || null;
+      const layout = resolvePointerLayout(anchor, center, preferredSide, previousLayout);
+      layoutByCampaign.set(campaign.id, {
+        vertical: layout.vertical,
+        side: layout.side,
+        offsetY: layout.offsetY,
+      });
 
-      const geometry = computePointerGeometry(anchor, center, side, underlineWidth);
+      const geometry = computePointerGeometry(anchor, layout, underlineWidth);
       return {
         campaign,
         ...geometry,
@@ -204,36 +257,153 @@ function applyPointerOpacity(previous, targets) {
   return next;
 }
 
+function ensurePointerEntry(domById, overlay, campaign) {
+  let entry = domById.get(campaign.id);
+  if (entry) return entry;
+
+  const svg = overlay.querySelector('.campaign-pointers__svg');
+  const g = document.createElementNS(SVG_NS, 'g');
+  const circle = document.createElementNS(SVG_NS, 'circle');
+  circle.setAttribute('class', 'campaign-pointers__dot');
+  circle.setAttribute('r', String(DOT_RADIUS));
+
+  const path = document.createElementNS(SVG_NS, 'path');
+  path.setAttribute('class', 'campaign-pointers__line');
+
+  g.appendChild(circle);
+  g.appendChild(path);
+  svg.appendChild(g);
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.setAttribute('role', 'tab');
+  const sideClass = campaign.pointerSide || 'right';
+  button.className = \`campaign-pointers__label campaign-pointers__label--\${sideClass}\`;
+
+  const typeSpan = document.createElement('span');
+  typeSpan.className = 'campaign-pointers__label-type';
+  typeSpan.textContent = campaign.type;
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'campaign-pointers__label-name';
+  nameSpan.textContent = campaign.theaterName;
+
+  button.appendChild(typeSpan);
+  button.appendChild(nameSpan);
+  overlay.appendChild(button);
+
+  entry = { g, circle, path, button, sideClass, campaign };
+  domById.set(campaign.id, entry);
+  return entry;
+}
+
+function paintPointerEntry(entry, frame, isActive) {
+  const accent = entry.campaign.highlightColor || '#FF8C00';
+  const opacity = frame?.opacity ?? 0;
+  const visible = opacity > 0.02;
+
+  entry.g.style.opacity = String(opacity);
+  entry.button.style.opacity = String(opacity);
+  entry.g.style.display = visible ? '' : 'none';
+  entry.button.style.display = visible ? '' : 'none';
+
+  if (!frame || !visible) return;
+
+  entry.circle.setAttribute('cx', String(frame.anchor.x));
+  entry.circle.setAttribute('cy', String(frame.anchor.y));
+  entry.path.setAttribute(
+    'd',
+    \`M \${frame.anchor.x} \${frame.anchor.y} L \${frame.elbow.x} \${frame.elbow.y} L \${frame.underlineStart.x} \${frame.underlineStart.y} L \${frame.underlineEnd.x} \${frame.underlineEnd.y}\`,
+  );
+  entry.button.style.left = \`\${frame.label.x}px\`;
+  entry.button.style.top = \`\${frame.label.y}px\`;
+
+  const sideClass = frame.side || entry.sideClass;
+  entry.button.className = \`campaign-pointers__label campaign-pointers__label--\${sideClass}\${isActive ? ' is-active' : ''}\`;
+  entry.circle.setAttribute('class', \`campaign-pointers__dot\${isActive ? ' is-active' : ''}\`);
+  entry.path.setAttribute('class', \`campaign-pointers__line\${isActive ? ' is-active' : ''}\`);
+  entry.button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+
+  if (isActive) {
+    entry.g.style.setProperty('--pointer-accent', accent);
+    entry.button.style.setProperty('--pointer-accent', accent);
+  } else {
+    entry.g.style.removeProperty('--pointer-accent');
+    entry.button.style.removeProperty('--pointer-accent');
+  }
+}
+
 export default function CampaignPointers({ globe, selectedCampaignId, onSelect }) {
   const overlayRef = useRef(null);
+  const domByIdRef = useRef(new Map());
   const smoothedRef = useRef(new Map());
-  const sideByCampaignRef = useRef(new Map());
-  const [pointers, setPointers] = useState([]);
+  const layoutByCampaignRef = useRef(new Map());
   const rafRef = useRef(0);
+  const selectedRef = useRef(selectedCampaignId);
+  const onSelectRef = useRef(onSelect);
+
+  selectedRef.current = selectedCampaignId;
+  onSelectRef.current = onSelect;
+
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    if (!overlay) return undefined;
+
+    POINTER_CAMPAIGNS.forEach((campaign) => {
+      const entry = ensurePointerEntry(domByIdRef.current, overlay, campaign);
+      entry.button.onclick = () => onSelectRef.current?.(campaign.id);
+    });
+
+    return () => {
+      domByIdRef.current.forEach((entry) => {
+        entry.g.remove();
+        entry.button.remove();
+      });
+      domByIdRef.current.clear();
+    };
+  }, []);
 
   useEffect(() => {
     if (!globe) return undefined;
 
-    const tick = () => {
+    const syncFrame = () => {
       const container = overlayRef.current?.parentElement;
-      if (container) {
-        const targets = buildPointerTargets(
-          globe,
-          container,
-          POINTER_CAMPAIGNS,
-          sideByCampaignRef.current,
+      const overlay = overlayRef.current;
+      if (!container || !overlay) return;
+
+      const targets = buildPointerTargets(
+        globe,
+        container,
+        POINTER_CAMPAIGNS,
+        layoutByCampaignRef.current,
+      );
+      const frames = applyPointerOpacity(smoothedRef.current, targets);
+      const framesById = new Map(frames.map((frame) => [frame.campaign.id, frame]));
+
+      POINTER_CAMPAIGNS.forEach((campaign) => {
+        const entry = ensurePointerEntry(domByIdRef.current, overlay, campaign);
+        paintPointerEntry(
+          entry,
+          framesById.get(campaign.id) || null,
+          campaign.id === selectedRef.current,
         );
-        const next = applyPointerOpacity(smoothedRef.current, targets);
-        setPointers(next);
-      }
+      });
+    };
+
+    const tick = () => {
+      syncFrame();
       rafRef.current = requestAnimationFrame(tick);
     };
 
     rafRef.current = requestAnimationFrame(tick);
 
+    const controls = globe.controls?.();
+    controls?.addEventListener?.('change', syncFrame);
+
     const resizeObserver = new ResizeObserver(() => {
       smoothedRef.current.clear();
-      sideByCampaignRef.current.clear();
+      layoutByCampaignRef.current.clear();
+      syncFrame();
     });
     if (overlayRef.current?.parentElement) {
       resizeObserver.observe(overlayRef.current.parentElement);
@@ -241,65 +411,25 @@ export default function CampaignPointers({ globe, selectedCampaignId, onSelect }
 
     return () => {
       cancelAnimationFrame(rafRef.current);
+      controls?.removeEventListener?.('change', syncFrame);
       resizeObserver.disconnect();
       smoothedRef.current.clear();
-      sideByCampaignRef.current.clear();
+      layoutByCampaignRef.current.clear();
     };
   }, [globe]);
 
+  useEffect(() => {
+    domByIdRef.current.forEach((entry, id) => {
+      const frame = smoothedRef.current.get(id);
+      if (frame) {
+        paintPointerEntry(entry, frame, id === selectedCampaignId);
+      }
+    });
+  }, [selectedCampaignId]);
+
   return (
     <div ref={overlayRef} className="campaign-pointers" role="tablist" aria-label="Campaigns">
-      <svg className="campaign-pointers__svg">
-        {pointers.map(({ campaign, anchor, elbow, underlineStart, underlineEnd, opacity }) => {
-          const isActive = campaign.id === selectedCampaignId;
-          const accent = campaign.highlightColor || '#FF6B01';
-          return (
-            <g
-              key={campaign.id}
-              style={{
-                opacity,
-                ...(isActive ? { '--pointer-accent': accent } : {}),
-              }}
-            >
-              <circle
-                className={\`campaign-pointers__dot\${isActive ? ' is-active' : ''}\`}
-                cx={anchor.x}
-                cy={anchor.y}
-                r={DOT_RADIUS}
-              />
-              <path
-                className={\`campaign-pointers__line\${isActive ? ' is-active' : ''}\`}
-                d={\`M \${anchor.x} \${anchor.y} L \${elbow.x} \${elbow.y} L \${underlineStart.x} \${underlineStart.y} L \${underlineEnd.x} \${underlineEnd.y}\`}
-              />
-            </g>
-          );
-        })}
-      </svg>
-
-      {pointers.map(({ campaign, label, side, opacity }) => {
-        const isActive = campaign.id === selectedCampaignId;
-        const accent = campaign.highlightColor || '#FF6B01';
-        const sideClass = side || campaign.pointerSide || 'right';
-        return (
-          <button
-            key={campaign.id}
-            type="button"
-            role="tab"
-            aria-selected={isActive}
-            className={\`campaign-pointers__label campaign-pointers__label--\${sideClass}\${isActive ? ' is-active' : ''}\`}
-            style={{
-              left: \`\${label.x}px\`,
-              top: \`\${label.y}px\`,
-              opacity,
-              '--pointer-accent': accent,
-            }}
-            onClick={() => onSelect(campaign.id)}
-          >
-            <span className="campaign-pointers__label-type">{campaign.type}</span>
-            <span className="campaign-pointers__label-name">{campaign.theaterName}</span>
-          </button>
-        );
-      })}
+      <svg className="campaign-pointers__svg" />
     </div>
   );
 }
