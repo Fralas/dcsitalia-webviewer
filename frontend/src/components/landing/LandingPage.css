@@ -21,6 +21,13 @@
   font-family: var(--landing-font);
 }
 
+.landing__stars {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
 /* ---------- Globe ---------- */
 .landing__globe {
   position: absolute;

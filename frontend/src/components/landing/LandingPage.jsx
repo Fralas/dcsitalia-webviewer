@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { StarsBackground } from '../ui/stars-background';
 import HexGlobe from './HexGlobe';
 import NoeEventsCard from './NoeEventsCard';
 import CampaignInfoCard from './CampaignInfoCard';
@@ -52,6 +53,15 @@ export default function LandingPage({
 
   return (
     <div className="landing">
+      <div className="landing__stars">
+        <StarsBackground
+          starDensity={0.00182}
+          allStarsTwinkle
+          twinkleProbability={0.65}
+          className="pointer-events-none"
+        />
+      </div>
+
       <div className="landing__globe">
         <HexGlobe
           selectedCampaignId={selectedCampaignId}

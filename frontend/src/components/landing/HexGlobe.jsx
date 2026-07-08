@@ -6,7 +6,6 @@ import { resolveGlobeHexColor } from '../../utils/globeTheaterColor';
 import { prepareGlobeCountryFeatures, buildTheaterClickAreasFromRawFeatures } from '../../utils/prepareGlobeFeatures';
 import { buildExtraHexFeatures, collectCountryHexCells } from '../../utils/buildExtraHexFeatures';
 import { attachTheaterAreaInteraction } from '../../utils/theaterClickAreas';
-import { industrialDark } from '../../config/industrialDarkTokens';
 import { GLOBE_EXTRA_DOTS } from '../../config/globeMarkers';
 
 const GEOJSON_URL = '/geo/ne_110m_admin_0_countries.geojson';
@@ -60,9 +59,11 @@ export default function HexGlobe({ selectedCampaignId, onCampaignSelect }) {
     let detachTheaterInteraction = () => {};
 
     const world = Globe()(container)
-      .backgroundColor(industrialDark.bgDeep)
+      .backgroundColor('rgba(0,0,0,0)')
       .globeImageUrl(`${CDN}/earth-dark.jpg`)
-      .showAtmosphere(false)
+      .showAtmosphere(true)
+      .atmosphereColor('#2a3346')
+      .atmosphereAltitude(0.18)
       .hexPolygonResolution(3)
       .hexPolygonMargin(HEX_POLYGON_MARGIN)
       .hexPolygonAltitude(HEX_POLYGON_ALTITUDE)
