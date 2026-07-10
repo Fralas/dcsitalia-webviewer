@@ -236,14 +236,42 @@
 .lidc-panel-deck-head {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  justify-content: space-between;
   gap: clamp(10px, 0.78vw, 20px);
   flex-shrink: 0;
   margin-bottom: clamp(12px, 0.91vw, 35px);
 }
 
+.lidc-panel-deck-head-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: clamp(10px, 0.78vw, 20px);
+  min-width: 0;
+}
+
 .lidc-panel-deck-head .lidc-panel-title {
   margin: 0;
+}
+
+.lidc-panel-deck-expand-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--lidc-accent-gold);
+  font-size: clamp(10px, 0.42vw, 16px);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0;
+  white-space: nowrap;
+}
+
+.lidc-panel-deck-expand-hint:hover {
+  color: var(--lidc-ink);
 }
 
 .lidc-deck-view-nav {
@@ -360,11 +388,15 @@
 .lidc-panel-deck.is-management-focus .lidc-panel-deck-body {
   margin-inline: calc(-1 * clamp(14px, 1.07vw, 41px));
   margin-bottom: calc(-1 * clamp(16px, 1.35vw, 52px));
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .lidc-panel-deck.is-management-focus.is-expanded .lidc-panel-deck-body {
-  margin-inline: calc(-1 * clamp(14px, 1.07vw, 41px));
-  margin-bottom: calc(-1 * clamp(16px, 1.35vw, 52px));
+  overflow: hidden;
 }
 
 .lidc-panel-overlay {
@@ -678,17 +710,6 @@ body.lidc-wizard-open {
   box-shadow: none;
 }
 
-.lidc-panel-table-preview-hint--floating {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  z-index: 2;
-  pointer-events: none;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: rgba(10, 10, 10, 0.72);
-}
-
 .lidc-panel-table-preview-head {
   display: flex;
   align-items: center;
@@ -714,13 +735,23 @@ body.lidc-wizard-open {
 
 .lidc-panel-table-preview .lidc-airframe-table-wrap.is-readonly,
 .lidc-panel-table-preview-static .lidc-airframe-table-wrap.is-readonly,
-.lidc-panel-deck .lidc-visual-card-members .lidc-airframe-table-wrap.is-readonly,
-.lidc-panel-table-preview.is-flush .lidc-member-table-wrap.is-readonly,
-.lidc-panel-table-preview-static.is-flush .lidc-member-table-wrap.is-readonly {
+.lidc-panel-deck .lidc-visual-card-members .lidc-airframe-table-wrap.is-readonly {
   height: auto;
   min-height: 120px;
   max-height: min(220px, 34vh);
   pointer-events: none;
+}
+
+.lidc-panel-table-preview.is-flush .lidc-member-table-wrap.is-readonly,
+.lidc-panel-table-preview-static.is-flush .lidc-member-table-wrap.is-readonly,
+.lidc-panel-deck.is-management-focus .lidc-member-table-wrap.is-readonly {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  max-height: none;
+  overflow: auto;
+  pointer-events: auto;
+  overscroll-behavior: contain;
 }
 
 .lidc-panel-table-preview .lidc-member-table-wrap.is-readonly .lidc-member-table tbody td,
@@ -1238,6 +1269,7 @@ body.lidc-deck-expanded-open {
 .lidc-received-list,
 .lidc-member-cards,
 .lidc-airframe-table-wrap,
+.lidc-member-table-wrap,
 .lidc-airframe-log-list,
 .lidc-airframe-pilot-menu,
 .lidc-wizard-body {
@@ -1249,6 +1281,7 @@ body.lidc-deck-expanded-open {
 .lidc-received-list::-webkit-scrollbar,
 .lidc-member-cards::-webkit-scrollbar,
 .lidc-airframe-table-wrap::-webkit-scrollbar,
+.lidc-member-table-wrap::-webkit-scrollbar,
 .lidc-airframe-log-list::-webkit-scrollbar,
 .lidc-airframe-pilot-menu::-webkit-scrollbar,
 .lidc-wizard-body::-webkit-scrollbar {
@@ -1260,6 +1293,7 @@ body.lidc-deck-expanded-open {
 .lidc-received-list::-webkit-scrollbar-track,
 .lidc-member-cards::-webkit-scrollbar-track,
 .lidc-airframe-table-wrap::-webkit-scrollbar-track,
+.lidc-member-table-wrap::-webkit-scrollbar-track,
 .lidc-airframe-log-list::-webkit-scrollbar-track,
 .lidc-airframe-pilot-menu::-webkit-scrollbar-track,
 .lidc-wizard-body::-webkit-scrollbar-track {
@@ -1271,6 +1305,7 @@ body.lidc-deck-expanded-open {
 .lidc-received-list::-webkit-scrollbar-thumb,
 .lidc-member-cards::-webkit-scrollbar-thumb,
 .lidc-airframe-table-wrap::-webkit-scrollbar-thumb,
+.lidc-member-table-wrap::-webkit-scrollbar-thumb,
 .lidc-airframe-log-list::-webkit-scrollbar-thumb,
 .lidc-airframe-pilot-menu::-webkit-scrollbar-thumb,
 .lidc-wizard-body::-webkit-scrollbar-thumb {
@@ -1283,6 +1318,7 @@ body.lidc-deck-expanded-open {
 .lidc-received-list::-webkit-scrollbar-thumb:hover,
 .lidc-member-cards::-webkit-scrollbar-thumb:hover,
 .lidc-airframe-table-wrap::-webkit-scrollbar-thumb:hover,
+.lidc-member-table-wrap::-webkit-scrollbar-thumb:hover,
 .lidc-airframe-log-list::-webkit-scrollbar-thumb:hover,
 .lidc-airframe-pilot-menu::-webkit-scrollbar-thumb:hover,
 .lidc-wizard-body::-webkit-scrollbar-thumb:hover {
@@ -1397,6 +1433,7 @@ body.lidc-deck-expanded-open {
   box-shadow: none;
   min-height: 0;
   flex: 1;
+  overflow: auto;
 }
 
 .lidc-visual-card-members .lidc-member-cards {
@@ -2022,6 +2059,8 @@ body.lidc-deck-expanded-open {
 
 .lidc-member-table {
   min-width: 880px;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .lidc-member-table thead th {
@@ -2059,6 +2098,16 @@ body.lidc-deck-expanded-open {
   padding: 9px 10px;
   background: transparent;
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.lidc-member-table-wrap .lidc-member-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--lidc-canvas);
+  color: var(--lidc-body);
+  border-bottom: 1px solid var(--lidc-hairline);
+  box-shadow: 0 1px 0 var(--lidc-hairline);
 }
 
 .lidc-airframe-table tbody tr {

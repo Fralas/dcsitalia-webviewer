@@ -43,6 +43,7 @@ const LIDC_SIDEBAR_VIEWS = Object.freeze({
 
 const DECK_SLOT_FLIP_MS = 520;
 const DECK_SLOT_FLIP_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const SHOW_SQUADRON_LEAVE_DELETE_UI = false;
 
 function prefersReducedDeckMotion() {
   return typeof window !== 'undefined'
@@ -1573,7 +1574,7 @@ export default function LidcPage() {
   }
 
   function renderSquadronManagementActions() {
-    if (!isViewingOwnSquadron) return null;
+    if (!SHOW_SQUADRON_LEAVE_DELETE_UI || !isViewingOwnSquadron) return null;
 
     return (
       <div className="lidc-squadron-management-actions">
@@ -1831,6 +1832,28 @@ export default function LidcPage() {
     return null;
   }
 
+  function renderMembersExpandHint() {
+    if (
+      fullscreenPanelView
+      || !isManagementFocusView
+      || loadingSquadronDetails
+      || squadronDetailsError
+    ) {
+      return null;
+    }
+
+    return (
+      <button
+        type="button"
+        className="lidc-panel-deck-expand-hint"
+        onClick={() => openFullscreenPanel('members')}
+      >
+        <Maximize2 size={13} />
+        {t('lidc.members.expandHint')}
+      </button>
+    );
+  }
+
   function renderExpandableTablePreview({ view, title, hint, children, flush = false }) {
     const canExpand = !loadingSquadronDetails && !squadronDetailsError;
 
@@ -1844,18 +1867,7 @@ export default function LidcPage() {
 
     if (flush) {
       return (
-        <div
-          className="lidc-panel-table-preview is-flush"
-          role="button"
-          tabIndex={0}
-          onClick={() => openFullscreenPanel(view)}
-          onKeyDown={(event) => handlePreviewExpandKeyDown(event, view)}
-          aria-label={hint}
-        >
-          <span className="lidc-panel-table-preview-hint lidc-panel-table-preview-hint--floating">
-            <Maximize2 size={13} />
-            {hint}
-          </span>
+        <div className="lidc-panel-table-preview-static is-flush">
           {children}
         </div>
       );
@@ -2196,8 +2208,11 @@ export default function LidcPage() {
           </header>
         ) : (
           <header className="lidc-panel-deck-head">
-            <h2 className="lidc-panel-title">SQUADRON DECK</h2>
-            {renderDeckViewNav()}
+            <div className="lidc-panel-deck-head-main">
+              <h2 className="lidc-panel-title">SQUADRON DECK</h2>
+              {renderDeckViewNav()}
+            </div>
+            {renderMembersExpandHint()}
           </header>
         )}
 
