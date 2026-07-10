@@ -348,6 +348,7 @@ body.lidc-map-fullscreen-open {
 
 .lidc-panel-map-overlay.is-fullscreen {
   padding: clamp(20px, 1.15vw, 44px);
+  background: none;
 }
 
 .lidc-panel-map-overlay .lidc-panel-title,

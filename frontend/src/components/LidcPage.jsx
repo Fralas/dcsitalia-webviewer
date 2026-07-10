@@ -594,6 +594,7 @@ export default function LidcPage() {
 
     syncMapFullscreenOffset();
     appShell?.classList.add('is-lidc-map-fullscreen');
+    header?.classList.add('is-lidc-map-fullscreen');
     document.body.classList.add('lidc-map-fullscreen-open');
     window.addEventListener('resize', syncMapFullscreenOffset);
 
@@ -601,6 +602,7 @@ export default function LidcPage() {
       window.removeEventListener('resize', syncMapFullscreenOffset);
       root.style.removeProperty('--lidc-map-fullscreen-top');
       appShell?.classList.remove('is-lidc-map-fullscreen');
+      header?.classList.remove('is-lidc-map-fullscreen');
       document.body.classList.remove('lidc-map-fullscreen-open');
     };
   }, [mapBoardExpanded]);
