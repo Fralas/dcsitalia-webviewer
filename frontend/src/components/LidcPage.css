@@ -372,6 +372,18 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 18px;
   letter-spacing: 0.12em;
+  text-align: left;
+  cursor: pointer;
+  transition: filter 160ms ease;
+}
+
+.lidc-invite-code-value.is-blurred {
+  filter: blur(8px);
+  user-select: none;
+}
+
+.lidc-invite-code-value.is-revealed {
+  filter: none;
 }
 
 .lidc-invite-code-copy {

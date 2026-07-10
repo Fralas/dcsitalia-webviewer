@@ -432,6 +432,8 @@ export default {
       shareHint: 'Share this code with pilots you want to join your squadron.',
       copy: 'Copy',
       copied: 'Copied',
+      reveal: 'Click to reveal code',
+      hide: 'Click to hide code',
       generatedOnCreate: 'Invite code',
       yes: 'Generated automatically'
     },
@@ -441,7 +443,9 @@ export default {
       member: 'Member'
     },
     squadrons: {
-      listEmpty: 'No squadrons available.'
+      listEmpty: 'No squadrons available.',
+      totalPersonnel: 'Total personnel',
+      totalAirframes: 'Total aircraft'
     },
     airframes: {
       empty: 'No purchased airframes found in this deck.',

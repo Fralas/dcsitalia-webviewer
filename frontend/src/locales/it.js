@@ -432,6 +432,8 @@ export default {
       shareHint: 'Condividi questo codice con i piloti che vuoi far entrare nello squadrone.',
       copy: 'Copia',
       copied: 'Copiato',
+      reveal: 'Clicca per mostrare il codice',
+      hide: 'Clicca per nascondere il codice',
       generatedOnCreate: 'Codice invito',
       yes: 'Generato automaticamente'
     },
@@ -441,7 +443,9 @@ export default {
       member: 'Membro'
     },
     squadrons: {
-      listEmpty: 'Nessuno squadrone disponibile.'
+      listEmpty: 'Nessuno squadrone disponibile.',
+      totalPersonnel: 'Personale totale',
+      totalAirframes: 'Velivoli totali'
     },
     airframes: {
       empty: 'Nessun velivolo acquistato nel deck.',
