@@ -2083,7 +2083,12 @@ export default function LidcPage({ onNavigateHome }) {
         <div className="lidc-wizard-root">
           <div className="lidc-wizard-backdrop" onClick={closeWizard} aria-hidden="true" />
 
-          <section className="lidc-wizard-card" role="dialog" aria-modal="true" aria-labelledby="lidc-wizard-title">
+          <section
+            className={`lidc-wizard-card ${currentStepKey === 'template' ? 'lidc-wizard-card--template' : ''}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="lidc-wizard-title"
+          >
             <header className="lidc-wizard-head">
               <div className="lidc-wizard-head-main">
                 <h2 id="lidc-wizard-title">{t('lidc.wizard.title')}</h2>
@@ -2136,7 +2141,7 @@ export default function LidcPage({ onNavigateHome }) {
               </div>
             </div>
 
-            <div className="lidc-wizard-body">
+            <div className={`lidc-wizard-body ${currentStepKey === 'template' ? 'lidc-wizard-body--template' : ''}`}>
               {currentStepKey === 'info' && (
                 <section className="lidc-step-section">
                   <header className="lidc-step-section-head">

@@ -2221,6 +2221,11 @@ body.lidc-wizard-open {
   gap: clamp(12px, 0.78vw, 18px);
 }
 
+.lidc-wizard-card--template {
+  max-height: none;
+  grid-template-rows: auto auto auto auto auto;
+}
+
 .lidc-wizard-head {
   display: flex;
   justify-content: space-between;
@@ -2371,10 +2376,12 @@ body.lidc-wizard-open {
 .lidc-wizard-body {
   min-height: 0;
   overflow-y: auto;
-  border: 1px solid var(--lidc-hairline);
-  border-radius: var(--lidc-radius);
-  background: var(--lidc-canvas);
-  padding: clamp(14px, 0.94vw, 20px);
+  padding: 0;
+}
+
+.lidc-wizard-body--template {
+  overflow: visible;
+  min-height: auto;
 }
 
 .lidc-wizard-root .lidc-step-section-head {
