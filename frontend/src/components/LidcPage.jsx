@@ -46,13 +46,31 @@ const DECK_SLOT_FLIP_MS = 680;
 const DECK_SLOT_FLIP_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
 const SHOW_SQUADRON_LEAVE_DELETE_UI = false;
 
-function prefersReducedDeckMotion() {
-  return typeof window !== 'undefined'
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function cancelDeckSlotFlip(deckSlot, transitionRef) {
+  if (!deckSlot) return;
+
+  if (transitionRef.current.onTransitionEnd) {
+    deckSlot.removeEventListener('transitionend', transitionRef.current.onTransitionEnd);
+    transitionRef.current.onTransitionEnd = null;
+  }
+
+  if (deckSlot.classList.contains('is-flip-animating')) {
+    deckSlot.getBoundingClientRect();
+  }
+
+  deckSlot.style.transition = 'none';
+  deckSlot.style.transform = '';
+  deckSlot.style.transformOrigin = '';
+  deckSlot.classList.remove('is-flip-animating');
+  deckSlot.offsetHeight;
+  deckSlot.style.transition = '';
 }
 
-function flipDeckSlot(deckSlot, firstRect) {
+function flipDeckSlot(deckSlot, firstRect, transitionRef, { transitionId, force = false } = {}) {
   if (!deckSlot || !firstRect) return;
+  if (transitionId != null && transitionId !== transitionRef.current.id) return;
+
+  cancelDeckSlotFlip(deckSlot, transitionRef);
 
   const lastRect = deckSlot.getBoundingClientRect();
   const dx = firstRect.left - lastRect.left;
@@ -60,7 +78,7 @@ function flipDeckSlot(deckSlot, firstRect) {
   const sx = firstRect.width / Math.max(lastRect.width, 1);
   const sy = firstRect.height / Math.max(lastRect.height, 1);
 
-  if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) {
+  if (!force && Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) {
     return;
   }
 
@@ -70,28 +88,41 @@ function flipDeckSlot(deckSlot, firstRect) {
   deckSlot.style.transition = 'transform 0s';
 
   requestAnimationFrame(() => {
+    if (transitionId != null && transitionId !== transitionRef.current.id) return;
     deckSlot.style.transition = `transform ${DECK_SLOT_FLIP_MS}ms ${DECK_SLOT_FLIP_EASING}`;
     deckSlot.style.transform = '';
   });
 
   const onEnd = (event) => {
     if (event.target !== deckSlot || event.propertyName !== 'transform') return;
+    if (transitionId != null && transitionId !== transitionRef.current.id) return;
+
     deckSlot.style.transition = '';
     deckSlot.style.transform = '';
     deckSlot.style.transformOrigin = '';
     deckSlot.classList.remove('is-flip-animating');
     deckSlot.removeEventListener('transitionend', onEnd);
+    if (transitionRef.current.onTransitionEnd === onEnd) {
+      transitionRef.current.onTransitionEnd = null;
+    }
   };
 
+  transitionRef.current.onTransitionEnd = onEnd;
   deckSlot.addEventListener('transitionend', onEnd);
 }
 
-function scheduleDeckLayoutTransition(deckSlot, firstRect) {
+function scheduleDeckLayoutTransition(deckSlot, firstRect, transitionRef, options = {}) {
   if (!deckSlot || !firstRect) return;
 
   requestAnimationFrame(() => {
-    flipDeckSlot(deckSlot, firstRect);
+    if (options.transitionId != null && options.transitionId !== transitionRef.current.id) return;
+    flipDeckSlot(deckSlot, firstRect, transitionRef, options);
   });
+}
+
+function prefersReducedDeckMotion() {
+  return typeof window !== 'undefined'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
 const AIRFRAME_STATUSES = Object.freeze({
@@ -339,6 +370,11 @@ export default function LidcPage() {
   const [memberActionMenuForId, setMemberActionMenuForId] = useState('');
   const memberActionMenuRef = useRef(null);
   const deckSlotRef = useRef(null);
+  const deckLayoutTransitionRef = useRef({
+    id: 0,
+    onTransitionEnd: null,
+    layoutExpanded: false,
+  });
   const [activeSquadron, setActiveSquadron] = useState(null);
   const [listedSquadrons, setListedSquadrons] = useState([]);
   const [loadingListedSquadrons, setLoadingListedSquadrons] = useState(true);
@@ -591,7 +627,9 @@ export default function LidcPage() {
     let mounted = true;
 
     async function loadSquadronDetails() {
-      const squadronId = selectedListSquadronId;
+      const squadronId = userLidcState?.hasSquadron
+        ? String(userLidcState?.squadron?.id || '')
+        : '';
       if (!user?.id || !squadronId) {
         if (!mounted) return;
         setLoadingSquadronDetails(false);
@@ -621,7 +659,7 @@ export default function LidcPage() {
     return () => {
       mounted = false;
     };
-  }, [user?.id, selectedListSquadronId]);
+  }, [user?.id, userLidcState?.hasSquadron, userLidcState?.squadron?.id]);
 
   useEffect(() => {
     setInviteCodeRevealed(false);
@@ -785,18 +823,10 @@ export default function LidcPage() {
   const currentStepKey = WIZARD_STEPS[currentStep] || WIZARD_STEPS[0];
   const isLogged = Boolean(user?.id);
   const userHasSquadron = Boolean(userLidcState.hasSquadron);
-  const isViewingOwnSquadron = userHasSquadron
-    && Boolean(selectedListSquadronId)
-    && selectedListSquadronId === String(userLidcState?.squadron?.id || '');
-  const isViewingListedSquadronDeck = Boolean(selectedListSquadronId)
-    && Boolean(activeSquadron)
-    && String(activeSquadron.id) === String(selectedListSquadronId)
-    && !isViewingOwnSquadron;
-  const isManagementFocusView = isViewingOwnSquadron
+  const isManagementFocusView = userHasSquadron
     && activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS;
-  const isDeckFocusView = (isViewingOwnSquadron
-    && activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_DECK)
-    || isViewingListedSquadronDeck;
+  const isDeckFocusView = userHasSquadron
+    && activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_DECK;
   const isTableFocusView = isDeckPanelFullscreen || isManagementFocusView || isDeckFocusView;
   const showMemberManagementView = isManagementFocusView;
   const showDeckManagementView = isDeckFocusView;
@@ -811,14 +841,16 @@ export default function LidcPage() {
   );
 
   const previewIdentity = useMemo(() => {
-    const baseSquadron = activeSquadron || createdSquadron || userLidcState.squadron || null;
+    const baseSquadron = userHasSquadron
+      ? (activeSquadron || userLidcState.squadron || null)
+      : (createdSquadron || null);
     return {
       name: name || baseSquadron?.name || t('lidc.preview.fallbackName'),
       description: description || baseSquadron?.description || t('lidc.preview.fallbackDescription'),
       baseLabel: previewBase?.displayName || previewBase?.name || baseSquadron?.baseId || '-',
       templateName: baseSquadron?.templateName || selectedTemplate?.name || '-',
     };
-  }, [activeSquadron, createdSquadron, userLidcState.squadron, name, description, previewBase, selectedTemplate]);
+  }, [userHasSquadron, activeSquadron, createdSquadron, userLidcState.squadron, name, description, previewBase, selectedTemplate]);
 
   function resetWizardDraft() {
     setCurrentStep(0);
@@ -949,9 +981,11 @@ export default function LidcPage() {
       setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS);
     }
 
+    const transitionId = ++deckLayoutTransitionRef.current.id;
     const deckSlot = deckSlotRef.current;
 
     if (prefersReducedDeckMotion()) {
+      deckLayoutTransitionRef.current.layoutExpanded = true;
       setBoardPanelsCollapsed(true);
       setDeckBoardExpanded(true);
       setIsDeckPanelFullscreen(true);
@@ -960,24 +994,34 @@ export default function LidcPage() {
       return;
     }
 
+    cancelDeckSlotFlip(deckSlot, deckLayoutTransitionRef);
     const firstRect = deckSlot?.getBoundingClientRect();
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
+        if (transitionId !== deckLayoutTransitionRef.current.id) return;
+
         setBoardPanelsCollapsed(true);
         setDeckBoardExpanded(true);
+        deckLayoutTransitionRef.current.layoutExpanded = true;
         setIsDeckPanelFullscreen(true);
         setMemberActionMenuForId('');
         setIsPilotMenuOpen(false);
-        scheduleDeckLayoutTransition(deckSlot, firstRect);
+        scheduleDeckLayoutTransition(deckSlot, firstRect, deckLayoutTransitionRef, { transitionId });
       });
     });
   }
 
   function closeFullscreenPanel() {
+    const transitionId = ++deckLayoutTransitionRef.current.id;
     const deckSlot = deckSlotRef.current;
+    const shouldForceFlip = deckLayoutTransitionRef.current.layoutExpanded
+      || Boolean(deckSlot?.classList.contains('is-expanded'))
+      || isDeckPanelFullscreen;
 
     if (prefersReducedDeckMotion()) {
+      deckLayoutTransitionRef.current.layoutExpanded = false;
+      cancelDeckSlotFlip(deckSlot, deckLayoutTransitionRef);
       setBoardPanelsCollapsed(false);
       setDeckBoardExpanded(false);
       setIsDeckPanelFullscreen(false);
@@ -985,16 +1029,25 @@ export default function LidcPage() {
       return;
     }
 
+    cancelDeckSlotFlip(deckSlot, deckLayoutTransitionRef);
     const firstRect = deckSlot?.getBoundingClientRect();
 
     setIsDeckPanelFullscreen(false);
     setMemberActionMenuForId('');
 
     requestAnimationFrame(() => {
-      setBoardPanelsCollapsed(false);
-      setDeckBoardExpanded(false);
+      requestAnimationFrame(() => {
+        if (transitionId !== deckLayoutTransitionRef.current.id) return;
 
-      scheduleDeckLayoutTransition(deckSlot, firstRect);
+        setBoardPanelsCollapsed(false);
+        setDeckBoardExpanded(false);
+        deckLayoutTransitionRef.current.layoutExpanded = false;
+
+        scheduleDeckLayoutTransition(deckSlot, firstRect, deckLayoutTransitionRef, {
+          transitionId,
+          force: shouldForceFlip,
+        });
+      });
     });
   }
 
@@ -1540,7 +1593,7 @@ export default function LidcPage() {
   }
 
   function renderSquadronManagementActions() {
-    if (!SHOW_SQUADRON_LEAVE_DELETE_UI || !isViewingOwnSquadron) return null;
+    if (!SHOW_SQUADRON_LEAVE_DELETE_UI || !userHasSquadron) return null;
 
     return (
       <div className="lidc-squadron-management-actions">
@@ -1869,26 +1922,6 @@ export default function LidcPage() {
       return renderDeckManagementView();
     }
 
-    if (hasSelectedSquadron) {
-      if (interactive) {
-        return (
-          <div className="lidc-panel-deck-expanded-content is-deck-expanded">
-            {renderAirframeTable({ interactive: true, flush: true })}
-          </div>
-        );
-      }
-      return renderDeckManagementView();
-    }
-
-    if (selectedListSquadronId) {
-      return (
-        <div className="lidc-loading">
-          <Loader2 size={14} className="spin" />
-          <span>{t('lidc.general.loading')}</span>
-        </div>
-      );
-    }
-
     return (
       <div className="lidc-panel-rows">
         {Array.from({ length: 6 }).map((_, index) => (
@@ -2149,7 +2182,7 @@ export default function LidcPage() {
           </div>
         )}
 
-        {userHasSquadron && isViewingOwnSquadron && activeSquadron?.inviteCode && (
+        {userHasSquadron && activeSquadron?.inviteCode && (
           <div className="lidc-invite-code-box">
             <span className="lidc-invite-code-label">{t('lidc.inviteCode.shareLabel')}</span>
             <div className="lidc-invite-code-row">
@@ -2190,7 +2223,7 @@ export default function LidcPage() {
   }
 
   function renderDeckViewNav() {
-    if (!isViewingOwnSquadron) return null;
+    if (!userHasSquadron) return null;
 
     return (
       <div className="lidc-deck-view-nav">

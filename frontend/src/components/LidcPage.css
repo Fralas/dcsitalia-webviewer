@@ -2525,7 +2525,7 @@ body.lidc-deck-expanded-open {
   display: grid;
   gap: clamp(12px, 0.78vw, 16px);
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .lidc-airframe-meta-stack {
@@ -2533,8 +2533,10 @@ body.lidc-deck-expanded-open {
   gap: 0;
   border: 1px solid var(--lidc-hairline);
   border-radius: var(--lidc-row-radius);
-  overflow: hidden;
+  overflow: visible;
   background: var(--lidc-canvas-soft);
+  position: relative;
+  z-index: 4;
 }
 
 .lidc-airframe-readonly-grid {
@@ -2542,6 +2544,8 @@ body.lidc-deck-expanded-open {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0;
   border-bottom: 1px solid var(--lidc-hairline);
+  overflow: hidden;
+  border-radius: calc(var(--lidc-row-radius) - 1px) calc(var(--lidc-row-radius) - 1px) 0 0;
 }
 
 .lidc-airframe-readonly-item {
@@ -2599,6 +2603,7 @@ body.lidc-deck-expanded-open {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
+  overflow: visible;
 }
 
 .lidc-airframe-pilot-cell {
@@ -2607,6 +2612,9 @@ body.lidc-deck-expanded-open {
   display: grid;
   place-items: center;
   padding: 10px 12px;
+  overflow: visible;
+  position: relative;
+  z-index: 2;
 }
 
 .lidc-airframe-pilot-box {
@@ -2616,6 +2624,7 @@ body.lidc-deck-expanded-open {
   border: 0;
   background: transparent;
   padding: 0;
+  overflow: visible;
 }
 
 .lidc-airframe-pilot-box .lidc-airframe-inline-field {
@@ -2623,6 +2632,8 @@ body.lidc-deck-expanded-open {
   justify-items: stretch;
   text-align: left;
   gap: 6px;
+  overflow: visible;
+  z-index: 3;
 }
 
 .lidc-airframe-pilot-box .lidc-airframe-inline-field span {
@@ -2700,7 +2711,7 @@ body.lidc-deck-expanded-open {
   top: calc(100% + 6px);
   left: 0;
   right: 0;
-  z-index: 6;
+  z-index: 30;
   border: 1px solid var(--lidc-hairline);
   border-radius: var(--lidc-row-radius);
   background: var(--lidc-canvas);
@@ -2748,6 +2759,8 @@ body.lidc-deck-expanded-open {
   gap: 0;
   min-height: 0;
   overflow: hidden;
+  position: relative;
+  z-index: 1;
 }
 
 .lidc-airframe-log-panel header {
