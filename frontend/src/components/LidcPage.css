@@ -26,6 +26,10 @@
   --lidc-shell-pad-x: clamp(12px, 1.146vw, 44px);
   --lidc-board-gap-x: clamp(10px, 0.81vw, 31px);
   --lidc-board-gap-y: clamp(10px, 0.78vw, 30px);
+  --lidc-deck-flip-ms: 680ms;
+  --lidc-deck-expand-ms: 1000ms;
+  --lidc-deck-restore-ms: 320ms;
+  --lidc-deck-easing: cubic-bezier(0.22, 1, 0.36, 1);
 
   position: relative;
   height: 100%;
@@ -60,12 +64,12 @@
   grid-template-columns: minmax(0, 976fr) minmax(0, 976fr) minmax(0, 1718fr);
   grid-template-rows: minmax(0, 836fr) minmax(0, 920fr);
   gap: var(--lidc-board-gap-y) var(--lidc-board-gap-x);
-  transition: gap 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: gap var(--lidc-deck-restore-ms) var(--lidc-deck-easing);
 }
 
 .lidc-board.is-deck-expanded {
   gap: 0;
-  transition: gap 820ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: gap var(--lidc-deck-expand-ms) var(--lidc-deck-easing);
 }
 
 .lidc-board-slot {
@@ -84,8 +88,8 @@
   visibility: visible;
   view-transition-name: none;
   transition:
-    opacity 220ms ease,
-    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity calc(var(--lidc-deck-restore-ms) - 40ms) ease,
+    transform var(--lidc-deck-restore-ms) var(--lidc-deck-easing),
     visibility 0s;
 }
 
@@ -108,8 +112,8 @@
 }
 
 ::view-transition-group(lidc-board-slot-deck) {
-  animation-duration: 520ms;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-duration: var(--lidc-deck-flip-ms);
+  animation-timing-function: var(--lidc-deck-easing);
 }
 
 .lidc-board-slot-list.is-collapsed {
@@ -118,9 +122,9 @@
   pointer-events: none;
   visibility: hidden;
   transition:
-    opacity 780ms ease,
-    transform 820ms cubic-bezier(0.22, 1, 0.36, 1),
-    visibility 0s linear 820ms;
+    opacity calc(var(--lidc-deck-expand-ms) - 60ms) ease,
+    transform var(--lidc-deck-expand-ms) var(--lidc-deck-easing),
+    visibility 0s linear var(--lidc-deck-expand-ms);
   transition-delay: 0ms;
 }
 
@@ -130,9 +134,9 @@
   pointer-events: none;
   visibility: hidden;
   transition:
-    opacity 780ms ease,
-    transform 820ms cubic-bezier(0.22, 1, 0.36, 1),
-    visibility 0s linear 820ms;
+    opacity calc(var(--lidc-deck-expand-ms) - 60ms) ease,
+    transform var(--lidc-deck-expand-ms) var(--lidc-deck-easing),
+    visibility 0s linear var(--lidc-deck-expand-ms);
   transition-delay: 60ms;
 }
 
@@ -142,9 +146,9 @@
   pointer-events: none;
   visibility: hidden;
   transition:
-    opacity 780ms ease,
-    transform 820ms cubic-bezier(0.22, 1, 0.36, 1),
-    visibility 0s linear 820ms;
+    opacity calc(var(--lidc-deck-expand-ms) - 60ms) ease,
+    transform var(--lidc-deck-expand-ms) var(--lidc-deck-easing),
+    visibility 0s linear var(--lidc-deck-expand-ms);
   transition-delay: 100ms;
 }
 
@@ -274,6 +278,12 @@
   color: var(--lidc-ink);
 }
 
+.lidc-panel-deck-head.is-fullscreen {
+  margin-bottom: clamp(12px, 0.91vw, 24px);
+  padding-bottom: 12px;
+  border-bottom: 0;
+}
+
 .lidc-deck-view-nav {
   display: inline-flex;
   align-items: center;
@@ -395,7 +405,7 @@
   min-height: 0;
 }
 
-.lidc-panel-deck.is-management-focus .lidc-panel-deck-body {
+.lidc-panel-deck.is-table-focus .lidc-panel-deck-body {
   margin-inline: calc(-1 * clamp(14px, 1.07vw, 41px));
   margin-bottom: calc(-1 * clamp(16px, 1.35vw, 52px));
   flex: 1;
@@ -405,7 +415,7 @@
   flex-direction: column;
 }
 
-.lidc-panel-deck.is-management-focus.is-expanded .lidc-panel-deck-body {
+.lidc-panel-deck.is-table-focus.is-expanded .lidc-panel-deck-body {
   overflow: hidden;
 }
 
@@ -743,8 +753,8 @@ body.lidc-wizard-open {
   font-weight: 600;
 }
 
-.lidc-panel-table-preview .lidc-airframe-table-wrap.is-readonly,
-.lidc-panel-table-preview-static .lidc-airframe-table-wrap.is-readonly,
+.lidc-panel-table-preview .lidc-airframe-table-wrap.is-readonly:not(.lidc-deck-table-wrap),
+.lidc-panel-table-preview-static .lidc-airframe-table-wrap.is-readonly:not(.lidc-deck-table-wrap),
 .lidc-panel-deck .lidc-visual-card-members .lidc-airframe-table-wrap.is-readonly {
   height: auto;
   min-height: 120px;
@@ -754,12 +764,15 @@ body.lidc-wizard-open {
 
 .lidc-panel-table-preview.is-flush .lidc-member-table-wrap.is-readonly,
 .lidc-panel-table-preview-static.is-flush .lidc-member-table-wrap.is-readonly,
-.lidc-panel-deck.is-management-focus .lidc-member-table-wrap.is-readonly {
+.lidc-panel-table-preview-static.is-flush .lidc-deck-table-wrap.is-readonly,
+.lidc-panel-deck.is-table-focus .lidc-member-table-wrap.is-readonly,
+.lidc-panel-deck.is-table-focus .lidc-deck-table-wrap.is-readonly {
   flex: 1;
   min-height: 0;
   height: 100%;
   max-height: none;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   pointer-events: auto;
   overscroll-behavior: contain;
 }
@@ -797,6 +810,11 @@ body.lidc-wizard-open {
   height: 100%;
   min-height: 0;
   margin: 0;
+}
+
+.lidc-panel-deck.is-borderless {
+  border: 0;
+  border-radius: 0;
 }
 
 .lidc-panel-deck-expanded-content {
@@ -880,8 +898,12 @@ body.lidc-wizard-open {
   overflow: auto;
 }
 
-.lidc-panel-deck.is-expanded .lidc-airframe-table-wrap.is-interactive {
+.lidc-panel-deck.is-expanded .lidc-airframe-table-wrap.is-interactive:not(.is-flush) {
   min-height: min(560px, calc(100vh - 260px));
+}
+
+.lidc-panel-deck-expanded-content.is-deck-expanded {
+  gap: 0;
 }
 
 body.lidc-deck-expanded-open {
@@ -1425,8 +1447,11 @@ body.lidc-deck-expanded-open {
 }
 
 .lidc-member-table-wrap.is-flush,
-.lidc-panel-deck.is-management-focus .lidc-member-table-wrap,
-.lidc-panel-deck-expanded-content.is-members-expanded .lidc-member-table-wrap.is-interactive {
+.lidc-deck-table-wrap.is-flush,
+.lidc-panel-deck.is-table-focus .lidc-member-table-wrap,
+.lidc-panel-deck.is-table-focus .lidc-deck-table-wrap,
+.lidc-panel-deck-expanded-content.is-members-expanded .lidc-member-table-wrap.is-interactive,
+.lidc-panel-deck-expanded-content.is-deck-expanded .lidc-deck-table-wrap.is-interactive {
   width: 100%;
   margin-inline: 0;
   border: 0;
@@ -1437,7 +1462,13 @@ body.lidc-deck-expanded-open {
   box-shadow: none;
   min-height: 0;
   flex: 1;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.lidc-deck-table-wrap {
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .lidc-visual-card-members .lidc-member-cards {
@@ -2060,6 +2091,59 @@ body.lidc-deck-expanded-open {
   padding: 0;
 }
 
+.lidc-deck-table-wrap .lidc-airframe-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 0;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.lidc-deck-table-wrap .lidc-airframe-table th,
+.lidc-deck-table-wrap .lidc-airframe-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lidc-deck-table-wrap .lidc-airframe-table td:first-child,
+.lidc-deck-table-wrap .lidc-airframe-table th:first-child {
+  white-space: normal;
+}
+
+.lidc-deck-table-wrap .lidc-airframe-cell-main strong,
+.lidc-deck-table-wrap .lidc-airframe-cell-main span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lidc-deck-table-wrap .lidc-airframe-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--lidc-canvas);
+  color: var(--lidc-body);
+  border-bottom: 1px solid var(--lidc-hairline);
+  box-shadow: 0 1px 0 var(--lidc-hairline);
+}
+
+.lidc-deck-table-wrap .lidc-airframe-table tbody tr:nth-child(odd) td {
+  background: var(--lidc-canvas);
+}
+
+.lidc-deck-table-wrap .lidc-airframe-table tbody tr:nth-child(even) td {
+  background: var(--lidc-canvas-soft);
+}
+
+.lidc-deck-table-wrap.is-interactive .lidc-airframe-table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.lidc-deck-table-wrap.is-readonly .lidc-airframe-table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .lidc-member-table {
   min-width: 880px;
   border-collapse: separate;
@@ -2163,6 +2247,12 @@ body.lidc-deck-expanded-open {
 .lidc-airframe-cell-main span {
   color: #aeb6c2;
   font-size: 11px;
+}
+
+.lidc-airframe-cell-board {
+  font-family: GeistMono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .lidc-member-user-cell {
@@ -3723,7 +3813,7 @@ body.lidc-deck-expanded-open {
     grid-template-columns: 1fr;
   }
 
-  .lidc-airframe-table-wrap {
+  .lidc-airframe-table-wrap:not(.lidc-deck-table-wrap) {
     overflow-x: auto;
   }
 
