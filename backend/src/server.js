@@ -2029,6 +2029,18 @@ app.get('/api/lidc/me', (req, res) => {
 });
 
 /**
+ * GET /api/lidc/squadrons - List existing LIDC squadrons
+ */
+app.get('/api/lidc/squadrons', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const squadrons = lidcService.listSquadrons();
+  res.json({ squadrons });
+});
+
+/**
  * POST /api/lidc/squadrons - Create new LIDC squadron (authenticated users only)
  */
 app.post('/api/lidc/squadrons', (req, res) => {

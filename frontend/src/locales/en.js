@@ -353,6 +353,9 @@ export default {
     },
     home: {
       createSquadron: 'Create new squadron',
+      createSquadronAction: 'Create squadron',
+      joinSquadron: 'Join a squadron',
+      mySquadronTitle: 'My squadron',
       invitesList: 'Invites list',
       chooseAction: 'Choose an action',
       chooseActionHint: 'You are not in a squadron: create one or check pending invites.'
@@ -391,6 +394,7 @@ export default {
       createFailed: 'Failed to create squadron.',
       userStateFailed: 'Failed to verify your LIDC state.',
       squadronLoadFailed: 'Failed to load squadron details.',
+      squadronsListFailed: 'Failed to load squadron list.',
       airframeAssignFailed: 'Failed to update airframe assignment.',
       leaveFailed: 'Failed to leave squadron.',
       deleteFailed: 'Failed to delete squadron.'
@@ -438,6 +442,9 @@ export default {
       empty: 'No squadron members available.',
       owner: 'Owner',
       member: 'Member'
+    },
+    squadrons: {
+      listEmpty: 'No squadrons available.'
     },
     airframes: {
       empty: 'No purchased airframes found in this deck.',

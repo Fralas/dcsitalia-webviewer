@@ -353,6 +353,9 @@ export default {
     },
     home: {
       createSquadron: 'Crea nuovo squadrone',
+      createSquadronAction: 'Crea squadrone',
+      joinSquadron: 'Unisciti allo squadrone',
+      mySquadronTitle: 'Il mio squadrone',
       invitesList: 'Lista inviti',
       chooseAction: 'Seleziona una azione',
       chooseActionHint: 'Non sei in uno squadrone: scegli se crearne uno nuovo o controllare gli inviti.'
@@ -391,6 +394,7 @@ export default {
       createFailed: 'Creazione squadrone non riuscita.',
       userStateFailed: 'Impossibile verificare il tuo stato LIDC.',
       squadronLoadFailed: 'Impossibile caricare i dettagli dello squadrone.',
+      squadronsListFailed: 'Impossibile caricare la lista squadroni.',
       airframeAssignFailed: 'Impossibile aggiornare l\'assegnazione del velivolo.',
       leaveFailed: 'Impossibile abbandonare lo squadrone.',
       deleteFailed: 'Impossibile cancellare lo squadrone.'
@@ -438,6 +442,9 @@ export default {
       empty: 'Nessun membro disponibile nello squadrone.',
       owner: 'Owner',
       member: 'Membro'
+    },
+    squadrons: {
+      listEmpty: 'Nessuno squadrone disponibile.'
     },
     airframes: {
       empty: 'Nessun velivolo acquistato nel deck.',

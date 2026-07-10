@@ -674,6 +674,15 @@ export async function getLidcMe() {
 }
 
 /**
+ * Get all LIDC squadrons (summary list)
+ */
+export async function getLidcSquadrons() {
+  return fetchAPI('/lidc/squadrons', {
+    credentials: 'include',
+  });
+}
+
+/**
  * Create a new LIDC squadron
  */
 export async function createLidcSquadron(payload) {
@@ -1076,6 +1085,7 @@ export default {
   getLidcTemplates,
   getLidcMe,
   getLidcUsers,
+  getLidcSquadrons,
   createLidcSquadron,
   getLidcSquadron,
   assignLidcAirframePilot,

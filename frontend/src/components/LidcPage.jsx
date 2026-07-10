@@ -11,7 +11,6 @@ import {
   Forklift,
   Helicopter,
   Home,
-  List,
   Loader2,
   LogIn,
   Plane,
@@ -167,6 +166,11 @@ function getUserInitial(entry) {
   return trimmed ? trimmed.charAt(0).toUpperCase() : '?';
 }
 
+function getSquadronInitial(name) {
+  const trimmed = String(name || '').trim();
+  return trimmed ? trimmed.charAt(0).toUpperCase() : '?';
+}
+
 function hashText(value) {
   const source = String(value || '');
   let hash = 0;
@@ -270,6 +274,10 @@ export default function LidcPage({ onNavigateHome }) {
   });
   const [hideInSquadronNotice, setHideInSquadronNotice] = useState(false);
   const [activeSquadron, setActiveSquadron] = useState(null);
+  const [listedSquadrons, setListedSquadrons] = useState([]);
+  const [loadingListedSquadrons, setLoadingListedSquadrons] = useState(true);
+  const [listedSquadronsError, setListedSquadronsError] = useState('');
+  const [selectedListSquadronId, setSelectedListSquadronId] = useState('');
   const [loadingSquadronDetails, setLoadingSquadronDetails] = useState(false);
   const [squadronDetailsError, setSquadronDetailsError] = useState('');
   const [updatingAirframeId, setUpdatingAirframeId] = useState('');
@@ -376,6 +384,57 @@ export default function LidcPage({ onNavigateHome }) {
     };
   }, [user]);
 
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadListedSquadrons() {
+      if (!user?.id) {
+        if (!mounted) return;
+        setListedSquadrons([]);
+        setListedSquadronsError('');
+        setLoadingListedSquadrons(false);
+        return;
+      }
+
+      setLoadingListedSquadrons(true);
+      setListedSquadronsError('');
+
+      try {
+        const response = await api.getLidcSquadrons();
+        if (!mounted) return;
+        setListedSquadrons(Array.isArray(response?.squadrons) ? response.squadrons : []);
+      } catch (error) {
+        if (!mounted) return;
+        setListedSquadrons([]);
+        setListedSquadronsError(error.message || t('lidc.errors.squadronsListFailed'));
+      } finally {
+        if (mounted) setLoadingListedSquadrons(false);
+      }
+    }
+
+    loadListedSquadrons();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (listedSquadrons.length === 0) return;
+
+    const hasCurrentSelection = selectedListSquadronId
+      && listedSquadrons.some((entry) => entry.id === selectedListSquadronId);
+    if (hasCurrentSelection) return;
+
+    const preferredId = userLidcState?.squadron?.id || '';
+    if (preferredId && listedSquadrons.some((entry) => entry.id === preferredId)) {
+      setSelectedListSquadronId(preferredId);
+      return;
+    }
+
+    setSelectedListSquadronId(listedSquadrons[0].id);
+  }, [listedSquadrons, userLidcState?.squadron?.id, selectedListSquadronId]);
+
   const isEntryWizardVisible = !isWizardOpen
     && !loadingUserState
     && Boolean(user?.id)
@@ -467,7 +526,7 @@ export default function LidcPage({ onNavigateHome }) {
     let mounted = true;
 
     async function loadSquadronDetails() {
-      const squadronId = userLidcState?.squadron?.id;
+      const squadronId = selectedListSquadronId;
       if (!user?.id || !squadronId) {
         if (!mounted) return;
         setLoadingSquadronDetails(false);
@@ -497,7 +556,7 @@ export default function LidcPage({ onNavigateHome }) {
     return () => {
       mounted = false;
     };
-  }, [user?.id, userLidcState?.squadron?.id]);
+  }, [user?.id, selectedListSquadronId]);
 
   function clearSidebarTimers() {
     if (sidebarOpenTimerRef.current) {
@@ -656,8 +715,13 @@ export default function LidcPage({ onNavigateHome }) {
   const currentStepKey = WIZARD_STEPS[currentStep] || WIZARD_STEPS[0];
   const isLogged = Boolean(user?.id);
   const userHasSquadron = Boolean(userLidcState.hasSquadron);
-  const isManagementFocusView = activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS
-    || activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS;
+  const isViewingOwnSquadron = userHasSquadron
+    && Boolean(selectedListSquadronId)
+    && selectedListSquadronId === String(userLidcState?.squadron?.id || '');
+  const isManagementFocusView = isViewingOwnSquadron && (
+    activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS
+    || activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS
+  );
   const effectivePreviewBaseId = baseId
     || activeSquadron?.baseId
     || createdSquadron?.baseId
@@ -822,6 +886,14 @@ export default function LidcPage({ onNavigateHome }) {
             createdAt: created.createdAt,
           },
         }));
+        setSelectedListSquadronId(created.id);
+      }
+
+      try {
+        const listResponse = await api.getLidcSquadrons();
+        setListedSquadrons(Array.isArray(listResponse?.squadrons) ? listResponse.squadrons : []);
+      } catch (_) {
+        // Non-blocking refresh after create.
       }
 
       closeWizard();
@@ -884,9 +956,17 @@ export default function LidcPage({ onNavigateHome }) {
 
       setCreatedSquadron(null);
       setActiveSquadron(null);
+      setSelectedListSquadronId('');
       setHideInSquadronNotice(false);
       setPanelMode('home');
       setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
+
+      try {
+        const listResponse = await api.getLidcSquadrons();
+        setListedSquadrons(Array.isArray(listResponse?.squadrons) ? listResponse.squadrons : []);
+      } catch (_) {
+        // Non-blocking refresh after leave.
+      }
     } catch (error) {
       setUserStateError(error.message || t('lidc.errors.leaveFailed'));
     } finally {
@@ -917,9 +997,17 @@ export default function LidcPage({ onNavigateHome }) {
 
       setCreatedSquadron(null);
       setActiveSquadron(null);
+      setSelectedListSquadronId('');
       setHideInSquadronNotice(false);
       setPanelMode('home');
       setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
+
+      try {
+        const listResponse = await api.getLidcSquadrons();
+        setListedSquadrons(Array.isArray(listResponse?.squadrons) ? listResponse.squadrons : []);
+      } catch (_) {
+        // Non-blocking refresh after delete.
+      }
     } catch (error) {
       setUserStateError(error.message || t('lidc.errors.deleteFailed'));
     } finally {
@@ -1301,7 +1389,7 @@ export default function LidcPage({ onNavigateHome }) {
   }
 
   function renderSquadronManagementActions() {
-    if (!userHasSquadron) return null;
+    if (!isViewingOwnSquadron) return null;
 
     return (
       <div className="lidc-squadron-management-actions">
@@ -1679,42 +1767,49 @@ export default function LidcPage({ onNavigateHome }) {
       <section className="lidc-panel lidc-panel-list">
         <h2 className="lidc-panel-title">{t('lidc.sidebar.squadronList')}</h2>
         <div className="lidc-panel-rows">
-          <button
-            type="button"
-            className={`lidc-panel-row ${activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_LIST ? 'is-active' : ''}`}
-            onClick={() => setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST)}
-          >
-            <List size={18} />
-            <span>{t('lidc.sidebar.squadronList')}</span>
-          </button>
-          <button
-            type="button"
-            className={`lidc-panel-row ${activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS ? 'is-active' : ''}`}
-            onClick={() => setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS)}
-          >
-            <Users size={18} />
-            <span>{t('lidc.sidebar.memberManagement')}</span>
-          </button>
-          <button
-            type="button"
-            className={`lidc-panel-row ${activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS ? 'is-active' : ''}`}
-            onClick={() => setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS)}
-          >
-            <Plane size={18} />
-            <span>{t('lidc.sidebar.aircraftManagement')}</span>
-          </button>
-          {!userHasSquadron && (
-            <>
-              <button type="button" className="lidc-panel-row" onClick={openCreateWizard}>
-                <Disc3 size={18} />
-                <span>{t('lidc.home.createSquadron')}</span>
-              </button>
-              <button type="button" className="lidc-panel-row" onClick={() => setPanelMode('invites')}>
-                <UserPlus size={18} />
-                <span>{t('lidc.home.invitesList')}</span>
-              </button>
-            </>
+          {!isLogged && (
+            <div className="lidc-panel-row lidc-panel-row--static">
+              <span>{t('lidc.center.loginTitle')}</span>
+            </div>
           )}
+
+          {isLogged && loadingListedSquadrons && (
+            <div className="lidc-panel-row lidc-panel-row--static">
+              <Loader2 size={18} className="spin" />
+              <span>{t('lidc.general.loading')}</span>
+            </div>
+          )}
+
+          {isLogged && !loadingListedSquadrons && listedSquadronsError && (
+            <div className="lidc-inline-error">{listedSquadronsError}</div>
+          )}
+
+          {isLogged && !loadingListedSquadrons && !listedSquadronsError && listedSquadrons.length === 0 && (
+            <div className="lidc-muted-box">{t('lidc.squadrons.listEmpty')}</div>
+          )}
+
+          {isLogged && !loadingListedSquadrons && listedSquadrons.map((squadron) => {
+            const isSelected = selectedListSquadronId === squadron.id;
+            const logo = String(squadron.logoDataUrl || '');
+
+            return (
+              <button
+                key={squadron.id}
+                type="button"
+                className={`lidc-panel-row lidc-panel-row--squadron ${isSelected ? 'is-active' : ''}`}
+                onClick={() => setSelectedListSquadronId(squadron.id)}
+              >
+                {logo ? (
+                  <img src={logo} alt="" className="lidc-panel-row-logo" />
+                ) : (
+                  <span className="lidc-panel-row-logo lidc-panel-row-logo-fallback" aria-hidden="true">
+                    {getSquadronInitial(squadron.name)}
+                  </span>
+                )}
+                <span className="lidc-panel-row-name">{squadron.name}</span>
+              </button>
+            );
+          })}
         </div>
       </section>
     );
@@ -1777,22 +1872,43 @@ export default function LidcPage({ onNavigateHome }) {
   }
 
   function renderMySquadronPanel() {
-    const showLockedOverlay = !userHasSquadron && !loadingUserState;
-    const showDiscordCta = showLockedOverlay && !isLogged;
+    const showNoSquadronActions = isLogged && !userHasSquadron && !loadingUserState;
+    const showDiscordCta = !isLogged && !loadingUserState;
     const squadronTitle = userHasSquadron
-      ? `${t('lidc.preview.eyebrow')} - ${previewIdentity.name}`
-      : 'MY SQUADRON - DCS ITALIA';
+      ? previewIdentity.name
+      : t('lidc.home.mySquadronTitle');
 
     return (
       <section className="lidc-panel lidc-panel-squadron">
         <h2 className="lidc-panel-title">{squadronTitle}</h2>
-        <div className={`lidc-panel-rows ${activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_LIST ? '' : 'lidc-panel-rows--compact'}`}>
-          {renderMySquadronRows()}
-        </div>
+
+        {!showNoSquadronActions && (
+          <div className={`lidc-panel-rows ${activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_LIST ? '' : 'lidc-panel-rows--compact'}`}>
+            {renderMySquadronRows()}
+          </div>
+        )}
 
         {catalogError && <div className="lidc-inline-error lidc-panel-inline-error">{catalogError}</div>}
 
-        {showLockedOverlay && <div className="lidc-panel-overlay" aria-hidden="true" />}
+        {showNoSquadronActions && (
+          <div className="lidc-panel-squadron-actions">
+            <button
+              type="button"
+              className="lidc-panel-squadron-action-btn lidc-panel-squadron-action-btn--primary"
+              onClick={openCreateWizard}
+            >
+              {t('lidc.home.createSquadronAction')}
+            </button>
+            <button
+              type="button"
+              className="lidc-panel-squadron-action-btn"
+              onClick={() => setPanelMode('invites')}
+            >
+              {t('lidc.home.joinSquadron')}
+            </button>
+          </div>
+        )}
+
         {showDiscordCta && (
           <a href="/api/auth/discord" className="lidc-discord-btn">
             Join our DISCORD
@@ -1808,17 +1924,54 @@ export default function LidcPage({ onNavigateHome }) {
     );
   }
 
+  function renderDeckViewNav() {
+    if (!isViewingOwnSquadron) return null;
+
+    return (
+      <div className="lidc-deck-view-nav">
+        <button
+          type="button"
+          className={`lidc-deck-view-nav-btn ${activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_LIST ? 'is-active' : ''}`}
+          onClick={() => setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST)}
+        >
+          {t('lidc.sidebar.squadronList')}
+        </button>
+        <button
+          type="button"
+          className={`lidc-deck-view-nav-btn ${activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS ? 'is-active' : ''}`}
+          onClick={() => setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS)}
+        >
+          {t('lidc.sidebar.memberManagement')}
+        </button>
+        <button
+          type="button"
+          className={`lidc-deck-view-nav-btn ${activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS ? 'is-active' : ''}`}
+          onClick={() => setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS)}
+        >
+          {t('lidc.sidebar.aircraftManagement')}
+        </button>
+      </div>
+    );
+  }
+
   function renderSquadronDeckPanel() {
     const showLockedOverlay = !userHasSquadron && !loadingUserState;
+    const hasSelectedSquadron = Boolean(activeSquadron);
 
     return (
       <section className={`lidc-panel lidc-panel-deck ${isManagementFocusView ? 'is-management-focus' : ''}`}>
         <h2 className="lidc-panel-title">SQUADRON DECK</h2>
+        {renderDeckViewNav()}
         <div className="lidc-panel-deck-body">
-          {activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS && renderMemberManagementView()}
-          {activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS && renderAircraftManagementView()}
-          {activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_LIST && (
-            userHasSquadron ? (
+          {isViewingOwnSquadron && activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS && renderMemberManagementView()}
+          {isViewingOwnSquadron && activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS && renderAircraftManagementView()}
+          {(!isViewingOwnSquadron || activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_LIST) && (
+            loadingSquadronDetails ? (
+              <div className="lidc-loading">
+                <Loader2 size={14} className="spin" />
+                <span>{t('lidc.general.loading')}</span>
+              </div>
+            ) : hasSelectedSquadron ? (
               <div className="lidc-squadron-view-stack">
                 {renderOverviewView()}
                 {renderCapsView()}

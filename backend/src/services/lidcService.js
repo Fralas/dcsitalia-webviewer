@@ -814,6 +814,23 @@ export function createSquadron(payload, sessionUser) {
   return squadron;
 }
 
+export function listSquadrons() {
+  ensureStorage();
+
+  return readSquadrons()
+    .map((squadron) => ({
+      id: sanitizeText(squadron?.id, 120),
+      name: sanitizeText(squadron?.name, 120),
+      logoDataUrl: sanitizeText(squadron?.logoDataUrl, MAX_LOGO_DATA_URL_LENGTH) || '',
+      templateName: sanitizeText(squadron?.templateName, 120),
+      baseId: sanitizeText(squadron?.baseId, 120),
+      memberCount: Array.isArray(squadron?.members) ? squadron.members.length : 0,
+      createdAt: Number.isFinite(squadron?.createdAt) ? squadron.createdAt : null,
+    }))
+    .filter((entry) => entry.id && entry.name)
+    .sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
+}
+
 export function getSquadronById(squadronId) {
   ensureStorage();
   const targetId = sanitizeText(squadronId, 120);
@@ -1189,6 +1206,7 @@ export default {
   upsertDiscordUser,
   getDiscordUsers,
   createSquadron,
+  listSquadrons,
   getSquadronById,
   updateAirframeAssignment,
   updateSquadronMemberRole,
