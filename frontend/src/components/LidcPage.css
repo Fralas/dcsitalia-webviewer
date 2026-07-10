@@ -403,7 +403,6 @@ body.lidc-map-fullscreen-open {
   gap: 2px;
   min-width: 0;
   padding: 0 0 2px;
-  transform: translate(0, -100%);
   text-align: left;
   pointer-events: none;
 }

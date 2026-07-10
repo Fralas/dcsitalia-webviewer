@@ -1,36 +1,45 @@
 import { useEffect, useState } from 'react';
 import { LIDC_AFGHANISTAN_AIRPORTS } from '../config/lidcAfghanistanAirports';
 
-const OUTWARD_PX = 44;
-const ARM_PX = 22;
-const DOT_RADIUS = 5;
+const BASE_OUTWARD_PX = 44;
+const BASE_LABEL_GAP_PX = 2;
+const BASE_DOT_RADIUS = 5;
 const EDGE_MARGIN = 24;
+const POINTER_REFERENCE_ZOOM = 8;
 
-function underlineWidthForName(name) {
-  return Math.min(150, Math.max(52, String(name || '').length * 8.2));
+function getPointerScale(zoom) {
+  const scaled = 2 ** ((zoom - POINTER_REFERENCE_ZOOM) / 3);
+  return Math.max(0.48, Math.min(1.18, scaled));
 }
 
-function buildPointerFrame(anchor, width, airport) {
+function underlineWidthForName(name, scale) {
+  const base = Math.min(150, Math.max(52, String(name || '').length * 8.2));
+  return base * scale;
+}
+
+function buildPointerFrame(anchor, width, airport, scale) {
   const side = airport.pointerSide || (anchor.x >= width / 2 ? 'right' : 'left');
   const leanX = Math.max(-0.4, Math.min(0.4, (anchor.x - width / 2) / 260));
   const stemLen = Math.hypot(leanX, 1) || 1;
+  const outwardPx = BASE_OUTWARD_PX * scale;
+  const labelGapPx = BASE_LABEL_GAP_PX * scale;
 
   const elbow = {
-    x: anchor.x + (leanX / stemLen) * OUTWARD_PX,
-    y: anchor.y - (1 / stemLen) * OUTWARD_PX,
+    x: anchor.x + (leanX / stemLen) * outwardPx,
+    y: anchor.y - (1 / stemLen) * outwardPx,
   };
 
-  const underlineWidth = underlineWidthForName(airport.name);
+  const underlineWidth = underlineWidthForName(airport.name, scale);
   let underlineStart;
   let underlineEnd;
   let label;
 
   if (side === 'left') {
-    underlineEnd = { x: elbow.x - ARM_PX, y: elbow.y };
+    underlineEnd = { x: elbow.x - labelGapPx, y: elbow.y };
     underlineStart = { x: underlineEnd.x - underlineWidth, y: elbow.y };
     label = { ...underlineStart };
   } else {
-    underlineStart = { x: elbow.x + ARM_PX, y: elbow.y };
+    underlineStart = { x: elbow.x + labelGapPx, y: elbow.y };
     underlineEnd = { x: underlineStart.x + underlineWidth, y: elbow.y };
     label = { ...underlineStart };
   }
@@ -43,6 +52,9 @@ function buildPointerFrame(anchor, width, airport) {
     underlineEnd,
     label,
     side,
+    scale,
+    dotRadius: BASE_DOT_RADIUS * scale,
+    strokeWidth: Math.max(1.4, 2.5 * scale),
   };
 }
 
@@ -53,6 +65,8 @@ function buildPointerFrames(map, airports) {
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
   if (!width || !height) return [];
+
+  const scale = getPointerScale(map.getZoom());
 
   return airports
     .map((airport) => {
@@ -68,7 +82,7 @@ function buildPointerFrames(map, airports) {
         return null;
       }
 
-      return buildPointerFrame(anchor, width, airport);
+      return buildPointerFrame(anchor, width, airport, scale);
     })
     .filter(Boolean);
 }
@@ -109,12 +123,14 @@ export default function LidcMapAirportPointers({ map }) {
             <path
               className="lidc-map-pointers__line"
               d={`M ${frame.anchor.x} ${frame.anchor.y} L ${frame.elbow.x} ${frame.elbow.y} L ${frame.underlineStart.x} ${frame.underlineStart.y} L ${frame.underlineEnd.x} ${frame.underlineEnd.y}`}
+              strokeWidth={frame.strokeWidth}
             />
             <circle
               className="lidc-map-pointers__dot"
               cx={frame.anchor.x}
               cy={frame.anchor.y}
-              r={DOT_RADIUS}
+              r={frame.dotRadius}
+              strokeWidth={Math.max(1, frame.strokeWidth * 0.6)}
             />
           </g>
         ))}
@@ -126,6 +142,8 @@ export default function LidcMapAirportPointers({ map }) {
           style={{
             left: `${frame.label.x}px`,
             top: `${frame.label.y}px`,
+            transform: `translate(0, -100%) scale(${frame.scale})`,
+            transformOrigin: frame.side === 'left' ? 'right bottom' : 'left bottom',
             '--pointer-accent': frame.airport.highlightColor,
           }}
         >
