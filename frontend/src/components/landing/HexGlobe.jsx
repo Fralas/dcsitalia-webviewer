@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Globe from 'globe.gl';
 import * as THREE from 'three';
 import CampaignPointers from './CampaignPointers';
+import { getCampaignById } from '../../config/campaigns';
 import { resolveGlobeHexColor } from '../../utils/globeTheaterColor';
 import { prepareGlobeCountryFeatures, buildTheaterClickAreasFromRawFeatures } from '../../utils/prepareGlobeFeatures';
 import { buildExtraHexFeatures, collectCountryHexCells } from '../../utils/buildExtraHexFeatures';
@@ -12,8 +13,17 @@ const GEOJSON_URL = '/geo/ne_110m_admin_0_countries.geojson';
 const CDN = 'https://cdn.jsdelivr.net/npm/three-globe/example/img';
 const GLOBE_POV_ALTITUDE = 2.4 / 1.3 / 1.2;
 const AUTO_ROTATE_RESUME_MS = 30_000;
+const FOCUS_ALTITUDE_FACTOR = 0.68;
+const FOCUS_TRANSITION_MS = 900;
+const RESET_TRANSITION_MS = 1200;
 const HEX_POLYGON_MARGIN = 0.3;
 const HEX_POLYGON_ALTITUDE = 0.001;
+
+const DEFAULT_POV = Object.freeze({
+  lat: 30,
+  lng: 40,
+  altitude: GLOBE_POV_ALTITUDE,
+});
 
 function applyUnlitMaterials(world) {
   world.scene().traverse((obj) => {
@@ -39,17 +49,146 @@ export default function HexGlobe({ selectedCampaignId, onCampaignSelect }) {
   const containerRef = useRef(null);
   const globeRef = useRef(null);
   const onCampaignSelectRef = useRef(onCampaignSelect);
+  const idleTimerRef = useRef(null);
+  const altitudeAnimRef = useRef(null);
+  const isCampaignFocusedRef = useRef(false);
+  const scheduleIdleRecoveryRef = useRef(() => {});
+  const resetZoomToDefaultRef = useRef(() => {});
+  const handleSelectCampaignRef = useRef(() => {});
+  const lastFocusedCampaignRef = useRef(null);
   const [pointersReady, setPointersReady] = useState(false);
 
-  const handleSelectCampaign = (campaignId) => {
-    const controls = globeRef.current?.controls?.();
+  const clearIdleTimer = useCallback(() => {
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
+    }
+  }, []);
+
+  const cancelAltitudeAnim = useCallback(() => {
+    if (altitudeAnimRef.current) {
+      cancelAnimationFrame(altitudeAnimRef.current);
+      altitudeAnimRef.current = null;
+    }
+  }, []);
+
+  const easeCubicInOut = (t) => (
+    t < 0.5 ? 4 * t * t * t : 1 - ((-2 * t + 2) ** 3) / 2
+  );
+
+  const resetToDefaultView = useCallback((transitionMs = RESET_TRANSITION_MS) => {
+    const world = globeRef.current;
+    if (!world) return;
+
+    cancelAltitudeAnim();
+    world.pointOfView(DEFAULT_POV, transitionMs);
+    isCampaignFocusedRef.current = false;
+    lastFocusedCampaignRef.current = null;
+  }, [cancelAltitudeAnim]);
+
+  const resetZoomToDefault = useCallback((transitionMs = RESET_TRANSITION_MS) => {
+    const world = globeRef.current;
+    if (!world) return;
+
+    const pov = world.pointOfView();
+    const startAlt = pov?.altitude ?? GLOBE_POV_ALTITUDE;
+    const isZoomedIn = isCampaignFocusedRef.current
+      || Math.abs(startAlt - GLOBE_POV_ALTITUDE) > 0.03;
+
+    if (!isZoomedIn) return;
+
+    cancelAltitudeAnim();
+    isCampaignFocusedRef.current = false;
+
+    const startTime = performance.now();
+    const targetAlt = GLOBE_POV_ALTITUDE;
+
+    const step = (now) => {
+      const activeWorld = globeRef.current;
+      if (!activeWorld) {
+        altitudeAnimRef.current = null;
+        return;
+      }
+
+      const progress = Math.min(1, (now - startTime) / transitionMs);
+      const altitude = startAlt + (targetAlt - startAlt) * easeCubicInOut(progress);
+      const current = activeWorld.pointOfView();
+
+      activeWorld.pointOfView(
+        { lat: current.lat, lng: current.lng, altitude },
+        0,
+      );
+
+      if (progress < 1) {
+        altitudeAnimRef.current = requestAnimationFrame(step);
+      } else {
+        altitudeAnimRef.current = null;
+      }
+    };
+
+    altitudeAnimRef.current = requestAnimationFrame(step);
+  }, [cancelAltitudeAnim]);
+
+  const scheduleIdleRecovery = useCallback(() => {
+    clearIdleTimer();
+    idleTimerRef.current = window.setTimeout(() => {
+      const world = globeRef.current;
+      if (!world) return;
+
+      resetToDefaultView();
+      const controls = world.controls?.();
+      if (controls) controls.autoRotate = true;
+      idleTimerRef.current = null;
+    }, AUTO_ROTATE_RESUME_MS);
+  }, [clearIdleTimer, resetToDefaultView]);
+
+  const focusOnCampaign = useCallback((campaignId) => {
+    const world = globeRef.current;
+    const campaign = getCampaignById(campaignId);
+    if (!world || !campaign?.pointerAnchor) return;
+
+    clearIdleTimer();
+
+    cancelAltitudeAnim();
+
+    const controls = world.controls?.();
     if (controls) controls.autoRotate = false;
+
+    const { lat, lng } = campaign.pointerAnchor;
+    world.pointOfView(
+      {
+        lat,
+        lng,
+        altitude: GLOBE_POV_ALTITUDE * FOCUS_ALTITUDE_FACTOR,
+      },
+      FOCUS_TRANSITION_MS,
+    );
+
+    isCampaignFocusedRef.current = true;
+    lastFocusedCampaignRef.current = campaignId;
+    scheduleIdleRecovery();
+  }, [clearIdleTimer, cancelAltitudeAnim, scheduleIdleRecovery]);
+
+  const handleSelectCampaign = useCallback((campaignId) => {
+    focusOnCampaign(campaignId);
     onCampaignSelectRef.current?.(campaignId);
-  };
+  }, [focusOnCampaign]);
+
+  useEffect(() => {
+    scheduleIdleRecoveryRef.current = scheduleIdleRecovery;
+    resetZoomToDefaultRef.current = resetZoomToDefault;
+    handleSelectCampaignRef.current = handleSelectCampaign;
+  }, [scheduleIdleRecovery, resetZoomToDefault, handleSelectCampaign]);
 
   useEffect(() => {
     onCampaignSelectRef.current = onCampaignSelect;
   }, [onCampaignSelect]);
+
+  useEffect(() => {
+    if (!selectedCampaignId || !globeRef.current) return;
+    if (selectedCampaignId === lastFocusedCampaignRef.current) return;
+    focusOnCampaign(selectedCampaignId);
+  }, [selectedCampaignId, focusOnCampaign]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -79,24 +218,20 @@ export default function HexGlobe({ selectedCampaignId, onCampaignSelect }) {
     controls.enablePan = false;
     controls.enableRotate = true;
 
-    let resumeTimer = null;
-
     const stopAutoRotate = () => {
       controls.autoRotate = false;
+      clearIdleTimer();
+      resetZoomToDefaultRef.current();
     };
 
-    const scheduleAutoRotateResume = () => {
-      if (resumeTimer) clearTimeout(resumeTimer);
-      resumeTimer = window.setTimeout(() => {
-        controls.autoRotate = true;
-        resumeTimer = null;
-      }, AUTO_ROTATE_RESUME_MS);
+    const handleControlEnd = () => {
+      scheduleIdleRecoveryRef.current();
     };
 
     controls.addEventListener('start', stopAutoRotate);
-    controls.addEventListener('end', scheduleAutoRotateResume);
+    controls.addEventListener('end', handleControlEnd);
 
-    world.pointOfView({ lat: 30, lng: 40, altitude: GLOBE_POV_ALTITUDE });
+    world.pointOfView(DEFAULT_POV);
     globeRef.current = world;
 
     const readyFrame = requestAnimationFrame(() => {
@@ -125,7 +260,7 @@ export default function HexGlobe({ selectedCampaignId, onCampaignSelect }) {
               world,
               theaterAreas,
               wrapRef.current,
-              (campaignId) => onCampaignSelectRef.current?.(campaignId),
+              (campaignId) => handleSelectCampaignRef.current?.(campaignId),
             );
           }
         });
@@ -144,14 +279,23 @@ export default function HexGlobe({ selectedCampaignId, onCampaignSelect }) {
     const resizeObserver = new ResizeObserver(handleResize);
     resizeObserver.observe(container);
 
+    const wrap = wrapRef.current;
+    const blockWheel = (event) => {
+      event.preventDefault();
+    };
+
+    wrap?.addEventListener('wheel', blockWheel, { passive: false });
+
     return () => {
       cancelled = true;
+      wrap?.removeEventListener('wheel', blockWheel);
       detachTheaterInteraction();
       cancelAnimationFrame(readyFrame);
       setPointersReady(false);
-      if (resumeTimer) clearTimeout(resumeTimer);
+      clearIdleTimer();
+      cancelAltitudeAnim();
       controls.removeEventListener('start', stopAutoRotate);
-      controls.removeEventListener('end', scheduleAutoRotateResume);
+      controls.removeEventListener('end', handleControlEnd);
       resizeObserver.disconnect();
       try {
         world._destructor?.();
@@ -159,8 +303,10 @@ export default function HexGlobe({ selectedCampaignId, onCampaignSelect }) {
         // ignore teardown errors
       }
       globeRef.current = null;
+      isCampaignFocusedRef.current = false;
+      lastFocusedCampaignRef.current = null;
     };
-  }, []);
+  }, [clearIdleTimer, cancelAltitudeAnim]);
 
   return (
     <div ref={wrapRef} className="landing-globe-wrap">

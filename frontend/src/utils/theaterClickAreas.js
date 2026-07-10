@@ -56,8 +56,6 @@ export function attachTheaterAreaInteraction(world, areas, container, onSelect) 
     const campaignId = resolveCampaignAtLatLng(coords.lat, coords.lng, normalized);
     if (!campaignId) return;
 
-    const controls = world.controls?.();
-    if (controls) controls.autoRotate = false;
     onSelect(campaignId);
   };
 
