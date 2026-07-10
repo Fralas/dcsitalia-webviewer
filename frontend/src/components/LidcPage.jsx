@@ -10,7 +10,6 @@ import {
   Disc3,
   Forklift,
   Helicopter,
-  Home,
   Loader2,
   Plane,
   Save,
@@ -25,10 +24,7 @@ import { useUser } from '../contexts/UserContext';
 import airports from '../config/airports';
 import * as api from '../services/api';
 import { t } from '../utils/locale';
-import { getCampaignById } from '../config/campaigns';
 import './LidcPage.css';
-
-const LIDC_CAMPAIGN = getCampaignById('lidc-afghanistan');
 
 const WIZARD_STEPS = ['info', 'template', 'deck', 'review'];
 
@@ -236,7 +232,7 @@ function isAuthenticationError(error) {
   return status === 401 || message.includes('not authenticated');
 }
 
-export default function LidcPage({ onNavigateHome }) {
+export default function LidcPage() {
   const { user } = useUser();
 
   const [templates, setTemplates] = useState([]);
@@ -1983,27 +1979,6 @@ export default function LidcPage({ onNavigateHome }) {
   return (
     <div className="lidc-page">
       <div className="lidc-shell">
-        <div className="lidc-campaign-bar">
-          <button
-            type="button"
-            className="lidc-campaign-back"
-            onClick={() => {
-              if (typeof onNavigateHome === 'function') {
-                onNavigateHome();
-                return;
-              }
-              window.location.href = '/';
-            }}
-            aria-label={t('lidc.center.backHome')}
-            title={t('lidc.center.backHome')}
-          >
-            <Home size={28} strokeWidth={2.5} />
-          </button>
-          <div className="lidc-campaign-title">
-            {LIDC_CAMPAIGN?.label || 'LIDC - AFGHANISTAN'}
-          </div>
-        </div>
-
         <div className="lidc-board">
           {renderSquadronListPanel()}
           {renderMySquadronPanel()}

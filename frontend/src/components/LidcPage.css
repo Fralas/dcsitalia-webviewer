@@ -41,56 +41,10 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: clamp(12px, 1.04vw, 40px);
   padding:
     clamp(8px, 0.68vw, 26px)
     var(--lidc-shell-pad-x)
     clamp(12px, 1.04vw, 40px);
-}
-
-.lidc-campaign-bar {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: clamp(8px, 0.5vw, 19px);
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.lidc-campaign-back {
-  box-sizing: border-box;
-  width: clamp(56px, 2.5vw, 96px);
-  height: clamp(56px, 2.5vw, 96px);
-  border: 2px solid var(--lidc-hairline);
-  border-radius: var(--lidc-radius);
-  background: var(--lidc-canvas);
-  color: var(--lidc-ink);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: border-color 140ms ease, background-color 140ms ease;
-}
-
-.lidc-campaign-back:hover {
-  border-color: rgba(255, 255, 255, 0.44);
-  background: #121212;
-}
-
-.lidc-campaign-title {
-  box-sizing: border-box;
-  min-height: clamp(56px, 2.5vw, 96px);
-  border: 2px solid var(--lidc-hairline);
-  border-radius: var(--lidc-radius);
-  background: var(--lidc-canvas);
-  color: var(--lidc-accent-gold);
-  font-size: clamp(20px, 1.25vw, 48px);
-  font-weight: 800;
-  line-height: 1.2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 0 clamp(12px, 1.2vw, 32px);
 }
 
 .lidc-board {
@@ -3238,11 +3192,6 @@ body.lidc-wizard-open {
 @media (max-width: 640px) {
   .lidc-shell {
     padding-inline: 10px;
-    gap: 12px;
-  }
-
-  .lidc-campaign-title {
-    font-size: clamp(18px, 5vw, 28px);
   }
 
   .lidc-discord-btn {

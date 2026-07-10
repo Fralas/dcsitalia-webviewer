@@ -407,7 +407,7 @@ function App() {
           <WikiPage language={appLanguage} />
         )}
         {currentView === 'lidc' && (
-          <LidcPage onNavigateHome={() => goToView('landing')} />
+          <LidcPage />
         )}
         {currentView === 'atc' && showAtc && (
           <AtcStripPage />
