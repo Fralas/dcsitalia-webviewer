@@ -1523,51 +1523,6 @@ export default function LidcPage() {
     }
   }
 
-  function renderOverviewView() {
-    const previewLogo = logoDataUrl || activeSquadron?.logoDataUrl || '';
-
-    return (
-      <div className="lidc-visual-grid">
-        <article className="lidc-visual-card">
-          <div className="lidc-eyebrow">{t('lidc.preview.eyebrow')}</div>
-          <h2>{previewIdentity.name}</h2>
-          <p>{previewIdentity.description}</p>
-          <div className="lidc-preview-meta">
-            <span>{t('lidc.info.base')}: {previewIdentity.baseLabel}</span>
-            <span>{t('lidc.template.title')}: {previewIdentity.templateName}</span>
-          </div>
-        </article>
-
-        <article className="lidc-visual-card lidc-visual-logo-card">
-          {previewLogo ? (
-            <img src={previewLogo} alt="Squadron logo" className="lidc-preview-logo" />
-          ) : (
-            <div className="lidc-preview-logo lidc-preview-logo-empty">{t('lidc.preview.logoPlaceholder')}</div>
-          )}
-        </article>
-      </div>
-    );
-  }
-
-  function renderCapsView() {
-    const capsSource = activeSquadron?.costSummary?.caps || capsByCategory;
-    const spentSource = activeSquadron?.costSummary?.spent || spentByCategory;
-
-    return (
-      <div className="lidc-visual-card">
-        <h3>{t('lidc.preview.templateCaps')}</h3>
-        <div className="lidc-visual-list">
-          {CATEGORY_META.map(({ key, labelKey }) => (
-            <div key={key} className="lidc-visual-row">
-              <span>{t(labelKey)}</span>
-              <strong>{Number(spentSource[key] || 0)} / {Number(capsSource[key] || 0)}</strong>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   function getPendingSquadronActionText() {
     if (pendingSquadronAction === 'leave') return t('lidc.center.confirmActionLeave');
     if (pendingSquadronAction === 'delete') return t('lidc.center.confirmActionDelete');
@@ -1815,7 +1770,6 @@ export default function LidcPage() {
     if (fullscreenPanelView === 'deck') {
       return (
         <div className="lidc-panel-deck-expanded-content">
-          {renderCapsView()}
           {renderAirframeTable({ interactive: true })}
         </div>
       );
@@ -1898,8 +1852,6 @@ export default function LidcPage() {
   function renderDeckVisualizationView() {
     return (
       <div className="lidc-squadron-view-stack lidc-deck-visualization">
-        {renderOverviewView()}
-        {renderCapsView()}
         {renderExpandableTablePreview({
           view: 'deck',
           title: t('lidc.views.deck'),
