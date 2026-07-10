@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  AlertTriangle,
   Coins,
   Copy,
   Check,
@@ -13,7 +12,6 @@ import {
   Helicopter,
   Home,
   Loader2,
-  LogIn,
   Plane,
   Save,
   Settings,
@@ -232,6 +230,12 @@ function formatInviteCode(code) {
   return `${normalized.slice(0, 4)}-${normalized.slice(4)}`;
 }
 
+function isAuthenticationError(error) {
+  const status = Number(error?.status);
+  const message = String(error?.message || '').toLowerCase();
+  return status === 401 || message.includes('not authenticated');
+}
+
 export default function LidcPage({ onNavigateHome }) {
   const { user } = useUser();
 
@@ -265,6 +269,7 @@ export default function LidcPage({ onNavigateHome }) {
   const [joinError, setJoinError] = useState('');
   const [joiningSquadron, setJoiningSquadron] = useState(false);
   const [inviteCodeCopied, setInviteCodeCopied] = useState(false);
+  const [inviteCodeRevealed, setInviteCodeRevealed] = useState(false);
 
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -279,7 +284,8 @@ export default function LidcPage({ onNavigateHome }) {
     hasSquadron: false,
     squadron: null,
   });
-  const [hideInSquadronNotice, setHideInSquadronNotice] = useState(false);
+  const [memberActionMenuForId, setMemberActionMenuForId] = useState('');
+  const memberActionMenuRef = useRef(null);
   const [activeSquadron, setActiveSquadron] = useState(null);
   const [listedSquadrons, setListedSquadrons] = useState([]);
   const [loadingListedSquadrons, setLoadingListedSquadrons] = useState(true);
@@ -294,8 +300,6 @@ export default function LidcPage({ onNavigateHome }) {
   const [airframeEditorSaving, setAirframeEditorSaving] = useState(false);
   const [isPilotMenuOpen, setIsPilotMenuOpen] = useState(false);
   const pilotMenuRef = useRef(null);
-  const [memberActionMenuForId, setMemberActionMenuForId] = useState('');
-  const memberActionMenuRef = useRef(null);
 
   const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false);
   const [templateEditorRaw, setTemplateEditorRaw] = useState('');
@@ -327,6 +331,13 @@ export default function LidcPage({ onNavigateHome }) {
     let mounted = true;
 
     async function loadCatalog() {
+      if (!user?.id) {
+        if (!mounted) return;
+        setCatalogError('');
+        setLoadingCatalog(false);
+        return;
+      }
+
       setLoadingCatalog(true);
       setCatalogError('');
 
@@ -348,6 +359,10 @@ export default function LidcPage({ onNavigateHome }) {
         }
       } catch (error) {
         if (!mounted) return;
+        if (isAuthenticationError(error)) {
+          setCatalogError('');
+          return;
+        }
         setCatalogError(error.message || t('lidc.errors.catalogLoadFailed'));
       } finally {
         if (mounted) setLoadingCatalog(false);
@@ -359,7 +374,7 @@ export default function LidcPage({ onNavigateHome }) {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     let mounted = true;
@@ -451,7 +466,6 @@ export default function LidcPage({ onNavigateHome }) {
           hasSquadron: false,
           squadron: null,
         });
-        setHideInSquadronNotice(false);
         setActiveSquadron(null);
         setSquadronDetailsError('');
         setAirframeUpdateError('');
@@ -475,7 +489,9 @@ export default function LidcPage({ onNavigateHome }) {
         applyUserLidcState(response);
       } catch (error) {
         if (!mounted) return;
-        setUserStateError(error.message || t('lidc.errors.userStateFailed'));
+        if (!isAuthenticationError(error)) {
+          setUserStateError(error.message || t('lidc.errors.userStateFailed'));
+        }
       } finally {
         if (mounted) setLoadingUserState(false);
       }
@@ -487,10 +503,6 @@ export default function LidcPage({ onNavigateHome }) {
       mounted = false;
     };
   }, [user]);
-
-  useEffect(() => {
-    setHideInSquadronNotice(false);
-  }, [user?.id, userLidcState?.squadron?.id]);
 
   useEffect(() => {
     setSelectedAirframeDraft(null);
@@ -533,6 +545,11 @@ export default function LidcPage({ onNavigateHome }) {
       mounted = false;
     };
   }, [user?.id, selectedListSquadronId]);
+
+  useEffect(() => {
+    setInviteCodeRevealed(false);
+    setInviteCodeCopied(false);
+  }, [activeSquadron?.id, activeSquadron?.inviteCode]);
 
   function clearSidebarTimers() {
     if (sidebarOpenTimerRef.current) {
@@ -792,7 +809,6 @@ export default function LidcPage({ onNavigateHome }) {
 
       setPanelMode('home');
       setJoinInviteCode('');
-      setHideInSquadronNotice(false);
       setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
 
       try {
@@ -826,6 +842,8 @@ export default function LidcPage({ onNavigateHome }) {
     const formatted = formatInviteCode(code);
     if (!formatted) return;
 
+    setInviteCodeRevealed(true);
+
     try {
       await navigator.clipboard.writeText(formatted);
       setInviteCodeCopied(true);
@@ -833,6 +851,10 @@ export default function LidcPage({ onNavigateHome }) {
     } catch (_) {
       // Clipboard unavailable.
     }
+  }
+
+  function toggleInviteCodeVisibility() {
+    setInviteCodeRevealed((prev) => !prev);
   }
 
   function handleLogoUpload(event) {
@@ -932,7 +954,6 @@ export default function LidcPage({ onNavigateHome }) {
           const stateResponse = await api.getLidcMe();
           const nextState = applyUserLidcState(stateResponse);
           if (nextState.hasSquadron) {
-            setHideInSquadronNotice(false);
             setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
             setPanelMode('home');
             closeWizard();
@@ -985,7 +1006,6 @@ export default function LidcPage({ onNavigateHome }) {
       setCreatedSquadron(null);
       setActiveSquadron(null);
       setSelectedListSquadronId('');
-      setHideInSquadronNotice(false);
       setPanelMode('home');
       setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
 
@@ -1026,7 +1046,6 @@ export default function LidcPage({ onNavigateHome }) {
       setCreatedSquadron(null);
       setActiveSquadron(null);
       setSelectedListSquadronId('');
-      setHideInSquadronNotice(false);
       setPanelMode('home');
       setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
 
@@ -1205,6 +1224,21 @@ export default function LidcPage({ onNavigateHome }) {
       };
     });
   }, [squadronMembers, airframeRows]);
+
+  const squadronSummaryStats = useMemo(() => {
+    const memberProfiles = Array.isArray(activeSquadron?.memberProfiles) ? activeSquadron.memberProfiles : [];
+    const totalPersonnel = memberRows.length > 0 ? memberRows.length : memberProfiles.length;
+    const totalAirframes = airframeRows.filter((row) => {
+      const category = String(row?.category || '').toLowerCase();
+      return category === 'aircrafts' || category === 'helicopters';
+    }).length;
+
+    return {
+      name: previewIdentity.name,
+      totalPersonnel,
+      totalAirframes,
+    };
+  }, [memberRows, airframeRows, activeSquadron?.memberProfiles, previewIdentity.name]);
 
   const selectedAirframeRow = useMemo(() => {
     const selectedId = String(selectedAirframeDraft?.id || '');
@@ -1649,78 +1683,6 @@ export default function LidcPage({ onNavigateHome }) {
       );
     }
 
-    if (!isLogged) {
-      return (
-        <div className="lidc-center-card">
-          <div className="lidc-center-head">
-            <h2>{t('lidc.center.loginTitle')}</h2>
-            <p>{t('lidc.center.loginHint')}</p>
-          </div>
-          <div className="lidc-auth-warning">
-            <div className="lidc-auth-warning-text">
-              <AlertTriangle size={16} />
-              <span>{t('lidc.auth.loginToCreate')}</span>
-            </div>
-            <button
-              type="button"
-              className="lidc-btn lidc-btn-primary lidc-btn-block"
-              onClick={() => { window.location.href = '/api/auth/discord'; }}
-            >
-              <LogIn size={14} />
-              {t('lidc.auth.loginButton')}
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    if (userHasSquadron) {
-      const squadronName = createdSquadron?.name || userLidcState?.squadron?.name || '-';
-      return (
-        <div className="lidc-center-card">
-          <button
-            type="button"
-            className="lidc-center-dismiss-btn"
-            onClick={() => setHideInSquadronNotice(true)}
-            aria-label={t('lidc.wizard.close')}
-            title={t('lidc.wizard.close')}
-          >
-            <X size={14} />
-          </button>
-          <div className="lidc-center-head">
-            <h2>{t('lidc.center.inSquadronTitle')}</h2>
-            <p>{t('lidc.center.inSquadronHint', { name: squadronName })}</p>
-          </div>
-          {createdSquadron && (
-            <div className="lidc-success">
-              <Check size={16} />
-              <div>
-                <div className="lidc-success-title">{t('lidc.review.created')}</div>
-                {createdSquadron.inviteCode && (
-                  <div className="lidc-success-meta">
-                    {t('lidc.inviteCode.label')}: {formatInviteCode(createdSquadron.inviteCode)}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          {userStateError && <div className="lidc-inline-error">{userStateError}</div>}
-          <div className="lidc-center-actions">
-            <button
-              type="button"
-              className="lidc-btn lidc-btn-outline"
-              onClick={() => openSquadronActionConfirm('leave')}
-              disabled={isSquadronActionBusy}
-            >
-              {leavingSquadron ? <Loader2 size={14} className="spin" /> : <X size={14} />}
-              {t('lidc.center.leaveSquadron')}
-            </button>
-            {adminEditorButton}
-          </div>
-        </div>
-      );
-    }
-
     if (panelMode === 'join') {
       return (
         <div className="lidc-center-card">
@@ -1781,12 +1743,6 @@ export default function LidcPage({ onNavigateHome }) {
       <section className="lidc-panel lidc-panel-list">
         <h2 className="lidc-panel-title">{t('lidc.sidebar.squadronList')}</h2>
         <div className="lidc-panel-rows">
-          {!isLogged && (
-            <div className="lidc-panel-row lidc-panel-row--static">
-              <span>{t('lidc.center.loginTitle')}</span>
-            </div>
-          )}
-
           {isLogged && loadingListedSquadrons && (
             <div className="lidc-panel-row lidc-panel-row--static">
               <Loader2 size={18} className="spin" />
@@ -1840,44 +1796,20 @@ export default function LidcPage({ onNavigateHome }) {
     }
 
     if (!isLogged) {
-      return (
-        <div className="lidc-panel-row lidc-panel-row--static">
-          <LogIn size={18} />
-          <span>{t('lidc.center.loginTitle')}</span>
-        </div>
-      );
+      return null;
     }
 
-    if (activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS) {
-      return memberRows.slice(0, 6).map((member) => (
-        <div key={member.memberId} className="lidc-panel-row lidc-panel-row--static">
-          <strong>{member.displayName}</strong>
-          <span>{member.roleLabel}</span>
-        </div>
-      ));
-    }
-
-    if (activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS) {
-      return airframeRows.slice(0, 6).map((airframe) => (
-        <div key={airframe.id} className="lidc-panel-row lidc-panel-row--static">
-          <strong>{airframe.model}</strong>
-          <span>{airframe.boardNumber}</span>
-        </div>
-      ));
+    if (!userHasSquadron) {
+      return null;
     }
 
     const rows = [
-      { label: t('lidc.info.name'), value: previewIdentity.name },
-      { label: t('lidc.info.base'), value: previewIdentity.baseLabel },
-      { label: t('lidc.template.title'), value: previewIdentity.templateName },
-      { label: t('lidc.deck.totalUnits'), value: String(effectiveTotalDeckUnits) },
+      { label: t('lidc.info.name'), value: squadronSummaryStats.name },
+      { label: t('lidc.squadrons.totalPersonnel'), value: String(squadronSummaryStats.totalPersonnel) },
+      { label: t('lidc.squadrons.totalAirframes'), value: String(squadronSummaryStats.totalAirframes) },
     ];
 
-    if (previewIdentity.description) {
-      rows.push({ label: t('lidc.info.description'), value: previewIdentity.description });
-    }
-
-    return rows.slice(0, 6).map((row) => (
+    return rows.map((row) => (
       <div key={row.label} className="lidc-panel-row lidc-panel-row--static">
         <span>{row.label}</span>
         <strong>{row.value}</strong>
@@ -1896,13 +1828,13 @@ export default function LidcPage({ onNavigateHome }) {
       <section className="lidc-panel lidc-panel-squadron">
         <h2 className="lidc-panel-title">{squadronTitle}</h2>
 
-        {!showNoSquadronActions && (
-          <div className={`lidc-panel-rows ${activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_LIST ? '' : 'lidc-panel-rows--compact'}`}>
+        {isLogged && !showNoSquadronActions && (
+          <div className="lidc-panel-rows">
             {renderMySquadronRows()}
           </div>
         )}
 
-        {catalogError && <div className="lidc-inline-error lidc-panel-inline-error">{catalogError}</div>}
+        {isLogged && catalogError && <div className="lidc-inline-error lidc-panel-inline-error">{catalogError}</div>}
 
         {showNoSquadronActions && (
           <div className="lidc-panel-squadron-actions">
@@ -1930,7 +1862,14 @@ export default function LidcPage({ onNavigateHome }) {
           <div className="lidc-invite-code-box">
             <span className="lidc-invite-code-label">{t('lidc.inviteCode.shareLabel')}</span>
             <div className="lidc-invite-code-row">
-              <code className="lidc-invite-code-value">{formatInviteCode(activeSquadron.inviteCode)}</code>
+              <button
+                type="button"
+                className={`lidc-invite-code-value ${inviteCodeRevealed ? 'is-revealed' : 'is-blurred'}`}
+                onClick={toggleInviteCodeVisibility}
+                title={inviteCodeRevealed ? t('lidc.inviteCode.hide') : t('lidc.inviteCode.reveal')}
+              >
+                {formatInviteCode(activeSquadron.inviteCode)}
+              </button>
               <button
                 type="button"
                 className="lidc-invite-code-copy"
@@ -2038,7 +1977,8 @@ export default function LidcPage({ onNavigateHome }) {
   const showInlineCenterStage = !isWizardOpen
     && !isEntryWizardVisible
     && !showNotInSquadronHomePopup
-    && !(userHasSquadron && hideInSquadronNotice);
+    && !userHasSquadron
+    && isLogged;
 
   return (
     <div className="lidc-page">
