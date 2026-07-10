@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Activity, AlertCircle, BookOpen, CalendarSync, ChevronDown, TowerControl, Users } from 'lucide-react';
+import { Activity, AlertCircle, BookOpen, CalendarSync, ChevronDown, TowerControl } from 'lucide-react';
 import FrontlineMap from './components/FrontlineMap';
 import LandingPage from './components/landing/LandingPage';
 import UserMenu from './components/UserMenu';
@@ -25,7 +25,7 @@ import {
   getTacticalMapByCampaignId,
   resolveTacticalMapFromPath,
 } from './config/tacticalMaps';
-import { canAccessAtc, canAccessLidc } from './config/featureAccess';
+import { canAccessAtc } from './config/featureAccess';
 import './AppHeader.css';
 
 const VIEW_TO_PATH = Object.freeze({
@@ -139,7 +139,6 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { user } = useUser();
-  const showLidc = canAccessLidc(user?.id);
   const showAtc = canAccessAtc(user?.id);
 
   const goToView = (view, options = {}) => {
@@ -159,9 +158,6 @@ function App() {
   };
 
   const handleSelectCampaign = (campaign) => {
-    if (campaign?.id === 'lidc-afghanistan') {
-      return;
-    }
     const target = getCampaignNavTarget(campaign);
     if (target.type === 'hidc' || target.type === 'lidc') {
       openCampaignTarget(target);
@@ -208,11 +204,11 @@ function App() {
   }, [currentView, activeTacticalMapId]);
 
   useEffect(() => {
-    if ((currentView === 'lidc' && !showLidc) || (currentView === 'atc' && !showAtc)) {
+    if (currentView === 'atc' && !showAtc) {
       setCurrentView('frontline');
       syncUrlWithView('frontline', { replace: true });
     }
-  }, [currentView, showLidc, showAtc]);
+  }, [currentView, showAtc]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -366,18 +362,6 @@ function App() {
               <BookOpen className="w-4 h-4" />
             </button>
 
-            {showLidc && (
-              <button
-                type="button"
-                onClick={() => goToView('lidc')}
-                className={`app-header__nav-btn${currentView === 'lidc' ? ' is-active' : ''}`}
-                title="Apri LIDC"
-                aria-label="Apri LIDC"
-              >
-                <Users className="w-4 h-4" />
-              </button>
-            )}
-
             {showAtc && (
               <button
                 type="button"
@@ -422,7 +406,7 @@ function App() {
         {currentView === 'wiki' && (
           <WikiPage language={appLanguage} />
         )}
-        {currentView === 'lidc' && showLidc && (
+        {currentView === 'lidc' && (
           <LidcPage onNavigateHome={() => goToView('landing')} />
         )}
         {currentView === 'atc' && showAtc && (
