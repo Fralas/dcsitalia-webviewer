@@ -233,6 +233,45 @@
   padding-top: 0;
 }
 
+.lidc-panel-deck-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: clamp(10px, 0.78vw, 20px);
+  flex-shrink: 0;
+  margin-bottom: clamp(12px, 0.91vw, 35px);
+}
+
+.lidc-panel-deck-head .lidc-panel-title {
+  margin: 0;
+}
+
+.lidc-deck-view-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+}
+
+.lidc-deck-view-nav-btn {
+  border: 1px solid var(--lidc-hairline);
+  border-radius: 999px;
+  background: #121212;
+  color: var(--lidc-body);
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.lidc-deck-view-nav-btn.is-active {
+  color: var(--lidc-ink);
+  border-color: rgba(255, 187, 0, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(255, 187, 0, 0.25);
+}
+
 .lidc-panel-title {
   margin: 0 0 clamp(12px, 0.91vw, 35px);
   font-size: clamp(16px, 0.83vw, 32px);
@@ -311,9 +350,21 @@
 }
 
 .lidc-panel-deck-body > .lidc-squadron-view-stack,
-.lidc-panel-deck-body > .lidc-visual-card-members {
+.lidc-panel-deck-body > .lidc-visual-card-members,
+.lidc-panel-deck-body > .lidc-panel-table-preview.is-flush,
+.lidc-panel-deck-body > .lidc-panel-table-preview-static.is-flush {
   flex: 1;
   min-height: 0;
+}
+
+.lidc-panel-deck.is-management-focus .lidc-panel-deck-body {
+  margin-inline: calc(-1 * clamp(14px, 1.07vw, 41px));
+  margin-bottom: calc(-1 * clamp(16px, 1.35vw, 52px));
+}
+
+.lidc-panel-deck.is-management-focus.is-expanded .lidc-panel-deck-body {
+  margin-inline: calc(-1 * clamp(14px, 1.07vw, 41px));
+  margin-bottom: calc(-1 * clamp(16px, 1.35vw, 52px));
 }
 
 .lidc-panel-overlay {
@@ -557,32 +608,6 @@ body.lidc-wizard-open {
   text-overflow: ellipsis;
 }
 
-.lidc-deck-view-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: -8px 0 clamp(10px, 0.65vw, 18px);
-}
-
-.lidc-deck-view-nav-btn {
-  border: 1px solid var(--lidc-hairline);
-  border-radius: 999px;
-  background: #121212;
-  color: var(--lidc-body);
-  padding: 6px 12px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
-.lidc-deck-view-nav-btn.is-active {
-  color: var(--lidc-ink);
-  border-color: rgba(255, 187, 0, 0.45);
-  box-shadow: inset 0 0 0 1px rgba(255, 187, 0, 0.25);
-}
-
 .lidc-deck-visualization {
   min-height: 0;
   height: auto;
@@ -635,6 +660,35 @@ body.lidc-wizard-open {
   outline: none;
 }
 
+.lidc-panel-table-preview.is-flush,
+.lidc-panel-table-preview-static.is-flush {
+  position: relative;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.lidc-panel-table-preview.is-flush:hover,
+.lidc-panel-table-preview.is-flush:focus-visible {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.lidc-panel-table-preview-hint--floating {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 2;
+  pointer-events: none;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(10, 10, 10, 0.72);
+}
+
 .lidc-panel-table-preview-head {
   display: flex;
   align-items: center;
@@ -660,7 +714,9 @@ body.lidc-wizard-open {
 
 .lidc-panel-table-preview .lidc-airframe-table-wrap.is-readonly,
 .lidc-panel-table-preview-static .lidc-airframe-table-wrap.is-readonly,
-.lidc-panel-deck .lidc-visual-card-members .lidc-airframe-table-wrap.is-readonly {
+.lidc-panel-deck .lidc-visual-card-members .lidc-airframe-table-wrap.is-readonly,
+.lidc-panel-table-preview.is-flush .lidc-member-table-wrap.is-readonly,
+.lidc-panel-table-preview-static.is-flush .lidc-member-table-wrap.is-readonly {
   height: auto;
   min-height: 120px;
   max-height: min(220px, 34vh);
@@ -672,6 +728,11 @@ body.lidc-wizard-open {
   background: var(--lidc-canvas);
   border-bottom-color: var(--lidc-hairline);
   color: var(--lidc-body);
+}
+
+.lidc-panel-table-preview.is-flush .lidc-member-table-wrap.is-readonly .lidc-member-table tbody td,
+.lidc-panel-table-preview-static.is-flush .lidc-member-table-wrap.is-readonly .lidc-member-table tbody td {
+  background: transparent;
 }
 
 .lidc-airframe-table-wrap.is-readonly tbody tr {
@@ -808,6 +869,15 @@ body.lidc-deck-expanded-open {
 .lidc-panel-deck .lidc-squadron-management-actions {
   position: sticky;
   top: 0;
+  padding-inline: clamp(14px, 1.07vw, 41px);
+}
+
+.lidc-panel-deck-expanded-content.is-members-expanded {
+  gap: 0;
+}
+
+.lidc-panel-deck-expanded-content.is-members-expanded .lidc-squadron-management-actions {
+  margin-bottom: 12px;
 }
 
 .lidc-sidebar.is-collapsed {
@@ -1312,6 +1382,21 @@ body.lidc-deck-expanded-open {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     0 18px 34px rgba(0, 0, 0, 0.28);
+}
+
+.lidc-member-table-wrap.is-flush,
+.lidc-panel-deck.is-management-focus .lidc-member-table-wrap,
+.lidc-panel-deck-expanded-content.is-members-expanded .lidc-member-table-wrap.is-interactive {
+  width: 100%;
+  margin-inline: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  min-height: 0;
+  flex: 1;
 }
 
 .lidc-visual-card-members .lidc-member-cards {

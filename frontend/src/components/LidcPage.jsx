@@ -1680,7 +1680,7 @@ export default function LidcPage() {
     );
   }
 
-  function renderMembersTable({ interactive = false } = {}) {
+  function renderMembersTable({ interactive = false, flush = false } = {}) {
     if (loadingSquadronDetails) {
       return (
         <div className="lidc-loading">
@@ -1699,7 +1699,7 @@ export default function LidcPage() {
     }
 
     return (
-      <div className={`lidc-airframe-table-wrap lidc-member-table-wrap ${interactive ? 'is-interactive' : 'is-readonly'}`}>
+      <div className={`lidc-airframe-table-wrap lidc-member-table-wrap ${interactive ? 'is-interactive' : 'is-readonly'} ${flush ? 'is-flush' : ''}`}>
         <table className="lidc-airframe-table lidc-member-table">
           <thead>
             <tr>
@@ -1821,9 +1821,9 @@ export default function LidcPage() {
 
     if (fullscreenPanelView === 'members') {
       return (
-        <div className="lidc-panel-deck-expanded-content">
+        <div className="lidc-panel-deck-expanded-content is-members-expanded">
           {renderSquadronManagementActions()}
-          {renderMembersTable({ interactive: true })}
+          {renderMembersTable({ interactive: true, flush: true })}
         </div>
       );
     }
@@ -1831,11 +1831,34 @@ export default function LidcPage() {
     return null;
   }
 
-  function renderExpandableTablePreview({ view, title, hint, children }) {
+  function renderExpandableTablePreview({ view, title, hint, children, flush = false }) {
     const canExpand = !loadingSquadronDetails && !squadronDetailsError;
 
     if (!canExpand) {
-      return <div className="lidc-panel-table-preview-static">{children}</div>;
+      return (
+        <div className={['lidc-panel-table-preview-static', flush && 'is-flush'].filter(Boolean).join(' ')}>
+          {children}
+        </div>
+      );
+    }
+
+    if (flush) {
+      return (
+        <div
+          className="lidc-panel-table-preview is-flush"
+          role="button"
+          tabIndex={0}
+          onClick={() => openFullscreenPanel(view)}
+          onKeyDown={(event) => handlePreviewExpandKeyDown(event, view)}
+          aria-label={hint}
+        >
+          <span className="lidc-panel-table-preview-hint lidc-panel-table-preview-hint--floating">
+            <Maximize2 size={13} />
+            {hint}
+          </span>
+          {children}
+        </div>
+      );
     }
 
     return (
@@ -1875,16 +1898,13 @@ export default function LidcPage() {
   }
 
   function renderMemberManagementView() {
-    return (
-      <div className="lidc-visual-card lidc-visual-card-members">
-        {renderExpandableTablePreview({
-          view: 'members',
-          title: t('lidc.sidebar.memberManagement'),
-          hint: t('lidc.members.expandHint'),
-          children: renderMembersTable({ interactive: false }),
-        })}
-      </div>
-    );
+    return renderExpandableTablePreview({
+      view: 'members',
+      title: t('lidc.sidebar.memberManagement'),
+      hint: t('lidc.members.expandHint'),
+      flush: true,
+      children: renderMembersTable({ interactive: false, flush: true }),
+    });
   }
 
   function renderCenterStage() {
@@ -2175,10 +2195,10 @@ export default function LidcPage() {
             </button>
           </header>
         ) : (
-          <>
+          <header className="lidc-panel-deck-head">
             <h2 className="lidc-panel-title">SQUADRON DECK</h2>
             {renderDeckViewNav()}
-          </>
+          </header>
         )}
 
         <div className="lidc-panel-deck-body">
