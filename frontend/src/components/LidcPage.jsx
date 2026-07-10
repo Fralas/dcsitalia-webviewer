@@ -2388,30 +2388,30 @@ export default function LidcPage() {
         aria-label={t('lidc.map.title')}
         aria-expanded={mapBoardExpanded}
       >
-        <header className={`lidc-panel-map-head ${isMapPanelFullscreen ? 'is-fullscreen' : ''}`}>
-          <h2 className="lidc-panel-title">{t('lidc.map.title')}</h2>
-          {isMapPanelFullscreen ? (
-            <button
-              type="button"
-              className="lidc-panel-deck-expanded-close"
-              onClick={closeMapFullscreen}
-              aria-label={t('lidc.wizard.close')}
-            >
-              <X size={18} />
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="lidc-panel-deck-expand-hint"
-              onClick={openMapFullscreen}
-            >
-              <Maximize2 size={13} />
-              {t('lidc.map.expandHint')}
-            </button>
-          )}
-        </header>
         <div className="lidc-map-frame">
-          <LidcTheaterMap />
+          <LidcTheaterMap layoutKey={Number(mapBoardExpanded) + Number(isMapPanelFullscreen)} />
+          <header className={`lidc-panel-map-overlay ${isMapPanelFullscreen ? 'is-fullscreen' : ''}`}>
+            <h2 className="lidc-panel-title">{t('lidc.map.title')}</h2>
+            {isMapPanelFullscreen ? (
+              <button
+                type="button"
+                className="lidc-panel-deck-expanded-close"
+                onClick={closeMapFullscreen}
+                aria-label={t('lidc.wizard.close')}
+              >
+                <X size={18} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="lidc-panel-map-expand-hint"
+                onClick={openMapFullscreen}
+              >
+                <Maximize2 size={13} />
+                {t('lidc.map.expandHint')}
+              </button>
+            )}
+          </header>
         </div>
       </aside>
     );

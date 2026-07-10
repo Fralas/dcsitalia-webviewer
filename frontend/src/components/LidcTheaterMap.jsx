@@ -25,7 +25,7 @@ const MAP_STYLE = {
       id: 'background',
       type: 'background',
       paint: {
-        'background-color': '#0b1220',
+        'background-color': '#0a0a0a',
       },
     },
     {
@@ -44,7 +44,7 @@ function fitTheaterBounds(map) {
   });
 }
 
-export default function LidcTheaterMap() {
+export default function LidcTheaterMap({ layoutKey = 0 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
 
@@ -82,6 +82,22 @@ export default function LidcTheaterMap() {
       mapRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return undefined;
+
+    const resizeMap = () => {
+      map.resize();
+    };
+
+    resizeMap();
+    const afterTransition = window.setTimeout(resizeMap, 720);
+
+    return () => {
+      window.clearTimeout(afterTransition);
+    };
+  }, [layoutKey]);
 
   return (
     <div
