@@ -18,6 +18,7 @@ import {
   Upload,
   Users,
   UserPlus,
+  Maximize2,
   X,
 } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
@@ -36,9 +37,8 @@ const CATEGORY_META = [
 ];
 
 const LIDC_SIDEBAR_VIEWS = Object.freeze({
-  SQUADRON_LIST: 'squadronList',
+  SQUADRON_DECK: 'squadronDeck',
   SQUADRON_MEMBERS: 'squadronMembers',
-  SQUADRON_AIRCRAFTS: 'squadronAircrafts',
 });
 
 const AIRFRAME_STATUSES = Object.freeze({
@@ -240,7 +240,7 @@ export default function LidcPage() {
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [catalogError, setCatalogError] = useState('');
 
-  const [activeView, setActiveView] = useState(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
+  const [activeView, setActiveView] = useState(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK);
   const [isSquadronManagementOpen, setIsSquadronManagementOpen] = useState(true);
   const [isSidebarPinned, setIsSidebarPinned] = useState(false);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
@@ -266,6 +266,7 @@ export default function LidcPage() {
   const [joiningSquadron, setJoiningSquadron] = useState(false);
   const [inviteCodeCopied, setInviteCodeCopied] = useState(false);
   const [inviteCodeRevealed, setInviteCodeRevealed] = useState(false);
+  const [fullscreenPanelView, setFullscreenPanelView] = useState('');
 
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -449,6 +450,24 @@ export default function LidcPage() {
       body.classList.remove('lidc-wizard-open');
     };
   }, [shouldBlurBehindOverlay]);
+
+  useEffect(() => {
+    if (!fullscreenPanelView || typeof document === 'undefined') return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key !== 'Escape' || selectedAirframeDraft) return;
+      setFullscreenPanelView('');
+      setMemberActionMenuForId('');
+    };
+
+    document.body.classList.add('lidc-fullscreen-panel-open');
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.classList.remove('lidc-fullscreen-panel-open');
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [fullscreenPanelView, selectedAirframeDraft]);
 
   useEffect(() => {
     let mounted = true;
@@ -707,10 +726,8 @@ export default function LidcPage() {
   const isViewingOwnSquadron = userHasSquadron
     && Boolean(selectedListSquadronId)
     && selectedListSquadronId === String(userLidcState?.squadron?.id || '');
-  const isManagementFocusView = isViewingOwnSquadron && (
-    activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS
-    || activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS
-  );
+  const isManagementFocusView = isViewingOwnSquadron
+    && activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS;
   const effectivePreviewBaseId = baseId
     || activeSquadron?.baseId
     || createdSquadron?.baseId
@@ -805,7 +822,7 @@ export default function LidcPage() {
 
       setPanelMode('home');
       setJoinInviteCode('');
-      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
+      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK);
 
       try {
         const listResponse = await api.getLidcSquadrons();
@@ -851,6 +868,24 @@ export default function LidcPage() {
 
   function toggleInviteCodeVisibility() {
     setInviteCodeRevealed((prev) => !prev);
+  }
+
+  function openFullscreenPanel(view) {
+    if (view !== 'deck' && view !== 'members') return;
+    setFullscreenPanelView(view);
+    setMemberActionMenuForId('');
+    setIsPilotMenuOpen(false);
+  }
+
+  function closeFullscreenPanel() {
+    setFullscreenPanelView('');
+    setMemberActionMenuForId('');
+  }
+
+  function handlePreviewExpandKeyDown(event, view) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    openFullscreenPanel(view);
   }
 
   function handleLogoUpload(event) {
@@ -943,14 +978,14 @@ export default function LidcPage() {
       }
 
       closeWizard();
-      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
+      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK);
     } catch (error) {
       if (Number(error?.status) === 409) {
         try {
           const stateResponse = await api.getLidcMe();
           const nextState = applyUserLidcState(stateResponse);
           if (nextState.hasSquadron) {
-            setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
+            setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK);
             setPanelMode('home');
             closeWizard();
             return;
@@ -1003,7 +1038,7 @@ export default function LidcPage() {
       setActiveSquadron(null);
       setSelectedListSquadronId('');
       setPanelMode('home');
-      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
+      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK);
 
       try {
         const listResponse = await api.getLidcSquadrons();
@@ -1043,7 +1078,7 @@ export default function LidcPage() {
       setActiveSquadron(null);
       setSelectedListSquadronId('');
       setPanelMode('home');
-      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
+      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK);
 
       try {
         const listResponse = await api.getLidcSquadrons();
@@ -1230,11 +1265,10 @@ export default function LidcPage() {
     }).length;
 
     return {
-      name: previewIdentity.name,
       totalPersonnel,
       totalAirframes,
     };
-  }, [memberRows, airframeRows, activeSquadron?.memberProfiles, previewIdentity.name]);
+  }, [memberRows, airframeRows, activeSquadron?.memberProfiles]);
 
   const selectedAirframeRow = useMemo(() => {
     const selectedId = String(selectedAirframeDraft?.id || '');
@@ -1467,196 +1501,301 @@ export default function LidcPage() {
     );
   }
 
-  function renderMemberManagementView() {
+  function renderAirframeTable({ interactive = false } = {}) {
+    if (loadingSquadronDetails) {
+      return (
+        <div className="lidc-loading">
+          <Loader2 size={14} className="spin" />
+          <span>{t('lidc.general.loading')}</span>
+        </div>
+      );
+    }
+
+    if (squadronDetailsError) {
+      return <div className="lidc-inline-error">{squadronDetailsError}</div>;
+    }
+
+    if (airframeRows.length === 0) {
+      return <div className="lidc-muted-box">{t('lidc.airframes.empty')}</div>;
+    }
+
     return (
-      <div className="lidc-visual-card lidc-visual-card-members">
-        {renderSquadronManagementActions()}
-
-        {loadingSquadronDetails && (
-          <div className="lidc-loading">
-            <Loader2 size={14} className="spin" />
-            <span>{t('lidc.general.loading')}</span>
-          </div>
+      <>
+        {interactive && airframeUpdateError && (
+          <div className="lidc-inline-error">{airframeUpdateError}</div>
         )}
+        <div className={`lidc-airframe-table-wrap ${interactive ? 'is-interactive' : 'is-readonly'}`}>
+        <table className="lidc-airframe-table">
+          <thead>
+            <tr>
+              <th>{t('lidc.airframes.columns.model')}</th>
+              <th>{t('lidc.airframes.columns.pilot')}</th>
+              <th>{t('lidc.airframes.columns.base')}</th>
+              <th>{t('lidc.airframes.columns.boardNumber')}</th>
+              <th>{t('lidc.airframes.columns.status')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {airframeRows.map((airframe) => {
+              const statusClassName = `lidc-status-pill is-${airframe.status}`;
+              const isUpdating = updatingAirframeId === airframe.id;
 
-        {squadronDetailsError && <div className="lidc-inline-error">{squadronDetailsError}</div>}
-
-        {!loadingSquadronDetails && !squadronDetailsError && squadronMembers.length === 0 && (
-          <div className="lidc-muted-box">{t('lidc.members.empty')}</div>
-        )}
-
-        {!loadingSquadronDetails && !squadronDetailsError && memberRows.length > 0 && (
-          <div className="lidc-airframe-table-wrap">
-            <table className="lidc-airframe-table lidc-member-table">
-              <thead>
-                <tr>
-                  <th>Utente</th>
-                  <th title="Aircrafts assegnati">
-                    <span className="lidc-member-count-head">
-                      <Plane size={14} />
+              return (
+                <tr
+                  key={airframe.id}
+                  className={[
+                    isUpdating ? 'is-updating' : '',
+                    interactive ? 'is-clickable' : '',
+                  ].filter(Boolean).join(' ')}
+                  onClick={interactive ? () => openAirframeEditor(airframe) : undefined}
+                >
+                  <td>
+                    <div className="lidc-airframe-cell-main">
+                      <strong>{airframe.model}</strong>
+                      <span>{airframe.unitLabel || airframe.unitId}</span>
+                    </div>
+                  </td>
+                  <td>{airframe.pilotLabel}</td>
+                  <td>{airframe.baseLabel}</td>
+                  <td><code>{airframe.boardNumber}</code></td>
+                  <td>
+                    <span className={statusClassName}>
+                      {getAirframeStatusLabel(airframe.status)}
                     </span>
-                  </th>
-                  <th title="Helicopters assegnati">
-                    <span className="lidc-member-count-head">
-                      <Helicopter size={14} />
-                    </span>
-                  </th>
-                  <th title="Logistics assegnati">
-                    <span className="lidc-member-count-head">
-                      <Forklift size={14} />
-                    </span>
-                  </th>
-                  <th>Ruolo</th>
-                  <th>Azioni</th>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {memberRows.map((member) => (
-                  <tr key={member.memberId}>
-                    <td>
-                      <div className="lidc-member-user-cell">
-                        {member.avatarUrl ? (
-                          <img src={member.avatarUrl} alt={member.displayName} className="lidc-member-table-avatar" />
-                        ) : (
-                          <span className="lidc-member-table-avatar lidc-member-table-avatar-fallback">{member.avatarFallback}</span>
-                        )}
-                        <div className="lidc-airframe-cell-main">
-                          <strong>{member.displayName}</strong>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="lidc-member-count-cell">
-                      <span className="lidc-member-assigned-count">
-                        <strong>{member.assignedAircraftCountA}</strong>
-                      </span>
-                    </td>
-                    <td className="lidc-member-count-cell">
-                      <span className="lidc-member-assigned-count">
-                        <strong>{member.assignedAircraftCountH}</strong>
-                      </span>
-                    </td>
-                    <td className="lidc-member-count-cell">
-                      <span className="lidc-member-assigned-count">
-                        <strong>{member.assignedAircraftCountL}</strong>
-                      </span>
-                    </td>
-                    <td>
-                      <span className="lidc-member-role-text">
-                        {member.roleLabel}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="lidc-member-actions" ref={memberActionMenuForId === member.memberId ? memberActionMenuRef : null}>
-                        <button
-                          type="button"
-                          className={`lidc-member-action-trigger ${memberActionMenuForId === member.memberId ? 'is-open' : ''}`}
-                          onClick={() => setMemberActionMenuForId((prev) => (prev === member.memberId ? '' : member.memberId))}
-                        >
-                          Azioni
-                          <ChevronDown size={12} />
-                        </button>
-
-                        {memberActionMenuForId === member.memberId && (
-                          <div className="lidc-member-action-menu" role="menu">
-                            <button
-                              type="button"
-                              className="lidc-member-action-menu-item"
-                              disabled={member.role === 'owner' || member.role === 'admin'}
-                            >
-                              Promuovi
-                            </button>
-                            <button
-                              type="button"
-                              className="lidc-member-action-menu-item"
-                              disabled={member.role === 'owner' || member.role !== 'admin'}
-                            >
-                              Degrada
-                            </button>
-                            <button
-                              type="button"
-                              className="lidc-member-action-menu-item is-danger"
-                              disabled={member.role === 'owner'}
-                            >
-                              Rimuovi
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              );
+            })}
+          </tbody>
+        </table>
+        {interactive && (
+          <div className="lidc-airframe-table-hint">{t('lidc.airframes.rowHint')}</div>
         )}
+        </div>
+      </>
+    );
+  }
+
+  function renderMembersTable({ interactive = false } = {}) {
+    if (loadingSquadronDetails) {
+      return (
+        <div className="lidc-loading">
+          <Loader2 size={14} className="spin" />
+          <span>{t('lidc.general.loading')}</span>
+        </div>
+      );
+    }
+
+    if (squadronDetailsError) {
+      return <div className="lidc-inline-error">{squadronDetailsError}</div>;
+    }
+
+    if (memberRows.length === 0) {
+      return <div className="lidc-muted-box">{t('lidc.members.empty')}</div>;
+    }
+
+    return (
+      <div className={`lidc-airframe-table-wrap ${interactive ? 'is-interactive' : 'is-readonly'}`}>
+        <table className="lidc-airframe-table lidc-member-table">
+          <thead>
+            <tr>
+              <th>Utente</th>
+              <th title="Aircrafts assegnati">
+                <span className="lidc-member-count-head">
+                  <Plane size={14} />
+                </span>
+              </th>
+              <th title="Helicopters assegnati">
+                <span className="lidc-member-count-head">
+                  <Helicopter size={14} />
+                </span>
+              </th>
+              <th title="Logistics assegnati">
+                <span className="lidc-member-count-head">
+                  <Forklift size={14} />
+                </span>
+              </th>
+              <th>Ruolo</th>
+              {interactive && <th>Azioni</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {memberRows.map((member) => (
+              <tr key={member.memberId}>
+                <td>
+                  <div className="lidc-member-user-cell">
+                    {member.avatarUrl ? (
+                      <img src={member.avatarUrl} alt={member.displayName} className="lidc-member-table-avatar" />
+                    ) : (
+                      <span className="lidc-member-table-avatar lidc-member-table-avatar-fallback">{member.avatarFallback}</span>
+                    )}
+                    <div className="lidc-airframe-cell-main">
+                      <strong>{member.displayName}</strong>
+                    </div>
+                  </div>
+                </td>
+                <td className="lidc-member-count-cell">
+                  <span className="lidc-member-assigned-count">
+                    <strong>{member.assignedAircraftCountA}</strong>
+                  </span>
+                </td>
+                <td className="lidc-member-count-cell">
+                  <span className="lidc-member-assigned-count">
+                    <strong>{member.assignedAircraftCountH}</strong>
+                  </span>
+                </td>
+                <td className="lidc-member-count-cell">
+                  <span className="lidc-member-assigned-count">
+                    <strong>{member.assignedAircraftCountL}</strong>
+                  </span>
+                </td>
+                <td>
+                  <span className="lidc-member-role-text">
+                    {member.roleLabel}
+                  </span>
+                </td>
+                {interactive && (
+                  <td>
+                    <div className="lidc-member-actions" ref={memberActionMenuForId === member.memberId ? memberActionMenuRef : null}>
+                      <button
+                        type="button"
+                        className={`lidc-member-action-trigger ${memberActionMenuForId === member.memberId ? 'is-open' : ''}`}
+                        onClick={() => setMemberActionMenuForId((prev) => (prev === member.memberId ? '' : member.memberId))}
+                      >
+                        Azioni
+                        <ChevronDown size={12} />
+                      </button>
+
+                      {memberActionMenuForId === member.memberId && (
+                        <div className="lidc-member-action-menu" role="menu">
+                          <button
+                            type="button"
+                            className="lidc-member-action-menu-item"
+                            disabled={member.role === 'owner' || member.role === 'admin'}
+                          >
+                            Promuovi
+                          </button>
+                          <button
+                            type="button"
+                            className="lidc-member-action-menu-item"
+                            disabled={member.role === 'owner' || member.role !== 'admin'}
+                          >
+                            Degrada
+                          </button>
+                          <button
+                            type="button"
+                            className="lidc-member-action-menu-item is-danger"
+                            disabled={member.role === 'owner'}
+                          >
+                            Rimuovi
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     );
   }
 
-  function renderAircraftManagementView() {
+  function renderExpandableTablePreview({ view, title, hint, children }) {
+    const canExpand = !loadingSquadronDetails && !squadronDetailsError;
+
+    if (!canExpand) {
+      return <div className="lidc-panel-table-preview-static">{children}</div>;
+    }
+
     return (
-      <div className="lidc-visual-card lidc-visual-card-aircrafts">
-        {renderSquadronManagementActions()}
-
-        {loadingSquadronDetails && (
-          <div className="lidc-loading">
-            <Loader2 size={14} className="spin" />
-            <span>{t('lidc.general.loading')}</span>
-          </div>
-        )}
-
-        {squadronDetailsError && <div className="lidc-inline-error">{squadronDetailsError}</div>}
-        {airframeUpdateError && <div className="lidc-inline-error">{airframeUpdateError}</div>}
-
-        {!loadingSquadronDetails && !squadronDetailsError && airframeRows.length === 0 && (
-          <div className="lidc-muted-box">{t('lidc.airframes.empty')}</div>
-        )}
-
-        {!loadingSquadronDetails && !squadronDetailsError && airframeRows.length > 0 && (
-          <div className="lidc-airframe-table-wrap">
-            <table className="lidc-airframe-table">
-              <thead>
-                <tr>
-                  <th>{t('lidc.airframes.columns.model')}</th>
-                  <th>{t('lidc.airframes.columns.pilot')}</th>
-                  <th>{t('lidc.airframes.columns.base')}</th>
-                  <th>{t('lidc.airframes.columns.boardNumber')}</th>
-                  <th>{t('lidc.airframes.columns.status')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {airframeRows.map((airframe) => {
-                  const statusClassName = `lidc-status-pill is-${airframe.status}`;
-                  const isUpdating = updatingAirframeId === airframe.id;
-
-                  return (
-                    <tr
-                      key={airframe.id}
-                      className={isUpdating ? 'is-updating' : ''}
-                      onClick={() => openAirframeEditor(airframe)}
-                    >
-                      <td>
-                        <div className="lidc-airframe-cell-main">
-                          <strong>{airframe.model}</strong>
-                          <span>{airframe.unitLabel || airframe.unitId}</span>
-                        </div>
-                      </td>
-                      <td>{airframe.pilotLabel}</td>
-                      <td>{airframe.baseLabel}</td>
-                      <td><code>{airframe.boardNumber}</code></td>
-                      <td>
-                        <span className={statusClassName}>
-                          {getAirframeStatusLabel(airframe.status)}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div
+        className="lidc-panel-table-preview"
+        role="button"
+        tabIndex={0}
+        onClick={() => openFullscreenPanel(view)}
+        onKeyDown={(event) => handlePreviewExpandKeyDown(event, view)}
+        aria-label={hint}
+      >
+        <div className="lidc-panel-table-preview-head">
+          <span>{title}</span>
+          <span className="lidc-panel-table-preview-hint">
+            <Maximize2 size={13} />
+            {hint}
+          </span>
+        </div>
+        {children}
       </div>
+    );
+  }
+
+  function renderDeckVisualizationView() {
+    return (
+      <div className="lidc-squadron-view-stack lidc-deck-visualization">
+        {renderOverviewView()}
+        {renderCapsView()}
+        {renderExpandableTablePreview({
+          view: 'deck',
+          title: t('lidc.views.deck'),
+          hint: t('lidc.deck.expandHint'),
+          children: renderAirframeTable({ interactive: false }),
+        })}
+      </div>
+    );
+  }
+
+  function renderMemberManagementView() {
+    return (
+      <div className="lidc-visual-card lidc-visual-card-members">
+        {renderExpandableTablePreview({
+          view: 'members',
+          title: t('lidc.sidebar.memberManagement'),
+          hint: t('lidc.members.expandHint'),
+          children: renderMembersTable({ interactive: false }),
+        })}
+      </div>
+    );
+  }
+
+  function renderFullscreenPanelPortal() {
+    if (!fullscreenPanelView || typeof document === 'undefined') return null;
+
+    const title = fullscreenPanelView === 'deck'
+      ? t('lidc.deck.fullscreenTitle')
+      : t('lidc.members.fullscreenTitle');
+
+    return createPortal(
+      <div className="lidc-deck-fullscreen-root" role="dialog" aria-modal="true" aria-label={title}>
+        <header className="lidc-deck-fullscreen-head">
+          <h2>{title}</h2>
+          <button
+            type="button"
+            className="lidc-deck-fullscreen-close"
+            onClick={closeFullscreenPanel}
+            aria-label={t('lidc.wizard.close')}
+          >
+            <X size={18} />
+          </button>
+        </header>
+
+        <div className="lidc-deck-fullscreen-body">
+          {fullscreenPanelView === 'deck' && (
+            <>
+              {renderCapsView()}
+              {renderAirframeTable({ interactive: true })}
+            </>
+          )}
+
+          {fullscreenPanelView === 'members' && (
+            <>
+              {renderSquadronManagementActions()}
+              {renderMembersTable({ interactive: true })}
+            </>
+          )}
+        </div>
+      </div>,
+      document.body,
     );
   }
 
@@ -1800,7 +1939,6 @@ export default function LidcPage() {
     }
 
     const rows = [
-      { label: t('lidc.info.name'), value: squadronSummaryStats.name },
       { label: t('lidc.squadrons.totalPersonnel'), value: String(squadronSummaryStats.totalPersonnel) },
       { label: t('lidc.squadrons.totalAirframes'), value: String(squadronSummaryStats.totalAirframes) },
     ];
@@ -1901,10 +2039,10 @@ export default function LidcPage() {
       <div className="lidc-deck-view-nav">
         <button
           type="button"
-          className={`lidc-deck-view-nav-btn ${activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_LIST ? 'is-active' : ''}`}
-          onClick={() => setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST)}
+          className={`lidc-deck-view-nav-btn ${activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_DECK ? 'is-active' : ''}`}
+          onClick={() => setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK)}
         >
-          {t('lidc.sidebar.squadronList')}
+          {t('lidc.views.deck')}
         </button>
         <button
           type="button"
@@ -1912,13 +2050,6 @@ export default function LidcPage() {
           onClick={() => setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS)}
         >
           {t('lidc.sidebar.memberManagement')}
-        </button>
-        <button
-          type="button"
-          className={`lidc-deck-view-nav-btn ${activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS ? 'is-active' : ''}`}
-          onClick={() => setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS)}
-        >
-          {t('lidc.sidebar.aircraftManagement')}
         </button>
       </div>
     );
@@ -1934,18 +2065,14 @@ export default function LidcPage() {
         {renderDeckViewNav()}
         <div className="lidc-panel-deck-body">
           {isViewingOwnSquadron && activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS && renderMemberManagementView()}
-          {isViewingOwnSquadron && activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS && renderAircraftManagementView()}
-          {(!isViewingOwnSquadron || activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_LIST) && (
+          {(!isViewingOwnSquadron || activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_DECK) && (
             loadingSquadronDetails ? (
               <div className="lidc-loading">
                 <Loader2 size={14} className="spin" />
                 <span>{t('lidc.general.loading')}</span>
               </div>
             ) : hasSelectedSquadron ? (
-              <div className="lidc-squadron-view-stack">
-                {renderOverviewView()}
-                {renderCapsView()}
-              </div>
+              renderDeckVisualizationView()
             ) : (
               <div className="lidc-panel-rows">
                 {Array.from({ length: 6 }).map((_, index) => (
@@ -2469,6 +2596,8 @@ export default function LidcPage() {
           </div>
         </div>
       )}
+
+      {renderFullscreenPanelPortal()}
 
       {isTemplateEditorOpen && (
         <div className="lidc-modal-root">

@@ -423,7 +423,9 @@ export default {
       capLine: 'Speso {{spent}} / Limite {{cap}}',
       remaining: 'Residuo',
       unitCost: 'Costo: {{cost}}',
-      totalUnits: 'Unità totali'
+      totalUnits: 'Unità totali',
+      expandHint: 'Clicca per espandere',
+      fullscreenTitle: 'Gestione deck'
     },
     inviteCode: {
       label: 'Codice invito',
@@ -440,7 +442,9 @@ export default {
     members: {
       empty: 'Nessun membro disponibile nello squadrone.',
       owner: 'Owner',
-      member: 'Membro'
+      member: 'Membro',
+      expandHint: 'Clicca per espandere',
+      fullscreenTitle: 'Gestione membri'
     },
     squadrons: {
       listEmpty: 'Nessuno squadrone disponibile.',

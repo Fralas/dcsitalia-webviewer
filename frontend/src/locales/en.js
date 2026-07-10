@@ -423,7 +423,9 @@ export default {
       capLine: 'Spent {{spent}} / Cap {{cap}}',
       remaining: 'Remaining',
       unitCost: 'Cost: {{cost}}',
-      totalUnits: 'Total units'
+      totalUnits: 'Total units',
+      expandHint: 'Click to expand',
+      fullscreenTitle: 'Deck management'
     },
     inviteCode: {
       label: 'Invite code',
@@ -440,7 +442,9 @@ export default {
     members: {
       empty: 'No squadron members available.',
       owner: 'Owner',
-      member: 'Member'
+      member: 'Member',
+      expandHint: 'Click to expand',
+      fullscreenTitle: 'Member management'
     },
     squadrons: {
       listEmpty: 'No squadrons available.',
