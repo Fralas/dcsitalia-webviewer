@@ -26,6 +26,15 @@
   border-bottom-color: transparent;
 }
 
+.app-header--lidc {
+  border-bottom: 2px solid #ffffff;
+  background: #0e0e0e;
+}
+
+.app-header--lidc::after {
+  display: none;
+}
+
 .app-header--landing::after {
   content: '';
   position: absolute;

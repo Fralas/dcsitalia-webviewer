@@ -304,8 +304,8 @@ function App() {
   }
 
   return (
-    <div className={`app-shell h-screen flex flex-col overflow-hidden ${currentView === 'landing' ? 'bg-[#0F0F0F]' : 'bg-yt-bg-primary'}`}>
-      <header className={`app-header${currentView === 'landing' ? ' app-header--landing' : ''}`}>
+    <div className={`app-shell h-screen flex flex-col overflow-hidden ${(currentView === 'landing' || currentView === 'lidc') ? 'bg-[#0E0E0E]' : 'bg-yt-bg-primary'}`}>
+      <header className={`app-header${currentView === 'landing' ? ' app-header--landing' : ''}${currentView === 'lidc' ? ' app-header--lidc' : ''}`}>
         <div className="app-header__inner">
           <div className="app-header__left">
             <button
@@ -423,7 +423,7 @@ function App() {
           <WikiPage language={appLanguage} />
         )}
         {currentView === 'lidc' && showLidc && (
-          <LidcPage />
+          <LidcPage onNavigateHome={() => goToView('landing')} />
         )}
         {currentView === 'atc' && showAtc && (
           <AtcStripPage />
