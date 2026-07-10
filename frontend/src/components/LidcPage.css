@@ -402,13 +402,13 @@ body.lidc-map-fullscreen-open {
   align-items: flex-start;
   gap: 2px;
   min-width: 0;
+  box-sizing: border-box;
   padding: 0 0 2px;
   text-align: left;
   pointer-events: none;
 }
 
 .lidc-map-pointers__label-type {
-  font-size: clamp(9px, 0.36vw, 11px);
   font-weight: 800;
   letter-spacing: 0.12em;
   line-height: 1;
@@ -417,13 +417,13 @@ body.lidc-map-fullscreen-open {
 }
 
 .lidc-map-pointers__label-name {
-  font-size: clamp(11px, 0.42vw, 13px);
   font-weight: 700;
   letter-spacing: 0.05em;
   line-height: 1;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.9);
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.65);
+  white-space: nowrap;
 }
 
 .lidc-theater-map,

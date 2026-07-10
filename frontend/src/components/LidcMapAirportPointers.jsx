@@ -4,6 +4,8 @@ import { LIDC_AFGHANISTAN_AIRPORTS } from '../config/lidcAfghanistanAirports';
 const BASE_OUTWARD_PX = 44;
 const BASE_LABEL_GAP_PX = 2;
 const BASE_DOT_RADIUS = 5;
+const BASE_TYPE_FONT_PX = 11;
+const BASE_NAME_FONT_PX = 13;
 const EDGE_MARGIN = 24;
 const POINTER_REFERENCE_ZOOM = 8;
 
@@ -15,6 +17,13 @@ function getPointerScale(zoom) {
 function underlineWidthForName(name, scale) {
   const base = Math.min(150, Math.max(52, String(name || '').length * 8.2));
   return base * scale;
+}
+
+function buildPointerPath(side, anchor, elbow, underlineStart, underlineEnd) {
+  if (side === 'left') {
+    return `M ${anchor.x} ${anchor.y} L ${elbow.x} ${elbow.y} L ${underlineEnd.x} ${underlineEnd.y} L ${underlineStart.x} ${underlineStart.y}`;
+  }
+  return `M ${anchor.x} ${anchor.y} L ${elbow.x} ${elbow.y} L ${underlineStart.x} ${underlineStart.y} L ${underlineEnd.x} ${underlineEnd.y}`;
 }
 
 function buildPointerFrame(anchor, width, airport, scale) {
@@ -32,16 +41,13 @@ function buildPointerFrame(anchor, width, airport, scale) {
   const underlineWidth = underlineWidthForName(airport.name, scale);
   let underlineStart;
   let underlineEnd;
-  let label;
 
   if (side === 'left') {
     underlineEnd = { x: elbow.x - labelGapPx, y: elbow.y };
     underlineStart = { x: underlineEnd.x - underlineWidth, y: elbow.y };
-    label = { ...underlineStart };
   } else {
     underlineStart = { x: elbow.x + labelGapPx, y: elbow.y };
     underlineEnd = { x: underlineStart.x + underlineWidth, y: elbow.y };
-    label = { ...underlineStart };
   }
 
   return {
@@ -50,11 +56,15 @@ function buildPointerFrame(anchor, width, airport, scale) {
     elbow,
     underlineStart,
     underlineEnd,
-    label,
+    label: { ...underlineStart },
+    labelWidth: underlineWidth,
     side,
     scale,
     dotRadius: BASE_DOT_RADIUS * scale,
     strokeWidth: Math.max(1.4, 2.5 * scale),
+    typeFontSize: BASE_TYPE_FONT_PX * scale,
+    nameFontSize: BASE_NAME_FONT_PX * scale,
+    pathD: buildPointerPath(side, anchor, elbow, underlineStart, underlineEnd),
   };
 }
 
@@ -122,7 +132,7 @@ export default function LidcMapAirportPointers({ map }) {
           >
             <path
               className="lidc-map-pointers__line"
-              d={`M ${frame.anchor.x} ${frame.anchor.y} L ${frame.elbow.x} ${frame.elbow.y} L ${frame.underlineStart.x} ${frame.underlineStart.y} L ${frame.underlineEnd.x} ${frame.underlineEnd.y}`}
+              d={frame.pathD}
               strokeWidth={frame.strokeWidth}
             />
             <circle
@@ -138,17 +148,27 @@ export default function LidcMapAirportPointers({ map }) {
       {frames.map((frame) => (
         <div
           key={`${frame.airport.id}-label`}
-          className={`lidc-map-pointers__label lidc-map-pointers__label--${frame.side}`}
+          className="lidc-map-pointers__label"
           style={{
             left: `${frame.label.x}px`,
             top: `${frame.label.y}px`,
-            transform: `translate(0, -100%) scale(${frame.scale})`,
-            transformOrigin: frame.side === 'left' ? 'right bottom' : 'left bottom',
+            width: `${frame.labelWidth}px`,
+            transform: 'translate(0, -100%)',
             '--pointer-accent': frame.airport.highlightColor,
           }}
         >
-          <span className="lidc-map-pointers__label-type">{frame.airport.subtitle}</span>
-          <span className="lidc-map-pointers__label-name">{frame.airport.name}</span>
+          <span
+            className="lidc-map-pointers__label-type"
+            style={{ fontSize: `${frame.typeFontSize}px` }}
+          >
+            {frame.airport.subtitle}
+          </span>
+          <span
+            className="lidc-map-pointers__label-name"
+            style={{ fontSize: `${frame.nameFontSize}px` }}
+          >
+            {frame.airport.name}
+          </span>
         </div>
       ))}
     </div>
