@@ -380,8 +380,8 @@ export default function LidcPage({ onNavigateHome }) {
     && !loadingUserState
     && Boolean(user?.id)
     && !Boolean(userLidcState.hasSquadron)
-    && (panelMode === 'home' || panelMode === 'invites');
-  const shouldBlurBehindOverlay = isWizardOpen || (isEntryWizardVisible && panelMode === 'home');
+    && panelMode === 'invites';
+  const shouldBlurBehindOverlay = isWizardOpen || isEntryWizardVisible;
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
@@ -1671,28 +1671,7 @@ export default function LidcPage({ onNavigateHome }) {
       );
     }
 
-    return (
-      <div className="lidc-center-card">
-        <div className="lidc-center-head">
-          <h2>{t('lidc.center.notInSquadronTitle')}</h2>
-          <p>{t('lidc.center.notInSquadronHint')}</p>
-        </div>
-
-        {userStateError && <div className="lidc-inline-error">{userStateError}</div>}
-
-        <div className="lidc-home-actions">
-          <button type="button" className="lidc-home-btn" onClick={openCreateWizard}>
-            <Disc3 size={18} />
-            <span>{t('lidc.home.createSquadron')}</span>
-          </button>
-          <button type="button" className="lidc-home-btn" onClick={() => setPanelMode('invites')}>
-            <UserPlus size={18} />
-            <span>{t('lidc.home.invitesList')}</span>
-          </button>
-        </div>
-        {adminEditorButton}
-      </div>
-    );
+    return null;
   }
 
   function renderSquadronListPanel() {
@@ -1867,8 +1846,10 @@ export default function LidcPage({ onNavigateHome }) {
   }
 
   const wizardPortalTarget = typeof document !== 'undefined' ? document.body : null;
+  const showNotInSquadronHomePopup = isLogged && !userHasSquadron && panelMode === 'home' && !loadingUserState;
   const showInlineCenterStage = !isWizardOpen
     && !isEntryWizardVisible
+    && !showNotInSquadronHomePopup
     && !(userHasSquadron && hideInSquadronNotice);
 
   return (
