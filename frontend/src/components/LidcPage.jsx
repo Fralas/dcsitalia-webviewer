@@ -26,6 +26,7 @@ import { useUser } from '../contexts/UserContext';
 import airports from '../config/airports';
 import * as api from '../services/api';
 import { t } from '../utils/locale';
+import { normalizeSquadronLogo } from '../utils/normalizeSquadronLogo';
 import LidcTheaterMap from './LidcTheaterMap';
 import './LidcPage.css';
 
@@ -342,6 +343,7 @@ export default function LidcPage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [logoDataUrl, setLogoDataUrl] = useState('');
+  const [logoUploadError, setLogoUploadError] = useState('');
   const [baseId, setBaseId] = useState('');
   const [templateId, setTemplateId] = useState('');
   const [quantities, setQuantities] = useState({});
@@ -897,6 +899,7 @@ export default function LidcPage() {
     setName('');
     setDescription('');
     setLogoDataUrl('');
+    setLogoUploadError('');
     setBaseId('');
     setQuantities({});
     setJoinInviteCode('');
@@ -918,6 +921,7 @@ export default function LidcPage() {
     setIsWizardOpen(false);
     setCurrentStep(0);
     setSubmitError('');
+    setLogoUploadError('');
   }
 
   function updateQuantity(unit, nextQuantity) {
@@ -1189,16 +1193,18 @@ export default function LidcPage() {
 
   function handleLogoUpload(event) {
     const file = event.target.files?.[0];
+    event.target.value = '';
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setLogoDataUrl(reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
-    event.target.value = '';
+    setLogoUploadError('');
+
+    normalizeSquadronLogo(file)
+      .then((normalizedLogo) => {
+        setLogoDataUrl(normalizedLogo);
+      })
+      .catch(() => {
+        setLogoUploadError(t('lidc.errors.logoUploadFailed'));
+      });
   }
 
   function buildSubmitError() {
@@ -2604,6 +2610,7 @@ export default function LidcPage() {
                         <input type="file" accept="image/*" onChange={handleLogoUpload} />
                       </label>
                       {logoDataUrl && <img src={logoDataUrl} alt="Logo preview" className="lidc-logo-preview" />}
+                      {logoUploadError && <div className="lidc-inline-error">{logoUploadError}</div>}
                     </div>
                   </div>
                 </section>

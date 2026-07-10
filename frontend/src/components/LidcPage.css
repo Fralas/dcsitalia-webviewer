@@ -884,8 +884,9 @@ body.lidc-wizard-open {
   width: clamp(44px, 2.2vw, 68px);
   height: clamp(44px, 2.2vw, 68px);
   border-radius: clamp(10px, 0.39vw, 15px);
-  object-fit: cover;
+  object-fit: contain;
   flex-shrink: 0;
+  background: #2a2a2a;
 }
 
 .lidc-panel-row-logo-fallback {
@@ -1779,7 +1780,8 @@ body.lidc-deck-expanded-open {
   height: 140px;
   border-radius: var(--lidc-radius);
   border: 1px solid var(--lidc-hairline);
-  object-fit: cover;
+  object-fit: contain;
+  background: #2a2a2a;
 }
 
 .lidc-preview-logo-empty {
@@ -3582,9 +3584,10 @@ body.lidc-deck-expanded-open {
 .lidc-logo-preview {
   width: 88px;
   height: 88px;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 6px;
   border: 1px solid var(--lidc-hairline);
+  background: #2a2a2a;
 }
 
 .lidc-template-card {

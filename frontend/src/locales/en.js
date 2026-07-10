@@ -392,6 +392,7 @@ export default {
       deckEmpty: 'Add at least one unit to the deck.',
       deckCapsExceeded: 'Deck exceeds one or more category caps.',
       loginRequired: 'You must login before creating a squadron.',
+      logoUploadFailed: 'Unable to process the selected logo image.',
       createFailed: 'Failed to create squadron.',
       userStateFailed: 'Failed to verify your LIDC state.',
       squadronLoadFailed: 'Failed to load squadron details.',
