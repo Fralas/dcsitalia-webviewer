@@ -2046,16 +2046,22 @@ export default function LidcPage({ onNavigateHome }) {
 
       {isWizardOpen && wizardPortalTarget && createPortal(
         <div className="lidc-wizard-root">
-          <div className="lidc-wizard-backdrop" />
+          <div className="lidc-wizard-backdrop" onClick={closeWizard} aria-hidden="true" />
 
-          <section className="lidc-wizard-card" role="dialog" aria-modal="true">
+          <section className="lidc-wizard-card" role="dialog" aria-modal="true" aria-labelledby="lidc-wizard-title">
             <header className="lidc-wizard-head">
-              <div>
-                <h2>{t('lidc.wizard.title')}</h2>
+              <div className="lidc-wizard-head-main">
+                <h2 id="lidc-wizard-title">{t('lidc.wizard.title')}</h2>
                 <p>{t('lidc.wizard.subtitle')}</p>
               </div>
-              <button type="button" className="lidc-btn lidc-btn-outline" onClick={closeWizard}>
-                {t('lidc.wizard.close')}
+              <button
+                type="button"
+                className="lidc-wizard-close"
+                onClick={closeWizard}
+                aria-label={t('lidc.wizard.close')}
+                title={t('lidc.wizard.close')}
+              >
+                <X size={18} />
               </button>
             </header>
 
