@@ -1,0 +1,48 @@
+/** Afghanistan airbases shown on the LIDC theater map. */
+export const LIDC_AFGHANISTAN_AIRPORTS = [
+  {
+    id: 'kandahar',
+    name: 'KANDAHAR',
+    subtitle: 'AIRPORT',
+    lat: 31.5058,
+    lon: 65.8472,
+    pointerSide: 'right',
+    highlightColor: '#E32C2C',
+  },
+  {
+    id: 'camp-bastion',
+    name: 'CAMP BASTION',
+    subtitle: 'AIRBASE',
+    lat: 31.863,
+    lon: 64.225,
+    pointerSide: 'left',
+    highlightColor: '#E32C2C',
+  },
+  {
+    id: 'herat',
+    name: 'HERAT',
+    subtitle: 'AIRPORT',
+    lat: 34.2101,
+    lon: 62.2283,
+    pointerSide: 'left',
+    highlightColor: '#E32C2C',
+  },
+  {
+    id: 'kabul',
+    name: 'KABUL',
+    subtitle: 'AIRPORT',
+    lat: 34.5658,
+    lon: 69.2123,
+    pointerSide: 'right',
+    highlightColor: '#E32C2C',
+  },
+  {
+    id: 'bagram',
+    name: 'BAGRAM',
+    subtitle: 'AIRBASE',
+    lat: 34.9461,
+    lon: 69.2649,
+    pointerSide: 'right',
+    highlightColor: '#E32C2C',
+  },
+];

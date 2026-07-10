@@ -1,9 +1,13 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import LidcMapAirportPointers from './LidcMapAirportPointers';
 
 /** Approximate Afghanistan theater viewport [west, south, east, north]. */
 const AFGHANISTAN_THEATER_BOUNDS = [58.0, 29.5, 71.5, 38.2];
+const MIN_PITCH = 0;
+const MAX_PITCH = 85;
+const MAX_ZOOM = 16;
 
 const MAP_STYLE = {
   version: 8,
@@ -47,6 +51,7 @@ function fitTheaterBounds(map) {
 export default function LidcTheaterMap({ layoutKey = 0 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
+  const [mapInstance, setMapInstance] = useState(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -57,10 +62,12 @@ export default function LidcTheaterMap({ layoutKey = 0 }) {
       style: MAP_STYLE,
       center: [66.0, 34.0],
       zoom: 5.0,
-      pitch: 0,
+      pitch: MIN_PITCH,
       bearing: 0,
       minZoom: 4,
-      maxZoom: 12,
+      maxZoom: MAX_ZOOM,
+      minPitch: MIN_PITCH,
+      maxPitch: MAX_PITCH,
       attributionControl: false,
       fadeDuration: 0,
     });
@@ -69,6 +76,7 @@ export default function LidcTheaterMap({ layoutKey = 0 }) {
 
     map.on('load', () => {
       fitTheaterBounds(map);
+      setMapInstance(map);
     });
 
     const resizeObserver = new ResizeObserver(() => {
@@ -80,6 +88,7 @@ export default function LidcTheaterMap({ layoutKey = 0 }) {
       resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
+      setMapInstance(null);
     };
   }, []);
 
@@ -100,11 +109,14 @@ export default function LidcTheaterMap({ layoutKey = 0 }) {
   }, [layoutKey]);
 
   return (
-    <div
-      ref={containerRef}
-      className="lidc-theater-map"
-      role="application"
-      aria-label="Interactive Afghanistan theater map"
-    />
+    <div className="lidc-theater-map-root">
+      <div
+        ref={containerRef}
+        className="lidc-theater-map"
+        role="application"
+        aria-label="Interactive Afghanistan theater map"
+      />
+      {mapInstance && <LidcMapAirportPointers map={mapInstance} />}
+    </div>
   );
 }
