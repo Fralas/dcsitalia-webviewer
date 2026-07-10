@@ -2273,12 +2273,16 @@ body.lidc-wizard-open {
 
 .lidc-wizard-stepper-shell {
   padding: clamp(4px, 0.3vw, 8px) 0;
+  display: flex;
+  justify-content: center;
 }
 
 .lidc-wizard-steps {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: clamp(8px, 0.55vw, 12px);
+  grid-template-columns: repeat(4, minmax(96px, 128px));
+  gap: clamp(12px, 1vw, 28px);
+  width: fit-content;
+  max-width: 100%;
 }
 
 .lidc-wizard-step-col {
@@ -3173,7 +3177,8 @@ body.lidc-wizard-open {
   .lidc-wizard-steps {
     overflow-x: auto;
     padding-bottom: 2px;
-    grid-template-columns: repeat(5, minmax(110px, 1fr));
+    grid-template-columns: repeat(4, minmax(110px, 1fr));
+    width: 100%;
   }
 
   .lidc-wizard-step-col {
