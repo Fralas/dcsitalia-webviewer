@@ -339,6 +339,76 @@
   border-color: transparent;
 }
 
+.lidc-invite-code-box {
+  margin-top: auto;
+  padding: 14px 16px;
+  border: 1px solid var(--lidc-border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.lidc-invite-code-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lidc-text-muted);
+}
+
+.lidc-invite-code-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lidc-invite-code-value {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--lidc-border);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--lidc-accent-gold);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 18px;
+  letter-spacing: 0.12em;
+}
+
+.lidc-invite-code-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--lidc-border);
+  background: transparent;
+  color: var(--lidc-text);
+  cursor: pointer;
+}
+
+.lidc-invite-code-copy:hover {
+  border-color: var(--lidc-accent-gold);
+  color: var(--lidc-accent-gold);
+}
+
+.lidc-invite-code-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--lidc-text-muted);
+}
+
+.lidc-join-code-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.lidc-invite-code-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .lidc-panel-center-stage {
   position: absolute;
   inset: 0;

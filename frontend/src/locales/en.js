@@ -302,7 +302,7 @@ export default {
   },
   lidc: {
     title: 'Low Intensity Dynamic Campaign',
-    subtitle: 'Create a LIDC squadron with deck and invites',
+    subtitle: 'Create a LIDC squadron with deck and invite code',
     sidebar: {
       visualization: 'Squadron visualization',
       navigation: 'Navigation',
@@ -321,7 +321,6 @@ export default {
       info: 'Squadron Info',
       template: 'Template',
       deck: 'Deck',
-      invites: 'Invites',
       review: 'Review / Create'
     },
     wizard: {
@@ -336,8 +335,6 @@ export default {
         templateHint: 'Choose the starting group. It defines category budget caps.',
         deckTitle: 'Deck composition',
         deckHint: 'Add units by category while staying under the selected template caps.',
-        invitesTitle: 'Team invites',
-        invitesHint: 'Select pilots to invite. Invites will be created with pending status.',
         reviewTitle: 'Final review',
         reviewHint: 'Check all details before creating the squadron.'
       }
@@ -358,15 +355,15 @@ export default {
       mySquadronTitle: 'My squadron',
       invitesList: 'Invites list',
       chooseAction: 'Choose an action',
-      chooseActionHint: 'You are not in a squadron: create one or check pending invites.'
+      chooseActionHint: 'You are not in a squadron: create one or join with an invite code.'
     },
     center: {
       loginTitle: 'Login required',
-      loginHint: 'Sign in with Discord to create a squadron or review your invites.',
+      loginHint: 'Sign in with Discord to create a squadron or join with an invite code.',
       notInSquadronTitle: 'You are not in a squadron',
-      notInSquadronHint: 'Create a new squadron or open your pending invite list.',
-      inviteListTitle: 'Invite list',
-      inviteListHint: 'These are your current LIDC invites with pending status.',
+      notInSquadronHint: 'Create a new squadron or join with an invite code.',
+      joinTitle: 'Join a squadron',
+      joinHint: 'Enter the invite code shared by your squadron.',
       inSquadronTitle: 'Squadron already assigned',
       inSquadronHint: 'You are already in group {{name}}.',
       leaveSquadron: 'Leave squadron',
@@ -395,6 +392,7 @@ export default {
       userStateFailed: 'Failed to verify your LIDC state.',
       squadronLoadFailed: 'Failed to load squadron details.',
       squadronsListFailed: 'Failed to load squadron list.',
+      joinFailed: 'Unable to join squadron with this invite code.',
       airframeAssignFailed: 'Failed to update airframe assignment.',
       leaveFailed: 'Failed to leave squadron.',
       deleteFailed: 'Failed to delete squadron.'
@@ -427,16 +425,15 @@ export default {
       unitCost: 'Cost: {{cost}}',
       totalUnits: 'Total units'
     },
-    invites: {
-      title: 'Invites',
-      empty: 'No users available in login history.',
-      receivedEmpty: 'You have no pending invites.',
-      searchLabel: 'Search user',
-      searchPlaceholder: 'Search by name or username...',
-      searchEmpty: 'No users found for this filter.',
-      you: 'You',
-      pending: 'Pending',
-      add: 'Invite'
+    inviteCode: {
+      label: 'Invite code',
+      placeholder: 'XXXX-XXXX',
+      shareLabel: 'Squadron invite code',
+      shareHint: 'Share this code with pilots you want to join your squadron.',
+      copy: 'Copy',
+      copied: 'Copied',
+      generatedOnCreate: 'Invite code',
+      yes: 'Generated automatically'
     },
     members: {
       empty: 'No squadron members available.',
@@ -483,8 +480,6 @@ export default {
       fallbackDescription: 'Preview of operational configuration and deck.',
       logoPlaceholder: 'No logo',
       templateCaps: 'Template caps',
-      invites: 'Pending invites',
-      noInvites: 'No invites selected',
       deckSummary: 'Deck summary',
       emptyCategory: 'No units'
     },

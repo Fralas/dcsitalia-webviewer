@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
   Coins,
+  Copy,
   Check,
   ChevronLeft,
   ChevronDown,
@@ -31,7 +32,7 @@ import './LidcPage.css';
 
 const LIDC_CAMPAIGN = getCampaignById('lidc-afghanistan');
 
-const WIZARD_STEPS = ['info', 'template', 'deck', 'invites', 'review'];
+const WIZARD_STEPS = ['info', 'template', 'deck', 'review'];
 
 const CATEGORY_META = [
   { key: 'aircrafts', labelKey: 'lidc.deck.categories.aircrafts' },
@@ -225,14 +226,18 @@ function buildMockAirframeLogs({ airframe, baseLabel, pilotLabel, status }) {
   }));
 }
 
+function formatInviteCode(code) {
+  const normalized = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (normalized.length !== 8) return normalized;
+  return `${normalized.slice(0, 4)}-${normalized.slice(4)}`;
+}
+
 export default function LidcPage({ onNavigateHome }) {
   const { user } = useUser();
 
   const [templates, setTemplates] = useState([]);
   const [units, setUnits] = useState([]);
-  const [inviteCandidates, setInviteCandidates] = useState([]);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
-  const [loadingUsers, setLoadingUsers] = useState(false);
   const [catalogError, setCatalogError] = useState('');
 
   const [activeView, setActiveView] = useState(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
@@ -255,8 +260,11 @@ export default function LidcPage({ onNavigateHome }) {
   const [baseId, setBaseId] = useState('');
   const [templateId, setTemplateId] = useState('');
   const [quantities, setQuantities] = useState({});
-  const [selectedInviteIds, setSelectedInviteIds] = useState([]);
-  const [inviteSearchQuery, setInviteSearchQuery] = useState('');
+
+  const [joinInviteCode, setJoinInviteCode] = useState('');
+  const [joinError, setJoinError] = useState('');
+  const [joiningSquadron, setJoiningSquadron] = useState(false);
+  const [inviteCodeCopied, setInviteCodeCopied] = useState(false);
 
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -270,7 +278,6 @@ export default function LidcPage({ onNavigateHome }) {
   const [userLidcState, setUserLidcState] = useState({
     hasSquadron: false,
     squadron: null,
-    invites: [],
   });
   const [hideInSquadronNotice, setHideInSquadronNotice] = useState(false);
   const [activeSquadron, setActiveSquadron] = useState(null);
@@ -299,7 +306,6 @@ export default function LidcPage({ onNavigateHome }) {
     const nextState = {
       hasSquadron: Boolean(response?.hasSquadron),
       squadron: response?.squadron || null,
-      invites: Array.isArray(response?.invites) ? response.invites : [],
     };
 
     setUserLidcState(nextState);
@@ -358,35 +364,6 @@ export default function LidcPage({ onNavigateHome }) {
   useEffect(() => {
     let mounted = true;
 
-    async function loadInviteCandidates() {
-      if (!user) {
-        setInviteCandidates([]);
-        return;
-      }
-
-      setLoadingUsers(true);
-      try {
-        const response = await api.getLidcUsers();
-        if (!mounted) return;
-        setInviteCandidates(Array.isArray(response?.users) ? response.users : []);
-      } catch (error) {
-        if (!mounted) return;
-        setInviteCandidates([]);
-      } finally {
-        if (mounted) setLoadingUsers(false);
-      }
-    }
-
-    loadInviteCandidates();
-
-    return () => {
-      mounted = false;
-    };
-  }, [user]);
-
-  useEffect(() => {
-    let mounted = true;
-
     async function loadListedSquadrons() {
       if (!user?.id) {
         if (!mounted) return;
@@ -439,7 +416,7 @@ export default function LidcPage({ onNavigateHome }) {
     && !loadingUserState
     && Boolean(user?.id)
     && !Boolean(userLidcState.hasSquadron)
-    && panelMode === 'invites';
+    && panelMode === 'join';
   const shouldBlurBehindOverlay = isWizardOpen || isEntryWizardVisible;
 
   useEffect(() => {
@@ -473,7 +450,6 @@ export default function LidcPage({ onNavigateHome }) {
         setUserLidcState({
           hasSquadron: false,
           squadron: null,
-          invites: [],
         });
         setHideInSquadronNotice(false);
         setActiveSquadron(null);
@@ -749,8 +725,8 @@ export default function LidcPage({ onNavigateHome }) {
     setLogoDataUrl('');
     setBaseId('');
     setQuantities({});
-    setSelectedInviteIds([]);
-    setInviteSearchQuery('');
+    setJoinInviteCode('');
+    setJoinError('');
     setSubmitError('');
     setCreatedSquadron(null);
 
@@ -795,15 +771,68 @@ export default function LidcPage({ onNavigateHome }) {
     });
   }
 
-  function toggleInvite(userId) {
-    if (!userId) return;
+  async function handleJoinSquadron() {
+    const code = joinInviteCode.trim();
+    if (!code || joiningSquadron) return;
 
-    setSelectedInviteIds((prev) => {
-      if (prev.includes(userId)) {
-        return prev.filter((entry) => entry !== userId);
+    setJoinError('');
+    setJoiningSquadron(true);
+
+    try {
+      const response = await api.joinLidcSquadronByInviteCode(code);
+      const joined = response?.squadron || null;
+
+      const stateResponse = await api.getLidcMe();
+      applyUserLidcState(stateResponse);
+
+      if (joined) {
+        setActiveSquadron(joined);
+        setSelectedListSquadronId(joined.id);
       }
-      return [...prev, userId];
-    });
+
+      setPanelMode('home');
+      setJoinInviteCode('');
+      setHideInSquadronNotice(false);
+      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
+
+      try {
+        const listResponse = await api.getLidcSquadrons();
+        setListedSquadrons(Array.isArray(listResponse?.squadrons) ? listResponse.squadrons : []);
+      } catch (_) {
+        // Non-blocking refresh after join.
+      }
+    } catch (error) {
+      if (Number(error?.status) === 409) {
+        try {
+          const stateResponse = await api.getLidcMe();
+          const nextState = applyUserLidcState(stateResponse);
+          if (nextState.hasSquadron) {
+            setPanelMode('home');
+            setJoinInviteCode('');
+            return;
+          }
+        } catch (_) {
+          // Fall back to default error rendering.
+        }
+      }
+
+      setJoinError(error.message || t('lidc.errors.joinFailed'));
+    } finally {
+      setJoiningSquadron(false);
+    }
+  }
+
+  async function copyInviteCode(code) {
+    const formatted = formatInviteCode(code);
+    if (!formatted) return;
+
+    try {
+      await navigator.clipboard.writeText(formatted);
+      setInviteCodeCopied(true);
+      window.setTimeout(() => setInviteCodeCopied(false), 2000);
+    } catch (_) {
+      // Clipboard unavailable.
+    }
   }
 
   function handleLogoUpload(event) {
@@ -865,7 +894,6 @@ export default function LidcPage({ onNavigateHome }) {
         logoDataUrl,
         baseId,
         templateId: selectedTemplate.id,
-        invites: selectedInviteIds.map((entry) => ({ userId: entry })),
         deck: deckPayload,
       };
 
@@ -1063,18 +1091,6 @@ export default function LidcPage({ onNavigateHome }) {
       setTemplateEditorSaving(false);
     }
   }
-
-  const filteredInviteCandidates = useMemo(() => {
-    const query = inviteSearchQuery.trim().toLowerCase();
-    if (!query) return inviteCandidates;
-
-    return inviteCandidates.filter((entry) => {
-      const globalName = String(entry?.globalName || '').toLowerCase();
-      const username = String(entry?.username || '').toLowerCase();
-      const id = String(entry?.id || '').toLowerCase();
-      return globalName.includes(query) || username.includes(query) || id.includes(query);
-    });
-  }, [inviteCandidates, inviteSearchQuery]);
 
   const squadronMembers = useMemo(() => {
     const list = Array.isArray(activeSquadron?.memberProfiles) ? activeSquadron.memberProfiles : [];
@@ -1680,7 +1696,11 @@ export default function LidcPage({ onNavigateHome }) {
               <Check size={16} />
               <div>
                 <div className="lidc-success-title">{t('lidc.review.created')}</div>
-                <div className="lidc-success-meta">ID: {createdSquadron.id}</div>
+                {createdSquadron.inviteCode && (
+                  <div className="lidc-success-meta">
+                    {t('lidc.inviteCode.label')}: {formatInviteCode(createdSquadron.inviteCode)}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1701,57 +1721,51 @@ export default function LidcPage({ onNavigateHome }) {
       );
     }
 
-    if (panelMode === 'invites') {
+    if (panelMode === 'join') {
       return (
         <div className="lidc-center-card">
           <div className="lidc-center-head">
-            <h2>{t('lidc.center.inviteListTitle')}</h2>
-            <p>{t('lidc.center.inviteListHint')}</p>
+            <h2>{t('lidc.center.joinTitle')}</h2>
+            <p>{t('lidc.center.joinHint')}</p>
           </div>
 
-          {userStateError && <div className="lidc-inline-error">{userStateError}</div>}
-
-          {userLidcState.invites.length === 0 ? (
-            <div className="lidc-muted-box">{t('lidc.invites.receivedEmpty')}</div>
-          ) : (
-            <div className="lidc-received-list">
-              {userLidcState.invites.map((invite) => {
-                const invitedBy = invite?.invitedBy || {};
-                const invitedByName = invitedBy.globalName || invitedBy.username || invitedBy.id || '-';
-                const squadronName = invite?.squadronName || '-';
-                const avatarUrl = invitedBy.avatarUrl || '';
-
-                return (
-                  <article key={`${invite.squadronId}-${invite.invitedAt}`} className="lidc-received-item">
-                    <div className="lidc-received-head">
-                      <span>{squadronName}</span>
-                      <span className="lidc-user-tag">{t('lidc.invites.pending')}</span>
-                    </div>
-                    <div className="lidc-received-meta">
-                      {avatarUrl ? (
-                        <img src={avatarUrl} alt={invitedByName} className="lidc-user-avatar" />
-                      ) : (
-                        <div className="lidc-user-avatar lidc-user-avatar-fallback">{invitedByName.slice(0, 1).toUpperCase()}</div>
-                      )}
-                      <div>
-                        <div className="lidc-user-name">{invitedByName}</div>
-                        <div className="lidc-user-sub">{formatTimestamp(invite?.invitedAt)}</div>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
+          <div className="lidc-join-code-panel">
+            <label className="lidc-field">
+              <span>{t('lidc.inviteCode.label')}</span>
+              <input
+                value={joinInviteCode}
+                onChange={(event) => setJoinInviteCode(event.target.value.toUpperCase())}
+                placeholder={t('lidc.inviteCode.placeholder')}
+                maxLength={9}
+                className="lidc-invite-code-input"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </label>
+            {joinError && <div className="lidc-inline-error">{joinError}</div>}
+          </div>
 
           <div className="lidc-center-actions">
-            <button type="button" className="lidc-btn lidc-btn-outline" onClick={() => setPanelMode('home')}>
+            <button
+              type="button"
+              className="lidc-btn lidc-btn-outline"
+              onClick={() => {
+                setPanelMode('home');
+                setJoinError('');
+                setJoinInviteCode('');
+              }}
+            >
               <ChevronLeft size={14} />
               {t('lidc.center.backHome')}
             </button>
-            <button type="button" className="lidc-btn lidc-btn-primary" onClick={openCreateWizard}>
-              <Disc3 size={14} />
-              {t('lidc.home.createSquadron')}
+            <button
+              type="button"
+              className="lidc-btn lidc-btn-primary"
+              onClick={handleJoinSquadron}
+              disabled={!joinInviteCode.trim() || joiningSquadron}
+            >
+              {joiningSquadron ? <Loader2 size={14} className="spin" /> : <UserPlus size={14} />}
+              {t('lidc.home.joinSquadron')}
             </button>
           </div>
           {adminEditorButton}
@@ -1902,10 +1916,31 @@ export default function LidcPage({ onNavigateHome }) {
             <button
               type="button"
               className="lidc-panel-squadron-action-btn"
-              onClick={() => setPanelMode('invites')}
+              onClick={() => {
+                setPanelMode('join');
+                setJoinError('');
+              }}
             >
               {t('lidc.home.joinSquadron')}
             </button>
+          </div>
+        )}
+
+        {userHasSquadron && isViewingOwnSquadron && activeSquadron?.inviteCode && (
+          <div className="lidc-invite-code-box">
+            <span className="lidc-invite-code-label">{t('lidc.inviteCode.shareLabel')}</span>
+            <div className="lidc-invite-code-row">
+              <code className="lidc-invite-code-value">{formatInviteCode(activeSquadron.inviteCode)}</code>
+              <button
+                type="button"
+                className="lidc-invite-code-copy"
+                onClick={() => copyInviteCode(activeSquadron.inviteCode)}
+              >
+                {inviteCodeCopied ? <Check size={14} /> : <Copy size={14} />}
+                {inviteCodeCopied ? t('lidc.inviteCode.copied') : t('lidc.inviteCode.copy')}
+              </button>
+            </div>
+            <p className="lidc-invite-code-hint">{t('lidc.inviteCode.shareHint')}</p>
           </div>
         )}
 
@@ -2246,78 +2281,6 @@ export default function LidcPage({ onNavigateHome }) {
                 </section>
               )}
 
-              {currentStepKey === 'invites' && (
-                <section className="lidc-step-section">
-                  <header className="lidc-step-section-head">
-                    <h3>{t('lidc.wizard.sections.invitesTitle')}</h3>
-                    <p>{t('lidc.wizard.sections.invitesHint')}</p>
-                  </header>
-
-                  <div className="lidc-invite-panel">
-                    <label className="lidc-field">
-                      <span>{t('lidc.invites.searchLabel')}</span>
-                      <input
-                        value={inviteSearchQuery}
-                        onChange={(event) => setInviteSearchQuery(event.target.value)}
-                        placeholder={t('lidc.invites.searchPlaceholder')}
-                        maxLength={80}
-                      />
-                    </label>
-
-                    {loadingUsers && (
-                      <div className="lidc-loading">
-                        <Loader2 size={14} className="spin" />
-                        <span>{t('lidc.general.loadingUsers')}</span>
-                      </div>
-                    )}
-
-                    {!loadingUsers && inviteCandidates.length === 0 && (
-                      <div className="lidc-muted-box">{t('lidc.invites.empty')}</div>
-                    )}
-
-                    {!loadingUsers && inviteCandidates.length > 0 && (
-                      <div className="lidc-user-list">
-                        {filteredInviteCandidates.map((entry) => {
-                          const isSelected = selectedInviteIds.includes(entry.id);
-                          const displayName = entry.globalName || entry.username || entry.id;
-                          const avatarUrl = entry.avatarUrl || '';
-                          const isSelf = user?.id && user.id === entry.id;
-
-                          return (
-                            <button
-                              type="button"
-                              key={entry.id}
-                              className={`lidc-user-item ${isSelected ? 'is-selected' : ''}`}
-                              onClick={() => !isSelf && toggleInvite(entry.id)}
-                              disabled={isSelf}
-                            >
-                              {avatarUrl ? (
-                                <img src={avatarUrl} alt={displayName} className="lidc-user-avatar" />
-                              ) : (
-                                <div className="lidc-user-avatar lidc-user-avatar-fallback">{displayName.slice(0, 1).toUpperCase()}</div>
-                              )}
-                              <div className="lidc-user-meta">
-                                <div className="lidc-user-name">{displayName}</div>
-                                <div className="lidc-user-sub">{formatTimestamp(entry.lastSeenAt)}</div>
-                              </div>
-                              {isSelf ? (
-                                <span className="lidc-user-tag">{t('lidc.invites.you')}</span>
-                              ) : (
-                                <span className="lidc-user-tag">{isSelected ? t('lidc.invites.pending') : t('lidc.invites.add')}</span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {!loadingUsers && inviteCandidates.length > 0 && filteredInviteCandidates.length === 0 && (
-                      <div className="lidc-muted-box">{t('lidc.invites.searchEmpty')}</div>
-                    )}
-                  </div>
-                </section>
-              )}
-
               {currentStepKey === 'review' && (
                 <section className="lidc-step-section">
                   <header className="lidc-step-section-head">
@@ -2329,7 +2292,7 @@ export default function LidcPage({ onNavigateHome }) {
                     <div className="lidc-review-line"><span>{t('lidc.info.name')}</span><strong>{name || '-'}</strong></div>
                     <div className="lidc-review-line"><span>{t('lidc.info.base')}</span><strong>{previewBase?.displayName || '-'}</strong></div>
                     <div className="lidc-review-line"><span>{t('lidc.template.title')}</span><strong>{selectedTemplate?.name || '-'}</strong></div>
-                    <div className="lidc-review-line"><span>{t('lidc.invites.title')}</span><strong>{selectedInviteIds.length}</strong></div>
+                    <div className="lidc-review-line"><span>{t('lidc.inviteCode.generatedOnCreate')}</span><strong>{t('lidc.inviteCode.yes')}</strong></div>
                     <div className="lidc-review-line"><span>{t('lidc.deck.totalUnits')}</span><strong>{totalDeckUnits}</strong></div>
 
                     <div className="lidc-review-assets">

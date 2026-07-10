@@ -10,6 +10,8 @@ const MAX_LOGO_DATA_URL_LENGTH = 12_000_000;
 const BOARD_NUMBER_PATTERN = /^\d{3}[A-Z]{2}$/;
 const BOARD_NUMBER_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const BOARD_NUMBER_MAX_ATTEMPTS = 20_000;
+const INVITE_CODE_PATTERN = /^[A-Z0-9]{8}$/;
+const INVITE_CODE_MAX_ATTEMPTS = 200;
 
 export const DECK_CATEGORIES = Object.freeze([
   'aircrafts',
@@ -125,6 +127,8 @@ function ensureStorage() {
   if (!fs.existsSync(DISCORD_USERS_FILE)) {
     writeJsonAtomic(DISCORD_USERS_FILE, []);
   }
+
+  ensureSquadronInviteCodes();
 }
 
 function readJson(filePath, fallback) {
@@ -400,21 +404,49 @@ function calculateCostSummary({ deck, template, unitsById }) {
   };
 }
 
-function normalizeInvites(rawInvites) {
-  const values = Array.isArray(rawInvites) ? rawInvites : [];
-  const unique = new Set();
+function normalizeInviteCode(value) {
+  const cleaned = sanitizeText(value, 16).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return INVITE_CODE_PATTERN.test(cleaned) ? cleaned : '';
+}
 
-  values.forEach((entry) => {
-    const userId = sanitizeText(entry?.userId || entry?.id || entry, 80);
-    if (userId) unique.add(userId);
+function generateUniqueInviteCode(takenCodes) {
+  for (let attempt = 0; attempt < INVITE_CODE_MAX_ATTEMPTS; attempt += 1) {
+    const code = crypto.randomBytes(4).toString('hex').toUpperCase();
+    if (!takenCodes.has(code)) {
+      takenCodes.add(code);
+      return code;
+    }
+  }
+
+  throw new Error('Unable to generate invite code');
+}
+
+function ensureSquadronInviteCodes() {
+  const squadrons = readSquadrons();
+  const taken = new Set();
+  let changed = false;
+
+  squadrons.forEach((squadron) => {
+    const existing = normalizeInviteCode(squadron?.inviteCode);
+    if (existing && !taken.has(existing)) {
+      if (squadron.inviteCode !== existing) {
+        squadron.inviteCode = existing;
+        changed = true;
+      }
+      taken.add(existing);
+    }
   });
 
-  const invitedAt = Date.now();
-  return Array.from(unique.values()).map((userId) => ({
-    userId,
-    status: 'pending',
-    invitedAt,
-  }));
+  squadrons.forEach((squadron) => {
+    if (!normalizeInviteCode(squadron?.inviteCode)) {
+      squadron.inviteCode = generateUniqueInviteCode(taken);
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    writeSquadrons(squadrons);
+  }
 }
 
 function normalizeBoardNumber(value) {
@@ -775,7 +807,13 @@ export function createSquadron(payload, sessionUser) {
     throw new Error('Deck must include at least one unit');
   }
 
-  const invites = normalizeInvites(payload?.invites);
+  const squadrons = readSquadrons();
+  const takenCodes = new Set(
+    squadrons
+      .map((entry) => normalizeInviteCode(entry?.inviteCode))
+      .filter(Boolean),
+  );
+  const inviteCode = generateUniqueInviteCode(takenCodes);
   const createdAt = Date.now();
 
   const squadron = {
@@ -787,7 +825,7 @@ export function createSquadron(payload, sessionUser) {
     templateId: template.id,
     templateName: template.name,
     deck,
-    invites,
+    inviteCode,
     members: [
       {
         userId,
@@ -807,7 +845,6 @@ export function createSquadron(payload, sessionUser) {
   };
   syncSquadronAirframesInMemory(squadron, unitsById);
 
-  const squadrons = readSquadrons();
   squadrons.push(squadron);
   writeSquadrons(squadrons);
 
@@ -831,13 +868,77 @@ export function listSquadrons() {
     .sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
 }
 
-export function getSquadronById(squadronId) {
+export function getSquadronById(squadronId, actorUserId = '') {
   ensureStorage();
   const targetId = sanitizeText(squadronId, 120);
   if (!targetId) return null;
 
   const squadron = ensureSquadronAirframesPersistedById(targetId);
   if (!squadron) return null;
+
+  const actorId = sanitizeText(actorUserId, 80);
+  const isMember = actorId && isUserMemberOfSquadron(squadron, actorId);
+  const result = {
+    ...squadron,
+    memberProfiles: listSquadronMembersForDisplay(squadron),
+  };
+
+  if (!isMember) {
+    delete result.inviteCode;
+  }
+
+  return result;
+}
+
+export function joinSquadronByInviteCode({ inviteCode, sessionUser }) {
+  ensureStorage();
+
+  const userId = sanitizeText(sessionUser?.id, 80);
+  if (!userId) {
+    throw new Error('Authentication required');
+  }
+
+  const existingSquadron = getUserPrimarySquadron(userId);
+  if (existingSquadron) {
+    const existingName = sanitizeText(existingSquadron?.name, 120) || '-';
+    throw new Error(`Already in squadron: ${existingName}`);
+  }
+
+  const normalizedCode = normalizeInviteCode(inviteCode);
+  if (!normalizedCode) {
+    throw new Error('Invalid invite code');
+  }
+
+  const squadrons = readSquadrons();
+  const squadronIndex = squadrons.findIndex(
+    (entry) => normalizeInviteCode(entry?.inviteCode) === normalizedCode,
+  );
+  if (squadronIndex < 0) {
+    throw new Error('Invite code not found');
+  }
+
+  const squadron = { ...squadrons[squadronIndex] };
+  if (isUserMemberOfSquadron(squadron, userId)) {
+    throw new Error('Already in squadron');
+  }
+
+  const joinedAt = Date.now();
+  const currentMembers = Array.isArray(squadron.members) ? squadron.members : [];
+  squadron.members = [
+    ...currentMembers,
+    {
+      userId,
+      role: 'member',
+      joinedAt,
+    },
+  ];
+
+  const templatesState = readTemplatesState();
+  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+  syncSquadronAirframesInMemory(squadron, unitsById);
+
+  squadrons[squadronIndex] = squadron;
+  writeSquadrons(squadrons);
 
   return {
     ...squadron,
@@ -1125,48 +1226,6 @@ export function getUserPrimarySquadron(userIdRaw) {
   return mine[0] || null;
 }
 
-export function getPendingInvitesForUser(userIdRaw) {
-  ensureStorage();
-  const userId = sanitizeText(userIdRaw, 80);
-  if (!userId) return [];
-
-  const squadrons = readSquadrons();
-  const invites = [];
-
-  squadrons.forEach((squadron) => {
-    const squadronInvites = Array.isArray(squadron?.invites) ? squadron.invites : [];
-
-    squadronInvites.forEach((invite) => {
-      const invitedUserId = sanitizeText(invite?.userId, 80);
-      if (invitedUserId !== userId) return;
-
-      const status = sanitizeText(invite?.status, 40) || 'pending';
-      invites.push({
-        squadronId: sanitizeText(squadron?.id, 120),
-        squadronName: sanitizeText(squadron?.name, 120),
-        templateName: sanitizeText(squadron?.templateName, 120),
-        baseId: sanitizeText(squadron?.baseId, 120),
-        invitedAt: Number.isFinite(invite?.invitedAt) ? invite.invitedAt : Number(squadron?.createdAt) || Date.now(),
-        status,
-        invitedBy: {
-          id: sanitizeText(squadron?.createdBy?.id, 80),
-          globalName: sanitizeText(squadron?.createdBy?.globalName, 140),
-          username: sanitizeText(squadron?.createdBy?.username, 140),
-          avatar: sanitizeText(squadron?.createdBy?.avatar, 200),
-          avatarUrl: buildAvatarUrl(
-            sanitizeText(squadron?.createdBy?.id, 80),
-            sanitizeText(squadron?.createdBy?.avatar, 200),
-          ),
-        },
-      });
-    });
-  });
-
-  return invites
-    .filter((entry) => entry.status === 'pending')
-    .sort((a, b) => (Number(b.invitedAt) || 0) - (Number(a.invitedAt) || 0));
-}
-
 export function getUserLidcState(userIdRaw) {
   ensureStorage();
   const userId = sanitizeText(userIdRaw, 80);
@@ -1174,12 +1233,10 @@ export function getUserLidcState(userIdRaw) {
     return {
       hasSquadron: false,
       squadron: null,
-      invites: [],
     };
   }
 
   const squadron = getUserPrimarySquadron(userId);
-  const invites = getPendingInvitesForUser(userId);
 
   return {
     hasSquadron: Boolean(squadron),
@@ -1192,7 +1249,6 @@ export function getUserLidcState(userIdRaw) {
           createdAt: Number.isFinite(squadron?.createdAt) ? squadron.createdAt : null,
         }
       : null,
-    invites,
   };
 }
 
@@ -1208,11 +1264,11 @@ export default {
   createSquadron,
   listSquadrons,
   getSquadronById,
+  joinSquadronByInviteCode,
   updateAirframeAssignment,
   updateSquadronMemberRole,
   leaveSquadron,
   deleteSquadron,
   getUserPrimarySquadron,
-  getPendingInvitesForUser,
   getUserLidcState,
 };

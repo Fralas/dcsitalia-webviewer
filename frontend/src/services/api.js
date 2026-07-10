@@ -665,7 +665,7 @@ export async function getLidcUsers() {
 }
 
 /**
- * Get current user LIDC state (squadron membership + pending invites)
+ * Get current user LIDC state (squadron membership)
  */
 export async function getLidcMe() {
   return fetchAPI('/lidc/me', {
@@ -689,6 +689,17 @@ export async function createLidcSquadron(payload) {
   return fetchAPI('/lidc/squadrons', {
     method: 'POST',
     body: JSON.stringify(payload || {}),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Join a LIDC squadron using invite code
+ */
+export async function joinLidcSquadronByInviteCode(inviteCode) {
+  return fetchAPI('/lidc/squadrons/join', {
+    method: 'POST',
+    body: JSON.stringify({ inviteCode }),
     credentials: 'include',
   });
 }
@@ -1087,6 +1098,7 @@ export default {
   getLidcUsers,
   getLidcSquadrons,
   createLidcSquadron,
+  joinLidcSquadronByInviteCode,
   getLidcSquadron,
   assignLidcAirframePilot,
   updateLidcMemberRole,

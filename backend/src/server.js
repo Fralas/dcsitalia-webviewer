@@ -2065,6 +2065,35 @@ app.post('/api/lidc/squadrons', (req, res) => {
 });
 
 /**
+ * POST /api/lidc/squadrons/join - Join squadron using invite code
+ */
+app.post('/api/lidc/squadrons/join', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const squadron = lidcService.joinSquadronByInviteCode({
+      inviteCode: req.body?.inviteCode,
+      sessionUser: req.session.user,
+    });
+    return res.status(200).json({ squadron });
+  } catch (error) {
+    const message = String(error?.message || 'Failed to join squadron');
+    const lowered = message.toLowerCase();
+    let status = 400;
+    if (lowered.includes('authentication required')) {
+      status = 401;
+    } else if (lowered.includes('already in squadron')) {
+      status = 409;
+    } else if (lowered.includes('not found') || lowered.includes('invalid invite code')) {
+      status = 404;
+    }
+    return res.status(status).json({ error: message });
+  }
+});
+
+/**
  * GET /api/lidc/squadrons/:id - Get a single LIDC squadron by id
  */
 app.get('/api/lidc/squadrons/:id', (req, res) => {
@@ -2072,7 +2101,7 @@ app.get('/api/lidc/squadrons/:id', (req, res) => {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
-  const squadron = lidcService.getSquadronById(req.params.id);
+  const squadron = lidcService.getSquadronById(req.params.id, req.session.user.id);
   if (!squadron) {
     return res.status(404).json({ error: 'Squadron not found' });
   }

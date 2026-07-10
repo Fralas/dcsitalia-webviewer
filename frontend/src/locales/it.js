@@ -302,7 +302,7 @@ export default {
   },
   lidc: {
     title: 'Low Intensity Dynamic Campaign',
-    subtitle: 'Crea uno squadrone LIDC con deck e inviti',
+    subtitle: 'Crea uno squadrone LIDC con deck e codice invito',
     sidebar: {
       visualization: 'Visualizzazione squadrone',
       navigation: 'Navigazione',
@@ -321,7 +321,6 @@ export default {
       info: 'Squadron Info',
       template: 'Template',
       deck: 'Deck',
-      invites: 'Inviti',
       review: 'Review / Create'
     },
     wizard: {
@@ -336,8 +335,6 @@ export default {
         templateHint: 'Scegli il gruppo iniziale: definisce i limiti di costo per categoria.',
         deckTitle: 'Composizione deck',
         deckHint: 'Aggiungi unita per categoria rispettando il limite del template scelto.',
-        invitesTitle: 'Inviti squadra',
-        invitesHint: 'Seleziona i piloti da invitare. Gli inviti verranno creati in stato pending.',
         reviewTitle: 'Controllo finale',
         reviewHint: 'Verifica i dati prima della creazione dello squadrone.'
       }
@@ -358,15 +355,15 @@ export default {
       mySquadronTitle: 'Il mio squadrone',
       invitesList: 'Lista inviti',
       chooseAction: 'Seleziona una azione',
-      chooseActionHint: 'Non sei in uno squadrone: scegli se crearne uno nuovo o controllare gli inviti.'
+      chooseActionHint: 'Non sei in uno squadrone: creane uno nuovo o unisciti con un codice invito.'
     },
     center: {
       loginTitle: 'Accesso richiesto',
-      loginHint: 'Effettua il login Discord per poter creare uno squadrone o vedere i tuoi inviti.',
+      loginHint: 'Effettua il login Discord per creare uno squadrone o unirti con un codice invito.',
       notInSquadronTitle: 'Non sei in uno squadrone',
-      notInSquadronHint: 'Puoi creare un nuovo squadrone o aprire la lista inviti ricevuti.',
-      inviteListTitle: 'Lista inviti',
-      inviteListHint: 'Questi sono gli inviti LIDC attualmente in stato pending.',
+      notInSquadronHint: 'Puoi creare un nuovo squadrone o unirti con un codice invito.',
+      joinTitle: 'Unisciti allo squadrone',
+      joinHint: 'Inserisci il codice invito condiviso dal tuo squadrone.',
       inSquadronTitle: 'Squadrone gia assegnato',
       inSquadronHint: 'Sei gia nel gruppo {{name}}.',
       leaveSquadron: 'Abbandona squadrone',
@@ -395,6 +392,7 @@ export default {
       userStateFailed: 'Impossibile verificare il tuo stato LIDC.',
       squadronLoadFailed: 'Impossibile caricare i dettagli dello squadrone.',
       squadronsListFailed: 'Impossibile caricare la lista squadroni.',
+      joinFailed: 'Impossibile unirsi allo squadrone con questo codice.',
       airframeAssignFailed: 'Impossibile aggiornare l\'assegnazione del velivolo.',
       leaveFailed: 'Impossibile abbandonare lo squadrone.',
       deleteFailed: 'Impossibile cancellare lo squadrone.'
@@ -427,16 +425,15 @@ export default {
       unitCost: 'Costo: {{cost}}',
       totalUnits: 'Unità totali'
     },
-    invites: {
-      title: 'Inviti',
-      empty: 'Nessun utente disponibile nello storico login.',
-      receivedEmpty: 'Non hai inviti in attesa.',
-      searchLabel: 'Cerca utente',
-      searchPlaceholder: 'Cerca per nome o username...',
-      searchEmpty: 'Nessun utente trovato con questo filtro.',
-      you: 'Tu',
-      pending: 'Pending',
-      add: 'Invita'
+    inviteCode: {
+      label: 'Codice invito',
+      placeholder: 'XXXX-XXXX',
+      shareLabel: 'Codice invito squadrone',
+      shareHint: 'Condividi questo codice con i piloti che vuoi far entrare nello squadrone.',
+      copy: 'Copia',
+      copied: 'Copiato',
+      generatedOnCreate: 'Codice invito',
+      yes: 'Generato automaticamente'
     },
     members: {
       empty: 'Nessun membro disponibile nello squadrone.',
@@ -483,8 +480,6 @@ export default {
       fallbackDescription: 'Anteprima della configurazione operativa e del deck.',
       logoPlaceholder: 'Nessun logo',
       templateCaps: 'Limiti template',
-      invites: 'Inviti pending',
-      noInvites: 'Nessun invito selezionato',
       deckSummary: 'Riepilogo deck',
       emptyCategory: 'Nessuna unità'
     },
