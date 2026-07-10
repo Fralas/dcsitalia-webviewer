@@ -41,8 +41,45 @@
 }
 
 .lidc-page.is-deck-panel-open,
-.lidc-page.is-deck-panel-open .lidc-shell {
+.lidc-page.is-deck-panel-open .lidc-shell,
+.lidc-page.is-map-fullscreen,
+.lidc-page.is-map-fullscreen .lidc-shell {
   overflow: visible;
+}
+
+.lidc-page.is-map-fullscreen .lidc-board-slot-map.is-expanded {
+  position: fixed;
+  top: var(--lidc-map-fullscreen-top, 72px);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  height: auto;
+  z-index: 40;
+  margin: 0;
+  padding: 0;
+  grid-column: unset;
+  grid-row: unset;
+}
+
+.lidc-page.is-map-fullscreen .lidc-board-slot-map.is-expanded .lidc-panel-map {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: #0a0a0a;
+}
+
+.lidc-page.is-map-fullscreen .lidc-board-slot-map.is-flip-animating {
+  z-index: 45;
+}
+
+.app-shell.is-lidc-map-fullscreen main {
+  overflow: visible;
+}
+
+body.lidc-map-fullscreen-open {
+  overflow: hidden;
 }
 
 .lidc-shell {
@@ -233,17 +270,12 @@
 }
 
 .lidc-panel-map {
+  position: relative;
   border: 1px solid #838383;
   border-radius: clamp(14px, 0.68vw, 26px);
-  background: linear-gradient(180deg, #151515 0%, #0a0a0a 100%);
+  background: #0a0a0a;
   min-height: 0;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.lidc-panel-map:not(.is-expanded) {
-  padding: clamp(16px, 0.95vw, 32px);
 }
 
 .lidc-panel-map.is-expanded {
@@ -256,26 +288,47 @@
 .lidc-panel-map.is-borderless {
   border: 0;
   border-radius: 0;
-  padding: clamp(20px, 1.15vw, 44px) 0 0;
 }
 
-.lidc-panel-map-head {
+.lidc-map-frame {
+  position: absolute;
+  inset: 0;
+  background: #0a0a0a;
+}
+
+.lidc-panel-map-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: clamp(10px, 0.78vw, 20px);
-  flex-shrink: 0;
-  margin-bottom: clamp(10px, 0.68vw, 20px);
-  padding: 0;
+  padding: clamp(16px, 0.95vw, 32px);
+  background: linear-gradient(
+    180deg,
+    rgba(10, 10, 10, 0.88) 0%,
+    rgba(10, 10, 10, 0.52) 58%,
+    rgba(10, 10, 10, 0) 100%
+  );
+  pointer-events: none;
 }
 
-.lidc-panel-map-head.is-fullscreen {
-  margin-bottom: clamp(12px, 0.91vw, 24px);
-  padding: 0 clamp(20px, 1.15vw, 44px);
+.lidc-panel-map-overlay.is-fullscreen {
+  padding: clamp(20px, 1.15vw, 44px);
 }
 
-.lidc-panel-map-head .lidc-panel-title {
+.lidc-panel-map-overlay .lidc-panel-title,
+.lidc-panel-map-overlay .lidc-panel-map-expand-hint,
+.lidc-panel-map-overlay .lidc-panel-deck-expanded-close {
+  pointer-events: auto;
+}
+
+.lidc-panel-map-overlay .lidc-panel-title {
   margin: 0;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.65);
 }
 
 .lidc-panel-map-expand-hint {
@@ -293,26 +346,12 @@
   padding: 4px 0;
   white-space: nowrap;
   box-shadow: none;
-  text-shadow: none;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
   filter: none;
 }
 
 .lidc-panel-map-expand-hint:hover {
   color: var(--lidc-ink);
-}
-
-.lidc-map-frame {
-  width: 100%;
-  flex: 1;
-  min-height: 0;
-  position: relative;
-  background: #0a0a0a;
-  border-radius: clamp(10px, 0.45vw, 16px);
-  overflow: hidden;
-}
-
-.lidc-panel-map.is-borderless .lidc-map-frame {
-  border-radius: 0;
 }
 
 .lidc-theater-map {

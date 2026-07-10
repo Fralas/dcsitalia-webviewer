@@ -581,6 +581,31 @@ export default function LidcPage() {
   }, [isDeckPanelFullscreen, isMapPanelFullscreen, selectedAirframeDraft]);
 
   useEffect(() => {
+    if (!mapBoardExpanded || typeof document === 'undefined') return undefined;
+
+    const root = document.documentElement;
+    const appShell = document.querySelector('.app-shell');
+    const header = document.querySelector('.app-header');
+
+    const syncMapFullscreenOffset = () => {
+      const headerHeight = header?.getBoundingClientRect().height ?? 72;
+      root.style.setProperty('--lidc-map-fullscreen-top', `${headerHeight}px`);
+    };
+
+    syncMapFullscreenOffset();
+    appShell?.classList.add('is-lidc-map-fullscreen');
+    document.body.classList.add('lidc-map-fullscreen-open');
+    window.addEventListener('resize', syncMapFullscreenOffset);
+
+    return () => {
+      window.removeEventListener('resize', syncMapFullscreenOffset);
+      root.style.removeProperty('--lidc-map-fullscreen-top');
+      appShell?.classList.remove('is-lidc-map-fullscreen');
+      document.body.classList.remove('lidc-map-fullscreen-open');
+    };
+  }, [mapBoardExpanded]);
+
+  useEffect(() => {
     let mounted = true;
 
     async function loadUserState() {
@@ -1137,14 +1162,13 @@ export default function LidcPage() {
     cancelDeckSlotFlip(mapSlot, mapLayoutTransitionRef);
     const firstRect = mapSlot?.getBoundingClientRect();
 
-    setIsMapPanelFullscreen(false);
-
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (transitionId !== mapLayoutTransitionRef.current.id) return;
 
         setBoardPanelsCollapsed(false);
         setMapBoardExpanded(false);
+        setIsMapPanelFullscreen(false);
         mapLayoutTransitionRef.current.layoutExpanded = false;
 
         scheduleDeckLayoutTransition(mapSlot, firstRect, mapLayoutTransitionRef, {
@@ -2390,9 +2414,9 @@ export default function LidcPage() {
       >
         <div className="lidc-map-frame">
           <LidcTheaterMap layoutKey={Number(mapBoardExpanded) + Number(isMapPanelFullscreen)} />
-          <header className={`lidc-panel-map-overlay ${isMapPanelFullscreen ? 'is-fullscreen' : ''}`}>
+          <header className={`lidc-panel-map-overlay ${mapBoardExpanded ? 'is-fullscreen' : ''}`}>
             <h2 className="lidc-panel-title">{t('lidc.map.title')}</h2>
-            {isMapPanelFullscreen ? (
+            {mapBoardExpanded ? (
               <button
                 type="button"
                 className="lidc-panel-deck-expanded-close"
@@ -2430,7 +2454,7 @@ export default function LidcPage() {
   const isAnyBoardPanelOpen = isDeckBoardExpanded || isMapBoardExpanded;
 
   return (
-    <div className={`lidc-page ${isAnyBoardPanelOpen ? 'is-deck-panel-open' : ''}`}>
+    <div className={`lidc-page ${isAnyBoardPanelOpen ? 'is-deck-panel-open' : ''} ${isMapBoardExpanded ? 'is-map-fullscreen' : ''}`}>
       <div className="lidc-shell">
         <div className={`lidc-board ${isDeckBoardExpanded ? 'is-deck-expanded' : ''} ${isMapBoardExpanded ? 'is-map-expanded' : ''}`}>
           <div
