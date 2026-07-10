@@ -424,7 +424,7 @@ export default {
       remaining: 'Residuo',
       unitCost: 'Costo: {{cost}}',
       totalUnits: 'Unità totali',
-      expandHint: 'Clicca per espandere',
+      expandHint: 'Clicca per aprire a schermo intero',
       fullscreenTitle: 'Gestione deck'
     },
     inviteCode: {
@@ -442,9 +442,27 @@ export default {
     members: {
       empty: 'Nessun membro disponibile nello squadrone.',
       owner: 'Owner',
+      admin: 'Admin',
       member: 'Membro',
-      expandHint: 'Clicca per espandere',
-      fullscreenTitle: 'Gestione membri'
+      expandHint: 'Clicca per aprire a schermo intero',
+      fullscreenTitle: 'Gestione membri',
+      columns: {
+        user: 'Utente',
+        aircrafts: 'Aircrafts assegnati',
+        helicopters: 'Helicopters assegnati',
+        logistics: 'Logistics assegnati',
+        aircraftsShort: 'A',
+        helicoptersShort: 'H',
+        logisticsShort: 'L',
+        role: 'Ruolo',
+        actions: 'Azioni',
+      },
+      actions: {
+        label: 'Azioni',
+        promote: 'Promuovi',
+        demote: 'Degrada',
+        remove: 'Rimuovi',
+      },
     },
     squadrons: {
       listEmpty: 'Nessuno squadrone disponibile.',

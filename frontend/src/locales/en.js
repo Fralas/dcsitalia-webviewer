@@ -424,7 +424,7 @@ export default {
       remaining: 'Remaining',
       unitCost: 'Cost: {{cost}}',
       totalUnits: 'Total units',
-      expandHint: 'Click to expand',
+      expandHint: 'Click to open full screen',
       fullscreenTitle: 'Deck management'
     },
     inviteCode: {
@@ -442,9 +442,27 @@ export default {
     members: {
       empty: 'No squadron members available.',
       owner: 'Owner',
+      admin: 'Admin',
       member: 'Member',
-      expandHint: 'Click to expand',
-      fullscreenTitle: 'Member management'
+      expandHint: 'Click to open full screen',
+      fullscreenTitle: 'Member management',
+      columns: {
+        user: 'User',
+        aircrafts: 'Assigned aircrafts',
+        helicopters: 'Assigned helicopters',
+        logistics: 'Assigned logistics',
+        aircraftsShort: 'A',
+        helicoptersShort: 'H',
+        logisticsShort: 'L',
+        role: 'Role',
+        actions: 'Actions',
+      },
+      actions: {
+        label: 'Actions',
+        promote: 'Promote',
+        demote: 'Demote',
+        remove: 'Remove',
+      },
     },
     squadrons: {
       listEmpty: 'No squadrons available.',

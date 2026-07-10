@@ -41,6 +41,57 @@ const LIDC_SIDEBAR_VIEWS = Object.freeze({
   SQUADRON_MEMBERS: 'squadronMembers',
 });
 
+const DECK_SLOT_FLIP_MS = 520;
+const DECK_SLOT_FLIP_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
+
+function prefersReducedDeckMotion() {
+  return typeof window !== 'undefined'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function flipDeckSlot(deckSlot, firstRect) {
+  if (!deckSlot || !firstRect) return;
+
+  const lastRect = deckSlot.getBoundingClientRect();
+  const dx = firstRect.left - lastRect.left;
+  const dy = firstRect.top - lastRect.top;
+  const sx = firstRect.width / Math.max(lastRect.width, 1);
+  const sy = firstRect.height / Math.max(lastRect.height, 1);
+
+  if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) {
+    return;
+  }
+
+  deckSlot.classList.add('is-flip-animating');
+  deckSlot.style.transformOrigin = 'top left';
+  deckSlot.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
+  deckSlot.style.transition = 'transform 0s';
+
+  requestAnimationFrame(() => {
+    deckSlot.style.transition = `transform ${DECK_SLOT_FLIP_MS}ms ${DECK_SLOT_FLIP_EASING}`;
+    deckSlot.style.transform = '';
+  });
+
+  const onEnd = (event) => {
+    if (event.target !== deckSlot || event.propertyName !== 'transform') return;
+    deckSlot.style.transition = '';
+    deckSlot.style.transform = '';
+    deckSlot.style.transformOrigin = '';
+    deckSlot.classList.remove('is-flip-animating');
+    deckSlot.removeEventListener('transitionend', onEnd);
+  };
+
+  deckSlot.addEventListener('transitionend', onEnd);
+}
+
+function scheduleDeckLayoutTransition(deckSlot, firstRect) {
+  if (!deckSlot || !firstRect) return;
+
+  requestAnimationFrame(() => {
+    flipDeckSlot(deckSlot, firstRect);
+  });
+}
+
 const AIRFRAME_STATUSES = Object.freeze({
   AIRBORNE: 'airborne',
   GROUNDED: 'grounded',
@@ -267,6 +318,8 @@ export default function LidcPage() {
   const [inviteCodeCopied, setInviteCodeCopied] = useState(false);
   const [inviteCodeRevealed, setInviteCodeRevealed] = useState(false);
   const [fullscreenPanelView, setFullscreenPanelView] = useState('');
+  const [deckBoardExpanded, setDeckBoardExpanded] = useState(false);
+  const [boardPanelsCollapsed, setBoardPanelsCollapsed] = useState(false);
 
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -283,6 +336,7 @@ export default function LidcPage() {
   });
   const [memberActionMenuForId, setMemberActionMenuForId] = useState('');
   const memberActionMenuRef = useRef(null);
+  const deckSlotRef = useRef(null);
   const [activeSquadron, setActiveSquadron] = useState(null);
   const [listedSquadrons, setListedSquadrons] = useState([]);
   const [loadingListedSquadrons, setLoadingListedSquadrons] = useState(true);
@@ -409,6 +463,13 @@ export default function LidcPage() {
   }, [user?.id]);
 
   useEffect(() => {
+    const validViews = Object.values(LIDC_SIDEBAR_VIEWS);
+    if (!validViews.includes(activeView)) {
+      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK);
+    }
+  }, [activeView]);
+
+  useEffect(() => {
     if (listedSquadrons.length === 0) return;
 
     const hasCurrentSelection = selectedListSquadronId
@@ -456,15 +517,14 @@ export default function LidcPage() {
 
     const handleKeyDown = (event) => {
       if (event.key !== 'Escape' || selectedAirframeDraft) return;
-      setFullscreenPanelView('');
-      setMemberActionMenuForId('');
+      closeFullscreenPanel();
     };
 
-    document.body.classList.add('lidc-fullscreen-panel-open');
+    document.body.classList.add('lidc-deck-expanded-open');
     document.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      document.body.classList.remove('lidc-fullscreen-panel-open');
+      document.body.classList.remove('lidc-deck-expanded-open');
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [fullscreenPanelView, selectedAirframeDraft]);
@@ -728,6 +788,8 @@ export default function LidcPage() {
     && selectedListSquadronId === String(userLidcState?.squadron?.id || '');
   const isManagementFocusView = isViewingOwnSquadron
     && activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS;
+  const showMemberManagementView = isViewingOwnSquadron
+    && activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS;
   const effectivePreviewBaseId = baseId
     || activeSquadron?.baseId
     || createdSquadron?.baseId
@@ -872,14 +934,56 @@ export default function LidcPage() {
 
   function openFullscreenPanel(view) {
     if (view !== 'deck' && view !== 'members') return;
-    setFullscreenPanelView(view);
-    setMemberActionMenuForId('');
-    setIsPilotMenuOpen(false);
+
+    const deckSlot = deckSlotRef.current;
+
+    if (prefersReducedDeckMotion()) {
+      setBoardPanelsCollapsed(true);
+      setDeckBoardExpanded(true);
+      setFullscreenPanelView(view);
+      setMemberActionMenuForId('');
+      setIsPilotMenuOpen(false);
+      return;
+    }
+
+    const firstRect = deckSlot?.getBoundingClientRect();
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setBoardPanelsCollapsed(true);
+        setDeckBoardExpanded(true);
+        setFullscreenPanelView(view);
+        setMemberActionMenuForId('');
+        setIsPilotMenuOpen(false);
+        scheduleDeckLayoutTransition(deckSlot, firstRect);
+      });
+    });
   }
 
   function closeFullscreenPanel() {
-    setFullscreenPanelView('');
-    setMemberActionMenuForId('');
+    const deckSlot = deckSlotRef.current;
+
+    if (prefersReducedDeckMotion()) {
+      setBoardPanelsCollapsed(false);
+      setDeckBoardExpanded(false);
+      setFullscreenPanelView('');
+      setMemberActionMenuForId('');
+      return;
+    }
+
+    const firstRect = deckSlot?.getBoundingClientRect();
+
+    requestAnimationFrame(() => {
+      setBoardPanelsCollapsed(false);
+      setDeckBoardExpanded(false);
+
+      scheduleDeckLayoutTransition(deckSlot, firstRect);
+
+      window.setTimeout(() => {
+        setFullscreenPanelView('');
+        setMemberActionMenuForId('');
+      }, DECK_SLOT_FLIP_MS);
+    });
   }
 
   function handlePreviewExpandKeyDown(event, view) {
@@ -1231,7 +1335,7 @@ export default function LidcPage() {
       const role = String(member?.role || 'member').toLowerCase();
       const roleLabel = role === 'owner'
         ? t('lidc.members.owner')
-        : (role === 'admin' ? 'Admin' : t('lidc.members.member'));
+        : (role === 'admin' ? t('lidc.members.admin') : t('lidc.members.member'));
       const displayName = formatUserLabel(member);
       const counts = airframeRows.reduce((acc, row) => {
         if (String(row?.pilotUserId || '') !== memberId) return acc;
@@ -1595,28 +1699,31 @@ export default function LidcPage() {
     }
 
     return (
-      <div className={`lidc-airframe-table-wrap ${interactive ? 'is-interactive' : 'is-readonly'}`}>
+      <div className={`lidc-airframe-table-wrap lidc-member-table-wrap ${interactive ? 'is-interactive' : 'is-readonly'}`}>
         <table className="lidc-airframe-table lidc-member-table">
           <thead>
             <tr>
-              <th>Utente</th>
-              <th title="Aircrafts assegnati">
+              <th>{t('lidc.members.columns.user')}</th>
+              <th title={t('lidc.members.columns.aircrafts')}>
                 <span className="lidc-member-count-head">
                   <Plane size={14} />
+                  <span className="lidc-member-count-head-label">{t('lidc.members.columns.aircraftsShort')}</span>
                 </span>
               </th>
-              <th title="Helicopters assegnati">
+              <th title={t('lidc.members.columns.helicopters')}>
                 <span className="lidc-member-count-head">
                   <Helicopter size={14} />
+                  <span className="lidc-member-count-head-label">{t('lidc.members.columns.helicoptersShort')}</span>
                 </span>
               </th>
-              <th title="Logistics assegnati">
+              <th title={t('lidc.members.columns.logistics')}>
                 <span className="lidc-member-count-head">
                   <Forklift size={14} />
+                  <span className="lidc-member-count-head-label">{t('lidc.members.columns.logisticsShort')}</span>
                 </span>
               </th>
-              <th>Ruolo</th>
-              {interactive && <th>Azioni</th>}
+              <th>{t('lidc.members.columns.role')}</th>
+              {interactive && <th>{t('lidc.members.columns.actions')}</th>}
             </tr>
           </thead>
           <tbody>
@@ -1635,22 +1742,22 @@ export default function LidcPage() {
                   </div>
                 </td>
                 <td className="lidc-member-count-cell">
-                  <span className="lidc-member-assigned-count">
-                    <strong>{member.assignedAircraftCountA}</strong>
+                  <span className={`lidc-member-count-badge ${member.assignedAircraftCountA === 0 ? 'is-zero' : ''}`}>
+                    {member.assignedAircraftCountA}
                   </span>
                 </td>
                 <td className="lidc-member-count-cell">
-                  <span className="lidc-member-assigned-count">
-                    <strong>{member.assignedAircraftCountH}</strong>
+                  <span className={`lidc-member-count-badge ${member.assignedAircraftCountH === 0 ? 'is-zero' : ''}`}>
+                    {member.assignedAircraftCountH}
                   </span>
                 </td>
                 <td className="lidc-member-count-cell">
-                  <span className="lidc-member-assigned-count">
-                    <strong>{member.assignedAircraftCountL}</strong>
+                  <span className={`lidc-member-count-badge ${member.assignedAircraftCountL === 0 ? 'is-zero' : ''}`}>
+                    {member.assignedAircraftCountL}
                   </span>
                 </td>
                 <td>
-                  <span className="lidc-member-role-text">
+                  <span className={`lidc-member-role-chip ${member.role === 'owner' ? 'is-owner' : ''} ${member.role === 'admin' ? 'is-admin' : ''}`}>
                     {member.roleLabel}
                   </span>
                 </td>
@@ -1662,7 +1769,7 @@ export default function LidcPage() {
                         className={`lidc-member-action-trigger ${memberActionMenuForId === member.memberId ? 'is-open' : ''}`}
                         onClick={() => setMemberActionMenuForId((prev) => (prev === member.memberId ? '' : member.memberId))}
                       >
-                        Azioni
+                        {t('lidc.members.actions.label')}
                         <ChevronDown size={12} />
                       </button>
 
@@ -1673,21 +1780,21 @@ export default function LidcPage() {
                             className="lidc-member-action-menu-item"
                             disabled={member.role === 'owner' || member.role === 'admin'}
                           >
-                            Promuovi
+                            {t('lidc.members.actions.promote')}
                           </button>
                           <button
                             type="button"
                             className="lidc-member-action-menu-item"
                             disabled={member.role === 'owner' || member.role !== 'admin'}
                           >
-                            Degrada
+                            {t('lidc.members.actions.demote')}
                           </button>
                           <button
                             type="button"
                             className="lidc-member-action-menu-item is-danger"
                             disabled={member.role === 'owner'}
                           >
-                            Rimuovi
+                            {t('lidc.members.actions.remove')}
                           </button>
                         </div>
                       )}
@@ -1700,6 +1807,28 @@ export default function LidcPage() {
         </table>
       </div>
     );
+  }
+
+  function renderExpandedPanelContent() {
+    if (fullscreenPanelView === 'deck') {
+      return (
+        <div className="lidc-panel-deck-expanded-content">
+          {renderCapsView()}
+          {renderAirframeTable({ interactive: true })}
+        </div>
+      );
+    }
+
+    if (fullscreenPanelView === 'members') {
+      return (
+        <div className="lidc-panel-deck-expanded-content">
+          {renderSquadronManagementActions()}
+          {renderMembersTable({ interactive: true })}
+        </div>
+      );
+    }
+
+    return null;
   }
 
   function renderExpandableTablePreview({ view, title, hint, children }) {
@@ -1755,47 +1884,6 @@ export default function LidcPage() {
           children: renderMembersTable({ interactive: false }),
         })}
       </div>
-    );
-  }
-
-  function renderFullscreenPanelPortal() {
-    if (!fullscreenPanelView || typeof document === 'undefined') return null;
-
-    const title = fullscreenPanelView === 'deck'
-      ? t('lidc.deck.fullscreenTitle')
-      : t('lidc.members.fullscreenTitle');
-
-    return createPortal(
-      <div className="lidc-deck-fullscreen-root" role="dialog" aria-modal="true" aria-label={title}>
-        <header className="lidc-deck-fullscreen-head">
-          <h2>{title}</h2>
-          <button
-            type="button"
-            className="lidc-deck-fullscreen-close"
-            onClick={closeFullscreenPanel}
-            aria-label={t('lidc.wizard.close')}
-          >
-            <X size={18} />
-          </button>
-        </header>
-
-        <div className="lidc-deck-fullscreen-body">
-          {fullscreenPanelView === 'deck' && (
-            <>
-              {renderCapsView()}
-              {renderAirframeTable({ interactive: true })}
-            </>
-          )}
-
-          {fullscreenPanelView === 'members' && (
-            <>
-              {renderSquadronManagementActions()}
-              {renderMembersTable({ interactive: true })}
-            </>
-          )}
-        </div>
-      </div>,
-      document.body,
     );
   }
 
@@ -2056,30 +2144,68 @@ export default function LidcPage() {
   }
 
   function renderSquadronDeckPanel() {
-    const showLockedOverlay = !userHasSquadron && !loadingUserState;
+    const showLockedOverlay = !userHasSquadron && !loadingUserState && !fullscreenPanelView;
     const hasSelectedSquadron = Boolean(activeSquadron);
+    const expandedTitle = fullscreenPanelView === 'deck'
+      ? t('lidc.deck.fullscreenTitle')
+      : fullscreenPanelView === 'members'
+        ? t('lidc.members.fullscreenTitle')
+        : '';
 
     return (
-      <section className={`lidc-panel lidc-panel-deck ${isManagementFocusView ? 'is-management-focus' : ''}`}>
-        <h2 className="lidc-panel-title">SQUADRON DECK</h2>
-        {renderDeckViewNav()}
+      <section
+        className={[
+          'lidc-panel',
+          'lidc-panel-deck',
+          isManagementFocusView ? 'is-management-focus' : '',
+          fullscreenPanelView ? 'is-expanded' : '',
+        ].filter(Boolean).join(' ')}
+        aria-expanded={Boolean(fullscreenPanelView)}
+      >
+        {fullscreenPanelView ? (
+          <header className="lidc-panel-deck-expanded-head">
+            <h2 className="lidc-panel-title">{expandedTitle}</h2>
+            <button
+              type="button"
+              className="lidc-panel-deck-expanded-close"
+              onClick={closeFullscreenPanel}
+              aria-label={t('lidc.wizard.close')}
+            >
+              <X size={18} />
+            </button>
+          </header>
+        ) : (
+          <>
+            <h2 className="lidc-panel-title">SQUADRON DECK</h2>
+            {renderDeckViewNav()}
+          </>
+        )}
+
         <div className="lidc-panel-deck-body">
-          {isViewingOwnSquadron && activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS && renderMemberManagementView()}
-          {(!isViewingOwnSquadron || activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_DECK) && (
-            loadingSquadronDetails ? (
-              <div className="lidc-loading">
-                <Loader2 size={14} className="spin" />
-                <span>{t('lidc.general.loading')}</span>
-              </div>
-            ) : hasSelectedSquadron ? (
-              renderDeckVisualizationView()
-            ) : (
-              <div className="lidc-panel-rows">
-                {Array.from({ length: 6 }).map((_, index) => (
-                  <div key={`deck-placeholder-${index}`} className="lidc-panel-row lidc-panel-row--placeholder" />
-                ))}
-              </div>
-            )
+          {fullscreenPanelView ? (
+            renderExpandedPanelContent()
+          ) : showMemberManagementView ? (
+            renderMemberManagementView()
+          ) : loadingSquadronDetails ? (
+            <div className="lidc-loading">
+              <Loader2 size={14} className="spin" />
+              <span>{t('lidc.general.loading')}</span>
+            </div>
+          ) : squadronDetailsError ? (
+            <div className="lidc-inline-error">{squadronDetailsError}</div>
+          ) : hasSelectedSquadron ? (
+            renderDeckVisualizationView()
+          ) : selectedListSquadronId ? (
+            <div className="lidc-loading">
+              <Loader2 size={14} className="spin" />
+              <span>{t('lidc.general.loading')}</span>
+            </div>
+          ) : (
+            <div className="lidc-panel-rows">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div key={`deck-placeholder-${index}`} className="lidc-panel-row lidc-panel-row--placeholder" />
+              ))}
+            </div>
           )}
         </div>
         {showLockedOverlay && <div className="lidc-panel-overlay" aria-hidden="true" />}
@@ -2103,14 +2229,36 @@ export default function LidcPage() {
     && !userHasSquadron
     && isLogged;
 
+  const isDeckBoardExpanded = deckBoardExpanded;
+
   return (
-    <div className="lidc-page">
+    <div className={`lidc-page ${isDeckBoardExpanded ? 'is-deck-panel-open' : ''}`}>
       <div className="lidc-shell">
-        <div className="lidc-board">
-          {renderSquadronListPanel()}
-          {renderMySquadronPanel()}
-          {renderMapPanel()}
-          {renderSquadronDeckPanel()}
+        <div className={`lidc-board ${isDeckBoardExpanded ? 'is-deck-expanded' : ''}`}>
+          <div
+            className={`lidc-board-slot lidc-board-slot-list ${boardPanelsCollapsed ? 'is-collapsed' : ''}`}
+            aria-hidden={boardPanelsCollapsed}
+          >
+            {renderSquadronListPanel()}
+          </div>
+          <div
+            className={`lidc-board-slot lidc-board-slot-squadron ${boardPanelsCollapsed ? 'is-collapsed' : ''}`}
+            aria-hidden={boardPanelsCollapsed}
+          >
+            {renderMySquadronPanel()}
+          </div>
+          <div
+            className={`lidc-board-slot lidc-board-slot-map ${boardPanelsCollapsed ? 'is-collapsed' : ''}`}
+            aria-hidden={boardPanelsCollapsed}
+          >
+            {renderMapPanel()}
+          </div>
+          <div
+            ref={deckSlotRef}
+            className={`lidc-board-slot lidc-board-slot-deck ${isDeckBoardExpanded ? 'is-expanded' : ''}`}
+          >
+            {renderSquadronDeckPanel()}
+          </div>
         </div>
       </div>
 
@@ -2596,8 +2744,6 @@ export default function LidcPage() {
           </div>
         </div>
       )}
-
-      {renderFullscreenPanelPortal()}
 
       {isTemplateEditorOpen && (
         <div className="lidc-modal-root">
