@@ -65,9 +65,16 @@
 .lidc-page.is-map-fullscreen .lidc-board-slot-map.is-expanded .lidc-panel-map {
   width: 100%;
   height: 100%;
+  min-height: 0;
   border: 0;
   border-radius: 0;
   background: #0a0a0a;
+}
+
+.lidc-page.is-map-fullscreen .lidc-board-slot-map.is-expanded .lidc-map-frame {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
 }
 
 .lidc-page.is-map-fullscreen .lidc-board-slot-map.is-flip-animating {
@@ -271,10 +278,15 @@ body.lidc-map-fullscreen-open {
 
 .lidc-panel-map {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
   border: 1px solid #838383;
   border-radius: clamp(14px, 0.68vw, 26px);
   background: #0a0a0a;
-  min-height: 0;
   overflow: hidden;
 }
 
@@ -291,16 +303,34 @@ body.lidc-map-fullscreen-open {
 }
 
 .lidc-map-frame {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   background: #0a0a0a;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.lidc-map-frame > .lidc-theater-map-root {
+  grid-area: 1 / 1;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  z-index: 0;
 }
 
 .lidc-panel-map-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  grid-area: 1 / 1;
+  align-self: start;
+  justify-self: stretch;
+  position: relative;
   z-index: 2;
   display: flex;
   align-items: center;
@@ -309,8 +339,8 @@ body.lidc-map-fullscreen-open {
   padding: clamp(16px, 0.95vw, 32px);
   background: linear-gradient(
     180deg,
-    rgba(10, 10, 10, 0.88) 0%,
-    rgba(10, 10, 10, 0.52) 58%,
+    rgba(10, 10, 10, 0.78) 0%,
+    rgba(10, 10, 10, 0.34) 52%,
     rgba(10, 10, 10, 0) 100%
   );
   pointer-events: none;
@@ -358,6 +388,7 @@ body.lidc-map-fullscreen-open {
   position: relative;
   width: 100%;
   height: 100%;
+  min-height: 0;
 }
 
 .lidc-theater-map {

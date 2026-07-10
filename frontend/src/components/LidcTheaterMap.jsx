@@ -43,7 +43,7 @@ const MAP_STYLE = {
 function fitTheaterBounds(map) {
   const [west, south, east, north] = AFGHANISTAN_THEATER_BOUNDS;
   map.fitBounds([[west, south], [east, north]], {
-    padding: { top: 44, right: 44, bottom: 44, left: 44 },
+    padding: { top: 28, right: 28, bottom: 28, left: 28 },
     duration: 0,
   });
 }
