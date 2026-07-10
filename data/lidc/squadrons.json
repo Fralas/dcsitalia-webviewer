@@ -191,5 +191,315 @@
         "createdAt": 1783684338728
       }
     ]
+  },
+  {
+    "id": "lidc_mock_grifoni_strike",
+    "name": "Grifoni Strike",
+    "description": "Squadron mock orientato a strike e superiorita aerea.",
+    "logoDataUrl": "",
+    "baseId": "rayak",
+    "templateId": "strike-wing",
+    "templateName": "Strike Wing",
+    "deck": {
+      "aircrafts": [
+        {
+          "unitId": "f16c",
+          "quantity": 2
+        },
+        {
+          "unitId": "fa18c",
+          "quantity": 2
+        }
+      ],
+      "helicopters": [
+        {
+          "unitId": "ah64d",
+          "quantity": 1
+        }
+      ],
+      "logistics": [
+        {
+          "unitId": "c130j",
+          "quantity": 1
+        }
+      ],
+      "groundAssets": [
+        {
+          "unitId": "m1a2",
+          "quantity": 1
+        }
+      ]
+    },
+    "inviteCode": "MOCK0001",
+    "members": [
+      {
+        "userId": "mock_owner_01",
+        "role": "owner",
+        "joinedAt": 1783600000000
+      },
+      {
+        "userId": "mock_member_01",
+        "role": "member",
+        "joinedAt": 1783600100000
+      },
+      {
+        "userId": "mock_member_02",
+        "role": "member",
+        "joinedAt": 1783600200000
+      },
+      {
+        "userId": "mock_member_03",
+        "role": "member",
+        "joinedAt": 1783600300000
+      }
+    ],
+    "costSummary": {
+      "caps": {
+        "aircrafts": 420,
+        "helicopters": 220,
+        "logistics": 220,
+        "groundAssets": 180
+      },
+      "spent": {
+        "aircrafts": 390,
+        "helicopters": 110,
+        "logistics": 130,
+        "groundAssets": 85
+      },
+      "remaining": {
+        "aircrafts": 30,
+        "helicopters": 110,
+        "logistics": 90,
+        "groundAssets": 95
+      },
+      "totalSpent": 715,
+      "totalUnits": 7
+    },
+    "createdAt": 1783600000000,
+    "createdBy": {
+      "id": "mock_owner_01",
+      "globalName": "Andrea Grifoni",
+      "username": "agrifoni",
+      "avatarUrl": "https://i.pravatar.cc/80?img=8"
+    },
+    "airframes": [
+      {
+        "id": "airframe_f16c_1_e48923",
+        "unitId": "f16c",
+        "unitLabel": "F-16C",
+        "category": "aircrafts",
+        "cost": 95,
+        "boardNumber": "714GD",
+        "assignedPilotUserId": null,
+        "createdAt": 1783698907749
+      },
+      {
+        "id": "airframe_f16c_2_99462e",
+        "unitId": "f16c",
+        "unitLabel": "F-16C",
+        "category": "aircrafts",
+        "cost": 95,
+        "boardNumber": "092GX",
+        "assignedPilotUserId": null,
+        "createdAt": 1783698907749
+      },
+      {
+        "id": "airframe_fa18c_1_57aae0",
+        "unitId": "fa18c",
+        "unitLabel": "F/A-18C Hornet",
+        "category": "aircrafts",
+        "cost": 100,
+        "boardNumber": "530TD",
+        "assignedPilotUserId": null,
+        "createdAt": 1783698907749
+      },
+      {
+        "id": "airframe_fa18c_2_a3366a",
+        "unitId": "fa18c",
+        "unitLabel": "F/A-18C Hornet",
+        "category": "aircrafts",
+        "cost": 100,
+        "boardNumber": "666JU",
+        "assignedPilotUserId": null,
+        "createdAt": 1783698907749
+      },
+      {
+        "id": "airframe_m1a2_1_79982b",
+        "unitId": "m1a2",
+        "unitLabel": "M1A2 Abrams",
+        "category": "groundAssets",
+        "cost": 85,
+        "boardNumber": "559UT",
+        "assignedPilotUserId": null,
+        "createdAt": 1783698907749
+      },
+      {
+        "id": "airframe_ah64d_1_9515d0",
+        "unitId": "ah64d",
+        "unitLabel": "AH-64D Apache",
+        "category": "helicopters",
+        "cost": 110,
+        "boardNumber": "704NY",
+        "assignedPilotUserId": null,
+        "createdAt": 1783698907749
+      },
+      {
+        "id": "airframe_c130j_1_1ab522",
+        "unitId": "c130j",
+        "unitLabel": "C-130J Super Hercules",
+        "category": "logistics",
+        "cost": 130,
+        "boardNumber": "163SF",
+        "assignedPilotUserId": null,
+        "createdAt": 1783698907749
+      }
+    ]
+  },
+  {
+    "id": "lidc_mock_falchi_log",
+    "name": "Falchi Logistici",
+    "description": "Squadron mock focalizzato su trasporto e sustainment.",
+    "logoDataUrl": "",
+    "baseId": "damascus",
+    "templateId": "task-force-logistics",
+    "templateName": "Task Force Logistica",
+    "deck": {
+      "aircrafts": [],
+      "helicopters": [
+        {
+          "unitId": "mi24p",
+          "quantity": 1
+        }
+      ],
+      "logistics": [
+        {
+          "unitId": "c130j",
+          "quantity": 2
+        },
+        {
+          "unitId": "ch47f",
+          "quantity": 1
+        },
+        {
+          "unitId": "mi8mt",
+          "quantity": 1
+        }
+      ],
+      "groundAssets": [
+        {
+          "unitId": "farp-team",
+          "quantity": 1
+        }
+      ]
+    },
+    "inviteCode": "MOCK0002",
+    "members": [
+      {
+        "userId": "mock_owner_02",
+        "role": "owner",
+        "joinedAt": 1783500000000
+      },
+      {
+        "userId": "mock_member_04",
+        "role": "member",
+        "joinedAt": 1783500100000
+      },
+      {
+        "userId": "mock_member_05",
+        "role": "member",
+        "joinedAt": 1783500200000
+      }
+    ],
+    "costSummary": {
+      "caps": {
+        "aircrafts": 160,
+        "helicopters": 240,
+        "logistics": 500,
+        "groundAssets": 200
+      },
+      "spent": {
+        "aircrafts": 0,
+        "helicopters": 100,
+        "logistics": 465,
+        "groundAssets": 45
+      },
+      "remaining": {
+        "aircrafts": 160,
+        "helicopters": 140,
+        "logistics": 35,
+        "groundAssets": 155
+      },
+      "totalSpent": 610,
+      "totalUnits": 6
+    },
+    "createdAt": 1783500000000,
+    "createdBy": {
+      "id": "mock_owner_02",
+      "globalName": "Elena Falchi",
+      "username": "efalchi",
+      "avatarUrl": "https://i.pravatar.cc/80?img=25"
+    },
+    "airframes": [
+      {
+        "id": "airframe_farp-team_1_43e944",
+        "unitId": "farp-team",
+        "unitLabel": "FARP Support Team",
+        "category": "groundAssets",
+        "cost": 45,
+        "boardNumber": "289HB",
+        "assignedPilotUserId": null,
+        "createdAt": 1783698908540
+      },
+      {
+        "id": "airframe_mi24p_1_17ad46",
+        "unitId": "mi24p",
+        "unitLabel": "Mi-24P Hind",
+        "category": "helicopters",
+        "cost": 100,
+        "boardNumber": "459PX",
+        "assignedPilotUserId": null,
+        "createdAt": 1783698908540
+      },
+      {
+        "id": "airframe_c130j_1_a4e75e",
+        "unitId": "c130j",
+        "unitLabel": "C-130J Super Hercules",
+        "category": "logistics",
+        "cost": 130,
+        "boardNumber": "114QY",
+        "assignedPilotUserId": null,
+        "createdAt": 1783698908540
+      },
+      {
+        "id": "airframe_c130j_2_b2db83",
+        "unitId": "c130j",
+        "unitLabel": "C-130J Super Hercules",
+        "category": "logistics",
+        "cost": 130,
+        "boardNumber": "535GL",
+        "assignedPilotUserId": null,
+        "createdAt": 1783698908540
+      },
+      {
+        "id": "airframe_ch47f_1_e74040",
+        "unitId": "ch47f",
+        "unitLabel": "CH-47F Chinook",
+        "category": "logistics",
+        "cost": 115,
+        "boardNumber": "856UN",
+        "assignedPilotUserId": null,
+        "createdAt": 1783698908540
+      },
+      {
+        "id": "airframe_mi8mt_1_912525",
+        "unitId": "mi8mt",
+        "unitLabel": "Mi-8MT",
+        "category": "logistics",
+        "cost": 90,
+        "boardNumber": "196GJ",
+        "assignedPilotUserId": null,
+        "createdAt": 1783698908540
+      }
+    ]
   }
 ]

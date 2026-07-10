@@ -788,10 +788,15 @@ export default function LidcPage() {
   const isViewingOwnSquadron = userHasSquadron
     && Boolean(selectedListSquadronId)
     && selectedListSquadronId === String(userLidcState?.squadron?.id || '');
+  const isViewingListedSquadronDeck = Boolean(selectedListSquadronId)
+    && Boolean(activeSquadron)
+    && String(activeSquadron.id) === String(selectedListSquadronId)
+    && !isViewingOwnSquadron;
   const isManagementFocusView = isViewingOwnSquadron
     && activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS;
-  const isDeckFocusView = isViewingOwnSquadron
-    && activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_DECK;
+  const isDeckFocusView = (isViewingOwnSquadron
+    && activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_DECK)
+    || isViewingListedSquadronDeck;
   const isTableFocusView = isDeckPanelFullscreen || isManagementFocusView || isDeckFocusView;
   const showMemberManagementView = isManagementFocusView;
   const showDeckManagementView = isDeckFocusView;
@@ -1872,12 +1877,7 @@ export default function LidcPage() {
           </div>
         );
       }
-      return renderExpandableTablePreview({
-        view: 'deck',
-        title: t('lidc.views.deck'),
-        hint: t('lidc.deck.expandHint'),
-        children: renderAirframeTable({ interactive: false }),
-      });
+      return renderDeckManagementView();
     }
 
     if (selectedListSquadronId) {
@@ -2591,15 +2591,31 @@ export default function LidcPage() {
       )}
 
       {selectedAirframeDraft && (
-        <div className="lidc-modal-root">
-          <button type="button" className="lidc-modal-backdrop" onClick={closeAirframeEditor} />
-          <div className="lidc-modal-card lidc-airframe-modal-card">
-            <div className="lidc-modal-head">
-              <h3>{t('lidc.airframes.editorTitle')}</h3>
-            </div>
+        <div className="lidc-modal-root lidc-airframe-modal-root">
+          <button type="button" className="lidc-modal-backdrop lidc-airframe-modal-backdrop" onClick={closeAirframeEditor} />
+          <div className="lidc-modal-card lidc-airframe-modal-card" role="dialog" aria-modal="true" aria-labelledby="lidc-airframe-modal-title">
+            <header className="lidc-airframe-modal-head">
+              <div className="lidc-airframe-modal-head-main">
+                <h3 id="lidc-airframe-modal-title">{t('lidc.airframes.editorTitle')}</h3>
+                {selectedAirframeRow && (
+                  <p className="lidc-airframe-modal-subtitle">
+                    {selectedAirframeRow.model}
+                    {selectedAirframeRow.boardNumber ? ` · ${selectedAirframeRow.boardNumber}` : ''}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                className="lidc-panel-deck-expanded-close"
+                onClick={closeAirframeEditor}
+                aria-label={t('lidc.wizard.close')}
+              >
+                <X size={18} />
+              </button>
+            </header>
 
             {selectedAirframeRow ? (
-              <>
+              <div className="lidc-airframe-modal-body">
                 <div className="lidc-airframe-meta-stack">
                   <div className="lidc-airframe-readonly-grid">
                     <article className="lidc-airframe-readonly-item">
@@ -2616,7 +2632,9 @@ export default function LidcPage() {
                     </article>
                     <article className="lidc-airframe-readonly-item">
                       <span>{t('lidc.airframes.columns.status')}</span>
-                      <strong>{getAirframeStatusLabel(selectedAirframeRow.status)}</strong>
+                      <span className={`lidc-status-pill is-${String(selectedAirframeRow.status || 'grounded').toLowerCase()}`}>
+                        {getAirframeStatusLabel(selectedAirframeRow.status)}
+                      </span>
                     </article>
                   </div>
 
@@ -2690,7 +2708,7 @@ export default function LidcPage() {
                 <section className="lidc-airframe-log-panel">
                   <header>
                     <h4>{t('lidc.airframes.logsTitle')}</h4>
-                    <span>{t('lidc.airframes.logsMockBadge')}</span>
+                    <span className="lidc-chip">{t('lidc.airframes.logsMockBadge')}</span>
                   </header>
                   <div className="lidc-airframe-log-list">
                     {(selectedAirframeRow.logs || []).map((log) => (
@@ -2705,7 +2723,7 @@ export default function LidcPage() {
                     ))}
                   </div>
                 </section>
-              </>
+              </div>
             ) : (
               <div className="lidc-muted-box">{t('lidc.airframes.empty')}</div>
             )}
@@ -2714,7 +2732,7 @@ export default function LidcPage() {
               <div className="lidc-inline-error">{airframeEditorError || airframeUpdateError}</div>
             )}
 
-            <div className="lidc-modal-actions">
+            <div className="lidc-modal-actions lidc-airframe-modal-actions">
               <button type="button" className="lidc-btn lidc-btn-outline" onClick={closeAirframeEditor}>
                 {t('lidc.general.cancel')}
               </button>
