@@ -353,6 +353,8 @@ export default function LidcPage() {
   const [inviteCodeRevealed, setInviteCodeRevealed] = useState(false);
   const [isDeckPanelFullscreen, setIsDeckPanelFullscreen] = useState(false);
   const [deckBoardExpanded, setDeckBoardExpanded] = useState(false);
+  const [isMapPanelFullscreen, setIsMapPanelFullscreen] = useState(false);
+  const [mapBoardExpanded, setMapBoardExpanded] = useState(false);
   const [boardPanelsCollapsed, setBoardPanelsCollapsed] = useState(false);
 
   const [submitError, setSubmitError] = useState('');
@@ -371,7 +373,13 @@ export default function LidcPage() {
   const [memberActionMenuForId, setMemberActionMenuForId] = useState('');
   const memberActionMenuRef = useRef(null);
   const deckSlotRef = useRef(null);
+  const mapSlotRef = useRef(null);
   const deckLayoutTransitionRef = useRef({
+    id: 0,
+    onTransitionEnd: null,
+    layoutExpanded: false,
+  });
+  const mapLayoutTransitionRef = useRef({
     id: 0,
     onTransitionEnd: null,
     layoutExpanded: false,
@@ -552,11 +560,15 @@ export default function LidcPage() {
   }, [shouldBlurBehindOverlay]);
 
   useEffect(() => {
-    if (!isDeckPanelFullscreen || typeof document === 'undefined') return undefined;
+    if ((!isDeckPanelFullscreen && !isMapPanelFullscreen) || typeof document === 'undefined') return undefined;
 
     const handleKeyDown = (event) => {
       if (event.key !== 'Escape' || selectedAirframeDraft) return;
-      closeFullscreenPanel();
+      if (isMapPanelFullscreen) {
+        closeMapFullscreen();
+      } else if (isDeckPanelFullscreen) {
+        closeFullscreenPanel();
+      }
     };
 
     document.body.classList.add('lidc-deck-expanded-open');
@@ -566,7 +578,7 @@ export default function LidcPage() {
       document.body.classList.remove('lidc-deck-expanded-open');
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isDeckPanelFullscreen, selectedAirframeDraft]);
+  }, [isDeckPanelFullscreen, isMapPanelFullscreen, selectedAirframeDraft]);
 
   useEffect(() => {
     let mounted = true;
@@ -975,7 +987,29 @@ export default function LidcPage() {
     setInviteCodeRevealed((prev) => !prev);
   }
 
+  function resetMapExpansion() {
+    ++mapLayoutTransitionRef.current.id;
+    cancelDeckSlotFlip(mapSlotRef.current, mapLayoutTransitionRef);
+    mapLayoutTransitionRef.current.layoutExpanded = false;
+    setMapBoardExpanded(false);
+    setIsMapPanelFullscreen(false);
+  }
+
+  function resetDeckExpansion() {
+    ++deckLayoutTransitionRef.current.id;
+    cancelDeckSlotFlip(deckSlotRef.current, deckLayoutTransitionRef);
+    deckLayoutTransitionRef.current.layoutExpanded = false;
+    setDeckBoardExpanded(false);
+    setIsDeckPanelFullscreen(false);
+    setMemberActionMenuForId('');
+    setIsPilotMenuOpen(false);
+  }
+
   function openFullscreenPanel(view) {
+    if (mapBoardExpanded || isMapPanelFullscreen) {
+      resetMapExpansion();
+    }
+
     if (view === 'deck') {
       setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK);
     } else if (view === 'members') {
@@ -1045,6 +1079,75 @@ export default function LidcPage() {
         deckLayoutTransitionRef.current.layoutExpanded = false;
 
         scheduleDeckLayoutTransition(deckSlot, firstRect, deckLayoutTransitionRef, {
+          transitionId,
+          force: shouldForceFlip,
+        });
+      });
+    });
+  }
+
+  function openMapFullscreen() {
+    if (deckBoardExpanded || isDeckPanelFullscreen) {
+      resetDeckExpansion();
+    }
+
+    const transitionId = ++mapLayoutTransitionRef.current.id;
+    const mapSlot = mapSlotRef.current;
+
+    if (prefersReducedDeckMotion()) {
+      mapLayoutTransitionRef.current.layoutExpanded = true;
+      setBoardPanelsCollapsed(true);
+      setMapBoardExpanded(true);
+      setIsMapPanelFullscreen(true);
+      return;
+    }
+
+    cancelDeckSlotFlip(mapSlot, mapLayoutTransitionRef);
+    const firstRect = mapSlot?.getBoundingClientRect();
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (transitionId !== mapLayoutTransitionRef.current.id) return;
+
+        setBoardPanelsCollapsed(true);
+        setMapBoardExpanded(true);
+        mapLayoutTransitionRef.current.layoutExpanded = true;
+        setIsMapPanelFullscreen(true);
+        scheduleDeckLayoutTransition(mapSlot, firstRect, mapLayoutTransitionRef, { transitionId });
+      });
+    });
+  }
+
+  function closeMapFullscreen() {
+    const transitionId = ++mapLayoutTransitionRef.current.id;
+    const mapSlot = mapSlotRef.current;
+    const shouldForceFlip = mapLayoutTransitionRef.current.layoutExpanded
+      || Boolean(mapSlot?.classList.contains('is-expanded'))
+      || isMapPanelFullscreen;
+
+    if (prefersReducedDeckMotion()) {
+      mapLayoutTransitionRef.current.layoutExpanded = false;
+      cancelDeckSlotFlip(mapSlot, mapLayoutTransitionRef);
+      setBoardPanelsCollapsed(false);
+      setMapBoardExpanded(false);
+      setIsMapPanelFullscreen(false);
+      return;
+    }
+
+    cancelDeckSlotFlip(mapSlot, mapLayoutTransitionRef);
+    const firstRect = mapSlot?.getBoundingClientRect();
+
+    setIsMapPanelFullscreen(false);
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (transitionId !== mapLayoutTransitionRef.current.id) return;
+
+        setBoardPanelsCollapsed(false);
+        setMapBoardExpanded(false);
+        mapLayoutTransitionRef.current.layoutExpanded = false;
+
+        scheduleDeckLayoutTransition(mapSlot, firstRect, mapLayoutTransitionRef, {
           transitionId,
           force: shouldForceFlip,
         });
@@ -2276,7 +2379,37 @@ export default function LidcPage() {
 
   function renderMapPanel() {
     return (
-      <aside className="lidc-panel-map" aria-label="Theater map">
+      <aside
+        className={[
+          'lidc-panel-map',
+          mapBoardExpanded ? 'is-expanded' : '',
+          isMapPanelFullscreen ? 'is-borderless' : '',
+        ].filter(Boolean).join(' ')}
+        aria-label={t('lidc.map.title')}
+        aria-expanded={mapBoardExpanded}
+      >
+        <header className={`lidc-panel-map-head ${isMapPanelFullscreen ? 'is-fullscreen' : ''}`}>
+          <h2 className="lidc-panel-title">{t('lidc.map.title')}</h2>
+          {isMapPanelFullscreen ? (
+            <button
+              type="button"
+              className="lidc-panel-deck-expanded-close"
+              onClick={closeMapFullscreen}
+              aria-label={t('lidc.wizard.close')}
+            >
+              <X size={18} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="lidc-panel-deck-expand-hint"
+              onClick={openMapFullscreen}
+            >
+              <Maximize2 size={13} />
+              {t('lidc.map.expandHint')}
+            </button>
+          )}
+        </header>
         <div className="lidc-map-frame">
           <LidcTheaterMap />
         </div>
@@ -2293,11 +2426,13 @@ export default function LidcPage() {
     && isLogged;
 
   const isDeckBoardExpanded = deckBoardExpanded;
+  const isMapBoardExpanded = mapBoardExpanded;
+  const isAnyBoardPanelOpen = isDeckBoardExpanded || isMapBoardExpanded;
 
   return (
-    <div className={`lidc-page ${isDeckBoardExpanded ? 'is-deck-panel-open' : ''}`}>
+    <div className={`lidc-page ${isAnyBoardPanelOpen ? 'is-deck-panel-open' : ''}`}>
       <div className="lidc-shell">
-        <div className={`lidc-board ${isDeckBoardExpanded ? 'is-deck-expanded' : ''}`}>
+        <div className={`lidc-board ${isDeckBoardExpanded ? 'is-deck-expanded' : ''} ${isMapBoardExpanded ? 'is-map-expanded' : ''}`}>
           <div
             className={`lidc-board-slot lidc-board-slot-list ${boardPanelsCollapsed ? 'is-collapsed' : ''}`}
             aria-hidden={boardPanelsCollapsed}
@@ -2311,14 +2446,26 @@ export default function LidcPage() {
             {renderMySquadronPanel()}
           </div>
           <div
-            className={`lidc-board-slot lidc-board-slot-map ${boardPanelsCollapsed ? 'is-collapsed' : ''}`}
-            aria-hidden={boardPanelsCollapsed}
+            ref={mapSlotRef}
+            className={[
+              'lidc-board-slot',
+              'lidc-board-slot-map',
+              deckBoardExpanded ? 'is-collapsed' : '',
+              mapBoardExpanded ? 'is-expanded' : '',
+            ].filter(Boolean).join(' ')}
+            aria-hidden={deckBoardExpanded}
           >
             {renderMapPanel()}
           </div>
           <div
             ref={deckSlotRef}
-            className={`lidc-board-slot lidc-board-slot-deck ${isDeckBoardExpanded ? 'is-expanded' : ''}`}
+            className={[
+              'lidc-board-slot',
+              'lidc-board-slot-deck',
+              mapBoardExpanded ? 'is-collapsed' : '',
+              deckBoardExpanded ? 'is-expanded' : '',
+            ].filter(Boolean).join(' ')}
+            aria-hidden={mapBoardExpanded}
           >
             {renderSquadronDeckPanel()}
           </div>

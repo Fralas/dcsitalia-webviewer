@@ -317,6 +317,10 @@ export default {
       deck: 'Visualizzazione deck',
       invites: 'Visualizzazione inviti'
     },
+    map: {
+      title: 'MAPPA TEATRO',
+      expandHint: 'Clicca per aprire a schermo intero',
+    },
     steps: {
       info: 'Squadron Info',
       template: 'Template',

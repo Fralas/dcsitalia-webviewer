@@ -67,7 +67,8 @@
   transition: gap var(--lidc-deck-restore-ms) var(--lidc-deck-easing);
 }
 
-.lidc-board.is-deck-expanded {
+.lidc-board.is-deck-expanded,
+.lidc-board.is-map-expanded {
   gap: 0;
   transition: gap var(--lidc-deck-expand-ms) var(--lidc-deck-easing);
 }
@@ -172,6 +173,36 @@
 .lidc-board-slot-map {
   grid-column: 3;
   grid-row: 1 / span 2;
+  z-index: 2;
+  view-transition-name: lidc-board-slot-map;
+}
+
+.lidc-board-slot-map.is-flip-animating {
+  z-index: 6;
+  will-change: transform;
+}
+
+.lidc-board-slot-map.is-expanded {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  z-index: 5;
+}
+
+::view-transition-group(lidc-board-slot-map) {
+  animation-duration: var(--lidc-deck-flip-ms);
+  animation-timing-function: var(--lidc-deck-easing);
+}
+
+.lidc-board-slot-deck.is-collapsed {
+  opacity: 0;
+  transform: translateY(80px);
+  pointer-events: none;
+  visibility: hidden;
+  transition:
+    opacity calc(var(--lidc-deck-expand-ms) - 60ms) ease,
+    transform var(--lidc-deck-expand-ms) var(--lidc-deck-easing),
+    visibility 0s linear var(--lidc-deck-expand-ms);
+  transition-delay: 100ms;
 }
 
 .lidc-panel {
@@ -214,14 +245,68 @@
     linear-gradient(180deg, #151515 0%, #0a0a0a 100%);
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.lidc-panel-map:not(.is-expanded) {
+  padding-top: clamp(16px, 0.95vw, 32px);
+}
+
+.lidc-panel-map.is-expanded {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+}
+
+.lidc-panel-map.is-borderless {
+  border: 0;
+  border-radius: 0;
+  padding-top: clamp(20px, 1.15vw, 44px);
+}
+
+.lidc-panel-map-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(10px, 0.78vw, 20px);
+  flex-shrink: 0;
+  margin-bottom: clamp(10px, 0.68vw, 20px);
+  padding:
+    0
+    clamp(16px, 0.95vw, 32px);
+}
+
+.lidc-panel-map-head.is-fullscreen {
+  margin-bottom: clamp(12px, 0.91vw, 24px);
+  padding:
+    0
+    clamp(20px, 1.15vw, 44px);
+}
+
+.lidc-panel-map-head .lidc-panel-title {
+  margin: 0;
 }
 
 .lidc-map-frame {
   width: 100%;
-  height: 100%;
+  flex: 1;
   min-height: 0;
   position: relative;
   background: #0b1220;
+  border-radius: clamp(10px, 0.45vw, 16px);
+  overflow: hidden;
+}
+
+.lidc-panel-map.is-borderless .lidc-map-frame {
+  padding: 0 clamp(20px, 1.15vw, 44px) clamp(20px, 1.15vw, 44px);
+  box-sizing: border-box;
+}
+
+.lidc-panel-map:not(.is-borderless) .lidc-map-frame {
+  padding: 0 clamp(16px, 0.95vw, 32px) clamp(16px, 0.95vw, 32px);
+  box-sizing: border-box;
 }
 
 .lidc-theater-map,
@@ -808,13 +893,17 @@ body.lidc-wizard-open {
   cursor: pointer;
 }
 
-.lidc-board.is-deck-expanded {
+.lidc-board.is-deck-expanded,
+.lidc-board.is-map-expanded {
   overflow: visible;
 }
 
 .lidc-board.is-deck-expanded .lidc-board-slot-list,
 .lidc-board.is-deck-expanded .lidc-board-slot-squadron,
-.lidc-board.is-deck-expanded .lidc-board-slot-map {
+.lidc-board.is-deck-expanded .lidc-board-slot-map,
+.lidc-board.is-map-expanded .lidc-board-slot-list,
+.lidc-board.is-map-expanded .lidc-board-slot-squadron,
+.lidc-board.is-map-expanded .lidc-board-slot-deck {
   overflow: visible;
 }
 
@@ -854,6 +943,7 @@ body.lidc-wizard-open {
   .lidc-board-slot-map,
   .lidc-board-slot-deck,
   .lidc-panel-deck,
+  .lidc-panel-map,
   .lidc-panel-deck-expanded-content {
     transition: none !important;
     animation: none !important;

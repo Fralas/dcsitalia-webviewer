@@ -317,6 +317,10 @@ export default {
       deck: 'Deck visualization',
       invites: 'Invites visualization'
     },
+    map: {
+      title: 'THEATER MAP',
+      expandHint: 'Click to open full screen',
+    },
     steps: {
       info: 'Squadron Info',
       template: 'Template',
