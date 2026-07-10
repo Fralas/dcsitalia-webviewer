@@ -196,6 +196,16 @@
   overflow: visible;
 }
 
+.lidc-panel-list .lidc-panel-rows {
+  align-content: start;
+  grid-auto-rows: max-content;
+}
+
+.lidc-panel-list .lidc-panel-row--squadron {
+  width: 100%;
+  height: auto;
+}
+
 .lidc-panel-map {
   border: 1px solid #838383;
   border-radius: clamp(14px, 0.68vw, 26px);
