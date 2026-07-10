@@ -26,6 +26,7 @@ import { useUser } from '../contexts/UserContext';
 import airports from '../config/airports';
 import * as api from '../services/api';
 import { t } from '../utils/locale';
+import LidcTheaterMap from './LidcTheaterMap';
 import './LidcPage.css';
 
 const WIZARD_STEPS = ['info', 'template', 'deck', 'review'];
@@ -2276,7 +2277,9 @@ export default function LidcPage() {
   function renderMapPanel() {
     return (
       <aside className="lidc-panel-map" aria-label="Theater map">
-        <div className="lidc-map-frame" />
+        <div className="lidc-map-frame">
+          <LidcTheaterMap />
+        </div>
       </aside>
     );
   }
