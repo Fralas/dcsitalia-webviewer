@@ -229,8 +229,8 @@
     box-shadow 520ms ease;
 }
 
-.lidc-panel-deck.is-management-focus {
-  padding-top: 0;
+.lidc-panel-deck:not(.is-expanded) {
+  padding-top: clamp(20px, 1.15vw, 44px);
 }
 
 .lidc-panel-deck-head {
@@ -275,29 +275,39 @@
 }
 
 .lidc-deck-view-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
   margin: 0;
 }
 
+.lidc-deck-view-nav-sep {
+  color: var(--lidc-mute);
+  padding: 0 8px;
+  font-size: 14px;
+  line-height: 1;
+  user-select: none;
+}
+
 .lidc-deck-view-nav-btn {
-  border: 1px solid var(--lidc-hairline);
-  border-radius: 999px;
-  background: #121212;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
   color: var(--lidc-body);
-  padding: 6px 12px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  padding: 4px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 140ms ease;
+}
+
+.lidc-deck-view-nav-btn:hover {
+  color: var(--lidc-ink);
 }
 
 .lidc-deck-view-nav-btn.is-active {
-  color: var(--lidc-ink);
-  border-color: rgba(255, 187, 0, 0.45);
-  box-shadow: inset 0 0 0 1px rgba(255, 187, 0, 0.25);
+  color: var(--lidc-accent-gold);
 }
 
 .lidc-panel-title {
@@ -756,14 +766,8 @@ body.lidc-wizard-open {
 
 .lidc-panel-table-preview .lidc-member-table-wrap.is-readonly .lidc-member-table tbody td,
 .lidc-panel-table-preview-static .lidc-member-table-wrap.is-readonly .lidc-member-table tbody td {
-  background: var(--lidc-canvas);
   border-bottom-color: var(--lidc-hairline);
   color: var(--lidc-body);
-}
-
-.lidc-panel-table-preview.is-flush .lidc-member-table-wrap.is-readonly .lidc-member-table tbody td,
-.lidc-panel-table-preview-static.is-flush .lidc-member-table-wrap.is-readonly .lidc-member-table tbody td {
-  background: transparent;
 }
 
 .lidc-airframe-table-wrap.is-readonly tbody tr {
@@ -2016,7 +2020,7 @@ body.lidc-deck-expanded-open {
 }
 
 .lidc-member-role-chip {
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 0;
   border-radius: var(--lidc-pill);
   padding: 3px 8px;
   font-size: 10px;
@@ -2028,7 +2032,6 @@ body.lidc-deck-expanded-open {
 }
 
 .lidc-member-role-chip.is-owner {
-  border-color: rgba(102, 190, 133, 0.42);
   color: #afe6c5;
   background: rgba(27, 76, 51, 0.38);
 }
@@ -2081,12 +2084,20 @@ body.lidc-deck-expanded-open {
   cursor: default;
 }
 
+.lidc-member-table tbody tr:nth-child(odd) td {
+  background: var(--lidc-canvas);
+}
+
+.lidc-member-table tbody tr:nth-child(even) td {
+  background: var(--lidc-canvas-soft);
+}
+
 .lidc-member-table-wrap.is-interactive .lidc-member-table tbody tr:hover td {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .lidc-member-table-wrap.is-readonly .lidc-member-table tbody tr:hover td {
-  background: rgba(15, 18, 24, 0.42);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .lidc-airframe-table thead th {
@@ -2211,7 +2222,7 @@ body.lidc-deck-expanded-open {
   height: 26px;
   padding: 0 9px;
   border-radius: var(--lidc-pill);
-  border: 1px solid var(--lidc-hairline);
+  border: 0;
   background: var(--lidc-canvas-soft);
   color: var(--lidc-ink);
   font-size: 11px;
@@ -2221,7 +2232,6 @@ body.lidc-deck-expanded-open {
 
 .lidc-member-count-badge.is-zero {
   color: var(--lidc-mute);
-  border-color: rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.02);
 }
 
@@ -2317,7 +2327,6 @@ body.lidc-deck-expanded-open {
 }
 
 .lidc-member-role-chip.is-admin {
-  border-color: rgba(255, 187, 0, 0.42);
   color: #ffe7a3;
   background: rgba(74, 56, 12, 0.38);
 }

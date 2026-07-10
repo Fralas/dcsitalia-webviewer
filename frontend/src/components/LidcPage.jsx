@@ -18,6 +18,7 @@ import {
   Upload,
   Users,
   UserPlus,
+  Warehouse,
   Maximize2,
   X,
 } from 'lucide-react';
@@ -2161,15 +2162,20 @@ export default function LidcPage() {
           type="button"
           className={`lidc-deck-view-nav-btn ${activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_DECK ? 'is-active' : ''}`}
           onClick={() => setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK)}
+          aria-label={t('lidc.views.deck')}
+          title={t('lidc.views.deck')}
         >
-          {t('lidc.views.deck')}
+          <Warehouse size={16} />
         </button>
+        <span className="lidc-deck-view-nav-sep" aria-hidden="true">|</span>
         <button
           type="button"
           className={`lidc-deck-view-nav-btn ${activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS ? 'is-active' : ''}`}
           onClick={() => setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS)}
+          aria-label={t('lidc.sidebar.memberManagement')}
+          title={t('lidc.sidebar.memberManagement')}
         >
-          {t('lidc.sidebar.memberManagement')}
+          <Users size={16} />
         </button>
       </div>
     );
