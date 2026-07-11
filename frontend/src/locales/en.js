@@ -364,6 +364,18 @@ export default {
       chooseAction: 'Choose an action',
       chooseActionHint: 'You are not in a squadron: create one or join with an invite code.'
     },
+    link: {
+      title: 'Link DCS account',
+      linked: 'DCS account linked',
+      linkedAs: 'Linked as {{name}}',
+      notLinked: 'Not linked to DCS',
+      generateCode: 'Generate link code',
+      codeLabel: 'Your link code',
+      codeHint: 'Type this code in DCS chat while connected to the server.',
+      waiting: 'Waiting for confirmation in DCS...',
+      expiresAt: 'Expires at {{time}}',
+      error: 'Unable to start link flow',
+    },
     center: {
       loginTitle: 'Login required',
       loginHint: 'Sign in with Discord to create a squadron or join with an invite code.',

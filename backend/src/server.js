@@ -41,6 +41,11 @@ import * as changelogTranslator from './services/changelogTranslator.js';
 import * as wikiService from './services/wiki.js';
 import * as achievementsService from './services/achievements.js';
 import * as lidcService from './services/lidcService.js';
+import {
+  LIDC_EXPORT_FILES,
+  exportPendingWarehouseOps,
+  processWarehouseOpsAck,
+} from './services/lidcDcsBridge.js';
 import * as atcStripsService from './services/atcStripsService.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -147,24 +152,24 @@ const PRODUCTION_POINTS_FILE = process.env.PRODUCTION_POINTS_FILE
 // (append + prune); DCORE owns the result file (read-only here).
 const WEB_COMMANDS_FILE = process.env.WEB_COMMANDS_FILE
   ? path.resolve(process.env.WEB_COMMANDS_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DBRIDGE\\Export_WebCommands.json';
+  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE-LIDC\\src\\DBRIDGE\\Export_WebCommands.json';
 
 const WEB_COMMANDS_RESULT_FILE = process.env.WEB_COMMANDS_RESULT_FILE
   ? path.resolve(process.env.WEB_COMMANDS_RESULT_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DBRIDGE\\Export_WebCommands_Result.json';
+  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE-LIDC\\src\\DBRIDGE\\Export_WebCommands_Result.json';
 
 // Tracked crate positions exported by DMAS (live until moved/activated in-game).
 const WEB_SPAWN_MARKERS_FILE = process.env.WEB_SPAWN_MARKERS_FILE
   ? path.resolve(process.env.WEB_SPAWN_MARKERS_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DBRIDGE\\Export_WebSpawn_Markers.json';
+  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE-LIDC\\src\\DBRIDGE\\Export_WebSpawn_Markers.json';
 
 const DBUILD_SITES_FILE = process.env.DBUILD_SITES_FILE
   ? path.resolve(process.env.DBUILD_SITES_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DBRIDGE\\Export_DBUILD_Sites.json';
+  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE-LIDC\\src\\DBRIDGE\\Export_DBUILD_Sites.json';
 
 const TANKER_ROUTES_FILE = process.env.TANKER_ROUTES_FILE
   ? path.resolve(process.env.TANKER_ROUTES_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DBRIDGE\\Export_Tanker_Routes.json';
+  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE-LIDC\\src\\DBRIDGE\\Export_Tanker_Routes.json';
 
 // Max placement distance from airport center (matches DMAS blue_airbase_radius_m).
 const AIRPORT_SPAWN_RADIUS_M = Number.parseInt(process.env.AIRPORT_SPAWN_RADIUS_M, 10) || 2500;
@@ -1519,6 +1524,78 @@ function syncTankerRoutesFromFile() {
   }
 }
 
+let lidcLinkRequestsSignature = '';
+
+let lidcWarehouseOpsAckSignature = '';
+
+function syncLidcWarehouseOpsAckFromFile() {
+  try {
+    const ackFile = LIDC_EXPORT_FILES.warehouseOpsAck;
+    if (!fs.existsSync(ackFile)) return;
+
+    const raw = fs.readFileSync(ackFile, 'utf8');
+    if (!raw || raw.trim() === '') return;
+    if (raw === lidcWarehouseOpsAckSignature) return;
+    lidcWarehouseOpsAckSignature = raw;
+
+    const parsed = JSON.parse(raw);
+    const appliedOpIds = Array.isArray(parsed?.appliedOpIds) ? parsed.appliedOpIds : [];
+    const result = processWarehouseOpsAck(appliedOpIds);
+    if (result.applied > 0) {
+      io.emit('lidc:warehouse-ops-updated', { applied: result.applied });
+    }
+  } catch (error) {
+    console.error('Failed LIDC warehouse ops ack sync from file:', error.message);
+  }
+}
+
+function syncLidcLinkRequestsFromFile() {
+  try {
+    const linkRequestsFile = LIDC_EXPORT_FILES.linkRequests;
+    if (!fs.existsSync(linkRequestsFile)) return;
+
+    const raw = fs.readFileSync(linkRequestsFile, 'utf8');
+    if (!raw || raw.trim() === '') return;
+    if (raw === lidcLinkRequestsSignature) return;
+    lidcLinkRequestsSignature = raw;
+
+    let requests = [];
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        requests = parsed;
+      } else if (Array.isArray(parsed?.requests)) {
+        requests = parsed.requests;
+      }
+    } else {
+      requests = trimmed.split(/\r?\n/).map((line) => {
+        const parts = line.split('|');
+        if (parts.length < 2) return null;
+        return {
+          code: parts[0],
+          ucid: parts[1],
+          name: parts[2] || '',
+          at: Number(parts[3]) || Date.now(),
+        };
+      }).filter(Boolean);
+    }
+
+    if (requests.length === 0) return;
+
+    const result = lidcService.processUcidLinkRequests(requests);
+    if (result.linked.length > 0) {
+      result.linked.forEach((entry) => {
+        io.emit('lidc:linked', entry);
+      });
+      fs.writeFileSync(linkRequestsFile, '', 'utf8');
+      lidcLinkRequestsSignature = '';
+    }
+  } catch (error) {
+    console.error('Failed LIDC link requests sync from file:', error.message);
+  }
+}
+
 function syncWebCommandResultsFromFile() {
   try {
     if (!fs.existsSync(WEB_COMMANDS_RESULT_FILE)) return;
@@ -1995,6 +2072,38 @@ app.put('/api/profile', (req, res) => {
 
 app.use('/api/lidc', requireFeatureAccess(LIDC_DISCORD_IDS));
 app.use('/api/atc', requireFeatureAccess(ATC_DISCORD_IDS));
+
+/**
+ * POST /api/lidc/link/start - Generate one-time DCS account link code
+ */
+app.post('/api/lidc/link/start', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const result = lidcService.startUcidLink(req.session.user.id);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message || 'Failed to start link flow' });
+  }
+});
+
+/**
+ * GET /api/lidc/link/status - Get DCS account link status for current user
+ */
+app.get('/api/lidc/link/status', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const result = lidcService.getUcidLinkStatus(req.session.user.id);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message || 'Failed to read link status' });
+  }
+});
 
 /**
  * GET /api/lidc/templates - Get LIDC templates and unit catalog
@@ -5198,9 +5307,19 @@ setInterval(() => {
   syncTankerRoutesFromFile();
 }, 2000);
 
-// Poll DBUILD sites exported by DCORE
+// Poll DBUILD sites exported by DCORE-LIDC
 setInterval(() => {
   syncDbuildSitesFromFile();
+}, 2000);
+
+// Poll LIDC UCID link requests written by DCS hook
+setInterval(() => {
+  syncLidcLinkRequestsFromFile();
+}, 2000);
+
+// Poll LIDC warehouse ops acknowledgments from DLIDC mission module
+setInterval(() => {
+  syncLidcWarehouseOpsAckFromFile();
 }, 2000);
 
 // ==================== START SERVER ====================
@@ -5240,6 +5359,9 @@ syncWebCommandResultsFromFile();
 syncWebSpawnMarkersFromFile();
 syncTankerRoutesFromFile();
 syncDbuildSitesFromFile();
+exportPendingWarehouseOps();
+syncLidcLinkRequestsFromFile();
+syncLidcWarehouseOpsAckFromFile();
 atcStripsService.initAtcStripsService();
 
 httpServer.listen(PORT, () => {

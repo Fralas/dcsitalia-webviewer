@@ -364,6 +364,18 @@ export default {
       chooseAction: 'Seleziona una azione',
       chooseActionHint: 'Non sei in uno squadrone: creane uno nuovo o unisciti con un codice invito.'
     },
+    link: {
+      title: 'Collega account DCS',
+      linked: 'Account DCS collegato',
+      linkedAs: 'Collegato come {{name}}',
+      notLinked: 'Non collegato a DCS',
+      generateCode: 'Genera codice collegamento',
+      codeLabel: 'Il tuo codice',
+      codeHint: 'Scrivi questo codice in chat DCS mentre sei connesso al server.',
+      waiting: 'In attesa di conferma in DCS...',
+      expiresAt: 'Scade alle {{time}}',
+      error: 'Impossibile avviare il collegamento',
+    },
     center: {
       loginTitle: 'Accesso richiesto',
       loginHint: 'Effettua il login Discord per creare uno squadrone o unirti con un codice invito.',

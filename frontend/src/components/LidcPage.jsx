@@ -25,6 +25,7 @@ import {
 import { useUser } from '../contexts/UserContext';
 import airports from '../config/airports';
 import * as api from '../services/api';
+import socketService from '../services/socket';
 import { t } from '../utils/locale';
 import { normalizeSquadronLogo } from '../utils/normalizeSquadronLogo';
 import LidcTheaterMap from './LidcTheaterMap';
@@ -407,6 +408,11 @@ export default function LidcPage() {
   const [templateEditorError, setTemplateEditorError] = useState('');
   const [templateEditorSaving, setTemplateEditorSaving] = useState(false);
 
+  const [ucidLinkStatus, setUcidLinkStatus] = useState({ linked: false, pending: null, link: null });
+  const [ucidLinkLoading, setUcidLinkLoading] = useState(false);
+  const [ucidLinkError, setUcidLinkError] = useState('');
+  const [ucidLinkStarting, setUcidLinkStarting] = useState(false);
+
   function applyUserLidcState(response) {
     const nextState = {
       hasSquadron: Boolean(response?.hasSquadron),
@@ -657,6 +663,78 @@ export default function LidcPage() {
       mounted = false;
     };
   }, [user]);
+
+  async function refreshUcidLinkStatus() {
+    if (!user?.id) {
+      setUcidLinkStatus({ linked: false, pending: null, link: null });
+      return;
+    }
+
+    setUcidLinkLoading(true);
+    setUcidLinkError('');
+    try {
+      const response = await api.getLidcUcidLinkStatus();
+      setUcidLinkStatus({
+        linked: Boolean(response?.linked),
+        pending: response?.pending || null,
+        link: response?.link || null,
+      });
+    } catch (error) {
+      if (!isAuthenticationError(error)) {
+        setUcidLinkError(error.message || t('lidc.link.error'));
+      }
+    } finally {
+      setUcidLinkLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    refreshUcidLinkStatus();
+  }, [user?.id]);
+
+  useEffect(() => {
+    socketService.connect();
+    const socket = socketService.socket;
+    if (!socket) return undefined;
+
+    const handleLinked = (payload) => {
+      if (!payload?.discordId || payload.discordId !== user?.id) return;
+      refreshUcidLinkStatus();
+    };
+
+    socket.on('lidc:linked', handleLinked);
+    return () => {
+      socket.off('lidc:linked', handleLinked);
+    };
+  }, [user?.id]);
+
+  async function handleStartUcidLink() {
+    setUcidLinkStarting(true);
+    setUcidLinkError('');
+    try {
+      const response = await api.startLidcUcidLink();
+      if (response?.linked) {
+        setUcidLinkStatus({
+          linked: true,
+          pending: null,
+          link: response.link || null,
+        });
+      } else {
+        setUcidLinkStatus({
+          linked: false,
+          pending: {
+            code: response.code,
+            expiresAt: response.expiresAt,
+          },
+          link: null,
+        });
+      }
+    } catch (error) {
+      setUcidLinkError(error.message || t('lidc.link.error'));
+    } finally {
+      setUcidLinkStarting(false);
+    }
+  }
 
   useEffect(() => {
     setSelectedAirframeDraft(null);
@@ -2317,6 +2395,45 @@ export default function LidcPage() {
         {isLogged && !showNoSquadronActions && (
           <div className="lidc-panel-rows">
             {renderMySquadronRows()}
+          </div>
+        )}
+
+        {isLogged && (
+          <div className="lidc-link-box">
+            <span className="lidc-link-box-label">{t('lidc.link.title')}</span>
+            {ucidLinkLoading ? (
+              <p className="lidc-link-box-hint">{t('lidc.general.loadingUserState')}</p>
+            ) : ucidLinkStatus.linked ? (
+              <p className="lidc-link-box-status is-linked">
+                {t('lidc.link.linked')}
+                {ucidLinkStatus.link?.name ? ` — ${ucidLinkStatus.link.name}` : ''}
+              </p>
+            ) : (
+              <>
+                {ucidLinkStatus.pending?.code ? (
+                  <>
+                    <div className="lidc-link-code-row">
+                      <strong className="lidc-link-code-value">{ucidLinkStatus.pending.code}</strong>
+                    </div>
+                    <p className="lidc-link-box-hint">{t('lidc.link.codeHint')}</p>
+                    <p className="lidc-link-box-hint">{t('lidc.link.waiting')}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="lidc-link-box-hint">{t('lidc.link.notLinked')}</p>
+                    <button
+                      type="button"
+                      className="lidc-panel-squadron-action-btn"
+                      onClick={handleStartUcidLink}
+                      disabled={ucidLinkStarting}
+                    >
+                      {ucidLinkStarting ? t('lidc.general.loading') : t('lidc.link.generateCode')}
+                    </button>
+                  </>
+                )}
+              </>
+            )}
+            {ucidLinkError && <div className="lidc-inline-error">{ucidLinkError}</div>}
           </div>
         )}
 

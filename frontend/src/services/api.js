@@ -649,6 +649,25 @@ export async function uploadWikiMedia(payload) {
 }
 
 /**
+ * Start DCS account link flow (one-time code)
+ */
+export async function startLidcUcidLink() {
+  return fetchAPI('/lidc/link/start', {
+    method: 'POST',
+    credentials: 'include',
+  });
+}
+
+/**
+ * Get DCS account link status for current user
+ */
+export async function getLidcUcidLinkStatus() {
+  return fetchAPI('/lidc/link/status', {
+    credentials: 'include',
+  });
+}
+
+/**
  * Get LIDC templates and units catalog
  */
 export async function getLidcTemplates() {
@@ -1105,6 +1124,8 @@ export default {
   leaveLidcSquadron,
   deleteLidcSquadron,
   updateLidcTemplates,
+  startLidcUcidLink,
+  getLidcUcidLinkStatus,
   getProductionPoints,
   getWebSpawnMarkers,
   getSpawnOptions,

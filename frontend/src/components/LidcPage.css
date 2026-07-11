@@ -858,6 +858,53 @@ body.lidc-map-fullscreen-open {
   color: var(--lidc-text-muted);
 }
 
+.lidc-link-box {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--lidc-border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.lidc-link-box-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lidc-text-muted);
+}
+
+.lidc-link-box-hint {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--lidc-text-muted);
+}
+
+.lidc-link-box-status.is-linked {
+  margin: 0;
+  font-size: 13px;
+  color: #8fd9a8;
+}
+
+.lidc-link-code-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lidc-link-code-value {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--lidc-border);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--lidc-accent-gold);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 18px;
+  letter-spacing: 0.12em;
+}
+
 .lidc-join-code-panel {
   display: grid;
   gap: 12px;

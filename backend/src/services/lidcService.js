@@ -1,11 +1,19 @@
 ﻿import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import {
+  exportPendingWarehouseOps,
+  queueWarehouseOpsForSquadronDeck,
+} from './lidcDcsBridge.js';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data/lidc');
 const TEMPLATES_FILE = path.join(DATA_DIR, 'templates.json');
 const SQUADRONS_FILE = path.join(DATA_DIR, 'squadrons.json');
 const DISCORD_USERS_FILE = path.join(DATA_DIR, 'discord-users.json');
+const UCID_LINKS_FILE = path.join(DATA_DIR, 'ucid-links.json');
+const LINK_CODES_FILE = path.join(DATA_DIR, 'link-codes.json');
+const LINK_CODE_TTL_MS = 10 * 60 * 1000;
+const LINK_CODE_PATTERN = /^LIDC-[A-Z0-9]{6}$/;
 const MAX_LOGO_DATA_URL_LENGTH = 12_000_000;
 const BOARD_NUMBER_PATTERN = /^\d{3}[A-Z]{2}$/;
 const BOARD_NUMBER_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -82,22 +90,22 @@ const DEFAULT_TEMPLATES_SEED = Object.freeze({
     },
   ],
   units: [
-    { id: 'f16c', label: 'F-16C', category: 'aircrafts', cost: 95 },
-    { id: 'fa18c', label: 'F/A-18C Hornet', category: 'aircrafts', cost: 100 },
-    { id: 'f15e', label: 'F-15E Strike Eagle', category: 'aircrafts', cost: 120 },
-    { id: 'a10c2', label: 'A-10C II', category: 'aircrafts', cost: 85 },
-    { id: 'm2000c', label: 'Mirage 2000C', category: 'aircrafts', cost: 80 },
+    { id: 'f16c', label: 'F-16C', category: 'aircrafts', cost: 95, dcsType: 'F-16C_50' },
+    { id: 'fa18c', label: 'F/A-18C Hornet', category: 'aircrafts', cost: 100, dcsType: 'F/A-18C_hornet' },
+    { id: 'f15e', label: 'F-15E Strike Eagle', category: 'aircrafts', cost: 120, dcsType: 'F-15ESE' },
+    { id: 'a10c2', label: 'A-10C II', category: 'aircrafts', cost: 85, dcsType: 'A-10C_2' },
+    { id: 'm2000c', label: 'Mirage 2000C', category: 'aircrafts', cost: 80, dcsType: 'M-2000C' },
 
-    { id: 'ah64d', label: 'AH-64D Apache', category: 'helicopters', cost: 110 },
-    { id: 'oh58d', label: 'OH-58D Kiowa', category: 'helicopters', cost: 65 },
-    { id: 'ka50', label: 'Ka-50', category: 'helicopters', cost: 95 },
-    { id: 'mi24p', label: 'Mi-24P Hind', category: 'helicopters', cost: 100 },
-    { id: 'sa342', label: 'SA-342 Gazelle', category: 'helicopters', cost: 55 },
+    { id: 'ah64d', label: 'AH-64D Apache', category: 'helicopters', cost: 110, dcsType: 'AH-64D_BLK_II' },
+    { id: 'oh58d', label: 'OH-58D Kiowa', category: 'helicopters', cost: 65, dcsType: 'OH58D' },
+    { id: 'ka50', label: 'Ka-50', category: 'helicopters', cost: 95, dcsType: 'Ka-50' },
+    { id: 'mi24p', label: 'Mi-24P Hind', category: 'helicopters', cost: 100, dcsType: 'Mi-24P' },
+    { id: 'sa342', label: 'SA-342 Gazelle', category: 'helicopters', cost: 55, dcsType: 'SA342M' },
 
-    { id: 'c130j', label: 'C-130J Super Hercules', category: 'logistics', cost: 130 },
-    { id: 'ch47f', label: 'CH-47F Chinook', category: 'logistics', cost: 115 },
-    { id: 'mi8mt', label: 'Mi-8MT', category: 'logistics', cost: 90 },
-    { id: 'uh1h', label: 'UH-1H Huey', category: 'logistics', cost: 70 },
+    { id: 'c130j', label: 'C-130J Super Hercules', category: 'logistics', cost: 130, dcsType: 'C-130J-30' },
+    { id: 'ch47f', label: 'CH-47F Chinook', category: 'logistics', cost: 115, dcsType: 'CH-47Fbl1' },
+    { id: 'mi8mt', label: 'Mi-8MT', category: 'logistics', cost: 90, dcsType: 'Mi-8MT' },
+    { id: 'uh1h', label: 'UH-1H Huey', category: 'logistics', cost: 70, dcsType: 'UH-1H' },
 
     { id: 'm1a2', label: 'M1A2 Abrams', category: 'groundAssets', cost: 85 },
     { id: 'bradley', label: 'M2A2 Bradley IFV', category: 'groundAssets', cost: 60 },
@@ -126,6 +134,14 @@ function ensureStorage() {
 
   if (!fs.existsSync(DISCORD_USERS_FILE)) {
     writeJsonAtomic(DISCORD_USERS_FILE, []);
+  }
+
+  if (!fs.existsSync(UCID_LINKS_FILE)) {
+    writeJsonAtomic(UCID_LINKS_FILE, {});
+  }
+
+  if (!fs.existsSync(LINK_CODES_FILE)) {
+    writeJsonAtomic(LINK_CODES_FILE, {});
   }
 
   ensureSquadronInviteCodes();
@@ -214,17 +230,24 @@ function normalizeUnit(rawUnit, index = 0) {
   const id = sanitizeText(rawUnit?.id, 80) || `unit_${Date.now()}_${index}`;
   const label = sanitizeText(rawUnit?.label, 120) || id;
   const cost = normalizeCap(rawUnit?.cost);
+  const dcsType = sanitizeText(rawUnit?.dcsType, 80) || null;
 
   if (!id || !label || cost <= 0) {
     return null;
   }
 
-  return {
+  const unit = {
     id,
     label,
     category,
     cost,
   };
+
+  if (dcsType) {
+    unit.dcsType = dcsType;
+  }
+
+  return unit;
 }
 
 function readTemplatesState() {
@@ -848,6 +871,14 @@ export function createSquadron(payload, sessionUser) {
   squadrons.push(squadron);
   writeSquadrons(squadrons);
 
+  queueWarehouseOpsForSquadronDeck({
+    squadronId: squadron.id,
+    baseId: squadron.baseId,
+    deck: squadron.deck,
+    unitsById,
+  });
+  exportPendingWarehouseOps();
+
   return squadron;
 }
 
@@ -1252,6 +1283,207 @@ export function getUserLidcState(userIdRaw) {
   };
 }
 
+function readUcidLinks() {
+  const raw = readJson(UCID_LINKS_FILE, {});
+  return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+}
+
+function writeUcidLinks(links) {
+  writeJsonAtomic(UCID_LINKS_FILE, links);
+}
+
+function readLinkCodes() {
+  const raw = readJson(LINK_CODES_FILE, {});
+  return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+}
+
+function writeLinkCodes(codes) {
+  writeJsonAtomic(LINK_CODES_FILE, codes);
+}
+
+function pruneExpiredLinkCodes(codes = readLinkCodes()) {
+  const now = Date.now();
+  let changed = false;
+  const next = { ...codes };
+
+  Object.entries(next).forEach(([code, entry]) => {
+    const expiresAt = Number(entry?.expiresAt) || 0;
+    if (expiresAt <= now) {
+      delete next[code];
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    writeLinkCodes(next);
+  }
+
+  return next;
+}
+
+function generateLinkCode() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let suffix = '';
+  for (let i = 0; i < 6; i += 1) {
+    suffix += alphabet[crypto.randomInt(0, alphabet.length)];
+  }
+  return `LIDC-${suffix}`;
+}
+
+export function startUcidLink(userId) {
+  ensureStorage();
+
+  const normalizedUserId = sanitizeText(userId, 80);
+  if (!normalizedUserId) {
+    throw new Error('Authentication required');
+  }
+
+  const links = readUcidLinks();
+  if (links[normalizedUserId]?.ucid) {
+    return {
+      linked: true,
+      link: links[normalizedUserId],
+    };
+  }
+
+  const codes = pruneExpiredLinkCodes();
+  Object.entries(codes).forEach(([code, entry]) => {
+    if (sanitizeText(entry?.discordId, 80) === normalizedUserId) {
+      delete codes[code];
+    }
+  });
+
+  let code = '';
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const candidate = generateLinkCode();
+    if (!codes[candidate]) {
+      code = candidate;
+      break;
+    }
+  }
+
+  if (!code) {
+    throw new Error('Unable to generate link code');
+  }
+
+  const expiresAt = Date.now() + LINK_CODE_TTL_MS;
+  codes[code] = {
+    discordId: normalizedUserId,
+    expiresAt,
+    createdAt: Date.now(),
+  };
+  writeLinkCodes(codes);
+
+  return {
+    linked: false,
+    code,
+    expiresAt,
+    instructions: 'Type this code in DCS chat while connected to the server.',
+  };
+}
+
+export function getUcidLinkStatus(userId) {
+  ensureStorage();
+
+  const normalizedUserId = sanitizeText(userId, 80);
+  if (!normalizedUserId) {
+    throw new Error('Authentication required');
+  }
+
+  const links = readUcidLinks();
+  const link = links[normalizedUserId] || null;
+  if (link?.ucid) {
+    return {
+      linked: true,
+      link: {
+        ucid: link.ucid,
+        name: link.name || null,
+        linkedAt: link.linkedAt || null,
+      },
+    };
+  }
+
+  const codes = pruneExpiredLinkCodes();
+  const pending = Object.entries(codes).find(([, entry]) => (
+    sanitizeText(entry?.discordId, 80) === normalizedUserId
+  ));
+
+  if (!pending) {
+    return { linked: false, pending: null };
+  }
+
+  const [code, entry] = pending;
+  return {
+    linked: false,
+    pending: {
+      code,
+      expiresAt: entry.expiresAt,
+    },
+  };
+}
+
+export function processUcidLinkRequests(requests = []) {
+  ensureStorage();
+
+  if (!Array.isArray(requests) || requests.length === 0) {
+    return { linked: [], skipped: 0 };
+  }
+
+  const codes = pruneExpiredLinkCodes();
+  const links = readUcidLinks();
+  const linked = [];
+  let skipped = 0;
+
+  requests.forEach((request) => {
+    const code = sanitizeText(request?.code, 16).toUpperCase();
+    const ucid = sanitizeText(request?.ucid, 120);
+    const name = sanitizeText(request?.name, 120);
+
+    if (!code || !LINK_CODE_PATTERN.test(code) || !ucid) {
+      skipped += 1;
+      return;
+    }
+
+    const pending = codes[code];
+    if (!pending) {
+      skipped += 1;
+      return;
+    }
+
+    const discordId = sanitizeText(pending.discordId, 80);
+    if (!discordId) {
+      skipped += 1;
+      return;
+    }
+
+    links[discordId] = {
+      ucid,
+      name: name || null,
+      linkedAt: Date.now(),
+    };
+
+    delete codes[code];
+    linked.push({
+      discordId,
+      ucid,
+      name: name || null,
+      code,
+    });
+  });
+
+  if (linked.length > 0) {
+    writeUcidLinks(links);
+    writeLinkCodes(codes);
+  }
+
+  return { linked, skipped };
+}
+
+export function getUcidLinksMap() {
+  ensureStorage();
+  return readUcidLinks();
+}
+
 ensureStorage();
 
 export default {
@@ -1271,4 +1503,8 @@ export default {
   deleteSquadron,
   getUserPrimarySquadron,
   getUserLidcState,
+  startUcidLink,
+  getUcidLinkStatus,
+  processUcidLinkRequests,
+  getUcidLinksMap,
 };
