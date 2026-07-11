@@ -2,10 +2,13 @@
 import fs from 'fs';
 import path from 'path';
 import {
+  computeWarehouseDeltaDiff,
   exportPendingWarehouseOps,
   getUnitDcsType,
   isWarehouseSpawnableCategory,
   LIDC_EXPORT_FILES,
+  processDeferredWarehouseOps,
+  queueWarehouseDeltaOps,
   queueWarehouseOpsForSquadronDeck,
   resolveBaseIdFromDcsAirbaseName,
   resolveDcsAirbaseName,
@@ -161,12 +164,6 @@ function readJson(filePath, fallback) {
     console.error(`LIDC read error (${filePath}):`, error.message);
     return fallback;
   }
-}
-
-function writeJsonAtomic(filePath, payload) {
-  const tempPath = `${filePath}.tmp`;
-  fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), 'utf8');
-  fs.renameSync(tempPath, filePath);
 }
 
 function sanitizeText(value, maxLen = 500) {
@@ -882,11 +879,96 @@ export function createSquadron(payload, sessionUser) {
     baseId: squadron.baseId,
     deck: squadron.deck,
     unitsById,
+    squadron,
   });
   exportPendingWarehouseOps();
   exportLidcAirframeRegistry();
 
   return squadron;
+}
+
+export function updateSquadronDeck({ squadronId, deck, actorUserId }) {
+  ensureStorage();
+
+  const normalizedSquadronId = sanitizeText(squadronId, 120);
+  const normalizedActorUserId = sanitizeText(actorUserId, 80);
+  if (!normalizedSquadronId) {
+    throw new Error('squadronId is required');
+  }
+  if (!normalizedActorUserId) {
+    throw new Error('Authentication required');
+  }
+
+  const squadrons = readSquadrons();
+  const squadronIndex = squadrons.findIndex(
+    (entry) => sanitizeText(entry?.id, 120) === normalizedSquadronId,
+  );
+  if (squadronIndex < 0) {
+    throw new Error('Squadron not found');
+  }
+
+  const squadron = { ...squadrons[squadronIndex] };
+  if (!isUserMemberOfSquadron(squadron, normalizedActorUserId)) {
+    throw new Error('Only squadron members can edit the deck');
+  }
+
+  const actorRole = getMemberRoleInSquadron(squadron, normalizedActorUserId);
+  const actorPermissions = getRolePermissions(actorRole);
+  if (!actorPermissions.canManageRoles) {
+    throw new Error('Only the squadron owner can edit the deck');
+  }
+
+  const templatesState = readTemplatesState();
+  const template = templatesState.templates.find(
+    (entry) => entry.id === sanitizeText(squadron?.templateId, 80),
+  );
+  if (!template) {
+    throw new Error('Template not found');
+  }
+
+  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+  const previousDeck = squadron.deck;
+  const nextDeck = normalizeDeckInput(deck || {});
+  const costSummary = calculateCostSummary({
+    deck: nextDeck,
+    template,
+    unitsById,
+  });
+
+  if (costSummary.totalUnits <= 0) {
+    throw new Error('Deck must include at least one unit');
+  }
+
+  const warehouseDeltas = computeWarehouseDeltaDiff(previousDeck, nextDeck, unitsById);
+
+  squadron.deck = nextDeck;
+  squadron.costSummary = costSummary;
+  squadron.updatedAt = Date.now();
+  syncSquadronAirframesInMemory(squadron, unitsById);
+
+  squadrons[squadronIndex] = squadron;
+  writeSquadrons(squadrons);
+
+  if (warehouseDeltas.length > 0) {
+    queueWarehouseDeltaOps({
+      squadronId: squadron.id,
+      baseId: squadron.baseId,
+      deltas: warehouseDeltas,
+      unitsById,
+      squadron,
+    });
+    exportPendingWarehouseOps();
+  }
+
+  exportLidcAirframeRegistry();
+
+  return {
+    squadron: {
+      ...squadron,
+      memberProfiles: listSquadronMembersForDisplay(squadron),
+    },
+    warehouseDeltas,
+  };
 }
 
 export function listSquadrons() {
@@ -1551,6 +1633,80 @@ export function exportLidcAirframeRegistry() {
   ensureStorage();
   const payload = buildAirframeRegistryPayload();
   writeJsonAtomic(LIDC_EXPORT_FILES.airframeRegistry, payload);
+  exportLidcPolicy();
+  return payload;
+}
+
+function managedKey(type, airbase) {
+  return `${type}::${airbase}`;
+}
+
+function buildLidcPolicyPayload() {
+  const templatesState = readTemplatesState();
+  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+  const ucidLinks = readUcidLinks();
+  const squadrons = readSquadrons();
+
+  const links = {};
+  Object.entries(ucidLinks).forEach(([discordId, link]) => {
+    const ucid = sanitizeText(link?.ucid, 120);
+    if (ucid) {
+      links[ucid] = discordId;
+    }
+  });
+
+  const managedMap = new Map();
+  const allow = {};
+
+  const addAllowEntry = (ucid, type, airbase) => {
+    if (!ucid || !type || !airbase) return;
+    if (!allow[ucid]) allow[ucid] = [];
+    const exists = allow[ucid].some(
+      (entry) => entry.type === type && entry.airbase === airbase,
+    );
+    if (!exists) {
+      allow[ucid].push({ type, airbase });
+    }
+  };
+
+  squadrons.forEach((squadron) => {
+    const homeAirbase = resolveDcsAirbaseName(squadron?.baseId);
+    const squadronAirframes = Array.isArray(squadron?.airframes) ? squadron.airframes : [];
+
+    squadronAirframes.forEach((airframe) => {
+      const unit = unitsById.get(airframe?.unitId);
+      if (!unit || !isWarehouseSpawnableCategory(unit.category)) return;
+
+      const dcsType = getUnitDcsType(unit);
+      if (!dcsType || !homeAirbase) return;
+
+      managedMap.set(managedKey(dcsType, homeAirbase), { type: dcsType, airbase: homeAirbase });
+
+      const pilotUserId = sanitizeText(airframe?.assignedPilotUserId, 80);
+      const link = pilotUserId ? ucidLinks[pilotUserId] : null;
+      const ucid = sanitizeText(link?.ucid, 120);
+      if (!ucid) return;
+
+      const state = sanitizeText(airframe?.dcsState, 40) || 'in_hangar';
+      if (state === 'destroyed') return;
+
+      const airbase = sanitizeText(airframe?.currentAirbase, 120) || homeAirbase;
+      addAllowEntry(ucid, dcsType, airbase);
+    });
+  });
+
+  return {
+    links,
+    allow,
+    managed: Array.from(managedMap.values()),
+    updatedAt: Date.now(),
+  };
+}
+
+export function exportLidcPolicy() {
+  ensureStorage();
+  const payload = buildLidcPolicyPayload();
+  writeJsonAtomic(LIDC_EXPORT_FILES.policy, payload);
   return payload;
 }
 
@@ -1627,7 +1783,13 @@ export function applyAirframeStateFromDcs(incomingAirframes = []) {
   if (updated > 0) {
     writeSquadrons(nextSquadrons);
     exportLidcAirframeRegistry();
+  } else {
+    exportLidcPolicy();
   }
+
+  const templatesState = readTemplatesState();
+  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+  processDeferredWarehouseOps(nextSquadrons, unitsById);
 
   return { updated, squadrons: nextSquadrons, uiStates: DCS_STATE_TO_UI };
 }
@@ -1642,6 +1804,7 @@ export default {
   upsertDiscordUser,
   getDiscordUsers,
   createSquadron,
+  updateSquadronDeck,
   listSquadrons,
   getSquadronById,
   joinSquadronByInviteCode,
@@ -1656,5 +1819,6 @@ export default {
   processUcidLinkRequests,
   getUcidLinksMap,
   exportLidcAirframeRegistry,
+  exportLidcPolicy,
   applyAirframeStateFromDcs,
 };

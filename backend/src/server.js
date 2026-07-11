@@ -2244,6 +2244,39 @@ app.get('/api/lidc/squadrons/:id', (req, res) => {
 });
 
 /**
+ * PUT /api/lidc/squadrons/:id/deck - Update squadron deck (owner only)
+ */
+app.put('/api/lidc/squadrons/:id/deck', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const result = lidcService.updateSquadronDeck({
+      squadronId: req.params.id,
+      deck: req.body?.deck || {},
+      actorUserId: req.session.user.id,
+    });
+
+    return res.json(result);
+  } catch (error) {
+    const message = String(error?.message || 'Failed to update squadron deck');
+    const lowered = message.toLowerCase();
+    let status = 400;
+
+    if (lowered.includes('authentication required')) {
+      status = 401;
+    } else if (lowered.includes('not found')) {
+      status = 404;
+    } else if (lowered.includes('only squadron members') || lowered.includes('only the squadron owner')) {
+      status = 403;
+    }
+
+    return res.status(status).json({ error: message });
+  }
+});
+
+/**
  * PUT /api/lidc/squadrons/:id/airframes/:airframeId - Assign or unassign pilot from airframe
  */
 app.put('/api/lidc/squadrons/:id/airframes/:airframeId', (req, res) => {
@@ -5352,6 +5385,11 @@ setInterval(() => {
   syncLidcAirframeStateFromFile();
 }, 2000);
 
+// Refresh LIDC access policy for DCS enforcement
+setInterval(() => {
+  lidcService.exportLidcPolicy();
+}, 30000);
+
 // ==================== START SERVER ====================
 
 // Load airbase status first
@@ -5393,6 +5431,7 @@ exportPendingWarehouseOps();
 syncLidcLinkRequestsFromFile();
 syncLidcWarehouseOpsAckFromFile();
 lidcService.exportLidcAirframeRegistry();
+lidcService.exportLidcPolicy();
 syncLidcAirframeStateFromFile();
 atcStripsService.initAtcStripsService();
 

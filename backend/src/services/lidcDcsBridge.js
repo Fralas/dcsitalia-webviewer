@@ -129,6 +129,39 @@ export function buildWarehouseDeltasFromDeck(deck, unitsById) {
   return Array.from(totals.entries()).map(([dcsType, qty]) => ({ dcsType, qty }));
 }
 
+function deckTotalsMap(deck, unitsById) {
+  const totals = new Map();
+  buildWarehouseDeltasFromDeck(deck, unitsById).forEach(({ dcsType, qty }) => {
+    totals.set(dcsType, qty);
+  });
+  return totals;
+}
+
+export function computeWarehouseDeltaDiff(oldDeck, newDeck, unitsById) {
+  const oldTotals = deckTotalsMap(oldDeck, unitsById);
+  const newTotals = deckTotalsMap(newDeck, unitsById);
+  const allTypes = new Set([...oldTotals.keys(), ...newTotals.keys()]);
+  const deltas = [];
+
+  allTypes.forEach((dcsType) => {
+    const diff = (newTotals.get(dcsType) || 0) - (oldTotals.get(dcsType) || 0);
+    if (diff !== 0) {
+      deltas.push({ dcsType, qty: diff });
+    }
+  });
+
+  return deltas;
+}
+
+function hasBlockingInUseAirframes(squadron, dcsType, unitsById) {
+  const airframes = Array.isArray(squadron?.airframes) ? squadron.airframes : [];
+  return airframes.some((airframe) => {
+    const unit = unitsById.get(airframe?.unitId);
+    if (getUnitDcsType(unit) !== dcsType) return false;
+    return (airframe?.dcsState || 'in_hangar') === 'in_use';
+  });
+}
+
 function readWarehouseOpsState() {
   try {
     if (!fs.existsSync(WAREHOUSE_OPS_FILE)) {
@@ -154,11 +187,12 @@ function writeWarehouseOpsState(state) {
   });
 }
 
-export function queueWarehouseOpsForSquadronDeck({
+export function queueWarehouseDeltaOps({
   squadronId,
   baseId,
-  deck,
+  deltas = [],
   unitsById,
+  squadron = null,
 }) {
   const dcsAirbaseName = resolveDcsAirbaseName(baseId);
   if (!dcsAirbaseName) {
@@ -166,26 +200,82 @@ export function queueWarehouseOpsForSquadronDeck({
     return [];
   }
 
-  const deltas = buildWarehouseDeltasFromDeck(deck, unitsById);
-  if (deltas.length === 0) return [];
+  const normalizedDeltas = Array.isArray(deltas)
+    ? deltas.filter((entry) => entry?.dcsType && Number(entry?.qty) !== 0)
+    : [];
+  if (normalizedDeltas.length === 0) return [];
 
   const state = readWarehouseOpsState();
   const createdAt = Date.now();
-  const newOps = deltas.map(({ dcsType, qty }) => ({
-    opId: `whop_${createdAt}_${crypto.randomBytes(4).toString('hex')}`,
-    squadronId,
-    baseId,
-    dcsAirbaseName,
-    dcsType,
-    delta: qty,
-    createdAt,
-    status: 'pending',
-  }));
+  const newOps = normalizedDeltas.map(({ dcsType, qty }) => {
+    const delta = Math.floor(Number(qty) || 0);
+    const blocked = delta < 0
+      && squadron
+      && hasBlockingInUseAirframes(squadron, dcsType, unitsById);
+
+    return {
+      opId: `whop_${createdAt}_${crypto.randomBytes(4).toString('hex')}`,
+      squadronId,
+      baseId,
+      dcsAirbaseName,
+      dcsType,
+      delta,
+      createdAt,
+      status: blocked ? 'deferred' : 'pending',
+      deferredReason: blocked ? 'airframe_in_use' : null,
+    };
+  });
 
   state.ops = [...state.ops, ...newOps];
   writeWarehouseOpsState(state);
   exportPendingWarehouseOps();
   return newOps;
+}
+
+export function queueWarehouseOpsForSquadronDeck({
+  squadronId,
+  baseId,
+  deck,
+  unitsById,
+  squadron = null,
+}) {
+  const deltas = buildWarehouseDeltasFromDeck(deck, unitsById);
+  return queueWarehouseDeltaOps({
+    squadronId,
+    baseId,
+    deltas,
+    unitsById,
+    squadron,
+  });
+}
+
+export function processDeferredWarehouseOps(squadrons = [], unitsById) {
+  const state = readWarehouseOpsState();
+  let changed = false;
+
+  state.ops = state.ops.map((op) => {
+    if (op.status !== 'deferred') return op;
+
+    const squadron = squadrons.find((entry) => entry?.id === op.squadronId) || null;
+    if (!squadron || !hasBlockingInUseAirframes(squadron, op.dcsType, unitsById)) {
+      changed = true;
+      return {
+        ...op,
+        status: 'pending',
+        deferredReason: null,
+        releasedAt: Date.now(),
+      };
+    }
+
+    return op;
+  });
+
+  if (changed) {
+    writeWarehouseOpsState(state);
+    exportPendingWarehouseOps();
+  }
+
+  return { released: changed };
 }
 
 export function exportPendingWarehouseOps() {
