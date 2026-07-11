@@ -1528,6 +1528,31 @@ let lidcLinkRequestsSignature = '';
 
 let lidcWarehouseOpsAckSignature = '';
 
+let lidcAirframeStateSignature = '';
+
+function syncLidcAirframeStateFromFile() {
+  try {
+    const stateFile = LIDC_EXPORT_FILES.airframeState;
+    if (!fs.existsSync(stateFile)) return;
+
+    const raw = fs.readFileSync(stateFile, 'utf8');
+    if (!raw || raw.trim() === '') return;
+    if (raw === lidcAirframeStateSignature) return;
+    lidcAirframeStateSignature = raw;
+
+    const parsed = JSON.parse(raw);
+    const incoming = Array.isArray(parsed?.airframes) ? parsed.airframes : [];
+    const result = lidcService.applyAirframeStateFromDcs(incoming);
+    if (result.updated > 0) {
+      io.emit('lidc:updated', {
+        updatedAirframes: result.updated,
+      });
+    }
+  } catch (error) {
+    console.error('Failed LIDC airframe state sync from file:', error.message);
+  }
+}
+
 function syncLidcWarehouseOpsAckFromFile() {
   try {
     const ackFile = LIDC_EXPORT_FILES.warehouseOpsAck;
@@ -5322,6 +5347,11 @@ setInterval(() => {
   syncLidcWarehouseOpsAckFromFile();
 }, 2000);
 
+// Poll LIDC airframe state exported by DLIDC mission module
+setInterval(() => {
+  syncLidcAirframeStateFromFile();
+}, 2000);
+
 // ==================== START SERVER ====================
 
 // Load airbase status first
@@ -5362,6 +5392,8 @@ syncDbuildSitesFromFile();
 exportPendingWarehouseOps();
 syncLidcLinkRequestsFromFile();
 syncLidcWarehouseOpsAckFromFile();
+lidcService.exportLidcAirframeRegistry();
+syncLidcAirframeStateFromFile();
 atcStripsService.initAtcStripsService();
 
 httpServer.listen(PORT, () => {

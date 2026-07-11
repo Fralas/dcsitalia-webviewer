@@ -3,7 +3,13 @@ import fs from 'fs';
 import path from 'path';
 import {
   exportPendingWarehouseOps,
+  getUnitDcsType,
+  isWarehouseSpawnableCategory,
+  LIDC_EXPORT_FILES,
   queueWarehouseOpsForSquadronDeck,
+  resolveBaseIdFromDcsAirbaseName,
+  resolveDcsAirbaseName,
+  writeJsonAtomic,
 } from './lidcDcsBridge.js';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data/lidc');
@@ -878,6 +884,7 @@ export function createSquadron(payload, sessionUser) {
     unitsById,
   });
   exportPendingWarehouseOps();
+  exportLidcAirframeRegistry();
 
   return squadron;
 }
@@ -1038,6 +1045,7 @@ export function updateAirframeAssignment({ squadronId, airframeId, pilotUserId, 
 
   squadrons[squadronIndex] = squadron;
   writeSquadrons(squadrons);
+  exportLidcAirframeRegistry();
 
   return {
     squadron: {
@@ -1474,6 +1482,7 @@ export function processUcidLinkRequests(requests = []) {
   if (linked.length > 0) {
     writeUcidLinks(links);
     writeLinkCodes(codes);
+    exportLidcAirframeRegistry();
   }
 
   return { linked, skipped };
@@ -1482,6 +1491,145 @@ export function processUcidLinkRequests(requests = []) {
 export function getUcidLinksMap() {
   ensureStorage();
   return readUcidLinks();
+}
+
+function buildAirframeRegistryPayload() {
+  const templatesState = readTemplatesState();
+  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+  const links = readUcidLinks();
+  const squadrons = readSquadrons();
+  const nameToUcid = {};
+
+  Object.entries(links).forEach(([discordId, link]) => {
+    const ucid = sanitizeText(link?.ucid, 120);
+    const name = sanitizeText(link?.name, 120);
+    if (name && ucid) {
+      nameToUcid[name.toLowerCase()] = ucid;
+    }
+    if (ucid) {
+      nameToUcid[discordId] = ucid;
+    }
+  });
+
+  const airframes = [];
+  squadrons.forEach((squadron) => {
+    const homeAirbase = resolveDcsAirbaseName(squadron?.baseId);
+    const squadronAirframes = Array.isArray(squadron?.airframes) ? squadron.airframes : [];
+    squadronAirframes.forEach((airframe) => {
+      const unit = unitsById.get(airframe?.unitId);
+      if (!unit || !isWarehouseSpawnableCategory(unit.category)) return;
+
+      const dcsType = getUnitDcsType(unit);
+      if (!dcsType) return;
+
+      const pilotUserId = sanitizeText(airframe?.assignedPilotUserId, 80);
+      const link = pilotUserId ? links[pilotUserId] : null;
+      const ucid = sanitizeText(link?.ucid, 120) || null;
+
+      airframes.push({
+        id: sanitizeText(airframe?.id, 160),
+        squadronId: sanitizeText(squadron?.id, 120),
+        ucid,
+        pilotName: sanitizeText(link?.name, 120) || null,
+        dcsType,
+        homeAirbase: homeAirbase || null,
+        currentAirbase: sanitizeText(airframe?.currentAirbase, 120) || homeAirbase || null,
+        state: sanitizeText(airframe?.dcsState, 40) || 'in_hangar',
+      });
+    });
+  });
+
+  return {
+    links,
+    nameToUcid,
+    airframes,
+    updatedAt: Date.now(),
+  };
+}
+
+export function exportLidcAirframeRegistry() {
+  ensureStorage();
+  const payload = buildAirframeRegistryPayload();
+  writeJsonAtomic(LIDC_EXPORT_FILES.airframeRegistry, payload);
+  return payload;
+}
+
+const DCS_STATE_TO_UI = Object.freeze({
+  in_hangar: 'grounded',
+  in_use: 'airborne',
+  destroyed: 'destroyed',
+});
+
+export function applyAirframeStateFromDcs(incomingAirframes = []) {
+  ensureStorage();
+  if (!Array.isArray(incomingAirframes) || incomingAirframes.length === 0) {
+    return { updated: 0, squadrons: readSquadrons() };
+  }
+
+  const stateById = new Map();
+  incomingAirframes.forEach((entry) => {
+    const id = sanitizeText(entry?.id, 160);
+    if (!id) return;
+    stateById.set(id, {
+      dcsState: sanitizeText(entry?.state, 40) || 'in_hangar',
+      currentAirbase: sanitizeText(entry?.airbase, 120) || null,
+      dcsStateUpdatedAt: Number(entry?.at) || Date.now(),
+      lat: Number(entry?.lat) || null,
+      lon: Number(entry?.lon) || null,
+    });
+  });
+
+  if (stateById.size === 0) {
+    return { updated: 0, squadrons: readSquadrons() };
+  }
+
+  const squadrons = readSquadrons();
+  let updated = 0;
+
+  const nextSquadrons = squadrons.map((squadron) => {
+    const airframes = Array.isArray(squadron?.airframes) ? squadron.airframes : [];
+    let squadronChanged = false;
+
+    const nextAirframes = airframes.map((airframe) => {
+      const patch = stateById.get(airframe?.id);
+      if (!patch) return airframe;
+
+      const currentBaseId = patch.currentAirbase
+        ? resolveBaseIdFromDcsAirbaseName(patch.currentAirbase)
+        : null;
+
+      const nextRecord = {
+        ...airframe,
+        dcsState: patch.dcsState,
+        dcsStateUpdatedAt: patch.dcsStateUpdatedAt,
+        currentAirbase: patch.currentAirbase,
+        currentBaseId: currentBaseId || airframe?.currentBaseId || null,
+        lastKnownLat: patch.lat,
+        lastKnownLon: patch.lon,
+      };
+
+      if (
+        airframe.dcsState !== nextRecord.dcsState
+        || airframe.currentAirbase !== nextRecord.currentAirbase
+        || airframe.currentBaseId !== nextRecord.currentBaseId
+      ) {
+        squadronChanged = true;
+        updated += 1;
+      }
+
+      return nextRecord;
+    });
+
+    if (!squadronChanged) return squadron;
+    return { ...squadron, airframes: nextAirframes };
+  });
+
+  if (updated > 0) {
+    writeSquadrons(nextSquadrons);
+    exportLidcAirframeRegistry();
+  }
+
+  return { updated, squadrons: nextSquadrons, uiStates: DCS_STATE_TO_UI };
 }
 
 ensureStorage();
@@ -1507,4 +1655,6 @@ export default {
   getUcidLinkStatus,
   processUcidLinkRequests,
   getUcidLinksMap,
+  exportLidcAirframeRegistry,
+  applyAirframeStateFromDcs,
 };

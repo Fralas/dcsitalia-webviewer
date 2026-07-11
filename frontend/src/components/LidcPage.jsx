@@ -264,18 +264,42 @@ function hashText(value) {
 }
 
 function getMockStatusForAirframe(airframe) {
-  const seed = hashText(`${airframe?.id || ''}:${airframe?.boardNumber || ''}`);
-  const remainder = seed % 3;
-  if (remainder === 0) return AIRFRAME_STATUSES.AIRBORNE;
-  if (remainder === 1) return AIRFRAME_STATUSES.GROUNDED;
-  return AIRFRAME_STATUSES.DESTROYED;
+  const dcsState = String(airframe?.dcsState || '').toLowerCase();
+  if (dcsState === 'in_use') return AIRFRAME_STATUSES.AIRBORNE;
+  if (dcsState === 'destroyed') return AIRFRAME_STATUSES.DESTROYED;
+  if (dcsState === 'in_hangar') return AIRFRAME_STATUSES.GROUNDED;
+  return AIRFRAME_STATUSES.GROUNDED;
 }
 
-function getMockBaseForAirframe(airframe, airportList) {
+function resolveAirframeBase(airframe, airportList, fallbackBaseId = '') {
   if (!Array.isArray(airportList) || airportList.length === 0) return null;
-  const seed = hashText(`${airframe?.id || ''}:${airframe?.unitId || ''}`);
-  const index = seed % airportList.length;
-  return airportList[index] || null;
+
+  const currentBaseId = String(airframe?.currentBaseId || '');
+  if (currentBaseId) {
+    const byId = airportList.find((entry) => entry.id === currentBaseId);
+    if (byId) return byId;
+  }
+
+  const currentAirbase = String(airframe?.currentAirbase || '').trim();
+  if (currentAirbase) {
+    const normalizedTarget = currentAirbase.toLowerCase();
+    const byName = airportList.find((entry) => {
+      const aliases = [
+        entry?.name,
+        entry?.displayName,
+        entry?.csvPrefix?.replace(/_/g, ' '),
+      ].filter(Boolean);
+      return aliases.some((alias) => String(alias).toLowerCase() === normalizedTarget);
+    });
+    if (byName) return byName;
+  }
+
+  const fallback = String(fallbackBaseId || '').trim();
+  if (fallback) {
+    return airportList.find((entry) => entry.id === fallback) || null;
+  }
+
+  return null;
 }
 
 function buildMockAirframeLogs({ airframe, baseLabel, pilotLabel, status }) {
@@ -691,6 +715,30 @@ export default function LidcPage() {
   useEffect(() => {
     refreshUcidLinkStatus();
   }, [user?.id]);
+
+  useEffect(() => {
+    socketService.connect();
+    const socket = socketService.socket;
+    if (!socket) return undefined;
+
+    const handleLidcUpdated = async () => {
+      const squadronId = activeSquadron?.id || userLidcState?.squadron?.id;
+      if (!squadronId) return;
+      try {
+        const squadron = await api.getLidcSquadron(squadronId);
+        setActiveSquadron(squadron);
+      } catch (error) {
+        if (!isAuthenticationError(error)) {
+          console.error('Failed to refresh LIDC squadron state:', error);
+        }
+      }
+    };
+
+    socket.on('lidc:updated', handleLidcUpdated);
+    return () => {
+      socket.off('lidc:updated', handleLidcUpdated);
+    };
+  }, [activeSquadron?.id, userLidcState?.squadron?.id]);
 
   useEffect(() => {
     socketService.connect();
@@ -1581,7 +1629,11 @@ export default function LidcPage() {
       const pilotUserId = String(airframe.assignedPilotUserId || '');
       const pilotProfile = pilotUserId ? (squadronMembersById.get(pilotUserId) || null) : null;
       const pilotLabel = pilotProfile ? formatUserLabel(pilotProfile) : t('lidc.airframes.unassigned');
-      const baseEntry = getMockBaseForAirframe(airframe, airports);
+      const baseEntry = resolveAirframeBase(
+        airframe,
+        airports,
+        activeSquadron?.baseId || userLidcState?.squadron?.baseId || '',
+      );
       const baseIdValue = String(baseEntry?.id || activeSquadron?.baseId || userLidcState?.squadron?.baseId || '');
       const baseLabel = baseEntry?.displayName || baseEntry?.name || baseIdValue || '-';
       const boardNumber = String(airframe.boardNumber || '').toUpperCase();

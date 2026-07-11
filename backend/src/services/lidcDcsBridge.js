@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { getAirportById } from '../config/airports.config.js';
+import { getAirportById, default as airports } from '../config/airports.config.js';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data/lidc');
 const WAREHOUSE_OPS_FILE = path.join(DATA_DIR, 'warehouse-ops.json');
@@ -16,6 +16,7 @@ export const LIDC_EXPORT_FILES = Object.freeze({
   policy: path.join(DCORE_LIDC_DBRIDGE_DIR, 'Export_LIDC_Policy.json'),
   warehouseOps: path.join(DCORE_LIDC_DBRIDGE_DIR, 'Export_LIDC_WarehouseOps.json'),
   warehouseOpsAck: path.join(DCORE_LIDC_DBRIDGE_DIR, 'Export_LIDC_WarehouseOps_Ack.json'),
+  airframeRegistry: path.join(DCORE_LIDC_DBRIDGE_DIR, 'Export_LIDC_AirframeRegistry.json'),
 });
 
 export function writeJsonAtomic(targetPath, payload) {
@@ -226,4 +227,29 @@ export function processWarehouseOpsAck(appliedOpIds = []) {
   }
 
   return { applied };
+}
+
+function normalizeAirbaseLookup(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function resolveBaseIdFromDcsAirbaseName(dcsAirbaseName) {
+  const target = normalizeAirbaseLookup(dcsAirbaseName);
+  if (!target) return null;
+
+  const match = airports.find((airport) => {
+    const aliases = [
+      airport?.name,
+      airport?.displayName,
+      airport?.csvPrefix?.replace(/_/g, ' '),
+      airport?.id?.replace(/-/g, ' '),
+    ];
+    return aliases.some((alias) => normalizeAirbaseLookup(alias) === target);
+  });
+
+  return match?.id || null;
 }
