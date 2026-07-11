@@ -321,6 +321,9 @@ export default {
       title: 'MAPPA TEATRO',
       expandHint: 'Clicca per aprire a schermo intero',
     },
+    debug: {
+      leaveSquadron: 'Debug: Abbandona squadrone',
+    },
     steps: {
       info: 'Squadron Info',
       template: 'Template',

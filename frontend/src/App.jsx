@@ -12,7 +12,7 @@ import * as api from './services/api';
 import socketService from './services/socket';
 import { t, getActiveLocale, setActiveLocale } from './utils/locale';
 import bannerImg from '../img/DCS_ITALIA_ICON.png';
-import gbFlagImg from '../img/flags/gb.svg';
+import enFlagImg from '../img/flags/en.svg';
 import itFlagImg from '../img/flags/it.svg';
 import { useUser } from './contexts/UserContext';
 import CampaignHeaderTabs from './components/CampaignHeaderTabs';
@@ -301,7 +301,7 @@ function App() {
 
   return (
     <div className={`app-shell h-screen flex flex-col overflow-hidden ${(currentView === 'landing' || currentView === 'lidc') ? 'bg-[#0E0E0E]' : 'bg-yt-bg-primary'}`}>
-      <header className={`app-header${currentView === 'landing' ? ' app-header--landing' : ''}${currentView === 'lidc' ? ' app-header--lidc' : ''}`}>
+      <header className={`app-header${currentView === 'landing' ? ' app-header--landing' : ''}${currentView === 'lidc' ? ' app-header--lidc' : ''}${currentView === 'frontline' ? ' app-header--frontline' : ''}`}>
         <div className="app-header__inner">
           <div className="app-header__left">
             <button
@@ -325,6 +325,10 @@ function App() {
           />
 
           <div className="app-header__right">
+            {currentView === 'lidc' && (
+              <div id="app-header-debug-slot" className="app-header__debug-slot" />
+            )}
+
             <button
               type="button"
               onClick={toggleLanguage}
@@ -333,7 +337,7 @@ function App() {
               title={isItalian ? 'Switch language to English' : 'Switch language to Italian'}
             >
               <img
-                src={isItalian ? itFlagImg : gbFlagImg}
+                src={isItalian ? itFlagImg : enFlagImg}
                 alt=""
                 className="app-header__lang-flag"
                 aria-hidden="true"

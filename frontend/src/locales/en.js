@@ -321,6 +321,9 @@ export default {
       title: 'THEATER MAP',
       expandHint: 'Click to open full screen',
     },
+    debug: {
+      leaveSquadron: 'Debug: Leave squadron',
+    },
     steps: {
       info: 'Squadron Info',
       template: 'Template',

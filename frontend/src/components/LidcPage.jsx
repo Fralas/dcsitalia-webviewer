@@ -47,6 +47,7 @@ const LIDC_SIDEBAR_VIEWS = Object.freeze({
 const DECK_SLOT_FLIP_MS = 680;
 const DECK_SLOT_FLIP_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
 const SHOW_SQUADRON_LEAVE_DELETE_UI = false;
+const SHOW_SQUADRON_LEAVE_DEBUG_HEADER = true;
 
 function cancelDeckSlotFlip(deckSlot, transitionRef) {
   if (!deckSlot) return;
@@ -596,7 +597,6 @@ export default function LidcPage() {
 
     syncMapFullscreenOffset();
     appShell?.classList.add('is-lidc-map-fullscreen');
-    header?.classList.add('is-lidc-map-fullscreen');
     document.body.classList.add('lidc-map-fullscreen-open');
     window.addEventListener('resize', syncMapFullscreenOffset);
 
@@ -604,7 +604,6 @@ export default function LidcPage() {
       window.removeEventListener('resize', syncMapFullscreenOffset);
       root.style.removeProperty('--lidc-map-fullscreen-top');
       appShell?.classList.remove('is-lidc-map-fullscreen');
-      header?.classList.remove('is-lidc-map-fullscreen');
       document.body.classList.remove('lidc-map-fullscreen-open');
     };
   }, [mapBoardExpanded]);
@@ -1728,6 +1727,33 @@ export default function LidcPage() {
     return '';
   }
 
+  function renderDebugLeaveHeaderButton() {
+    if (!SHOW_SQUADRON_LEAVE_DEBUG_HEADER || !isLogged || !userHasSquadron) {
+      return null;
+    }
+
+    const headerDebugSlot = typeof document !== 'undefined'
+      ? document.getElementById('app-header-debug-slot')
+      : null;
+
+    if (!headerDebugSlot) return null;
+
+    return createPortal(
+      <button
+        type="button"
+        className="app-header__nav-btn app-header__nav-btn--lang app-header__nav-btn--debug"
+        onClick={() => openSquadronActionConfirm('leave')}
+        disabled={isSquadronActionBusy}
+        title={t('lidc.debug.leaveSquadron')}
+        aria-label={t('lidc.debug.leaveSquadron')}
+      >
+        {leavingSquadron ? <Loader2 size={14} className="spin" /> : <X size={14} />}
+        <span>{t('lidc.debug.leaveSquadron')}</span>
+      </button>,
+      headerDebugSlot,
+    );
+  }
+
   function renderSquadronManagementActions() {
     if (!SHOW_SQUADRON_LEAVE_DELETE_UI || !userHasSquadron) return null;
 
@@ -2503,6 +2529,8 @@ export default function LidcPage() {
           </div>
         </div>
       </div>
+
+      {renderDebugLeaveHeaderButton()}
 
       {isEntryWizardVisible && wizardPortalTarget && createPortal(
         <div className="lidc-center-stage lidc-center-stage-global">

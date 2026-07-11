@@ -23,41 +23,32 @@
 }
 
 .app-header--landing {
+  --header-fade-r: 15;
+  --header-fade-g: 15;
+  --header-fade-b: 15;
+  --header-fade-solid: var(--header-bg);
   border-bottom-color: transparent;
 }
 
 .app-header--lidc {
-  border-bottom: 2px solid #ffffff;
+  --header-fade-r: 14;
+  --header-fade-g: 14;
+  --header-fade-b: 14;
+  --header-fade-solid: #0e0e0e;
   background: #0e0e0e;
-}
-
-.app-header--lidc::after {
-  display: none;
-}
-
-.app-header--lidc.is-lidc-map-fullscreen {
   border-bottom-color: transparent;
 }
 
-.app-header--lidc.is-lidc-map-fullscreen::after {
-  display: block;
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 100%;
-  height: 72px;
-  background: linear-gradient(
-    to bottom,
-    #0e0e0e 0%,
-    rgba(14, 14, 14, 0.55) 42%,
-    rgba(14, 14, 14, 0) 100%
-  );
-  pointer-events: none;
-  z-index: 1;
+.app-header--frontline {
+  --header-fade-r: 15;
+  --header-fade-g: 15;
+  --header-fade-b: 15;
+  --header-fade-solid: var(--header-bg);
+  border-bottom-color: transparent;
 }
 
-.app-header--landing::after {
+.app-header--landing::after,
+.app-header--frontline::after {
   content: '';
   position: absolute;
   left: 0;
@@ -66,9 +57,9 @@
   height: 72px;
   background: linear-gradient(
     to bottom,
-    var(--header-bg) 0%,
-    rgba(15, 15, 15, 0.55) 42%,
-    rgba(15, 15, 15, 0) 100%
+    var(--header-fade-solid) 0%,
+    rgba(var(--header-fade-r), var(--header-fade-g), var(--header-fade-b), 0.55) 42%,
+    rgba(var(--header-fade-r), var(--header-fade-g), var(--header-fade-b), 0) 100%
   );
   pointer-events: none;
   z-index: 1;
@@ -212,6 +203,34 @@
   gap: 8px;
   flex-shrink: 0;
   justify-self: end;
+}
+
+.app-header__debug-slot {
+  display: flex;
+  align-items: center;
+}
+
+.app-header__nav-btn--debug {
+  border-color: rgba(255, 140, 0, 0.55);
+  color: #ffb347;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding-inline: 10px;
+  gap: 6px;
+  max-width: 190px;
+  white-space: nowrap;
+}
+
+.app-header__nav-btn--debug:hover:not(:disabled) {
+  border-color: rgba(255, 140, 0, 0.85);
+  color: #ffd18a;
+  background: rgba(255, 140, 0, 0.12);
+}
+
+.app-header__nav-btn--debug:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .app-header__lang {
