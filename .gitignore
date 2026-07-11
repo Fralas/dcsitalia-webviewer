@@ -11,7 +11,6 @@ data/historical/*.json
 *.sqlite
 data-buffer.json
 lua-zones-buffer.json
-ago --name-status --pretty=format-h -ad -an -s --date=short
 CHANGELOG.md
 /csvexample
 /data/changelogs/media
@@ -19,3 +18,26 @@ data/changelogs/drafts.json
 data/wiki/pages.json
 data/wiki/drafts.json
 data/wiki/media/
+
+# LIDC runtime data (squadrons, links, warehouse ledger)
+data/lidc/discord-users.json
+data/lidc/squadrons.json
+data/lidc/ucid-links.json
+data/lidc/link-codes.json
+data/lidc/warehouse-ops.json
+backend/data/lidc/discord-users.json
+backend/data/lidc/squadrons.json
+backend/data/lidc/ucid-links.json
+backend/data/lidc/link-codes.json
+backend/data/lidc/warehouse-ops.json
+
+# Per-user achievement progress
+data/achievements/users.json
+backend/data/achievements/users.json
+
+# Runtime server config (written live)
+logistics-route-visibility.json
+backend/logistics-route-visibility.json
+
+# Atomic write temp files
+*.tmp
