@@ -323,9 +323,9 @@
 .info-card {
   display: flex;
   flex-direction: column;
-  min-height: min(86vh, 760px);
-  max-height: none;
-  padding: 22px 8px 22px 22px;
+  min-height: 0;
+  max-height: min(86vh, 760px);
+  padding: 22px 8px 14px 22px;
   border-radius: 16px;
   border: 1px solid var(--landing-card-border);
   background: var(--landing-card);
@@ -334,9 +334,10 @@
 }
 
 .info-card__scroll {
-  overflow-y: visible;
+  overflow-y: auto;
   padding-right: 14px;
   min-height: 0;
+  flex: 0 1 auto;
 }
 
 .info-card__title {
@@ -351,7 +352,7 @@
   font-size: 26px;
   font-weight: 800;
   letter-spacing: 0.04em;
-  color: var(--landing-accent);
+  color: var(--info-card-accent, var(--landing-accent));
   text-transform: uppercase;
 }
 
@@ -394,11 +395,12 @@
 }
 
 .info-card__cta {
-  margin: 18px 14px 0 0;
+  margin: 14px 14px 0 0;
+  flex: 0 0 auto;
   padding: 13px 16px;
   border: none;
   border-radius: 10px;
-  background: var(--landing-accent);
+  background: var(--info-card-accent, var(--landing-accent));
   color: #1a1206;
   font-size: 14px;
   font-weight: 800;

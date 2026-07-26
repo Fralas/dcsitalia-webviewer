@@ -28,6 +28,7 @@ import * as airbaseStatusParser from './services/airbaseStatusParser.js';
 import * as airbaseStatusManager from './services/airbaseStatusManager.js';
 import * as discordAuth from './services/discordAuth.js';
 import { ATC_DISCORD_IDS, LIDC_DISCORD_IDS, requireFeatureAccess } from './config/featureAccess.js';
+import { authBypassMiddleware, isAuthBypassEnabled } from './config/authBypass.js';
 import * as combatMissionDispatch from './services/combatMissionDispatch.js';
 import * as luaZoneSync from './services/luaZoneSync.js';
 import * as activeUsers from './services/activeUsers.js';
@@ -340,6 +341,9 @@ app.use(session({
   }
 }));
 
+// Temporary local Discord bypass (AUTH_BYPASS_LOCAL + development only)
+app.use(authBypassMiddleware);
+
 // Store current data in memory
 let currentData = {};
 let dataRefreshInProgress = false;
@@ -416,6 +420,11 @@ async function ensureSessionUserPermissions(req, options = {}) {
   const forceRefresh = options.forceRefresh === true;
   const sessionUser = req?.session?.user;
   if (!sessionUser?.id) return null;
+
+  // Local auth bypass: keep injected permissions, skip Discord role lookup.
+  if (sessionUser.isLocalBypass === true) {
+    return sessionUser;
+  }
 
   const lastResolvedAt = Number(req.session.userPermissionsResolvedAt || 0);
   const cacheValid = !forceRefresh
@@ -5450,6 +5459,9 @@ httpServer.listen(PORT, () => {
 ║   Missions: http://localhost:${PORT}/api/missions    ║
 ╚═══════════════════════════════════════════════════════╝
   `);
+  if (isAuthBypassEnabled()) {
+    logger.warn('AUTH BYPASS LOCAL enabled — Discord login not required in development');
+  }
 });
 
 // ==================== ADMIN ENDPOINTS ====================

@@ -13,7 +13,7 @@ import c130ModelUrl from '../assets/3D/yc-130prototype_of_c-130.glb';
 import ch47ModelUrl from '../assets/3D/ch47.glb';
 import t72ModelUrl from '../assets/3D/t90.glb';
 import kc135ModelUrl from '../assets/3D/kc-135_dcs_world.glb';
-import { Ambulance, Anchor, Blend, Box, Boxes, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChessRook, Clock3, Factory, Forklift, Fuel, Hammer, MapPin, PersonStanding, Satellite, TowerControl, X } from 'lucide-react';
+import { Ambulance, Anchor, Blend, Box, Boxes, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChessRook, Clock3, Factory, Forklift, Fuel, Hammer, MapPin, PersonStanding, Satellite, TowerControl, Warehouse, X } from 'lucide-react';
 import frontlineZones from '../config/frontlineZones.json';
 import { getDefaultTacticalMap, getTacticalMapByCampaignId } from '../config/tacticalMaps';
 import { buildZoneConnections, getNeighborZoneIds, normalizeZoneId } from '../config/zoneConfini';
@@ -29,6 +29,7 @@ import MapFilterBar from './map/MapFilterBar';
 import MapActionContextMenu from './map/MapActionContextMenu';
 import ProductionPointPanel from './map/ProductionPointPanel';
 import ProductionPointRetrieveBanner from './map/ProductionPointRetrieveBanner';
+import './map/AirportSpawnPanel.css';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 
@@ -442,8 +443,6 @@ function formatSpawnBannerName(keyword) {
   return SPAWN_BANNER_DISPLAY_NAMES[value] || (value.charAt(0) + value.slice(1).toLowerCase());
 }
 
-const DBUILD_CONTEXT_MENU_OFFSET_X = 16;
-const DBUILD_CONTEXT_MENU_OFFSET_Y = -12;
 const TANKER_MIN_DIST_NM = 45;
 const TANKER_EXCLUSION_RADIUS_M = TANKER_MIN_DIST_NM * 1852;
 const TANKER_ROUTE_COLOR = '#22d3ee';
@@ -532,19 +531,19 @@ function buildTankerRouteFeatures(routes) {
 const SPAWN_MENU_SECTIONS = [
   {
     id: 'infantry',
-    title: 'INFANTRY',
+    title: 'INFANTRY TO EMBARK',
     spawnType: 'inf_spawn',
     keywords: ['MANPAD', 'SCOUT'],
   },
   {
     id: 'build',
-    title: 'BUILD',
+    title: 'SPAWN CRATE FOR BUILD ASSET',
     spawnType: 'crate_spawn',
     keywords: ['AMMO', 'FUEL', 'BUILD'],
   },
   {
     id: 'deployables',
-    title: 'DEPLOYABLES',
+    title: 'SPAWN CRATE TO DEPLOYABLES VEHICLE',
     spawnType: 'crate_spawn',
     keywords: ['HMMWV', 'TOW', 'L118', 'TACAN'],
   },
@@ -1288,6 +1287,46 @@ function FlatMapContextMenuHandler({ enabled, onContextMenu }) {
   return null;
 }
 
+// Keeps the corona menu pinned to a map lat/lon while the camera moves/zooms.
+function FlatMapContextMenuAnchorTracker({ anchor, onScreenUpdate }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!anchor || !onScreenUpdate) return undefined;
+    if (!Number.isFinite(anchor.lat) || !Number.isFinite(anchor.lon)) return undefined;
+
+    let rafId = 0;
+    const update = () => {
+      const point = map.latLngToContainerPoint([anchor.lat, anchor.lon]);
+      const rect = map.getContainer().getBoundingClientRect();
+      onScreenUpdate({
+        clientX: rect.left + point.x,
+        clientY: rect.top + point.y,
+      });
+    };
+    const schedule = () => {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = 0;
+        update();
+      });
+    };
+
+    update();
+    map.on('move', schedule);
+    map.on('zoom', schedule);
+    map.on('resize', schedule);
+    return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+      map.off('move', schedule);
+      map.off('zoom', schedule);
+      map.off('resize', schedule);
+    };
+  }, [map, anchor?.lat, anchor?.lon, onScreenUpdate]);
+
+  return null;
+}
+
 function FlatMapSpawnClickHandler({ active, onPlace }) {
   useMapEvents({
     click: (event) => {
@@ -1619,6 +1658,8 @@ function FlatMapView({
   onDbuildPlacementSelect,
   mapContextMenuEnabled,
   onMapContextMenu,
+  mapContextMenuAnchor,
+  onMapContextMenuScreenUpdate,
   tankerPlacementActive,
   onTankerPlace,
   tankerWp1,
@@ -1656,7 +1697,14 @@ function FlatMapView({
         <FlatMapZoomWatcher onZoomChange={onZoomChange} />
         <FlatMapFocus
           center={focusTargetKey ? focusCoordinates : null}
-          targetZoom={placementActive ? 15 : undefined}
+          targetZoom={
+            placementActive
+            || String(focusTargetKey || '').startsWith('airport:')
+            || String(focusTargetKey || '').startsWith('spawn:')
+            || String(focusTargetKey || '').startsWith('retrieve:')
+              ? 15
+              : undefined
+          }
         />
 
         {showAto && gridConnections.map((connection) => (
@@ -2040,6 +2088,10 @@ function FlatMapView({
         })}
 
         <FlatMapContextMenuHandler enabled={mapContextMenuEnabled} onContextMenu={onMapContextMenu} />
+        <FlatMapContextMenuAnchorTracker
+          anchor={mapContextMenuAnchor}
+          onScreenUpdate={onMapContextMenuScreenUpdate}
+        />
         <FlatMapSpawnClickHandler active={placementActive} onPlace={onPlacementPlace} />
       </MapContainer>
     </div>
@@ -2087,6 +2139,8 @@ function MapLibreFlatMapView({
   onDbuildPlacementSelect,
   mapContextMenuEnabled,
   onMapContextMenu,
+  mapContextMenuAnchor,
+  onMapContextMenuScreenUpdate,
   tankerPlacementActive,
   onTankerPlace,
   tankerWp1,
@@ -3069,8 +3123,12 @@ function MapLibreFlatMapView({
       minPitch: MIN_PITCH,
       maxPitch: MAX_PITCH,
       attributionControl: false,
+      // Right mouse is reserved for the spawn corona menu — no pan/rotate/pitch.
+      dragRotate: false,
+      pitchWithRotate: false,
     });
     mapRef.current = map;
+    map.dragRotate.disable();
     // Reduce zoom aggressiveness from fast wheel input to avoid unstable camera states.
     map.scrollZoom.setWheelZoomRate(1 / 1500);
     map.scrollZoom.setZoomRate(1 / 220);
@@ -3259,6 +3317,8 @@ function MapLibreFlatMapView({
 
           renderer.resetState();
           renderer.render(scene, camera);
+          // Allow later MapLibre fill/line layers (e.g. spawn radius) to draw above 3D domes.
+          _gl.clear(_gl.DEPTH_BUFFER_BIT);
         },
       };
       map.addLayer(domeLayer);
@@ -3498,7 +3558,7 @@ function MapLibreFlatMapView({
         source: 'spawn-radius-src',
         paint: {
           'fill-color': '#facc15',
-          'fill-opacity': 0.06,
+          'fill-opacity': 0.08,
         },
       });
 
@@ -3508,9 +3568,9 @@ function MapLibreFlatMapView({
         source: 'spawn-radius-src',
         paint: {
           'line-color': '#facc15',
-          'line-width': 2,
+          'line-width': 2.5,
           'line-dasharray': [2, 2],
-          'line-opacity': 0.85,
+          'line-opacity': 1,
         },
       });
 
@@ -3824,6 +3884,14 @@ function MapLibreFlatMapView({
         }
       }
 
+      // Keep spawn/retrieve radius above all other map layers (including zone domes).
+      if (map.getLayer('spawn-radius-fill-layer')) {
+        map.moveLayer('spawn-radius-fill-layer');
+      }
+      if (map.getLayer('spawn-radius-line-layer')) {
+        map.moveLayer('spawn-radius-line-layer');
+      }
+
       window.requestAnimationFrame(() => {
         map.resize();
         window.requestAnimationFrame(() => {
@@ -4048,6 +4116,46 @@ function MapLibreFlatMapView({
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map || !mapContextMenuAnchor || !onMapContextMenuScreenUpdate) return undefined;
+    if (!Number.isFinite(mapContextMenuAnchor.lat) || !Number.isFinite(mapContextMenuAnchor.lon)) {
+      return undefined;
+    }
+
+    let rafId = 0;
+    const update = () => {
+      const point = map.project([mapContextMenuAnchor.lon, mapContextMenuAnchor.lat]);
+      const rect = map.getContainer().getBoundingClientRect();
+      onMapContextMenuScreenUpdate({
+        clientX: rect.left + point.x,
+        clientY: rect.top + point.y,
+      });
+    };
+    const schedule = () => {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = 0;
+        update();
+      });
+    };
+
+    update();
+    map.on('move', schedule);
+    map.on('zoom', schedule);
+    map.on('rotate', schedule);
+    map.on('pitch', schedule);
+    map.on('resize', schedule);
+    return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+      map.off('move', schedule);
+      map.off('zoom', schedule);
+      map.off('rotate', schedule);
+      map.off('pitch', schedule);
+      map.off('resize', schedule);
+    };
+  }, [mapContextMenuAnchor, onMapContextMenuScreenUpdate]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     if (!map) return;
 
     const handleSpawnClick = (event) => {
@@ -4107,19 +4215,26 @@ function MapLibreFlatMapView({
     const previous = lastAutoFocusRef.current;
     if (
       previous &&
+      previous.key === focusTargetKey &&
       Math.abs(previous.lat - nextLat) < 0.00001 &&
       Math.abs(previous.lon - nextLon) < 0.00001
     ) {
       return;
     }
-    lastAutoFocusRef.current = { lat: nextLat, lon: nextLon };
+    lastAutoFocusRef.current = { lat: nextLat, lon: nextLon, key: focusTargetKey };
     logMapDebug('autofocus-easeTo', {
       focusTargetKey,
       target: { lon: nextLon, lat: nextLat },
       currentZoom: Number(map.getZoom().toFixed(3)),
     });
 
-    const focusZoom = String(focusTargetKey || '').startsWith('spawn:')
+    const focusKey = String(focusTargetKey || '');
+    const airportLikeFocus = (
+      focusKey.startsWith('spawn:')
+      || focusKey.startsWith('airport:')
+      || focusKey.startsWith('retrieve:')
+    );
+    const focusZoom = airportLikeFocus
       ? Math.min(effectiveMaxZoom, 15)
       : Math.min(effectiveMaxZoom, map.getZoom() + 0.35);
 
@@ -4230,6 +4345,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   const [feedEvents, setFeedEvents] = useState([]);
   const [feedCollapsed, setFeedCollapsed] = useState(false);
   const [operationsCollapsed, setOperationsCollapsed] = useState(false);
+  const [opsLogisticAirportFocus, setOpsLogisticAirportFocus] = useState(null);
   const [zoneStatusMeta, setZoneStatusMeta] = useState({});
   const [mapMode, setMapMode] = useState(startInTacticalMode);
   const [basemapMode, setBasemapMode] = useState(BASEMAP_MODE_DARK);
@@ -5033,11 +5149,6 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     [selectedZoneId, filteredZones, validZones]
   );
 
-  const selectedZone = useMemo(() => {
-    const id = hoveredZoneId || selectedZoneId;
-    return id ? filteredZones.find((zone) => zone.id === id) || validZones.find((zone) => zone.id === id) || null : null;
-  }, [hoveredZoneId, selectedZoneId, filteredZones, validZones]);
-
   const airportsById = useMemo(() => {
     const map = new Map();
     validAirports.forEach((airport) => map.set(airport.id, airport));
@@ -5109,6 +5220,11 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     return airport?.coordinates || null;
   }, [spawnMode, airportsById]);
 
+  const selectedAirportCenter = useMemo(() => {
+    if (!selectedAirportId) return null;
+    return airportsById.get(selectedAirportId)?.coordinates || null;
+  }, [selectedAirportId, airportsById]);
+
   const retrievePpCenter = useMemo(() => {
     if (!retrieveMode) return null;
     const pp = productionPoints.find((entry) => entry.id === retrieveMode.ppId);
@@ -5117,12 +5233,14 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
 
   const mapMaxZoom = (spawnMode || retrieveMode || tankerMode || selectedAirportId) ? MAP_ZOOM_AIRPORT_MAX : MAP_ZOOM_DEFAULT_MAX;
 
-  const tacticalFocusCoordinates = spawnAirportCenter || retrievePpCenter || selectedDcsarFocus || theaterFocus || focusedZone?.coordinates || null;
+  const tacticalFocusCoordinates = spawnAirportCenter || retrievePpCenter || selectedAirportCenter || selectedDcsarFocus || theaterFocus || focusedZone?.coordinates || null;
   const tacticalFocusTargetKey = spawnMode
     ? `spawn:${spawnMode.airportId}`
     : retrieveMode
       ? `retrieve:${retrieveMode.ppId}`
-      : (selectedDcsarId || selectedZoneId || null);
+      : selectedAirportId
+        ? `airport:${selectedAirportId}`
+        : (selectedDcsarId || selectedZoneId || null);
 
   const handleScaleChange = (scale) => {
     if (!isDesktopDevice) return;
@@ -5165,25 +5283,25 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     [validZones],
   );
   const selectedZoneNeighbors = useMemo(() => {
-    if (!selectedZone?.id) return [];
-    return getNeighborZoneIds(selectedZone.id)
+    if (!focusedZone?.id) return [];
+    return getNeighborZoneIds(focusedZone.id)
       .map((neighborId) => zoneById.get(normalizeZoneId(neighborId)))
       .filter(Boolean)
       .map((entry) => ({ ...entry, zoneNumber: getZoneNumber(entry) }));
-  }, [selectedZone, zoneById]);
-  const selectedZoneHasTasks = Array.isArray(selectedZone?.tasks) && selectedZone.tasks.length > 0;
+  }, [focusedZone, zoneById]);
+  const selectedZoneHasTasks = Array.isArray(focusedZone?.tasks) && focusedZone.tasks.length > 0;
   const selectedZoneAcceptedByOther = Boolean(
-    selectedZone?.operation_assigned &&
-    selectedZone?.operation_assigned_to &&
-    selectedZone.operation_assigned_to !== currentUserName &&
-    Number(selectedZone?.operation_remaining_ms || 0) > 0
+    focusedZone?.operation_assigned &&
+    focusedZone?.operation_assigned_to &&
+    focusedZone.operation_assigned_to !== currentUserName &&
+    Number(focusedZone?.operation_remaining_ms || 0) > 0
   );
   const selectedZoneAcceptedByCurrentUser = Boolean(
-    selectedZone?.operation_assigned &&
-    selectedZone?.operation_assigned_to === currentUserName &&
-    Number(selectedZone?.operation_remaining_ms || 0) > 0
+    focusedZone?.operation_assigned &&
+    focusedZone?.operation_assigned_to === currentUserName &&
+    Number(focusedZone?.operation_remaining_ms || 0) > 0
   );
-  const selectedChangedAt = selectedZone ? zoneStatusMeta[selectedZone.id]?.changedAt : null;
+  const selectedChangedAt = focusedZone ? zoneStatusMeta[focusedZone.id]?.changedAt : null;
 
   const airportLogistics = useMemo(() => {
     if (!selectedAirportId) return [];
@@ -5709,6 +5827,8 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     setSelectedZoneId(null);
     setSelectedProductionPointId(null);
     setRetrieveMode(null);
+    setOperationsCollapsed(false);
+    setOpsLogisticAirportFocus({ airportId: normalizedAirportId, at: Date.now() });
   }, []);
 
   const handleToggleAirportRoutePriority = useCallback(async (airportId) => {
@@ -6000,11 +6120,29 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     setMapContextMenu({
       lat: payload.lat,
       lon: payload.lon,
-      x: payload.clientX - rect.left + DBUILD_CONTEXT_MENU_OFFSET_X,
-      y: payload.clientY - rect.top + DBUILD_CONTEXT_MENU_OFFSET_Y,
+      x: payload.clientX - rect.left,
+      y: payload.clientY - rect.top,
     });
     setSelectedDbuildPlacementId(null);
   }, [mapContextMenuEnabled]);
+
+  const handleMapContextMenuScreenUpdate = useCallback((payload) => {
+    if (!mapSectionRef.current) return;
+    const rect = mapSectionRef.current.getBoundingClientRect();
+    const nextX = payload.clientX - rect.left;
+    const nextY = payload.clientY - rect.top;
+    setMapContextMenu((prev) => {
+      if (!prev) return null;
+      if (Math.abs(prev.x - nextX) < 0.25 && Math.abs(prev.y - nextY) < 0.25) return prev;
+      return { ...prev, x: nextX, y: nextY };
+    });
+  }, []);
+
+  const mapContextMenuAnchor = useMemo(() => {
+    if (!mapContextMenu) return null;
+    if (!Number.isFinite(mapContextMenu.lat) || !Number.isFinite(mapContextMenu.lon)) return null;
+    return { lat: mapContextMenu.lat, lon: mapContextMenu.lon };
+  }, [mapContextMenu?.lat, mapContextMenu?.lon]);
 
   const tankerWp1 = tankerMode?.wp1 || null;
 
@@ -6170,6 +6308,8 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       onDbuildPlacementSelect={handleDbuildPlacementSelect}
                       mapContextMenuEnabled={mapContextMenuEnabled}
                       onMapContextMenu={handleMapContextMenu}
+                      mapContextMenuAnchor={mapContextMenuAnchor}
+                      onMapContextMenuScreenUpdate={handleMapContextMenuScreenUpdate}
                       tankerPlacementActive={Boolean(tankerMode)}
                       onTankerPlace={handleTankerPlace}
                       tankerWp1={tankerWp1}
@@ -6218,6 +6358,8 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       onDbuildPlacementSelect={handleDbuildPlacementSelect}
                       mapContextMenuEnabled={mapContextMenuEnabled}
                       onMapContextMenu={handleMapContextMenu}
+                      mapContextMenuAnchor={mapContextMenuAnchor}
+                      onMapContextMenuScreenUpdate={handleMapContextMenuScreenUpdate}
                       tankerPlacementActive={Boolean(tankerMode)}
                       onTankerPlace={handleTankerPlace}
                       tankerWp1={tankerWp1}
@@ -6249,6 +6391,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                 productionPoints={productionPointsForMap}
                 dcsarPoints={dcsarPoints}
                 airports={validAirports}
+                logisticAirportFocus={opsLogisticAirportFocus}
                 onSelectZone={setSelectedZoneId}
                 onSelectLogisticsMission={(mission) => {
                   setSelectedLogisticsMission(mission);
@@ -6258,31 +6401,33 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                 onSelectDcsar={(point) => setSelectedDcsarId(point?.id || null)}
               />
 
-              {filters.showAto && selectedZone && (
+              {filters.showAto && focusedZone && (
                 <div className="absolute bottom-4 left-4 z-[1000]">
                   <ZoneMissionCard
-                    zone={selectedZone}
+                    zone={focusedZone}
                     zones={zoneOptionsForCard}
                     neighborZones={selectedZoneNeighbors}
                     changedAt={selectedChangedAt}
-                    zoneNumber={getZoneNumber(selectedZone)}
-                    coordinatesDms={formatZoneCoordinates(selectedZone.coordinates, 'dms')}
-                    coordinatesMgrs={formatZoneCoordinates(selectedZone.coordinates, 'mgrs')}
+                    zoneNumber={getZoneNumber(focusedZone)}
+                    coordinatesDms={formatZoneCoordinates(focusedZone.coordinates, 'dms')}
+                    coordinatesMgrs={formatZoneCoordinates(focusedZone.coordinates, 'mgrs')}
                     acceptedByCurrentUser={selectedZoneAcceptedByCurrentUser}
                     acceptedByOther={selectedZoneAcceptedByOther}
                     hasTasks={selectedZoneHasTasks}
                     canAcceptMore={canCurrentUserAcceptMoreZones}
-                    accepting={acceptingZoneOperationId === selectedZone.id}
-                    declining={decliningZoneOperationId === selectedZone.id}
+                    accepting={acceptingZoneOperationId === focusedZone.id}
+                    declining={decliningZoneOperationId === focusedZone.id}
+                    activeZoneId={selectedZoneId}
                     onSelectZone={setSelectedZoneId}
                     onAccept={handleAcceptZoneOperation}
                     onDecline={handleDeclineZoneOperation}
+                    onClose={() => setSelectedZoneId(null)}
                   />
                 </div>
               )}
 
               {mapMode && filters.showDcsar && hoveredDcsarPoint && (
-                <div className={`absolute bottom-4 z-[1000] w-[360px] rounded-xl border border-yt-border bg-[#1b1d2af0] p-3 shadow-2xl backdrop-blur ${filters.showAto && selectedZone ? 'left-[366px]' : 'left-4'}`}>
+                <div className={`absolute bottom-4 z-[1000] w-[360px] rounded-xl border border-yt-border bg-[#1b1d2af0] p-3 shadow-2xl backdrop-blur ${filters.showAto && focusedZone ? 'left-[474px]' : 'left-4'}`}>
                   <div className="mb-2 flex flex-wrap gap-1.5">
                     <span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${hoveredDcsarPoint.accepted ? 'bg-green-500/20 text-green-200' : 'bg-slate-200/20 text-slate-100'}`}>
                       {hoveredDcsarPoint.accepted ? 'Accepted' : 'Awaiting Rescue'}
@@ -6363,12 +6508,12 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
               )}
 
               {spawnMode && (
-                <div className="absolute left-1/2 top-4 z-[1100] -translate-x-1/2 rounded-lg border border-amber-400/60 bg-[#1a1505f2] px-4 py-2 text-center shadow-2xl backdrop-blur">
-                  <div className="text-sm font-semibold text-amber-200">
+                <div className="absolute left-1/2 top-4 z-[1100] -translate-x-1/2 rounded-lg border border-[#4e4e4e] bg-[#0e0e0ef2] px-4 py-2 text-center shadow-2xl backdrop-blur">
+                  <div className="text-sm font-semibold text-white">
                     Place {spawnMode.quantity || 1}x {formatSpawnBannerName(spawnMode.label)} inside of the designated range
                   </div>
                   <div className="mt-2 flex items-center justify-center gap-1.5">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-100/70">Qty</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/70">Qty</span>
                     {Array.from({ length: SPAWN_QUANTITY_MAX }, (_, index) => {
                       const value = index + 1;
                       const selected = (spawnMode.quantity || 1) === value;
@@ -6379,8 +6524,8 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                           onClick={() => handleSetSpawnQuantity(value)}
                           className={`min-w-[28px] rounded border px-2 py-0.5 text-[11px] font-semibold ${
                             selected
-                              ? 'border-amber-300 bg-amber-300/20 text-amber-100'
-                              : 'border-amber-400/40 text-amber-100/80 hover:bg-amber-400/10'
+                              ? 'border-[#575757] bg-[#575757] text-white'
+                              : 'border-[#4e4e4e] bg-[#0e0e0e] text-white/80 hover:border-[#757575] hover:bg-[#1b1b1b]'
                           }`}
                         >
                           {value}
@@ -6388,7 +6533,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       );
                     })}
                   </div>
-                  <div className="mt-1 text-[11px] text-amber-100/80">
+                  <div className="mt-1 text-[11px] text-white/70">
                     Total {(spawnMode.cost || 0) * (spawnMode.quantity || 1)} fp
                     {' • '}
                     {SPAWN_OFFSET_METERS} m spacing
@@ -6398,7 +6543,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                   <button
                     type="button"
                     onClick={handleCancelSpawnMode}
-                    className="mt-1 rounded border border-amber-400/60 px-2 py-0.5 text-[11px] font-semibold text-amber-200 hover:bg-amber-400/15"
+                    className="mt-1 rounded border border-[#4e4e4e] bg-[#0e0e0e] px-2 py-0.5 text-[11px] font-semibold text-white hover:border-[#757575] hover:bg-[#1b1b1b]"
                   >
                     Cancel
                   </button>
@@ -6534,371 +6679,264 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
               )}
 
               {selectedAirport && (
-                <div className="absolute left-4 bottom-4 z-[1000] w-[320px] rounded-xl border border-yt-border bg-[#101827f2] p-3 shadow-2xl backdrop-blur">
-                  <div className="mb-2 flex items-center justify-between">
-                    <div className="text-sm font-semibold text-yt-text-primary">
-                      Spawn @ {selectedAirport.displayName || selectedAirport.name}
-                    </div>
-                    <PanelCloseButton onClick={() => { setSelectedAirportId(null); setSpawnMode(null); setRetrieveMode(null); setTankerMode(null); }} />
-                  </div>
-                  {!isAuthenticated ? (
-                    <div className="rounded border border-dashed border-yt-border px-2 py-2 text-[11px] text-yt-text-secondary">
-                      Login to spawn units and crates.
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {SPAWN_MENU_SECTIONS.map((section) => {
-                        const sectionOptions = section.keywords
-                          .map((keyword) => {
-                            const option = spawnOptionByKeyword.get(keyword);
-                            return option ? { keyword, option } : null;
-                          })
-                          .filter(Boolean);
-                        if (sectionOptions.length === 0) return null;
-
-                        return (
-                          <div key={section.id}>
-                            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-yt-text-secondary">
-                              {section.title}
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {sectionOptions.map(({ keyword, option }) => {
-                                const selected = spawnMode?.keyword === keyword && spawnMode?.type === section.spawnType;
-                                return (
-                                  <button
-                                    key={`${section.id}-${keyword}`}
-                                    type="button"
-                                    onClick={() => handleEnterSpawnMode(selectedAirport.id, section.spawnType, option)}
-                                    className={`rounded border px-2.5 py-1 text-[11px] font-semibold tracking-[0.02em] ${
-                                      selected
-                                        ? 'border-amber-400/70 bg-amber-400/15 text-amber-200'
-                                        : 'border-yt-border text-yt-text-primary hover:bg-yt-bg-tertiary/50'
-                                    }`}
-                                  >
-                                    {keyword}
-                                    <span className="ml-1 text-yt-text-secondary">({option.cost})</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {spawnMode && (
-                        <div className="rounded border border-amber-400/30 bg-amber-400/5 px-2 py-2">
-                          <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-200/90">
-                            Quantity (max {SPAWN_QUANTITY_MAX})
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {Array.from({ length: SPAWN_QUANTITY_MAX }, (_, index) => {
-                              const value = index + 1;
-                              const selected = (spawnMode.quantity || 1) === value;
-                              return (
-                                <button
-                                  key={value}
-                                  type="button"
-                                  onClick={() => handleSetSpawnQuantity(value)}
-                                  className={`min-w-[30px] rounded border px-2 py-1 text-[11px] font-semibold ${
-                                    selected
-                                      ? 'border-amber-400/70 bg-amber-400/15 text-amber-200'
-                                      : 'border-yt-border text-yt-text-primary hover:bg-yt-bg-tertiary/50'
-                                  }`}
-                                >
-                                  {value}
-                                </button>
-                              );
-                            })}
-                          </div>
-                          <div className="mt-1.5 text-[10px] text-yt-text-secondary">
-                            {spawnMode.quantity || 1}× {spawnMode.label} • total {(spawnMode.cost || 0) * (spawnMode.quantity || 1)} fp • {SPAWN_OFFSET_METERS} m between items
-                          </div>
-                        </div>
-                      )}
-                      <div className="text-[10px] text-yt-text-secondary">
-                        Select an item, choose quantity, then click inside the airport on the map.
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {filters.showLogistics && selectedAirport && (
-                <div className="absolute right-4 bottom-4 z-[1000] w-[430px] max-h-[62vh] overflow-y-auto rounded-xl border border-yt-border bg-[#101827f2] p-3 shadow-2xl backdrop-blur">
-                  <div className="mb-2 flex items-center justify-between">
-                    <div className="text-sm font-semibold text-yt-text-primary">
-                      {selectedAirport.displayName || selectedAirport.name}
-                    </div>
-                    <PanelCloseButton onClick={() => setSelectedAirportId(null)} />
-                  </div>
-                  {canManageLogisticsRouteVisibility && (
-                    <div className="mb-2 flex items-center justify-between rounded border border-yt-border/70 bg-[#0c1320] px-2.5 py-1.5 text-[11px] text-yt-text-secondary">
-                      <div>
-                        Airport priority: <span className={`font-semibold ${selectedAirportRoutesHidden ? 'text-amber-300' : 'text-green-300'}`}>{selectedAirportRoutesHidden ? 'Not priority' : 'Priority'}</span>
-                      </div>
+                <div className="absolute left-4 bottom-4 z-[1000]">
+                  <section
+                    className="airport-spawn-panel"
+                    aria-label={`${selectedAirport.displayName || selectedAirport.name} - AIRBASE`}
+                  >
+                    <div className="airport-spawn-panel__header">
+                      <h2 className="airport-spawn-panel__title">
+                        {(selectedAirport.displayName || selectedAirport.name || 'AIRBASE').toUpperCase()} - AIRBASE
+                      </h2>
                       <button
                         type="button"
-                        onClick={() => handleToggleAirportRoutePriority(selectedAirport.id)}
-                        disabled={updatingRoutePriorityAirportId === String(selectedAirport.id)}
-                        className="rounded border border-yt-border px-2 py-0.5 font-semibold text-yt-text-primary hover:bg-yt-bg-tertiary/50"
-                        title={`Discord role ${LOGISTICS_ROUTE_TOGGLE_ROLE_ID}`}
+                        className="airport-spawn-panel__close"
+                        aria-label="Close"
+                        title="Close"
+                        onClick={() => {
+                          setSelectedAirportId(null);
+                          setSpawnMode(null);
+                          setRetrieveMode(null);
+                          setTankerMode(null);
+                          setShowLogisticsComposeWindow(false);
+                          setShowLogisticsRequestWindow(false);
+                        }}
                       >
-                        {updatingRoutePriorityAirportId === String(selectedAirport.id)
-                          ? 'Saving...'
-                          : (selectedAirportRoutesHidden ? 'Set Priority' : 'Set Not Priority')}
+                        <X strokeWidth={2.5} />
                       </button>
                     </div>
-                  )}
 
-                  {airportLogistics.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-yt-border px-3 py-3 text-xs text-yt-text-secondary">
-                      No logistics tasks for this airport.
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="rounded-lg border border-yt-border bg-[#0c1320] p-2.5">
-                        <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">
-                          Requested Containers
-                        </div>
-                        <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px]">
-                          <span className="rounded border border-yt-border/80 bg-[#121c2d] px-2 py-0.5 text-yt-text-secondary">
-                            Selected: <span className="font-semibold text-yt-text-primary">{selectedContainerIds.length}</span>
-                          </span>
-                          <span className="rounded border border-yt-border/80 bg-[#121c2d] px-2 py-0.5 text-yt-text-secondary">
-                            ISO: <span className="font-semibold text-yt-text-primary">{formatIsoUnits(selectedContainersIsoTotal)}</span>/2.5
-                          </span>
-                          <span className="rounded border border-yt-border/80 bg-[#121c2d] px-2 py-0.5 text-yt-text-secondary">
-                            Large: <span className="font-semibold text-yt-text-primary">{selectedLargeContainerCount}</span>/2
-                          </span>
-                        </div>
+                    <div className="airport-spawn-panel__divider" />
 
-                        <div className="rounded border border-yt-border/70 bg-[#101b2c] px-2 py-2 text-[11px] text-yt-text-secondary">
-                          Pending containers: <span className="font-semibold text-yt-text-primary">{airportContainerItems.length}</span>
+                    <div className="airport-spawn-panel__body">
+                      <div className="airport-spawn-panel__block">
+                        <div className="airport-spawn-panel__block-title">
+                          <Warehouse className="airport-spawn-panel__block-icon" strokeWidth={2} aria-hidden="true" />
+                          <span>WAREHOUSE</span>
                         </div>
-
-                        <div className="mt-2 flex items-center gap-2 border-t border-yt-border/70 pt-2">
+                        <div className="airport-spawn-panel__action-row">
                           <button
                             type="button"
-                            onClick={() => setShowLogisticsComposeWindow(true)}
-                            disabled={airportContainerItems.length === 0}
-                            className="rounded border border-yt-border px-2.5 py-1.5 text-xs font-semibold text-yt-text-primary hover:bg-yt-bg-tertiary/50 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="airport-spawn-panel__action-btn"
+                            disabled={!isAuthenticated}
+                            onClick={() => {
+                              setShowLogisticsRequestWindow(false);
+                              setShowLogisticsComposeWindow(true);
+                            }}
                           >
-                            Open Container Window
+                            WAREHOUSE REQUEST
                           </button>
                           <button
                             type="button"
-                            onClick={() => setShowLogisticsRequestWindow(true)}
-                            className="rounded border border-yt-border px-2.5 py-1.5 text-xs font-semibold text-yt-text-primary hover:bg-yt-bg-tertiary/50"
+                            className="airport-spawn-panel__action-btn"
+                            disabled={!isAuthenticated}
+                            onClick={() => {
+                              setShowLogisticsComposeWindow(false);
+                              setShowLogisticsRequestWindow(true);
+                            }}
                           >
-                            Request
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleComposeLogisticsMission}
-                            disabled={!canComposeSelectedMission || composingMission}
-                            className="rounded border border-green-500/50 bg-green-500/15 px-2.5 py-1.5 text-xs font-semibold text-green-300 hover:bg-green-500/25 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {composingMission ? 'Creating...' : 'Create Mission'}
+                            CREATE CUSTOM REQUEST
                           </button>
                         </div>
                       </div>
 
-                      {airportAssignedLogistics.length > 0 && (
-                        <div className="space-y-2">
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">
-                            Assigned Missions
+                      <div className="airport-spawn-panel__divider airport-spawn-panel__divider--inset" />
+
+                      <div className="airport-spawn-panel__block">
+                        <div className="airport-spawn-panel__block-title">
+                          <Box className="airport-spawn-panel__block-icon" strokeWidth={2} aria-hidden="true" />
+                          <span>SPAWN ASSET</span>
+                        </div>
+
+                        {!isAuthenticated ? (
+                          <div className="airport-spawn-panel__empty">
+                            Login to spawn units and crates.
                           </div>
-                          {airportAssignedLogistics.map((mission) => {
-                            const sourceAirport = airportsById.get(mission.source_airport_id);
-                            const orders = getMissionOrders(mission);
-                            return (
-                              <div key={mission.id} className="rounded-lg border border-yt-border bg-yt-bg-tertiary/60 p-2">
-                                <div className="mb-1 text-xs font-semibold text-yt-text-primary">
-                                  From: {sourceAirport?.displayName || sourceAirport?.name || mission.source_airport_id}
-                                </div>
-                                <div className="mb-2 flex items-center justify-between gap-2">
-                                  <div className="text-[11px] text-yt-text-secondary">
-                                    Mission {mission.id}
+                        ) : (
+                          <>
+                            {SPAWN_MENU_SECTIONS.map((section) => {
+                              const sectionOptions = section.keywords
+                                .map((keyword) => {
+                                  const option = spawnOptionByKeyword.get(keyword);
+                                  return option ? { keyword, option } : null;
+                                })
+                                .filter(Boolean);
+                              if (sectionOptions.length === 0) return null;
+
+                              return (
+                                <div key={section.id} className="airport-spawn-panel__spawn-section">
+                                  <p className="airport-spawn-panel__section-title">{section.title}</p>
+                                  <div className="airport-spawn-panel__pills">
+                                    {sectionOptions.map(({ keyword, option }) => {
+                                      const selected = spawnMode?.keyword === keyword && spawnMode?.type === section.spawnType;
+                                      return (
+                                        <button
+                                          key={`${section.id}-${keyword}`}
+                                          type="button"
+                                          onClick={() => handleEnterSpawnMode(selectedAirport.id, section.spawnType, option)}
+                                          className={`airport-spawn-panel__pill${selected ? ' is-selected' : ''}`}
+                                        >
+                                          {keyword}
+                                          <span className="airport-spawn-panel__pill-cost">({option.cost})</span>
+                                        </button>
+                                      );
+                                    })}
                                   </div>
-                                  <span className="rounded bg-blue-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-blue-300">
-                                    {mission.status}
-                                  </span>
                                 </div>
-                                {mission.accepted_by && (
-                                  <div className="mb-2 text-[10px] text-blue-200">
-                                    Accepted by {mission.accepted_by}
-                                  </div>
-                                )}
-                                <div className="space-y-1.5">
-                                  {orders.map((order, index) => {
-                                    const containerCount = getOrderContainers(order);
-                                    const totalWeight = Number(order.total_weight_lbs || 0);
-                                    const weightPerContainer = containerCount > 0 ? (totalWeight / containerCount) : totalWeight;
-                                    const priority = getPriorityText(order.priority || mission.priority);
+                              );
+                            })}
+
+                            {spawnMode && (
+                              <div className="airport-spawn-panel__qty">
+                                <p className="airport-spawn-panel__qty-title">
+                                  Quantity (max {SPAWN_QUANTITY_MAX})
+                                </p>
+                                <div className="airport-spawn-panel__qty-pills">
+                                  {Array.from({ length: SPAWN_QUANTITY_MAX }, (_, index) => {
+                                    const value = index + 1;
+                                    const selected = (spawnMode.quantity || 1) === value;
                                     return (
-                                      <div key={`${mission.id}-${order.weapon_id || index}`} className="rounded border border-yt-border/70 bg-[#0c1320] px-2 py-1.5">
-                                        <div className="text-[11px] font-semibold text-yt-text-primary">
-                                          {containerCount} container{containerCount > 1 ? 's' : ''} - {getWeaponDisplayName(order.weapon_id || 'cargo')}
-                                        </div>
-                                        <div className="text-[10px] text-yt-text-secondary">
-                                          Content: Qty {Number(order.quantity_needed || 0)}
-                                        </div>
-                                        <div className="text-[10px] text-yt-text-secondary">
-                                          Weight/container: {weightPerContainer > 0 ? `${weightPerContainer.toFixed(1)} lbs` : '-'}
-                                        </div>
-                                        <div className="text-[10px] text-yt-text-secondary">
-                                          Priority: {priority}
-                                        </div>
-                                      </div>
+                                      <button
+                                        key={value}
+                                        type="button"
+                                        onClick={() => handleSetSpawnQuantity(value)}
+                                        className={`airport-spawn-panel__qty-pill${selected ? ' is-selected' : ''}`}
+                                      >
+                                        {value}
+                                      </button>
                                     );
                                   })}
                                 </div>
-                                <div className="mt-2 border-t border-yt-border/70 pt-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelectedLogisticsMission(mission)}
-                                    className="inline-flex items-center gap-2 text-xs font-semibold text-[#4ca3ff] transition-colors hover:text-[#7cbcff]"
-                                  >
-                                    View Details
-                                  </button>
-                                </div>
+                                <p className="airport-spawn-panel__hint airport-spawn-panel__hint--spaced">
+                                  {spawnMode.quantity || 1}× {spawnMode.label} • total {(spawnMode.cost || 0) * (spawnMode.quantity || 1)} fp • {SPAWN_OFFSET_METERS} m between items
+                                </p>
                               </div>
-                            );
-                          })}
-                        </div>
-                      )}
+                            )}
+
+                            <p className="airport-spawn-panel__hint">
+                              Select an item, choose quantity, then click inside the airport on the map.
+                            </p>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  )}
+                  </section>
                 </div>
               )}
 
-              {filters.showLogistics && selectedAirport && showLogisticsComposeWindow && (
-                <div className="fixed inset-0 z-[1200] flex items-center justify-center">
+              {selectedAirport && showLogisticsComposeWindow && (
+                <div className="absolute inset-0 z-[2500] flex items-center justify-center">
                   <button
                     type="button"
                     className="absolute inset-0 bg-black/70"
                     onClick={() => setShowLogisticsComposeWindow(false)}
-                    aria-label="Close logistics compose window"
+                    aria-label="Close warehouse request window"
                   />
-                  <div className="relative flex h-[86vh] w-[min(980px,94vw)] flex-col rounded-2xl border border-yt-border bg-[#0f1727] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
-                    <div className="mb-3 flex items-center justify-between">
+                  <div className="airport-modal">
+                    <div className="airport-modal__header">
                       <div>
-                        <div className="text-sm font-semibold text-yt-text-primary">
-                          Container Selection
-                        </div>
-                        <div className="text-xs text-yt-text-secondary">
+                        <div className="airport-modal__title">WAREHOUSE REQUEST</div>
+                        <div className="airport-modal__subtitle">
                           {selectedAirport.displayName || selectedAirport.name}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="airport-modal__header-actions">
                         <button
                           type="button"
                           onClick={handleComposeLogisticsMission}
                           disabled={!canComposeSelectedMission || composingMission}
-                          className="rounded border border-green-500/50 bg-green-500/15 px-2.5 py-1.5 text-xs font-semibold text-green-300 hover:bg-green-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="airport-modal__primary-btn"
                         >
                           {composingMission ? 'Creating...' : 'Create Mission'}
                         </button>
-                        <PanelCloseButton onClick={() => setShowLogisticsComposeWindow(false)} />
+                        <button
+                          type="button"
+                          className="airport-spawn-panel__close"
+                          aria-label="Close"
+                          onClick={() => setShowLogisticsComposeWindow(false)}
+                        >
+                          <X strokeWidth={2.5} />
+                        </button>
                       </div>
                     </div>
 
-                    <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px]">
-                      <span className="rounded border border-yt-border/80 bg-[#121c2d] px-2 py-0.5 text-yt-text-secondary">
-                        Selected: <span className="font-semibold text-yt-text-primary">{selectedContainerIds.length}</span>
+                    <div className="airport-modal__meta-row">
+                      <span className="airport-modal__chip">
+                        Selected: <strong>{selectedContainerIds.length}</strong>
                       </span>
-                      <span className="rounded border border-yt-border/80 bg-[#121c2d] px-2 py-0.5 text-yt-text-secondary">
-                        ISO: <span className="font-semibold text-yt-text-primary">{formatIsoUnits(selectedContainersIsoTotal)}</span>/2.5
+                      <span className="airport-modal__chip">
+                        ISO: <strong>{formatIsoUnits(selectedContainersIsoTotal)}</strong>/2.5
                       </span>
-                      <span className="rounded border border-yt-border/80 bg-[#121c2d] px-2 py-0.5 text-yt-text-secondary">
-                        Large: <span className="font-semibold text-yt-text-primary">{selectedLargeContainerCount}</span>/2
+                      <span className="airport-modal__chip">
+                        Large: <strong>{selectedLargeContainerCount}</strong>/2
                       </span>
                       {selectedSourceAirportId && (
-                        <span className="rounded border border-yt-border/80 bg-[#121c2d] px-2 py-0.5 text-yt-text-secondary">
-                          Source lock: <span className="font-semibold text-yt-text-primary">{airportsById.get(selectedSourceAirportId)?.displayName || selectedSourceAirportId}</span>
+                        <span className="airport-modal__chip">
+                          Source: <strong>{airportsById.get(selectedSourceAirportId)?.displayName || selectedSourceAirportId}</strong>
                         </span>
                       )}
                     </div>
-                    <div className="mb-3">
+
+                    <div className="airport-modal__search">
                       <input
                         type="text"
                         value={logisticsWeaponSearch}
                         onChange={(event) => setLogisticsWeaponSearch(event.target.value)}
                         placeholder="Search weapon..."
-                        className="w-full rounded border border-yt-border bg-[#0c1320] px-2.5 py-1.5 text-xs text-yt-text-primary outline-none placeholder:text-yt-text-secondary focus:border-yt-accent/60"
+                        className="airport-modal__input"
                       />
                     </div>
 
-                    <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                    <div className="airport-modal__list">
                       {filteredAirportContainerItems.length === 0 ? (
-                        <div className="rounded-lg border border-dashed border-yt-border px-3 py-3 text-xs text-yt-text-secondary">
+                        <div className="airport-modal__empty">
                           {airportContainerItems.length === 0 ? 'No pending containers for this airport.' : 'No containers match this weapon search.'}
                         </div>
                       ) : (
-                        <div className="space-y-2">
+                        <div className="airport-modal__cards">
                           {filteredAirportContainerItems.map((containerItem) => {
-                          const isoUnits = Number(containerItem.units) || 0;
-                          const typeLabel = getIsoContainerTypeLabel(isoUnits);
-                          const selectionState = evaluateContainerSelection(containerItem);
-                          const dimmed = selectionState.disabled && !selectionState.selected;
+                            const isoUnits = Number(containerItem.units) || 0;
+                            const typeLabel = getIsoContainerTypeLabel(isoUnits);
+                            const selectionState = evaluateContainerSelection(containerItem);
+                            const dimmed = selectionState.disabled && !selectionState.selected;
 
-                          return (
-                            <button
-                              key={`pending-container-${containerItem.id}`}
-                              type="button"
-                              onClick={() => handleToggleContainerMission(containerItem)}
-                              disabled={selectionState.disabled && !selectionState.selected}
-                              title={selectionState.reason || ''}
-                              className={`rounded-lg border p-2 transition ${
-                                selectionState.selected
-                                  ? 'border-sky-400 bg-sky-500/12'
-                                  : dimmed
-                                    ? 'border-yt-border/40 bg-yt-bg-tertiary/25 opacity-45'
-                                    : 'border-yt-border bg-yt-bg-tertiary/60'
-                              } w-full text-left`}
-                            >
-                              <div className="mb-2 flex items-start justify-between gap-2">
-                                <div>
-                                  <div className="text-xs font-semibold text-yt-text-primary">
-                                    {typeLabel} - {formatIsoUnits(isoUnits)} ISO
-                                  </div>
-                                  <div className="text-[11px] text-yt-text-secondary">
+                            return (
+                              <button
+                                key={`pending-container-${containerItem.id}`}
+                                type="button"
+                                onClick={() => handleToggleContainerMission(containerItem)}
+                                disabled={selectionState.disabled && !selectionState.selected}
+                                title={selectionState.reason || ''}
+                                className={`airport-modal__card${selectionState.selected ? ' is-selected' : ''}${dimmed ? ' is-dimmed' : ''}`}
+                              >
+                                <div className="airport-modal__card-top">
+                                  <span className="airport-modal__card-badge">{typeLabel}</span>
+                                  <span className="airport-modal__card-meta">
                                     From: {containerItem.sourceAirportName}
-                                  </div>
-                                  <div className="text-[10px] text-yt-text-secondary">
+                                  </span>
+                                  <span className="airport-modal__card-meta">
                                     Mission: {containerItem.missionId}
+                                  </span>
+                                </div>
+                                <div className="airport-modal__card-body">
+                                  <div className="airport-modal__card-title">
+                                    1 container - {getWeaponDisplayName(containerItem.weaponId || 'cargo')}
                                   </div>
+                                  <div className="airport-modal__card-line">
+                                    Content: Qty {Number(containerItem.quantityNeeded || 0)}
+                                  </div>
+                                  <div className="airport-modal__card-line">
+                                    Weight/container: {containerItem.totalWeightLbs > 0 ? `${containerItem.totalWeightLbs.toFixed(1)} lbs` : '-'}
+                                  </div>
+                                  <div className="airport-modal__card-line">
+                                    Priority: {containerItem.priority}
+                                  </div>
+                                  {selectionState.reason ? (
+                                    <div className="airport-modal__card-note">{selectionState.reason}</div>
+                                  ) : null}
                                 </div>
-                                <span className={`rounded border px-2 py-0.5 text-[10px] font-semibold uppercase ${
-                                  selectionState.selected
-                                    ? 'border-sky-400 bg-sky-500/20 text-sky-200'
-                                    : 'border-yt-border bg-[#101b2c] text-yt-text-secondary'
-                                }`}>
-                                  {selectionState.selected ? 'Selected' : 'Available'}
-                                </span>
-                              </div>
-
-                              {selectionState.reason && !selectionState.selected && (
-                                <div className="mb-2 text-[10px] text-amber-300">
-                                  {selectionState.reason}
-                                </div>
-                              )}
-
-                              <div className="rounded border border-yt-border/70 bg-[#0c1320] px-2 py-1.5">
-                                <div className="text-[11px] font-semibold text-yt-text-primary">
-                                  1 container - {getWeaponDisplayName(containerItem.weaponId || 'cargo')}
-                                </div>
-                                <div className="text-[10px] text-yt-text-secondary">
-                                  Content: Qty {Number(containerItem.quantityNeeded || 0)}
-                                </div>
-                                <div className="text-[10px] text-yt-text-secondary">
-                                  Weight/container: {containerItem.totalWeightLbs > 0 ? `${containerItem.totalWeightLbs.toFixed(1)} lbs` : '-'}
-                                </div>
-                                <div className="text-[10px] text-yt-text-secondary">
-                                  Priority: {containerItem.priority}
-                                </div>
-                              </div>
-                            </button>
-                          );
+                              </button>
+                            );
                           })}
                         </div>
                       )}
@@ -6907,36 +6945,39 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                 </div>
               )}
 
-              {filters.showLogistics && selectedAirport && showLogisticsRequestWindow && (
-                <div className="fixed inset-0 z-[1200] flex items-center justify-center">
+              {selectedAirport && showLogisticsRequestWindow && (
+                <div className="absolute inset-0 z-[2500] flex items-center justify-center">
                   <button
                     type="button"
                     className="absolute inset-0 bg-black/70"
                     onClick={() => setShowLogisticsRequestWindow(false)}
-                    aria-label="Close logistics request window"
+                    aria-label="Close custom request window"
                   />
-                  <div className="relative w-[min(700px,92vw)] rounded-2xl border border-yt-border bg-[#0f1727] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
-                    <div className="mb-3 flex items-center justify-between">
+                  <div className="airport-modal airport-modal--compact">
+                    <div className="airport-modal__header">
                       <div>
-                        <div className="text-sm font-semibold text-yt-text-primary">
-                          Request Weapon Order
-                        </div>
-                        <div className="text-xs text-yt-text-secondary">
+                        <div className="airport-modal__title">CREATE CUSTOM REQUEST</div>
+                        <div className="airport-modal__subtitle">
                           {selectedAirport.displayName || selectedAirport.name}
                         </div>
                       </div>
-                      <PanelCloseButton onClick={() => setShowLogisticsRequestWindow(false)} />
+                      <button
+                        type="button"
+                        className="airport-spawn-panel__close"
+                        aria-label="Close"
+                        onClick={() => setShowLogisticsRequestWindow(false)}
+                      >
+                        <X strokeWidth={2.5} />
+                      </button>
                     </div>
 
-                    <div className="mb-2 text-[11px] text-yt-text-secondary">
+                    <div className="airport-modal__hint">
                       If an order for this weapon already exists at this airport, request is blocked.
                     </div>
 
-                    <div className="mb-3">
-                      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">
-                        Weapon
-                      </label>
-                      <div className="relative">
+                    <div className="airport-modal__field">
+                      <label className="airport-modal__label">Weapon</label>
+                      <div className="airport-modal__field-control">
                         <input
                           type="text"
                           value={requestWeaponSearch}
@@ -6953,10 +6994,10 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                             setRequestWeaponId(match?.weaponId || '');
                           }}
                           placeholder="Type weapon name..."
-                          className="w-full rounded border border-yt-border bg-[#0c1320] px-2.5 py-1.5 text-xs text-yt-text-primary outline-none placeholder:text-yt-text-secondary focus:border-yt-accent/60"
+                          className="airport-modal__input"
                         />
                         {requestWeaponSearch.trim() !== '' && !requestWeaponId && requestWeaponSuggestions.length > 0 && (
-                          <div className="absolute z-20 mt-1 max-h-44 w-full overflow-y-auto rounded border border-yt-border bg-[#0c1320] p-1 shadow-xl">
+                          <div className="airport-modal__suggest">
                             {requestWeaponSuggestions.map((weapon) => (
                               <button
                                 key={weapon.weaponId}
@@ -6965,49 +7006,47 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                                   setRequestWeaponId(weapon.weaponId);
                                   setRequestWeaponSearch(weapon.displayName);
                                 }}
-                                className="w-full rounded px-2 py-1 text-left text-xs text-yt-text-primary hover:bg-yt-bg-tertiary/60"
+                                className="airport-modal__suggest-item"
                               >
-                                {weapon.displayName} <span className="text-yt-text-secondary">({weapon.currentQty})</span>
+                                {weapon.displayName} <span>({weapon.currentQty})</span>
                               </button>
                             ))}
                           </div>
                         )}
                       </div>
                       {selectedRequestWeapon?.disabled && (
-                        <div className="mt-1 text-[10px] text-amber-300">This weapon already has an active order for this airport.</div>
+                        <div className="airport-modal__warn">This weapon already has an active order for this airport.</div>
                       )}
                     </div>
 
-                    <div className="mb-4">
-                      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.08em] text-yt-text-secondary">
-                        Quantity
-                      </label>
+                    <div className="airport-modal__field">
+                      <label className="airport-modal__label">Quantity</label>
                       <input
                         type="number"
                         min={1}
                         step={1}
                         value={requestQuantity}
                         onChange={(event) => setRequestQuantity(event.target.value)}
-                        className="w-full rounded border border-yt-border bg-[#0c1320] px-2.5 py-1.5 text-xs text-yt-text-primary outline-none focus:border-yt-accent/60"
+                        className="airport-modal__input"
                       />
-                      <div className="mt-1 text-[10px] text-yt-text-secondary">
+                      <div className="airport-modal__hint">
                         ISO container size is chosen automatically (small/large) from requested quantity.
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="airport-modal__footer">
                       <button
                         type="button"
+                        className="airport-modal__secondary-btn"
                         onClick={() => setShowLogisticsRequestWindow(false)}
-                        className="rounded border border-yt-border px-2.5 py-1.5 text-xs font-semibold text-yt-text-secondary hover:text-yt-text-primary"
                       >
                         Cancel
                       </button>
                       <button
                         type="button"
+                        className="airport-modal__primary-btn"
                         onClick={handleCreateManualRequest}
-                        disabled={requestingOrder || !requestWeaponId}
-                        className="rounded border border-green-500/50 bg-green-500/15 px-2.5 py-1.5 text-xs font-semibold text-green-300 hover:bg-green-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={requestingOrder || !requestWeaponId || !(Number(requestQuantity) > 0) || selectedRequestWeapon?.disabled}
                       >
                         {requestingOrder ? 'Requesting...' : 'Request Order'}
                       </button>

@@ -1,0 +1,647 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@600;700&display=swap');
+
+.airport-spawn-panel {
+  --asp-scale: 0.6;
+  --asp-radius-card: calc(25px * var(--asp-scale));
+  --asp-radius-control: 10px;
+  --asp-radius-option: 8px;
+  --asp-control-bg: #0e0e0e;
+  --asp-control-border: #4e4e4e;
+  --asp-blue: #3b82f6;
+
+  box-sizing: border-box;
+  width: calc(763px * var(--asp-scale));
+  max-width: calc(100vw - 2rem);
+  background: var(--asp-control-bg);
+  border: 1px solid var(--asp-control-border);
+  border-radius: var(--asp-radius-card);
+  color: #ffffff;
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+}
+
+.airport-spawn-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(11px * var(--asp-scale));
+  padding: calc(18px * var(--asp-scale)) calc(14px * var(--asp-scale)) calc(16px * var(--asp-scale));
+}
+
+.airport-spawn-panel__title {
+  margin: 0;
+  min-width: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  color: var(--asp-blue);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+
+.airport-spawn-panel__block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.airport-spawn-panel__block-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  color: #ffffff;
+  text-transform: uppercase;
+}
+
+.airport-spawn-panel__block-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: #ffffff;
+}
+
+.airport-spawn-panel__action-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.airport-spawn-panel__action-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 10px;
+  background: var(--asp-control-bg);
+  border: 1px solid var(--asp-control-border);
+  border-radius: var(--asp-radius-control);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  white-space: normal;
+  text-align: center;
+  cursor: pointer;
+}
+
+.airport-spawn-panel__action-btn:hover:not(:disabled) {
+  border-color: #757575;
+  background: #1b1b1b;
+}
+
+.airport-spawn-panel__action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.airport-spawn-panel__spawn-section + .airport-spawn-panel__spawn-section {
+  margin-top: calc(10px * var(--asp-scale));
+}
+
+.airport-spawn-panel__close {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  background: var(--asp-control-bg);
+  border: 1px solid var(--asp-control-border);
+  border-radius: 9px;
+  color: #c8ced8;
+  cursor: pointer;
+}
+
+.airport-spawn-panel__close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  border-color: var(--asp-control-border);
+}
+
+.airport-spawn-panel__close svg {
+  width: 14px;
+  height: 14px;
+}
+
+.airport-spawn-panel__divider {
+  height: 0;
+  margin: 0 calc(14px * var(--asp-scale));
+  border-top: 1px solid var(--asp-control-border);
+}
+
+.airport-spawn-panel__divider.airport-spawn-panel__divider--inset {
+  /* Same width as header divider; bottom gap matches WAREHOUSE ↔ header line (body pad-top) */
+  margin:
+    12px
+    calc((14px - 20px) * var(--asp-scale))
+    calc((18px - 16px) * var(--asp-scale));
+}
+
+.airport-spawn-panel__body {
+  padding: calc(18px * var(--asp-scale)) calc(20px * var(--asp-scale)) calc(18px * var(--asp-scale));
+  display: flex;
+  flex-direction: column;
+  gap: calc(16px * var(--asp-scale));
+}
+
+.airport-spawn-panel__empty {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  min-height: calc(48px * var(--asp-scale));
+  padding: calc(12px * var(--asp-scale)) calc(14px * var(--asp-scale));
+  background: var(--asp-control-bg);
+  border: 1px dashed var(--asp-control-border);
+  border-radius: var(--asp-radius-control);
+  color: #949494;
+  font-size: calc(16px * var(--asp-scale));
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.airport-spawn-panel__section-title {
+  margin: 0 0 calc(10px * var(--asp-scale));
+  font-size: calc(15px * var(--asp-scale));
+  font-weight: 600;
+  line-height: calc(18px * var(--asp-scale));
+  color: #949494;
+  text-transform: uppercase;
+}
+
+.airport-spawn-panel__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.airport-spawn-panel__pill {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 10px;
+  background: var(--asp-control-bg);
+  border: 1px solid var(--asp-control-border);
+  border-radius: var(--asp-radius-control);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.airport-spawn-panel__pill:hover {
+  border-color: #757575;
+  background: #1b1b1b;
+}
+
+.airport-spawn-panel__pill.is-selected {
+  border-color: #575757;
+  background: #575757;
+  color: #ffffff;
+}
+
+.airport-spawn-panel__pill-cost {
+  margin-left: 6px;
+  color: #949494;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.airport-spawn-panel__pill.is-selected .airport-spawn-panel__pill-cost {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.airport-spawn-panel__qty {
+  box-sizing: border-box;
+  padding: calc(12px * var(--asp-scale));
+  background: var(--asp-control-bg);
+  border: 1px solid var(--asp-control-border);
+  border-radius: var(--asp-radius-control);
+}
+
+.airport-spawn-panel__qty-title {
+  margin: 0 0 calc(10px * var(--asp-scale));
+  font-size: calc(15px * var(--asp-scale));
+  font-weight: 600;
+  line-height: 1.2;
+  color: #ffffff;
+  text-transform: uppercase;
+}
+
+.airport-spawn-panel__qty-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.airport-spawn-panel__qty-pill {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0 10px;
+  background: var(--asp-control-bg);
+  border: 1px solid var(--asp-control-border);
+  border-radius: var(--asp-radius-control);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+}
+
+.airport-spawn-panel__qty-pill:hover {
+  border-color: #757575;
+  background: #1b1b1b;
+}
+
+.airport-spawn-panel__qty-pill.is-selected {
+  border-color: #575757;
+  background: #575757;
+  color: #ffffff;
+}
+
+.airport-spawn-panel__hint {
+  margin: 0;
+  font-size: calc(13px * var(--asp-scale));
+  line-height: 1.35;
+  color: #949494;
+}
+
+.airport-spawn-panel__hint--spaced {
+  margin-top: calc(10px * var(--asp-scale));
+}
+
+/* Warehouse / custom request modals — same tokens as panel / zone / PP */
+.airport-modal {
+  --am-scale: 0.6;
+  --am-bg: #0e0e0e;
+  --am-border: #4e4e4e;
+  --am-radius-card: calc(25px * var(--am-scale));
+  --am-radius-control: 10px;
+  --am-radius-option: 8px;
+  --am-blue: #3b82f6;
+
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: min(980px, 94vw);
+  height: 86vh;
+  padding: calc(18px * var(--am-scale)) calc(20px * var(--am-scale));
+  background: var(--am-bg);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-card);
+  color: #ffffff;
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+.airport-modal--compact {
+  width: min(520px, 92vw);
+  height: auto;
+  max-height: 86vh;
+}
+
+.airport-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: calc(14px * var(--am-scale));
+}
+
+.airport-modal__title {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  color: var(--am-blue);
+  text-transform: uppercase;
+}
+
+.airport-modal__subtitle {
+  margin-top: 4px;
+  font-size: calc(13px * var(--am-scale));
+  line-height: 1.35;
+  color: #949494;
+}
+
+.airport-modal__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.airport-modal .airport-spawn-panel__close {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+}
+
+.airport-modal .airport-spawn-panel__close svg {
+  width: 14px;
+  height: 14px;
+}
+
+.airport-modal__meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.airport-modal__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 10px;
+  background: var(--am-bg);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-control);
+  color: #949494;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.airport-modal__chip strong {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.airport-modal__search,
+.airport-modal__field {
+  margin-bottom: 12px;
+}
+
+.airport-modal__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: calc(15px * var(--am-scale));
+  font-weight: 600;
+  line-height: calc(18px * var(--am-scale));
+  color: #949494;
+  text-transform: uppercase;
+}
+
+.airport-modal__field-control {
+  position: relative;
+}
+
+.airport-modal__input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 10px;
+  background: var(--am-bg);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-control);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+}
+
+.airport-modal__input::placeholder {
+  color: #757575;
+}
+
+.airport-modal__input:focus {
+  border-color: #757575;
+}
+
+.airport-modal__list {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.airport-modal__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.airport-modal__empty {
+  padding: 12px 14px;
+  border: 1px dashed var(--am-border);
+  border-radius: var(--am-radius-control);
+  color: #949494;
+  font-size: calc(16px * var(--am-scale));
+  font-weight: 600;
+}
+
+.airport-modal__card {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px;
+  text-align: left;
+  background: var(--am-bg);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-control);
+  color: #ffffff;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.airport-modal__card:hover:not(:disabled) {
+  border-color: #757575;
+  background: #1b1b1b;
+}
+
+.airport-modal__card.is-selected {
+  border-color: #575757;
+  background: #575757;
+}
+
+.airport-modal__card.is-dimmed {
+  opacity: 0.45;
+}
+
+.airport-modal__card:disabled {
+  cursor: not-allowed;
+}
+
+.airport-modal__card-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.airport-modal__card-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  background: var(--am-bg);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-control);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.airport-modal__card.is-selected .airport-modal__card-badge {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.airport-modal__card-meta {
+  color: #949494;
+  font-size: calc(13px * var(--am-scale));
+}
+
+.airport-modal__card.is-selected .airport-modal__card-meta {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.airport-modal__card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.airport-modal__card-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.airport-modal__card-line {
+  font-size: calc(13px * var(--am-scale));
+  color: #949494;
+}
+
+.airport-modal__card.is-selected .airport-modal__card-line {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.airport-modal__card-note {
+  margin-top: 6px;
+  font-size: calc(13px * var(--am-scale));
+  color: #fbbf24;
+}
+
+.airport-modal__hint {
+  margin: 0 0 12px;
+  font-size: calc(13px * var(--am-scale));
+  line-height: 1.35;
+  color: #949494;
+}
+
+.airport-modal__warn {
+  margin-top: 6px;
+  font-size: calc(13px * var(--am-scale));
+  color: #fbbf24;
+}
+
+.airport-modal__suggest {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 176px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--am-bg);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-control);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.airport-modal__suggest-item {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--am-radius-option);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.airport-modal__suggest-item span {
+  color: #949494;
+}
+
+.airport-modal__suggest-item:hover {
+  background: #1b1b1b;
+}
+
+.airport-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.airport-modal__primary-btn,
+.airport-modal__secondary-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: var(--am-radius-control);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.airport-modal__primary-btn {
+  background: #575757;
+  border: 1px solid #575757;
+  color: #ffffff;
+}
+
+.airport-modal__primary-btn:hover:not(:disabled) {
+  background: #6a6a6a;
+  border-color: #6a6a6a;
+}
+
+.airport-modal__primary-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.airport-modal__secondary-btn {
+  background: var(--am-bg);
+  border: 1px solid var(--am-border);
+  color: #ffffff;
+}
+
+.airport-modal__secondary-btn:hover {
+  border-color: #757575;
+  background: #1b1b1b;
+}

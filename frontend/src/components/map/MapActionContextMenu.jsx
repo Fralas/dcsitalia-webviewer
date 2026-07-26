@@ -57,7 +57,7 @@ export default function MapActionContextMenu({
 
   useEffect(() => {
     if (menu) setPath([]);
-  }, [menu?.x, menu?.y, menu?.lat, menu?.lon]);
+  }, [menu?.lat, menu?.lon]);
 
   const currentNode = useMemo(() => resolveContextMenuNode(path), [path]);
   const currentItems = currentNode?.children || MAP_CONTEXT_MENU_ROOT.children || [];
@@ -103,7 +103,7 @@ export default function MapActionContextMenu({
   if (!menu) return null;
 
   const atRoot = path.length === 0;
-  const centerIcon = atRoot ? Hammer : ChevronLeft;
+  const centerIcon = atRoot ? Crosshair : ChevronLeft;
 
   return (
     <div
@@ -124,8 +124,10 @@ export default function MapActionContextMenu({
         petalOffset={28}
         labelMaxLength={11}
         animationDuration={380}
-        iconColor="#f8fafc"
-        backgroundColor="rgba(21, 25, 37, 0.88)"
+        iconColor="#ffffff"
+        centerIconColor={atRoot ? '#FF8C00' : '#ffffff'}
+        backgroundColor="#575757"
+        borderColor="#575757"
         className="drop-shadow-[0_10px_26px_rgba(0,0,0,0.5)]"
       />
     </div>

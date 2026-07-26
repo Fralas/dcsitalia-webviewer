@@ -68,6 +68,7 @@ export default function LiveFeedPanel({
   productionPoints,
   dcsarPoints = [],
   airports,
+  logisticAirportFocus = null,
   onSelectZone,
   onSelectLogisticsMission,
   onSelectProductionPoint,
@@ -164,6 +165,7 @@ export default function LiveFeedPanel({
               productionPoints={productionPoints}
               dcsarPoints={dcsarPoints}
               airports={airports}
+              logisticAirportFocus={logisticAirportFocus}
               onSelectZone={onSelectZone}
               onSelectLogisticsMission={onSelectLogisticsMission}
               onSelectProductionPoint={onSelectProductionPoint}

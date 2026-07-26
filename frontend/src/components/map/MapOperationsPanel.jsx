@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Factory, Forklift, Helicopter, MapPin, Plane, RotateCcw } from 'lucide-react';
 import {
   getAirportLabel,
@@ -56,6 +57,141 @@ function sortByDistance(rows, getDistance = (row) => row.distanceNm) {
     if (bDistance != null) return 1;
     return 0;
   });
+}
+
+function OpsSelect({
+  id,
+  openSelectId,
+  setOpenSelectId,
+  value,
+  onChange,
+  options = [],
+  ariaLabel,
+  icon = null,
+  wrapClassName = '',
+  muted = false,
+  onActivate,
+  compact = false,
+}) {
+  const open = openSelectId === id;
+  const rootRef = useRef(null);
+  const triggerRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuStyle, setMenuStyle] = useState(null);
+
+  const selected = options.find((option) => String(option.value) === String(value));
+  const label = selected?.label ?? options[0]?.label ?? '';
+
+  const updateMenuPosition = () => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const width = Math.max(rect.width, compact ? 96 : 140);
+    const left = Math.min(rect.left, window.innerWidth - width - 8);
+    setMenuStyle({
+      position: 'fixed',
+      top: rect.bottom + 4,
+      left: Math.max(8, left),
+      width,
+      zIndex: 5000,
+    });
+  };
+
+  useEffect(() => {
+    if (!open) {
+      setMenuStyle(null);
+      return undefined;
+    }
+
+    updateMenuPosition();
+
+    const handlePointerDown = (event) => {
+      const inTrigger = rootRef.current?.contains(event.target);
+      const inMenu = menuRef.current?.contains(event.target);
+      if (!inTrigger && !inMenu) setOpenSelectId(null);
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setOpenSelectId(null);
+    };
+    const handleReposition = () => updateMenuPosition();
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('resize', handleReposition);
+    window.addEventListener('scroll', handleReposition, true);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', handleReposition);
+      window.removeEventListener('scroll', handleReposition, true);
+    };
+  }, [open, setOpenSelectId]);
+
+  const handleTriggerClick = () => {
+    if (muted) {
+      onActivate?.();
+      return;
+    }
+    setOpenSelectId(open ? null : id);
+  };
+
+  const handleOptionClick = (nextValue) => {
+    onChange?.(nextValue);
+    setOpenSelectId(null);
+  };
+
+  return (
+    <div
+      ref={rootRef}
+      className={`map-ops-section__select-wrap${compact ? ' map-ops-section__select-wrap--compact' : ''}${muted ? ' is-muted' : ''}${open ? ' is-open' : ''} ${wrapClassName}`.trim()}
+      onClick={() => {
+        if (muted) onActivate?.();
+      }}
+    >
+      <button
+        ref={triggerRef}
+        type="button"
+        className={`map-ops-section__select-trigger${compact ? ' map-ops-section__select-trigger--compact' : ''}${open ? ' is-open' : ''}`}
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        tabIndex={muted ? -1 : 0}
+        onClick={(event) => {
+          event.stopPropagation();
+          handleTriggerClick();
+        }}
+      >
+        {icon}
+        <span className="map-ops-section__select-trigger-label">{label}</span>
+        <ChevronDown className="map-ops-section__select-chevron" strokeWidth={2.5} aria-hidden="true" />
+      </button>
+
+      {open && menuStyle && createPortal(
+        <ul
+          ref={menuRef}
+          className="map-ops-section__select-menu"
+          style={menuStyle}
+          role="listbox"
+          aria-label={ariaLabel}
+        >
+          {options.map((option) => {
+            const selectedOption = String(option.value) === String(value);
+            return (
+              <li key={`${id}-${option.value}`} role="option" aria-selected={selectedOption}>
+                <button
+                  type="button"
+                  className={`map-ops-section__select-menu-option${selectedOption ? ' is-selected' : ''}`}
+                  onClick={() => handleOptionClick(option.value)}
+                >
+                  <span className="map-ops-section__select-menu-option-label">{option.label}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>,
+        document.body,
+      )}
+    </div>
+  );
 }
 
 function TakeoffIcon() {
@@ -176,6 +312,7 @@ export default function MapOperationsPanel({
   productionPoints = [],
   dcsarPoints = [],
   airports = [],
+  logisticAirportFocus = null,
   onSelectZone,
   onSelectLogisticsMission,
   onSelectProductionPoint,
@@ -202,8 +339,22 @@ export default function MapOperationsPanel({
   const [productionDistanceMode, setProductionDistanceMode] = useState('range');
   const [productionPointId, setProductionPointId] = useState('');
   const [productionMinStock, setProductionMinStock] = useState('');
+  const [openSelectId, setOpenSelectId] = useState(null);
 
   const missionTasks = aircraftMode === 'heli' ? HELI_MISSION_TASKS : PLANE_MISSION_TASKS;
+
+  useEffect(() => {
+    setOpenSelectId(null);
+  }, [activeTab]);
+
+  useEffect(() => {
+    const airportId = logisticAirportFocus?.airportId;
+    if (!airportId) return;
+    setActiveTab('logistic');
+    setLogisticArrivalAirportId(String(airportId));
+    setLogisticDistanceMode('arrival');
+    setOpenSelectId(null);
+  }, [logisticAirportFocus]);
 
   useEffect(() => {
     if (aircraftMode === 'heli' && taskFilter === 'CAP') {
@@ -270,11 +421,6 @@ export default function MapOperationsPanel({
       .filter((zone) => getCoords(zone) && (linkedZoneIds.size === 0 || linkedZoneIds.has(zone.id)))
       .sort((a, b) => getZoneNumber(a).localeCompare(getZoneNumber(b), undefined, { numeric: true }));
   }, [zones, productionPointOptions]);
-
-  const selectedProductionPoint = useMemo(
-    () => productionPointOptions.find((entry) => entry.id === productionPointId) || null,
-    [productionPointOptions, productionPointId],
-  );
 
   useEffect(() => {
     if (missionAirportId && !airportOptions.some((entry) => entry.id === missionAirportId)) {
@@ -573,8 +719,13 @@ export default function MapOperationsPanel({
   }) => (
     <div
       className={`map-ops-section__radius-wrap${muted ? ' is-muted' : ''}`}
-      onClick={() => {
-        if (muted) onActivate?.();
+      onClick={(event) => {
+        if (muted) {
+          onActivate?.();
+          return;
+        }
+        const input = event.currentTarget.querySelector('input');
+        if (input && event.target !== input) input.focus();
       }}
     >
       <input
@@ -646,26 +797,25 @@ export default function MapOperationsPanel({
 
         {activeTab === 'logistic' && (
           <>
-            <div className="map-ops-section__select-wrap map-ops-section__select-wrap--brandina">
-              <select
-                className="map-ops-section__select map-ops-section__select--brandina"
-                value={logisticAircraft}
-                onChange={(event) => setLogisticAircraft(event.target.value)}
-                aria-label={t('map.rightPanel.ops.aircraft')}
-              >
-                {LOGISTIC_AIRCRAFT.map((aircraft) => (
-                  <option key={aircraft} value={aircraft}>
-                    {aircraft}
-                  </option>
-                ))}
-              </select>
-              <span className="map-ops-section__brandina-value" aria-hidden="true">
-                {logisticAircraft}
-              </span>
-              <ChevronDown className="map-ops-section__select-chevron" strokeWidth={2.5} />
-            </div>
+            <OpsSelect
+              id="logistic-aircraft"
+              openSelectId={openSelectId}
+              setOpenSelectId={setOpenSelectId}
+              compact
+              wrapClassName="map-ops-section__select-wrap--brandina"
+              value={logisticAircraft}
+              onChange={setLogisticAircraft}
+              ariaLabel={t('map.rightPanel.ops.aircraft')}
+              options={LOGISTIC_AIRCRAFT.map((aircraft) => ({ value: aircraft, label: aircraft }))}
+            />
 
-            <div className="map-ops-section__weight-wrap">
+            <div
+              className="map-ops-section__weight-wrap"
+              onClick={(event) => {
+                const input = event.currentTarget.querySelector('input');
+                if (input && event.target !== input) input.focus();
+              }}
+            >
               <input
                 type="number"
                 min={0}
@@ -697,7 +847,13 @@ export default function MapOperationsPanel({
         )}
 
         {activeTab === 'production' && (
-          <div className="map-ops-section__stock-wrap">
+          <div
+            className="map-ops-section__stock-wrap"
+            onClick={(event) => {
+              const input = event.currentTarget.querySelector('input');
+              if (input && event.target !== input) input.focus();
+            }}
+          >
             <input
               type="number"
               min={0}
@@ -714,23 +870,23 @@ export default function MapOperationsPanel({
 
         {activeTab === 'logistic' ? (
           <div className="map-ops-section__logistic-route map-ops-section__logistic-route--logistic">
-            <div className="map-ops-section__select-wrap map-ops-section__select-wrap--departure">
-              <TakeoffIcon />
-              <select
-                className="map-ops-section__select"
-                value={logisticDepartureAirportId}
-                onChange={(event) => setLogisticDepartureAirportId(event.target.value)}
-                aria-label={t('map.rightPanel.ops.departure')}
-              >
-                <option value="">{t('map.rightPanel.ops.departure')}</option>
-                {airportOptions.map((airport) => (
-                  <option key={`log-dep-${airport.id}`} value={airport.id}>
-                    {getAirportLabel(airport)}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="map-ops-section__select-chevron" strokeWidth={2.5} />
-            </div>
+            <OpsSelect
+              id="logistic-departure"
+              openSelectId={openSelectId}
+              setOpenSelectId={setOpenSelectId}
+              wrapClassName="map-ops-section__select-wrap--departure"
+              icon={<TakeoffIcon />}
+              value={logisticDepartureAirportId}
+              onChange={setLogisticDepartureAirportId}
+              ariaLabel={t('map.rightPanel.ops.departure')}
+              options={[
+                { value: '', label: t('map.rightPanel.ops.departure') },
+                ...airportOptions.map((airport) => ({
+                  value: airport.id,
+                  label: getAirportLabel(airport),
+                })),
+              ]}
+            />
 
             {renderRadiusField({
               value: logisticRangeNm,
@@ -740,52 +896,48 @@ export default function MapOperationsPanel({
               ariaLabel: t('map.rightPanel.ops.radius'),
             })}
 
-            <div
-              className={`map-ops-section__select-wrap map-ops-section__select-wrap--arrival${logisticArrivalMuted ? ' is-muted' : ''}`}
-              onClick={() => {
-                if (logisticArrivalMuted) setLogisticDistanceMode('arrival');
+            <OpsSelect
+              id="logistic-arrival"
+              openSelectId={openSelectId}
+              setOpenSelectId={setOpenSelectId}
+              wrapClassName="map-ops-section__select-wrap--arrival"
+              icon={<LandingIcon />}
+              muted={logisticArrivalMuted}
+              onActivate={() => setLogisticDistanceMode('arrival')}
+              value={logisticArrivalAirportId}
+              onChange={(nextValue) => {
+                setLogisticDistanceMode('arrival');
+                setLogisticArrivalAirportId(nextValue);
               }}
-            >
-              <LandingIcon />
-              <select
-                className="map-ops-section__select"
-                value={logisticArrivalAirportId}
-                tabIndex={logisticArrivalMuted ? -1 : 0}
-                onChange={(event) => {
-                  setLogisticDistanceMode('arrival');
-                  setLogisticArrivalAirportId(event.target.value);
-                }}
-                aria-label={t('map.rightPanel.ops.arrival')}
-              >
-                <option value="">{t('map.rightPanel.ops.arrival')}</option>
-                {airportOptions.map((airport) => (
-                  <option key={`log-arr-${airport.id}`} value={airport.id}>
-                    {getAirportLabel(airport)}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="map-ops-section__select-chevron" strokeWidth={2.5} />
-            </div>
+              ariaLabel={t('map.rightPanel.ops.arrival')}
+              options={[
+                { value: '', label: t('map.rightPanel.ops.arrival') },
+                ...airportOptions.map((airport) => ({
+                  value: airport.id,
+                  label: getAirportLabel(airport),
+                })),
+              ]}
+            />
           </div>
         ) : activeTab === 'production' ? (
           <div className="map-ops-section__logistic-route map-ops-section__logistic-route--production">
-            <div className="map-ops-section__select-wrap map-ops-section__select-wrap--departure">
-              <TakeoffIcon />
-              <select
-                className="map-ops-section__select"
-                value={productionDepartureAirportId}
-                onChange={(event) => setProductionDepartureAirportId(event.target.value)}
-                aria-label={t('map.rightPanel.ops.departure')}
-              >
-                <option value="">{t('map.rightPanel.ops.departure')}</option>
-                {airportOptions.map((airport) => (
-                  <option key={`pp-dep-${airport.id}`} value={airport.id}>
-                    {getAirportLabel(airport)}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="map-ops-section__select-chevron" strokeWidth={2.5} />
-            </div>
+            <OpsSelect
+              id="production-departure"
+              openSelectId={openSelectId}
+              setOpenSelectId={setOpenSelectId}
+              wrapClassName="map-ops-section__select-wrap--departure"
+              icon={<TakeoffIcon />}
+              value={productionDepartureAirportId}
+              onChange={setProductionDepartureAirportId}
+              ariaLabel={t('map.rightPanel.ops.departure')}
+              options={[
+                { value: '', label: t('map.rightPanel.ops.departure') },
+                ...airportOptions.map((airport) => ({
+                  value: airport.id,
+                  label: getAirportLabel(airport),
+                })),
+              ]}
+            />
 
             {renderRadiusField({
               value: productionRangeNm,
@@ -795,73 +947,41 @@ export default function MapOperationsPanel({
               ariaLabel: t('map.rightPanel.ops.radius'),
             })}
 
-            <div className="map-ops-section__select-wrap map-ops-section__select-wrap--brandina map-ops-section__select-wrap--production-point">
-              <select
-                className="map-ops-section__select map-ops-section__select--brandina"
-                value={productionPointId}
-                onChange={(event) => setProductionPointId(event.target.value)}
-                aria-label={t('map.rightPanel.ops.productionPoint')}
-              >
-                <option value="">{t('map.rightPanel.ops.productionPoint')}</option>
-                {productionPointOptions.map((pp) => (
-                  <option key={`pp-filter-${pp.id}`} value={pp.id}>
-                    {formatProductionPointCode(pp)}
-                  </option>
-                ))}
-              </select>
-              <span className="map-ops-section__brandina-value" aria-hidden="true">
-                {selectedProductionPoint
-                  ? formatProductionPointCode(selectedProductionPoint)
-                  : t('map.rightPanel.ops.productionPoint')}
-              </span>
-              <ChevronDown className="map-ops-section__select-chevron" strokeWidth={2.5} />
-            </div>
-
-            <div
-              className={`map-ops-section__select-wrap map-ops-section__select-wrap--arrival map-ops-section__select-wrap--zone${productionArrivalMuted ? ' is-muted' : ''}`}
-              onClick={() => {
-                if (productionArrivalMuted) setProductionDistanceMode('arrival');
-              }}
-            >
-              <LandingIcon />
-              <select
-                className="map-ops-section__select map-ops-section__select--zone"
-                value={productionArrivalZoneId}
-                tabIndex={productionArrivalMuted ? -1 : 0}
-                onChange={(event) => {
-                  setProductionDistanceMode('arrival');
-                  setProductionArrivalZoneId(event.target.value);
-                }}
-                aria-label={t('map.rightPanel.ops.dropZone')}
-              >
-                <option value="">{t('map.rightPanel.ops.arrival')}</option>
-                {productionDeliveryZones.map((zone) => (
-                  <option key={`pp-arr-zone-${zone.id}`} value={zone.id}>
-                    {t('map.rightPanel.ops.zone', { number: getZoneNumber(zone) })}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="map-ops-section__select-chevron" strokeWidth={2.5} />
-            </div>
+            <OpsSelect
+              id="production-point"
+              openSelectId={openSelectId}
+              setOpenSelectId={setOpenSelectId}
+              wrapClassName="map-ops-section__select-wrap--brandina map-ops-section__select-wrap--production-point"
+              value={productionPointId}
+              onChange={setProductionPointId}
+              ariaLabel={t('map.rightPanel.ops.productionPoint')}
+              options={[
+                { value: '', label: t('map.rightPanel.ops.productionPoint') },
+                ...productionPointOptions.map((pp) => ({
+                  value: pp.id,
+                  label: formatProductionPointCode(pp),
+                })),
+              ]}
+            />
           </div>
         ) : (
-          <div className="map-ops-section__select-wrap map-ops-section__select-wrap--airport">
-            <TakeoffIcon />
-            <select
-              className="map-ops-section__select"
-              value={missionAirportId}
-              onChange={(event) => setMissionAirportId(event.target.value)}
-              aria-label={t('map.rightPanel.ops.departure')}
-            >
-              <option value="">{t('map.rightPanel.ops.departure')}</option>
-              {filteredAirportOptions.map((airport) => (
-                <option key={airport.id} value={airport.id}>
-                  {getAirportLabel(airport)}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="map-ops-section__select-chevron" strokeWidth={2.5} />
-          </div>
+          <OpsSelect
+            id="mission-departure"
+            openSelectId={openSelectId}
+            setOpenSelectId={setOpenSelectId}
+            wrapClassName="map-ops-section__select-wrap--airport"
+            icon={<TakeoffIcon />}
+            value={missionAirportId}
+            onChange={setMissionAirportId}
+            ariaLabel={t('map.rightPanel.ops.departure')}
+            options={[
+              { value: '', label: t('map.rightPanel.ops.departure') },
+              ...filteredAirportOptions.map((airport) => ({
+                value: airport.id,
+                label: getAirportLabel(airport),
+              })),
+            ]}
+          />
         )}
 
         {activeTab === 'mission' && renderRadiusField({

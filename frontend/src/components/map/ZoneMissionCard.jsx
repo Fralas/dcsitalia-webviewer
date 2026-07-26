@@ -1,5 +1,14 @@
-import { ChevronDown, CircleHelp } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, X } from 'lucide-react';
 import './ZoneMissionCard.css';
+
+const STATUS_FILTERS = [
+  { id: 'all', label: 'All zones' },
+  { id: 'BLUE', label: 'Blue zones' },
+  { id: 'RED', label: 'Red zones' },
+  { id: 'NEUTRAL', label: 'Neutral zones' },
+  { id: 'UNDER_ATTACK', label: 'Under attack' },
+];
 
 function formatShortRelativeTime(timestamp) {
   if (!timestamp) return '-';
@@ -28,6 +37,36 @@ function getDotClass(status) {
   return 'zone-mission-card__dot--neutral';
 }
 
+function formatCardDms(dms) {
+  if (!dms || dms === '-') return dms;
+  // Two non-breaking spaces so HTML does not collapse the gap.
+  return String(dms).replace(', ', '\u00A0\u00A0');
+}
+
+function zoneMatchesStatusFilter(zone, statusFilter) {
+  if (!statusFilter || statusFilter === 'all') return true;
+  const status = String(zone?.status || 'NEUTRAL').toUpperCase();
+  if (statusFilter === 'NEUTRAL') {
+    return status === 'NEUTRAL' || (!['BLUE', 'RED', 'UNDER_ATTACK'].includes(status));
+  }
+  return status === statusFilter;
+}
+
+function StatusFilterSwatch({ filterId }) {
+  if (filterId === 'all') {
+    return <span className="zone-mission-card__chip-ring" aria-hidden="true" />;
+  }
+  if (filterId === 'NEUTRAL') {
+    return <span className="zone-mission-card__dot zone-mission-card__dot--filter-neutral" aria-hidden="true" />;
+  }
+  return (
+    <span
+      className={`zone-mission-card__dot ${getDotClass(filterId)}`}
+      aria-hidden="true"
+    />
+  );
+}
+
 export default function ZoneMissionCard({
   zone,
   zones = [],
@@ -42,10 +81,73 @@ export default function ZoneMissionCard({
   canAcceptMore = true,
   accepting = false,
   declining = false,
+  activeZoneId = null,
   onSelectZone,
   onAccept,
   onDecline,
+  onClose,
 }) {
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [openMenu, setOpenMenu] = useState(null); // 'filter' | 'zone' | null
+  const headerControlsRef = useRef(null);
+  const lastDropdownZoneIdRef = useRef(null);
+  const prevActiveZoneIdRef = useRef(activeZoneId);
+
+  const filterOpen = openMenu === 'filter';
+  const zoneOpen = openMenu === 'zone';
+  const anyMenuOpen = openMenu != null;
+
+  useEffect(() => {
+    if (!anyMenuOpen) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (!headerControlsRef.current?.contains(event.target)) {
+        setOpenMenu(null);
+      }
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setOpenMenu(null);
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [anyMenuOpen]);
+
+  // Map click can select any zone; if the committed selection changes to a zone
+  // outside the active filter, clear the filter. Ignore filter-driven selection.
+  useEffect(() => {
+    const prevId = prevActiveZoneIdRef.current;
+    prevActiveZoneIdRef.current = activeZoneId;
+    if (!activeZoneId || activeZoneId === prevId) return;
+    if (lastDropdownZoneIdRef.current === activeZoneId) return;
+
+    setStatusFilter((current) => {
+      if (current === 'all') return current;
+      const activeZone = zones.find((entry) => entry.id === activeZoneId);
+      if (activeZone && !zoneMatchesStatusFilter(activeZone, current)) {
+        setOpenMenu(null);
+        return 'all';
+      }
+      return current;
+    });
+  }, [activeZoneId, zones]);
+
+  const filteredZones = useMemo(
+    () => zones.filter((entry) => zoneMatchesStatusFilter(entry, statusFilter)),
+    [zones, statusFilter],
+  );
+
+  // Include current zone if parent has not switched yet after a filter change.
+  const selectZones = useMemo(() => {
+    if (!zone?.id) return filteredZones;
+    if (filteredZones.some((entry) => entry.id === zone.id)) return filteredZones;
+    return [zone, ...filteredZones];
+  }, [filteredZones, zone]);
+
   if (!zone) return null;
 
   const tasks = Array.isArray(zone.tasks) ? zone.tasks.filter(Boolean) : [];
@@ -58,33 +160,112 @@ export default function ZoneMissionCard({
     || !canAcceptMore
   );
 
+  const handleSelectZone = (zoneId) => {
+    lastDropdownZoneIdRef.current = zoneId;
+    setOpenMenu(null);
+    onSelectZone?.(zoneId);
+  };
+
+  const handleStatusFilterSelect = (nextFilter) => {
+    setStatusFilter(nextFilter);
+    setOpenMenu(null);
+
+    const matches = zones.filter((entry) => zoneMatchesStatusFilter(entry, nextFilter));
+    if (matches.length === 0) return;
+
+    // Always jump to the first zone of the chosen status (sorted list).
+    const nextZoneId = matches[0].id;
+    lastDropdownZoneIdRef.current = nextZoneId;
+    if (zone?.id !== nextZoneId) {
+      onSelectZone?.(nextZoneId);
+    }
+  };
+
+  const toggleMenu = (menu) => {
+    setOpenMenu((current) => (current === menu ? null : menu));
+  };
+
   return (
-    <section className="zone-mission-card" aria-label={`Zone ${zoneNumber} mission card`}>
-      <div className="zone-mission-card__header">
-        <div className="zone-mission-card__header-chip" aria-hidden="true">
-          <span className="zone-mission-card__chip-ring" />
-          <ChevronDown strokeWidth={3} className="zone-mission-card__chip-chevron" />
+    <section
+      className={`zone-mission-card${anyMenuOpen ? ' zone-mission-card--menu-open' : ''}`}
+      aria-label={`Zone ${zoneNumber} mission card`}
+    >
+      <div className="zone-mission-card__header" ref={headerControlsRef}>
+        <div className="zone-mission-card__filter">
+          <button
+            type="button"
+            className={`zone-mission-card__header-chip${filterOpen ? ' is-open' : ''}`}
+            aria-label="Filter zones by status"
+            aria-haspopup="listbox"
+            aria-expanded={filterOpen}
+            onClick={() => toggleMenu('filter')}
+          >
+            <StatusFilterSwatch filterId={statusFilter} />
+            <ChevronDown strokeWidth={3} className="zone-mission-card__chip-chevron" aria-hidden="true" />
+          </button>
+
+          {filterOpen && (
+            <ul className="zone-mission-card__menu zone-mission-card__menu--filter" role="listbox" aria-label="Zone status filter">
+              {STATUS_FILTERS.map((option) => {
+                const selected = statusFilter === option.id;
+                return (
+                  <li key={option.id} role="option" aria-selected={selected}>
+                    <button
+                      type="button"
+                      className={`zone-mission-card__menu-option${selected ? ' is-selected' : ''}`}
+                      onClick={() => handleStatusFilterSelect(option.id)}
+                    >
+                      <StatusFilterSwatch filterId={option.id} />
+                      <span className="zone-mission-card__menu-option-label">{option.label}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
 
         <div className="zone-mission-card__zone-select">
-          <span className={`zone-mission-card__dot ${getDotClass(zone.status)}`} aria-hidden="true" />
-          <select
-            className="zone-mission-card__select"
-            value={zone.id}
-            onChange={(event) => onSelectZone?.(event.target.value)}
+          <button
+            type="button"
+            className={`zone-mission-card__zone-trigger${zoneOpen ? ' is-open' : ''}`}
             aria-label="Select zone"
+            aria-haspopup="listbox"
+            aria-expanded={zoneOpen}
+            onClick={() => toggleMenu('zone')}
           >
-            {zones.map((entry) => (
-              <option key={entry.id} value={entry.id}>
-                ZONE {entry.zoneNumber}
-              </option>
-            ))}
-          </select>
-          <ChevronDown strokeWidth={3} className="zone-mission-card__select-chevron" aria-hidden="true" />
+            <span className="zone-mission-card__zone-trigger-label">ZONE {zoneNumber}</span>
+            <ChevronDown strokeWidth={3} className="zone-mission-card__chip-chevron" aria-hidden="true" />
+          </button>
+
+          {zoneOpen && (
+            <ul className="zone-mission-card__menu zone-mission-card__menu--zone" role="listbox" aria-label="Select zone">
+              {selectZones.map((entry) => {
+                const selected = entry.id === zone.id;
+                return (
+                  <li key={entry.id} role="option" aria-selected={selected}>
+                    <button
+                      type="button"
+                      className={`zone-mission-card__menu-option${selected ? ' is-selected' : ''}`}
+                      onClick={() => handleSelectZone(entry.id)}
+                    >
+                      <span className="zone-mission-card__menu-option-label">ZONE {entry.zoneNumber}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
 
-        <button type="button" className="zone-mission-card__help" aria-label="Zone help">
-          <CircleHelp strokeWidth={2} />
+        <button
+          type="button"
+          className="zone-mission-card__close"
+          aria-label="Close"
+          title="Close"
+          onClick={onClose}
+        >
+          <X strokeWidth={2.5} />
         </button>
       </div>
 
@@ -105,11 +286,11 @@ export default function ZoneMissionCard({
         </div>
         <div className="zone-mission-card__meta-col zone-mission-card__meta-col--coords">
           <p className="zone-mission-card__meta-line">
-            Coordinate DMS:{' '}
-            <span className="zone-mission-card__meta-value">{coordinatesDms}</span>
+            <span className="zone-mission-card__meta-label">Coordinate DMS:</span>{' '}
+            <span className="zone-mission-card__meta-value">{formatCardDms(coordinatesDms)}</span>
           </p>
           <p className="zone-mission-card__meta-line">
-            Coordinate MGRS:{' '}
+            <span className="zone-mission-card__meta-label">Coordinate MGRS:</span>{' '}
             <span className="zone-mission-card__meta-value">{coordinatesMgrs}</span>
           </p>
         </div>

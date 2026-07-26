@@ -1,11 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap');
 
 .zone-mission-card {
-  --zmc-scale: 0.5;
+  /* Match ZONE ### pill rem size to map-ops DEAD/SEAD/STRIKE pills (12px / 0.75rem) */
+  --zmc-scale: 0.6;
   --zmc-blue: #3b82f6;
+  /* Match map-ops control rounding/colors (CAS/DEAD pills, selects, tabs) */
+  --zmc-radius-control: 10px;
+  --zmc-radius-option: 8px;
+  --zmc-control-bg: #0e0e0e;
+  --zmc-control-border: #4e4e4e;
 
   box-sizing: border-box;
-  width: calc(699px * var(--zmc-scale));
+  /* 699 design + ~4× widest glyph (W) at meta 20px so MGRS/DMS never clip */
+  width: calc(763px * var(--zmc-scale));
   max-width: calc(100vw - 2rem);
   background: #0e0e0e;
   border: 1px solid #4e4e4e;
@@ -15,11 +22,22 @@
   overflow: hidden;
 }
 
+.zone-mission-card--menu-open {
+  overflow: visible;
+}
+
 .zone-mission-card__header {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: calc(11px * var(--zmc-scale));
   padding: calc(18px * var(--zmc-scale)) calc(14px * var(--zmc-scale)) calc(20px * var(--zmc-scale));
+}
+
+.zone-mission-card__filter {
+  position: relative;
+  flex-shrink: 0;
 }
 
 .zone-mission-card__header-chip {
@@ -30,10 +48,23 @@
   width: calc(92px * var(--zmc-scale));
   height: calc(46px * var(--zmc-scale));
   padding: 0 calc(8px * var(--zmc-scale)) 0 calc(6px * var(--zmc-scale));
-  background: #0e0e0e;
-  border: 1px solid #575757;
-  border-radius: calc(10px * var(--zmc-scale));
+  background: var(--zmc-control-bg);
+  border: 1px solid var(--zmc-control-border);
+  border-radius: var(--zmc-radius-control);
+  color: #ffffff;
+  cursor: pointer;
   flex-shrink: 0;
+}
+
+.zone-mission-card__header-chip:hover,
+.zone-mission-card__header-chip.is-open {
+  border-color: #757575;
+  background: #1b1b1b;
+}
+
+.zone-mission-card__header-chip .zone-mission-card__dot {
+  width: calc(35px * var(--zmc-scale));
+  height: calc(35px * var(--zmc-scale));
 }
 
 .zone-mission-card__chip-ring {
@@ -49,21 +80,135 @@
   flex-shrink: 0;
   width: calc(18px * var(--zmc-scale));
   height: calc(18px * var(--zmc-scale));
+  transition: transform 0.15s ease;
+}
+
+.zone-mission-card__header-chip.is-open .zone-mission-card__chip-chevron {
+  transform: rotate(180deg);
+}
+
+.zone-mission-card__dot--filter-neutral,
+.zone-mission-card__menu-option .zone-mission-card__dot--filter-neutral,
+.zone-mission-card__header-chip .zone-mission-card__dot--filter-neutral {
+  background: #ffffff;
+}
+
+.zone-mission-card__menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px * var(--zmc-scale));
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: calc(4px * var(--zmc-scale));
+  margin: 0;
+  padding: calc(8px * var(--zmc-scale));
+  list-style: none;
+  background: var(--zmc-control-bg);
+  border: 1px solid var(--zmc-control-border);
+  border-radius: var(--zmc-radius-control);
+  box-shadow: 0 calc(-8px * var(--zmc-scale)) calc(24px * var(--zmc-scale)) rgba(0, 0, 0, 0.45);
+  animation: zone-mission-card-menu-in 0.15s ease;
+  max-height: calc(280px * var(--zmc-scale));
+  overflow-y: auto;
+}
+
+.zone-mission-card__menu--filter {
+  min-width: calc(220px * var(--zmc-scale));
+}
+
+.zone-mission-card__menu--zone {
+  right: 0;
+  left: 0;
+  min-width: 100%;
+}
+
+@keyframes zone-mission-card-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.zone-mission-card__menu-option {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: calc(10px * var(--zmc-scale));
+  width: 100%;
+  min-height: calc(40px * var(--zmc-scale));
+  padding: 0 calc(10px * var(--zmc-scale));
+  border: 0;
+  border-radius: var(--zmc-radius-option);
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  text-align: left;
+}
+
+.zone-mission-card__menu-option:hover,
+.zone-mission-card__menu-option.is-selected {
+  background: #252525;
+}
+
+.zone-mission-card__menu-option .zone-mission-card__chip-ring,
+.zone-mission-card__menu-option .zone-mission-card__dot {
+  width: calc(22px * var(--zmc-scale));
+  height: calc(22px * var(--zmc-scale));
+}
+
+.zone-mission-card__menu-option-label {
+  font-size: calc(16px * var(--zmc-scale));
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .zone-mission-card__zone-select {
   box-sizing: border-box;
   position: relative;
+  width: calc(300px * var(--zmc-scale));
+  flex-shrink: 0;
+}
+
+.zone-mission-card__zone-trigger {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: calc(11px * var(--zmc-scale));
-  width: calc(300px * var(--zmc-scale));
+  justify-content: space-between;
+  gap: calc(8px * var(--zmc-scale));
+  width: 100%;
   height: calc(46px * var(--zmc-scale));
-  padding: 0 calc(36px * var(--zmc-scale)) 0 calc(8px * var(--zmc-scale));
-  background: #0e0e0e;
-  border: 1px solid #575757;
-  border-radius: calc(10px * var(--zmc-scale));
-  flex-shrink: 0;
+  padding: 0 calc(8px * var(--zmc-scale)) 0 calc(12px * var(--zmc-scale));
+  background: var(--zmc-control-bg);
+  border: 1px solid var(--zmc-control-border);
+  border-radius: var(--zmc-radius-control);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.zone-mission-card__zone-trigger:hover,
+.zone-mission-card__zone-trigger.is-open {
+  border-color: #757575;
+  background: #1b1b1b;
+}
+
+.zone-mission-card__zone-trigger.is-open .zone-mission-card__chip-chevron {
+  transform: rotate(180deg);
+}
+
+.zone-mission-card__zone-trigger-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: calc(20px * var(--zmc-scale));
+  font-weight: 600;
+  line-height: calc(24px * var(--zmc-scale));
 }
 
 .zone-mission-card__dot {
@@ -78,37 +223,7 @@
 .zone-mission-card__dot--neutral { background: #8c8c8c; }
 .zone-mission-card__dot--attack { background: #fb923c; }
 
-.zone-mission-card__select {
-  width: 100%;
-  min-width: 0;
-  height: 100%;
-  border: 0;
-  background: transparent;
-  color: #ffffff;
-  font-family: inherit;
-  font-size: calc(20px * var(--zmc-scale));
-  font-weight: 600;
-  line-height: calc(24px * var(--zmc-scale));
-  appearance: none;
-  cursor: pointer;
-  padding: 0;
-}
-
-.zone-mission-card__select option {
-  background: #0e0e0e;
-  color: #ffffff;
-}
-
-.zone-mission-card__select-chevron {
-  position: absolute;
-  right: calc(8px * var(--zmc-scale));
-  color: #ffffff;
-  pointer-events: none;
-  width: calc(18px * var(--zmc-scale));
-  height: calc(18px * var(--zmc-scale));
-}
-
-.zone-mission-card__help {
+.zone-mission-card__close {
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
@@ -116,27 +231,28 @@
   width: calc(46px * var(--zmc-scale));
   height: calc(46px * var(--zmc-scale));
   margin-left: auto;
-  background: #0e0e0e;
-  border: 1px solid #515151;
-  border-radius: calc(10px * var(--zmc-scale));
+  background: var(--zmc-control-bg);
+  border: 1px solid var(--zmc-control-border);
+  border-radius: var(--zmc-radius-control);
   color: #ffffff;
   cursor: pointer;
   flex-shrink: 0;
 }
 
-.zone-mission-card__help svg {
+.zone-mission-card__close svg {
   width: calc(22px * var(--zmc-scale));
   height: calc(22px * var(--zmc-scale));
 }
 
-.zone-mission-card__help:hover {
-  border-color: #575757;
+.zone-mission-card__close:hover {
+  border-color: #757575;
+  background: #1b1b1b;
 }
 
 .zone-mission-card__divider {
   height: 0;
   margin: 0 calc(14px * var(--zmc-scale));
-  border-top: 1px solid #515151;
+  border-top: 1px solid var(--zmc-control-border);
 }
 
 .zone-mission-card__meta {
@@ -162,6 +278,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.zone-mission-card__meta-label {
+  color: #949494;
+}
+
+.zone-mission-card__meta-value {
+  color: #ffffff;
 }
 
 .zone-mission-card__meta-value--blue {
@@ -192,11 +316,11 @@
 .zone-mission-card__pills {
   display: flex;
   flex-wrap: wrap;
-  gap: calc(6px * var(--zmc-scale));
+  gap: 6px;
 }
 
 .zone-mission-card__pills--neighbor {
-  gap: calc(7px * var(--zmc-scale));
+  gap: 6px;
 }
 
 .zone-mission-card__pill {
@@ -204,30 +328,29 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: calc(37px * var(--zmc-scale));
-  background: #252525;
-  border: 1px solid #515151;
-  border-radius: calc(5px * var(--zmc-scale));
+  min-height: 32px;
+  padding: 0 10px;
+  background: var(--zmc-control-bg);
+  border: 1px solid var(--zmc-control-border);
+  border-radius: var(--zmc-radius-control);
   color: #ffffff;
-  font-size: calc(20px * var(--zmc-scale));
-  font-weight: 600;
-  line-height: calc(24px * var(--zmc-scale));
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.01em;
   text-align: center;
   white-space: nowrap;
 }
 
-.zone-mission-card__pills--task .zone-mission-card__pill {
-  width: calc(111px * var(--zmc-scale));
-}
-
+.zone-mission-card__pills--task .zone-mission-card__pill,
 .zone-mission-card__pills--neighbor .zone-mission-card__pill {
-  width: calc(132.38px * var(--zmc-scale));
+  width: auto;
+  min-width: 0;
 }
 
 .zone-mission-card__pill--empty {
   width: auto;
-  min-width: calc(111px * var(--zmc-scale));
-  padding: 0 calc(12px * var(--zmc-scale));
+  min-width: 0;
   color: #949494;
 }
 
@@ -243,8 +366,8 @@
   width: calc(310.71px * var(--zmc-scale));
   max-width: 100%;
   height: calc(37px * var(--zmc-scale));
-  border-radius: calc(10px * var(--zmc-scale));
-  border: 1px solid #515151;
+  border-radius: var(--zmc-radius-control);
+  border: 1px solid var(--zmc-control-border);
   font-family: inherit;
   font-size: calc(20px * var(--zmc-scale));
   font-weight: 600;
@@ -313,7 +436,7 @@
   .zone-mission-card__pills--task .zone-mission-card__pill,
   .zone-mission-card__pills--neighbor .zone-mission-card__pill {
     width: auto;
-    min-width: calc(88px * var(--zmc-scale));
-    padding: 0 calc(10px * var(--zmc-scale));
+    min-width: 0;
+    padding: 0 10px;
   }
 }

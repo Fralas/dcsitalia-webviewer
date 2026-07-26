@@ -171,7 +171,7 @@ function App() {
     ? activeTacticalMapId
     : currentView === 'lidc'
       ? 'lidc-afghanistan'
-      : selectedCampaignId;
+      : null;
 
   const openCampaignTarget = (target) => {
     if (target?.type === 'hidc' && target.tacticalMapId) {
@@ -382,6 +382,12 @@ function App() {
           </div>
         </div>
       </header>
+      {(currentView === 'landing' || currentView === 'frontline') && (
+        <div
+          className={`app-header-fade${currentView === 'landing' ? ' app-header-fade--landing' : ''}${currentView === 'frontline' ? ' app-header-fade--frontline' : ''}`}
+          aria-hidden="true"
+        />
+      )}
 
       <main className={`flex-1 ${(currentView === 'landing' || currentView === 'frontline' || currentView === 'lidc' || currentView === 'atc') ? 'overflow-hidden' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
         {currentView === 'landing' && (

@@ -154,13 +154,13 @@ export default function UserMenu({ onOpenProfile, variant = 'default' }) {
       {menuOpen && (
         <>
           <div
-            className="fixed inset-0 z-10"
+            className="fixed inset-0 z-[5550]"
             onClick={() => setMenuOpen(false)}
           />
 
           <div className={isBrand
             ? 'app-header__menu'
-            : 'absolute right-0 mt-2 w-48 bg-yt-bg-secondary border border-yt-border rounded-lg shadow-lg z-20'}>
+            : 'absolute right-0 mt-2 w-48 bg-yt-bg-secondary border border-yt-border rounded-lg shadow-lg z-[5600]'}>
             <button
               type="button"
               onClick={handleOpenProfile}

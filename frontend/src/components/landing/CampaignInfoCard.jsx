@@ -96,8 +96,14 @@ export default function CampaignInfoCard({ campaign, language = 'en', onOpenCamp
     }
   };
 
+  const accentColor = campaign?.highlightColor || '#FF8C00';
+
   return (
-    <section className="info-card" aria-label={campaign?.title || overview.title}>
+    <section
+      className="info-card"
+      aria-label={campaign?.title || overview.title}
+      style={isOverview ? undefined : { '--info-card-accent': accentColor }}
+    >
       <div className="info-card__scroll">
         {!isOverview && (
           <>

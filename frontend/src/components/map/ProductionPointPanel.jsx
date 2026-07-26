@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 import './ProductionPointPanel.css';
 
@@ -45,23 +46,69 @@ function clampQuantity(quantity, maxStock) {
 }
 
 function PanelHeader({ pp, productionPoints, onSelectPp, onClose }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const selectRef = useRef(null);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (!selectRef.current?.contains(event.target)) {
+        setMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [menuOpen]);
+
+  const handleSelect = (ppId) => {
+    setMenuOpen(false);
+    if (ppId !== pp?.id) onSelectPp?.(ppId);
+  };
+
   return (
-    <div className="pp-panel__header">
-      <div className="pp-panel__title-select">
-        <span className={`pp-panel__dot ${getDotClass(pp?.owner, pp?.built)}`} aria-hidden="true" />
-        <select
-          className="pp-panel__select"
-          value={pp?.id}
-          onChange={(event) => onSelectPp?.(event.target.value)}
+    <div className={`pp-panel__header${menuOpen ? ' is-menu-open' : ''}`}>
+      <div className="pp-panel__title-select" ref={selectRef}>
+        <button
+          type="button"
+          className={`pp-panel__select-trigger${menuOpen ? ' is-open' : ''}`}
           aria-label="Select production point"
+          aria-haspopup="listbox"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
         >
-          {(productionPoints || []).map((entry) => (
-            <option key={entry.id} value={entry.id}>
-              {formatProductionPointLabel(entry)}
-            </option>
-          ))}
-        </select>
-        <ChevronDown strokeWidth={3} className="pp-panel__select-chevron" aria-hidden="true" />
+          <span className={`pp-panel__dot ${getDotClass(pp?.owner, pp?.built)}`} aria-hidden="true" />
+          <span className="pp-panel__select-trigger-label">{formatProductionPointLabel(pp)}</span>
+          <ChevronDown strokeWidth={3} className="pp-panel__select-chevron" aria-hidden="true" />
+        </button>
+
+        {menuOpen && (
+          <ul className="pp-panel__menu" role="listbox" aria-label="Select production point">
+            {(productionPoints || []).map((entry) => {
+              const selected = entry.id === pp?.id;
+              return (
+                <li key={entry.id} role="option" aria-selected={selected}>
+                  <button
+                    type="button"
+                    className={`pp-panel__menu-option${selected ? ' is-selected' : ''}`}
+                    onClick={() => handleSelect(entry.id)}
+                  >
+                    <span className={`pp-panel__dot ${getDotClass(entry?.owner, entry?.built)}`} aria-hidden="true" />
+                    <span className="pp-panel__menu-option-label">{formatProductionPointLabel(entry)}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
 
       <button type="button" className="pp-panel__close" onClick={onClose} aria-label="Close production point panel">
@@ -94,31 +141,33 @@ function PanelMeta({ pp, variant = 'main' }) {
   );
 }
 
-function RequestedCrateSection({ pp, standalone = false }) {
+function RequestedCrateSection({ pp }) {
   const categories = Object.entries(pp?.required_categories || {});
   if (categories.length === 0) return null;
 
   return (
-    <div className={`pp-panel__requested-body${standalone ? ' pp-panel__requested-body--standalone' : ''}`}>
-      {!standalone && <div className="pp-panel__divider" />}
+    <div className="pp-panel__requested-body">
+      <div className="pp-panel__divider" />
       <div className="pp-panel__requested-head">
-        <p className="pp-panel__section-title">REQUESTED CRATE</p>
-        <span className="pp-panel__requested-status">{getStatusLabel(pp, 'requested')}</span>
-      </div>
-      <div className="pp-panel__crate-grid">
-        {categories.map(([category, need]) => {
-          const have = Number(pp?.build_counts?.[category] || 0);
-          const required = Number(need) || 0;
-          const done = have >= required;
-          return (
-            <div
-              key={category}
-              className={`pp-panel__crate-pill${done ? ' pp-panel__crate-pill--done' : ''}`}
-            >
-              {category} CRATE {have}/{required}
-            </div>
-          );
-        })}
+        <div className="pp-panel__requested-row">
+          <div className="pp-panel__requested-label-block">
+            <p className="pp-panel__section-title">REQUESTED CRATE</p>
+            <span className="pp-panel__requested-status">{getStatusLabel(pp, 'requested')}</span>
+          </div>
+          {categories.map(([category, need]) => {
+            const have = Number(pp?.build_counts?.[category] || 0);
+            const required = Number(need) || 0;
+            const done = have >= required;
+            return (
+              <div key={category} className="pp-panel__requested-item">
+                <span className="pp-panel__requested-divider" aria-hidden="true" />
+                <span className={`pp-panel__crate-pill${done ? ' pp-panel__crate-pill--done' : ''}`}>
+                  {category} CRATE {have}/{required}
+                </span>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -174,7 +223,7 @@ export default function ProductionPointPanel({
   const hasRequestedCrates = Object.keys(pp.required_categories || {}).length > 0;
   const showActions = !isUpgrading;
   const showQty = showActions && (canRetrieve || Number(pp?.stock) > 0);
-  const showBottomRequestedPanel = hasRequestedCrates && !isBuilt && !isUpgrading;
+  const showRequestedCrates = hasRequestedCrates && !isBuilt;
 
   const upgradeLabel = isUpgrading
     ? 'UPGRADING...'
@@ -264,16 +313,12 @@ export default function ProductionPointPanel({
           </>
         )}
 
+        {showRequestedCrates && <RequestedCrateSection pp={pp} />}
+
         {!isAuthenticated && (
           <p className="pp-panel__footer-note">Login to interact</p>
         )}
       </section>
-
-      {showBottomRequestedPanel && (
-        <section className="pp-panel pp-panel--requested" aria-label="Production point requested crate">
-          <RequestedCrateSection pp={pp} standalone />
-        </section>
-      )}
     </div>
   );
 }

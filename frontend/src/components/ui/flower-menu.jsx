@@ -27,11 +27,14 @@ function getFlowerLayout({ togglerSize, itemCount, petalOffset, hasLabels = true
   return { itemSize, iconSize, effectivePetalOffset, menuSpan };
 }
 
-const MenuToggler = ({  togglerId,
+const MenuToggler = ({
+  togglerId,
   isOpen,
   onChange,
   backgroundColor,
+  borderColor,
   iconColor,
+  centerIconColor,
   animationDuration,
   togglerSize,
   iconSize,
@@ -41,6 +44,14 @@ const MenuToggler = ({  togglerId,
   const lineHeight = iconSize * 0.1;
   const lineWidth = iconSize * 0.8;
   const lineSpacing = iconSize * 0.25;
+  const hubStyle = {
+    backgroundColor,
+    borderColor: borderColor || backgroundColor,
+    color: centerIconColor || iconColor,
+    transitionDuration: `${animationDuration}ms`,
+    width: togglerSize,
+    height: togglerSize,
+  };
 
   return (
     <>
@@ -61,14 +72,8 @@ const MenuToggler = ({  togglerId,
             event.stopPropagation();
             centerOnClick();
           }}
-          className="absolute inset-0 z-20 m-auto flex cursor-pointer items-center justify-center rounded-full border border-transparent transition-all"
-          style={{
-            backgroundColor,
-            color: iconColor,
-            transitionDuration: `${animationDuration}ms`,
-            width: togglerSize,
-            height: togglerSize,
-          }}
+          className="absolute inset-0 z-20 m-auto flex cursor-pointer items-center justify-center rounded-full border transition-all"
+          style={hubStyle}
           aria-label="Back"
         >
           {CenterIcon ? (
@@ -78,16 +83,10 @@ const MenuToggler = ({  togglerId,
       ) : (
         <label
           htmlFor={togglerId}
-          className="absolute inset-0 z-20 m-auto flex cursor-pointer items-center justify-center rounded-full border border-transparent transition-all"
-          style={{
-            backgroundColor,
-            color: iconColor,
-            transitionDuration: `${animationDuration}ms`,
-            width: togglerSize,
-            height: togglerSize,
-          }}
+          className="absolute inset-0 z-20 m-auto flex cursor-pointer items-center justify-center rounded-full border transition-all"
+          style={hubStyle}
         >
-          {CenterIcon && !isOpen ? (
+          {CenterIcon ? (
             <CenterIcon style={{ width: iconSize, height: iconSize }} aria-hidden="true" />
           ) : (
             <span
@@ -126,6 +125,7 @@ const FlowerMenuItem = ({
   isOpen,
   iconColor,
   backgroundColor,
+  borderColor,
   animationDuration,
   itemCount,
   itemSize,
@@ -161,7 +161,7 @@ const FlowerMenuItem = ({
           item.onClick?.(event);
         }}
         className={cn(
-          'group flex w-full flex-col items-center justify-center gap-1 border-0 bg-transparent p-0 opacity-60 transition-all duration-100 hover:opacity-100',
+          'group flex w-full flex-col items-center justify-center gap-1 border-0 bg-transparent p-0 opacity-100 transition-all duration-100 hover:brightness-125',
           {
             'pointer-events-auto': isOpen,
             'pointer-events-none': !isOpen,
@@ -174,9 +174,10 @@ const FlowerMenuItem = ({
         }}
       >
         <span
-          className="flex items-center justify-center rounded-full border border-transparent transition-transform duration-200 group-hover:scale-110"
+          className="flex items-center justify-center rounded-full border transition-transform duration-200 group-hover:scale-110"
           style={{
             backgroundColor,
+            borderColor: borderColor || backgroundColor,
             width: itemSize,
             height: itemSize,
           }}
@@ -202,7 +203,9 @@ const FlowerMenuItem = ({
 export function FlowerMenu({
   menuItems,
   iconColor = 'white',
+  centerIconColor = null,
   backgroundColor = 'rgba(255, 255, 255, 0.2)',
+  borderColor = null,
   animationDuration = 500,
   togglerSize = 40,
   petalOffset = 30,
@@ -253,7 +256,9 @@ export function FlowerMenu({
         isOpen={isOpen}
         onChange={handleToggle}
         backgroundColor={backgroundColor}
+        borderColor={borderColor}
         iconColor={iconColor}
+        centerIconColor={centerIconColor}
         animationDuration={animationDuration}
         togglerSize={togglerSize}
         iconSize={iconSize}
@@ -269,6 +274,7 @@ export function FlowerMenu({
             isOpen={isOpen}
             iconColor={iconColor}
             backgroundColor={backgroundColor}
+            borderColor={borderColor}
             animationDuration={animationDuration}
             itemCount={itemCount}
             itemSize={itemSize}
