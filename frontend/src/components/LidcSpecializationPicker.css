@@ -1,0 +1,275 @@
+.lidc-spec-picker {
+  --spec-ink: var(--lidc-ink, #ffffff);
+  --spec-body: var(--lidc-body, #dadbdf);
+  --spec-mute: var(--lidc-mute, #7d8187);
+  --spec-hairline: var(--lidc-hairline, #4e4e4e);
+  --spec-canvas: var(--lidc-canvas, #0e0e0e);
+  --spec-canvas-soft: var(--lidc-canvas-soft, #1b1b1b);
+  --spec-gold: var(--lidc-accent-gold, #ffbb00);
+  --spec-radius: var(--lidc-row-radius, 15px);
+
+  display: grid;
+  gap: 14px;
+  font-family: var(--lidc-font, "Inter", "Segoe UI", sans-serif);
+  color: var(--spec-ink);
+}
+
+/* ---------- Chosen slots ---------- */
+
+.lidc-spec-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.lidc-spec-slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px dashed var(--spec-hairline);
+  border-radius: var(--spec-radius);
+  background: transparent;
+}
+
+.lidc-spec-slot.is-filled {
+  border-style: solid;
+  border-color: rgba(255, 187, 0, 0.5);
+  background: rgba(255, 187, 0, 0.07);
+}
+
+.lidc-spec-slot-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--spec-mute);
+}
+
+.lidc-spec-slot.is-filled .lidc-spec-slot-index {
+  background: var(--spec-gold);
+  color: #121212;
+}
+
+.lidc-spec-slot-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--spec-mute);
+}
+
+.lidc-spec-slot.is-filled .lidc-spec-slot-name {
+  color: var(--spec-ink);
+}
+
+.lidc-spec-slot-clear {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--spec-body);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.lidc-spec-slot-clear:hover {
+  background: rgba(255, 127, 127, 0.2);
+}
+
+/* ---------- Combined caps preview ---------- */
+
+.lidc-spec-combined {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--spec-hairline);
+  border-radius: var(--spec-radius);
+  background: var(--spec-canvas-soft);
+}
+
+.lidc-spec-combined-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--spec-mute);
+}
+
+.lidc-spec-combined-head strong {
+  font-size: 18px;
+  letter-spacing: 0;
+  color: var(--spec-gold);
+}
+
+.lidc-spec-combined-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lidc-spec-combined-list li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 11px;
+  color: var(--spec-mute);
+}
+
+.lidc-spec-combined-list li span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lidc-spec-combined-list li strong {
+  font-size: 12px;
+  color: var(--spec-ink);
+}
+
+/* ---------- Specialization cards ---------- */
+
+.lidc-spec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.lidc-spec-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--spec-hairline);
+  border-radius: var(--lidc-radius, 25px);
+  background: var(--spec-canvas);
+  color: var(--spec-ink);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.lidc-spec-card:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: translateY(-1px);
+}
+
+.lidc-spec-card.is-selected {
+  border-color: rgba(255, 187, 0, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(255, 187, 0, 0.25);
+}
+
+.lidc-spec-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lidc-spec-card-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--spec-gold);
+}
+
+.lidc-spec-card-title h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--spec-ink);
+}
+
+.lidc-spec-card-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border: 1px solid var(--spec-hairline);
+  border-radius: 999px;
+  color: #121212;
+}
+
+.lidc-spec-card-check.is-selected {
+  border-color: var(--spec-gold);
+  background: var(--spec-gold);
+}
+
+.lidc-spec-card-desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--spec-mute);
+}
+
+.lidc-spec-card-caps {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lidc-spec-card-caps li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--spec-mute);
+}
+
+.lidc-spec-card-caps li strong {
+  color: var(--spec-body);
+}
+
+.lidc-spec-card-caps li.is-dominant span,
+.lidc-spec-card-caps li.is-dominant strong {
+  color: var(--spec-gold);
+}
+
+.lidc-spec-card-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--spec-hairline);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--spec-mute);
+}
+
+.lidc-spec-card-foot strong {
+  font-size: 15px;
+  letter-spacing: 0;
+  color: var(--spec-ink);
+}

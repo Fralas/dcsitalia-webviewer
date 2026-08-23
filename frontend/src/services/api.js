@@ -668,10 +668,10 @@ export async function getLidcUcidLinkStatus() {
 }
 
 /**
- * Get LIDC templates and units catalog
+ * Get LIDC specializations and units catalog
  */
-export async function getLidcTemplates() {
-  return fetchAPI('/lidc/templates');
+export async function getLidcSpecializations() {
+  return fetchAPI('/lidc/specializations');
 }
 
 /**
@@ -733,6 +733,17 @@ export async function getLidcSquadron(squadronId) {
 }
 
 /**
+ * Replace the deck of a squadron (owner only)
+ */
+export async function updateLidcSquadronDeck(squadronId, deck) {
+  return fetchAPI(`/lidc/squadrons/${encodeURIComponent(squadronId)}/deck`, {
+    method: 'PUT',
+    body: JSON.stringify({ deck: deck || {} }),
+    credentials: 'include',
+  });
+}
+
+/**
  * Assign (or clear) pilot for one squadron airframe
  */
 export async function assignLidcAirframePilot(squadronId, airframeId, pilotUserId = null) {
@@ -781,10 +792,10 @@ export async function deleteLidcSquadron(squadronId) {
 }
 
 /**
- * Update LIDC templates catalog (wiki editor only)
+ * Update LIDC specializations catalog (wiki editor only)
  */
-export async function updateLidcTemplates(payload) {
-  return fetchAPI('/lidc/templates', {
+export async function updateLidcSpecializations(payload) {
+  return fetchAPI('/lidc/specializations', {
     method: 'PUT',
     body: JSON.stringify(payload || {}),
     credentials: 'include',
@@ -1112,18 +1123,19 @@ export default {
   deleteWikiDraft,
   updateWikiPage,
   uploadWikiMedia,
-  getLidcTemplates,
+  getLidcSpecializations,
   getLidcMe,
   getLidcUsers,
   getLidcSquadrons,
   createLidcSquadron,
   joinLidcSquadronByInviteCode,
   getLidcSquadron,
+  updateLidcSquadronDeck,
   assignLidcAirframePilot,
   updateLidcMemberRole,
   leaveLidcSquadron,
   deleteLidcSquadron,
-  updateLidcTemplates,
+  updateLidcSpecializations,
   startLidcUcidLink,
   getLidcUcidLinkStatus,
   getProductionPoints,

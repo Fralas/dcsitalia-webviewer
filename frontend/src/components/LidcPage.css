@@ -4331,3 +4331,41 @@ body.lidc-deck-expanded-open {
     flex-direction: column;
   }
 }
+
+/* ==================== Deck editor ==================== */
+
+.lidc-deck-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--lidc-hairline);
+  border-radius: var(--lidc-pill);
+  background: transparent;
+  color: var(--lidc-body);
+  font-family: var(--lidc-font);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+}
+
+.lidc-deck-edit-btn:hover {
+  border-color: var(--lidc-accent-gold);
+  background: rgba(255, 187, 0, 0.08);
+  color: var(--lidc-accent-gold);
+}
+
+.lidc-deck-editor-modal-card {
+  width: min(980px, 96vw);
+  max-height: 92vh;
+}
+
+.lidc-deck-editor-body {
+  min-height: 0;
+  max-height: min(66vh, 640px);
+  overflow-y: auto;
+  padding-right: 6px;
+}

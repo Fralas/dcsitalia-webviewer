@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Coins,
   Copy,
   Check,
   ChevronLeft,
@@ -29,16 +28,20 @@ import socketService from '../services/socket';
 import { t } from '../utils/locale';
 import { normalizeSquadronLogo } from '../utils/normalizeSquadronLogo';
 import LidcTheaterMap from './LidcTheaterMap';
+import LidcDeckBuilder, {
+  DECK_CATEGORY_META,
+  buildDeckPayloadFromQuantities,
+  buildQuantitiesFromDeck,
+  computeDeckSpentByCategory,
+  createEmptyDeckCategoryMap,
+} from './LidcDeckBuilder';
+import LidcSpecializationPicker, { sumSpecializationCaps } from './LidcSpecializationPicker';
 import './LidcPage.css';
 
-const WIZARD_STEPS = ['info', 'template', 'deck', 'review'];
+const WIZARD_STEPS = ['info', 'specializations', 'deck', 'review'];
+const SPECIALIZATION_SLOTS = 2;
 
-const CATEGORY_META = [
-  { key: 'aircrafts', labelKey: 'lidc.deck.categories.aircrafts' },
-  { key: 'helicopters', labelKey: 'lidc.deck.categories.helicopters' },
-  { key: 'logistics', labelKey: 'lidc.deck.categories.logistics' },
-  { key: 'groundAssets', labelKey: 'lidc.deck.categories.groundAssets' },
-];
+const CATEGORY_META = DECK_CATEGORY_META;
 
 const LIDC_SIDEBAR_VIEWS = Object.freeze({
   SQUADRON_DECK: 'squadronDeck',
@@ -180,49 +183,6 @@ const MOCK_MEMBER_PROFILES = Object.freeze([
   },
 ]);
 
-function createEmptyCategoryMap() {
-  return {
-    aircrafts: 0,
-    helicopters: 0,
-    logistics: 0,
-    groundAssets: 0,
-  };
-}
-
-function computeSpentByCategory(quantities, units) {
-  const spent = createEmptyCategoryMap();
-
-  units.forEach((unit) => {
-    const quantity = Number(quantities?.[unit.id] || 0);
-    if (quantity <= 0) return;
-
-    const category = unit.category;
-    if (spent[category] === undefined) return;
-    spent[category] += Number(unit.cost || 0) * quantity;
-  });
-
-  return spent;
-}
-
-function buildDeckPayload(quantities, units) {
-  const deck = {
-    aircrafts: [],
-    helicopters: [],
-    logistics: [],
-    groundAssets: [],
-  };
-
-  units.forEach((unit) => {
-    const quantity = Math.floor(Number(quantities?.[unit.id] || 0));
-    if (!Number.isFinite(quantity) || quantity <= 0) return;
-    if (!deck[unit.category]) return;
-
-    deck[unit.category].push({ unitId: unit.id, quantity });
-  });
-
-  return deck;
-}
-
 function formatTimestamp(value) {
   if (!Number.isFinite(value)) return '-';
   return new Date(value).toLocaleString();
@@ -347,7 +307,7 @@ function isAuthenticationError(error) {
 export default function LidcPage() {
   const { user } = useUser();
 
-  const [templates, setTemplates] = useState([]);
+  const [specializations, setSpecializations] = useState([]);
   const [units, setUnits] = useState([]);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [catalogError, setCatalogError] = useState('');
@@ -371,8 +331,13 @@ export default function LidcPage() {
   const [logoDataUrl, setLogoDataUrl] = useState('');
   const [logoUploadError, setLogoUploadError] = useState('');
   const [baseId, setBaseId] = useState('');
-  const [templateId, setTemplateId] = useState('');
+  const [specializationIds, setSpecializationIds] = useState([]);
   const [quantities, setQuantities] = useState({});
+
+  const [isDeckEditorOpen, setIsDeckEditorOpen] = useState(false);
+  const [deckEditorQuantities, setDeckEditorQuantities] = useState({});
+  const [deckEditorError, setDeckEditorError] = useState('');
+  const [deckEditorSaving, setDeckEditorSaving] = useState(false);
 
   const [joinInviteCode, setJoinInviteCode] = useState('');
   const [joinError, setJoinError] = useState('');
@@ -473,21 +438,17 @@ export default function LidcPage() {
       setCatalogError('');
 
       try {
-        const response = await api.getLidcTemplates();
+        const response = await api.getLidcSpecializations();
         if (!mounted) return;
 
-        const nextTemplates = Array.isArray(response?.templates) ? response.templates : [];
+        const nextSpecializations = Array.isArray(response?.specializations) ? response.specializations : [];
         const nextUnits = Array.isArray(response?.units) ? response.units : [];
 
-        setTemplates(nextTemplates);
+        setSpecializations(nextSpecializations);
         setUnits(nextUnits);
-
-        if (nextTemplates.length > 0) {
-          setTemplateId((prev) => {
-            if (nextTemplates.some((entry) => entry.id === prev)) return prev;
-            return nextTemplates[0].id;
-          });
-        }
+        setSpecializationIds((prev) => prev.filter(
+          (id) => nextSpecializations.some((entry) => entry.id === id),
+        ));
       } catch (error) {
         if (!mounted) return;
         if (isAuthenticationError(error)) {
@@ -904,53 +865,45 @@ export default function LidcPage() {
     };
   }, []);
 
-  const selectedTemplate = useMemo(
-    () => templates.find((entry) => entry.id === templateId) || null,
-    [templates, templateId],
+  const selectedSpecializations = useMemo(
+    () => specializationIds
+      .map((id) => specializations.find((entry) => entry.id === id))
+      .filter(Boolean),
+    [specializations, specializationIds],
   );
 
-  const unitsByCategory = useMemo(() => {
-    const map = {
-      aircrafts: [],
-      helicopters: [],
-      logistics: [],
-      groundAssets: [],
-    };
+  const spentByCategory = useMemo(
+    () => computeDeckSpentByCategory(quantities, units),
+    [quantities, units],
+  );
 
-    units.forEach((unit) => {
-      if (!map[unit.category]) return;
-      map[unit.category].push(unit);
-    });
+  const capsByCategory = useMemo(
+    () => sumSpecializationCaps(selectedSpecializations),
+    [selectedSpecializations],
+  );
 
-    Object.keys(map).forEach((category) => {
-      map[category].sort((a, b) => String(a.label).localeCompare(String(b.label)));
-    });
+  const deckPayload = useMemo(
+    () => buildDeckPayloadFromQuantities(quantities, units),
+    [quantities, units],
+  );
 
-    return map;
-  }, [units]);
-
-  const spentByCategory = useMemo(() => computeSpentByCategory(quantities, units), [quantities, units]);
-
-  const capsByCategory = useMemo(() => {
-    const caps = createEmptyCategoryMap();
-    if (!selectedTemplate?.caps) return caps;
-
+  // A squadron keeps the caps it was created with, so the editor budgets against them.
+  const activeSquadronCaps = useMemo(() => {
+    const caps = createEmptyDeckCategoryMap();
+    const source = activeSquadron?.costSummary?.caps;
     CATEGORY_META.forEach(({ key }) => {
-      caps[key] = Number(selectedTemplate.caps?.[key] || 0);
+      caps[key] = Math.max(0, Number(source?.[key] || 0));
     });
-
     return caps;
-  }, [selectedTemplate]);
+  }, [activeSquadron]);
 
-  const remainingByCategory = useMemo(() => {
-    const remaining = createEmptyCategoryMap();
-    CATEGORY_META.forEach(({ key }) => {
-      remaining[key] = Math.max(0, (capsByCategory[key] || 0) - (spentByCategory[key] || 0));
-    });
-    return remaining;
-  }, [capsByCategory, spentByCategory]);
-
-  const deckPayload = useMemo(() => buildDeckPayload(quantities, units), [quantities, units]);
+  const deckEditorTotalUnits = useMemo(
+    () => Object.values(deckEditorQuantities).reduce((sum, value) => {
+      const quantity = Math.floor(Number(value || 0));
+      return sum + (Number.isFinite(quantity) && quantity > 0 ? quantity : 0);
+    }, 0),
+    [deckEditorQuantities],
+  );
 
   const totalDeckUnits = useMemo(() => {
     return Object.values(quantities).reduce((sum, value) => {
@@ -968,10 +921,10 @@ export default function LidcPage() {
 
   const validation = useMemo(() => {
     const infoValid = name.trim().length > 0 && baseId.trim().length > 0;
-    const templateValid = Boolean(selectedTemplate);
+    const specializationsValid = selectedSpecializations.length === SPECIALIZATION_SLOTS;
     const deckHasUnits = totalDeckUnits > 0;
 
-    let capsValid = Boolean(templateValid);
+    let capsValid = specializationsValid;
     CATEGORY_META.forEach(({ key }) => {
       if ((spentByCategory[key] || 0) > (capsByCategory[key] || 0)) {
         capsValid = false;
@@ -980,12 +933,12 @@ export default function LidcPage() {
 
     return {
       infoValid,
-      templateValid,
+      specializationsValid,
       deckHasUnits,
       capsValid,
-      canSubmit: infoValid && templateValid && deckHasUnits && capsValid,
+      canSubmit: infoValid && specializationsValid && deckHasUnits && capsValid,
     };
-  }, [name, baseId, selectedTemplate, totalDeckUnits, spentByCategory, capsByCategory]);
+  }, [name, baseId, selectedSpecializations, totalDeckUnits, spentByCategory, capsByCategory]);
 
   const currentStepKey = WIZARD_STEPS[currentStep] || WIZARD_STEPS[0];
   const isLogged = Boolean(user?.id);
@@ -1015,9 +968,13 @@ export default function LidcPage() {
       name: name || baseSquadron?.name || t('lidc.preview.fallbackName'),
       description: description || baseSquadron?.description || t('lidc.preview.fallbackDescription'),
       baseLabel: previewBase?.displayName || previewBase?.name || baseSquadron?.baseId || '-',
-      templateName: baseSquadron?.templateName || selectedTemplate?.name || '-',
+      specializationNames: (
+        Array.isArray(baseSquadron?.specializationNames) && baseSquadron.specializationNames.length > 0
+          ? baseSquadron.specializationNames
+          : selectedSpecializations.map((entry) => entry.name)
+      ),
     };
-  }, [userHasSquadron, activeSquadron, createdSquadron, userLidcState.squadron, name, description, previewBase, selectedTemplate]);
+  }, [userHasSquadron, activeSquadron, createdSquadron, userLidcState.squadron, name, description, previewBase, selectedSpecializations]);
 
   function resetWizardDraft() {
     setCurrentStep(0);
@@ -1027,14 +984,11 @@ export default function LidcPage() {
     setLogoUploadError('');
     setBaseId('');
     setQuantities({});
+    setSpecializationIds([]);
     setJoinInviteCode('');
     setJoinError('');
     setSubmitError('');
     setCreatedSquadron(null);
-
-    if (templates.length > 0) {
-      setTemplateId(templates[0].id);
-    }
   }
 
   function openCreateWizard() {
@@ -1047,31 +1001,6 @@ export default function LidcPage() {
     setCurrentStep(0);
     setSubmitError('');
     setLogoUploadError('');
-  }
-
-  function updateQuantity(unit, nextQuantity) {
-    const quantity = Math.max(0, Math.floor(Number(nextQuantity || 0)));
-
-    if (selectedTemplate) {
-      const category = unit.category;
-      const currentQuantity = Number(quantities[unit.id] || 0);
-      const diff = quantity - currentQuantity;
-
-      if (diff > 0) {
-        const projectedSpent = (spentByCategory[category] || 0) + (diff * Number(unit.cost || 0));
-        if (projectedSpent > (capsByCategory[category] || 0)) return;
-      }
-    }
-
-    setQuantities((prev) => {
-      const next = { ...prev };
-      if (quantity <= 0) {
-        delete next[unit.id];
-      } else {
-        next[unit.id] = quantity;
-      }
-      return next;
-    });
   }
 
   async function handleJoinSquadron() {
@@ -1334,7 +1263,7 @@ export default function LidcPage() {
 
   function buildSubmitError() {
     if (!validation.infoValid) return t('lidc.errors.infoRequired');
-    if (!validation.templateValid) return t('lidc.errors.templateRequired');
+    if (!validation.specializationsValid) return t('lidc.errors.specializationsRequired');
     if (!validation.deckHasUnits) return t('lidc.errors.deckEmpty');
     if (!validation.capsValid) return t('lidc.errors.deckCapsExceeded');
     if (!isLogged) return t('lidc.errors.loginRequired');
@@ -1343,7 +1272,9 @@ export default function LidcPage() {
 
   function getStepBlockingError(stepKey) {
     if (stepKey === 'info' && !validation.infoValid) return t('lidc.errors.infoRequired');
-    if (stepKey === 'template' && !validation.templateValid) return t('lidc.errors.templateRequired');
+    if (stepKey === 'specializations' && !validation.specializationsValid) {
+      return t('lidc.errors.specializationsRequired');
+    }
     if (stepKey === 'deck') {
       if (!validation.deckHasUnits) return t('lidc.errors.deckEmpty');
       if (!validation.capsValid) return t('lidc.errors.deckCapsExceeded');
@@ -1376,7 +1307,7 @@ export default function LidcPage() {
         description,
         logoDataUrl,
         baseId,
-        templateId: selectedTemplate.id,
+        specializationIds,
         deck: deckPayload,
       };
 
@@ -1392,7 +1323,7 @@ export default function LidcPage() {
           squadron: {
             id: created.id,
             name: created.name,
-            templateName: created.templateName,
+            specializationNames: created.specializationNames,
             baseId: created.baseId,
             createdAt: created.createdAt,
           },
@@ -1534,9 +1465,50 @@ export default function LidcPage() {
     }
   }
 
+  function openDeckEditor() {
+    if (!activeSquadron) return;
+    setDeckEditorError('');
+    setDeckEditorQuantities(buildQuantitiesFromDeck(activeSquadron.deck));
+    setIsDeckEditorOpen(true);
+  }
+
+  function closeDeckEditor() {
+    if (deckEditorSaving) return;
+    setIsDeckEditorOpen(false);
+    setDeckEditorError('');
+  }
+
+  async function saveDeckEditor() {
+    const squadronId = activeSquadron?.id || '';
+    if (!squadronId || deckEditorSaving) return;
+
+    if (deckEditorTotalUnits <= 0) {
+      setDeckEditorError(t('lidc.errors.deckEmpty'));
+      return;
+    }
+
+    setDeckEditorSaving(true);
+    setDeckEditorError('');
+
+    try {
+      const deck = buildDeckPayloadFromQuantities(deckEditorQuantities, units);
+      const response = await api.updateLidcSquadronDeck(squadronId, deck);
+
+      if (response?.squadron) {
+        setActiveSquadron(response.squadron);
+      }
+
+      setIsDeckEditorOpen(false);
+    } catch (error) {
+      setDeckEditorError(error.message || t('lidc.errors.deckUpdateFailed'));
+    } finally {
+      setDeckEditorSaving(false);
+    }
+  }
+
   function openTemplateEditor() {
     setTemplateEditorError('');
-    setTemplateEditorRaw(JSON.stringify({ templates, units }, null, 2));
+    setTemplateEditorRaw(JSON.stringify({ specializations, units }, null, 2));
     setIsTemplateEditorOpen(true);
   }
 
@@ -1553,16 +1525,15 @@ export default function LidcPage() {
 
     setTemplateEditorSaving(true);
     try {
-      const response = await api.updateLidcTemplates(parsed);
-      const nextTemplates = Array.isArray(response?.templates) ? response.templates : [];
+      const response = await api.updateLidcSpecializations(parsed);
+      const nextSpecializations = Array.isArray(response?.specializations) ? response.specializations : [];
       const nextUnits = Array.isArray(response?.units) ? response.units : [];
 
-      setTemplates(nextTemplates);
+      setSpecializations(nextSpecializations);
       setUnits(nextUnits);
-
-      if (!nextTemplates.some((entry) => entry.id === templateId) && nextTemplates.length > 0) {
-        setTemplateId(nextTemplates[0].id);
-      }
+      setSpecializationIds((prev) => prev.filter(
+        (id) => nextSpecializations.some((entry) => entry.id === id),
+      ));
 
       setIsTemplateEditorOpen(false);
     } catch (error) {
@@ -2149,6 +2120,16 @@ export default function LidcPage() {
         <div className="lidc-panel-deck-head-main">
           <h2 className="lidc-panel-title">SQUADRON DECK</h2>
           {renderDeckViewNav()}
+          {showDeckManagementView && activeSquadron && isCurrentUserOwner && (
+            <button
+              type="button"
+              className="lidc-deck-edit-btn"
+              onClick={openDeckEditor}
+            >
+              <Settings size={13} />
+              {t('lidc.builder.editDeck')}
+            </button>
+          )}
         </div>
         {isDeckPanelFullscreen ? (
           <button
@@ -2713,7 +2694,7 @@ export default function LidcPage() {
           <div className="lidc-wizard-backdrop" onClick={closeWizard} aria-hidden="true" />
 
           <section
-            className={`lidc-wizard-card ${currentStepKey === 'template' ? 'lidc-wizard-card--template' : ''}`}
+            className={`lidc-wizard-card ${currentStepKey === 'specializations' ? 'lidc-wizard-card--template' : ''}`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="lidc-wizard-title"
@@ -2770,7 +2751,7 @@ export default function LidcPage() {
               </div>
             </div>
 
-            <div className={`lidc-wizard-body ${currentStepKey === 'template' ? 'lidc-wizard-body--template' : ''}`}>
+            <div className={`lidc-wizard-body ${currentStepKey === 'specializations' ? 'lidc-wizard-body--template' : ''}`}>
               {currentStepKey === 'info' && (
                 <section className="lidc-step-section">
                   <header className="lidc-step-section-head">
@@ -2813,53 +2794,19 @@ export default function LidcPage() {
                 </section>
               )}
 
-              {currentStepKey === 'template' && (
+              {currentStepKey === 'specializations' && (
                 <section className="lidc-step-section">
                   <header className="lidc-step-section-head">
-                    <h3>{t('lidc.wizard.sections.templateTitle')}</h3>
-                    <p>{t('lidc.wizard.sections.templateHint')}</p>
+                    <h3>{t('lidc.wizard.sections.specializationsTitle')}</h3>
+                    <p>{t('lidc.wizard.sections.specializationsHint', { count: SPECIALIZATION_SLOTS })}</p>
                   </header>
 
-                  <div className="lidc-template-plan-list">
-                    {templates.map((entry, index) => {
-                      const isSelected = templateId === entry.id;
-                      const totalCap = CATEGORY_META.reduce((sum, { key }) => sum + Number(entry?.caps?.[key] || 0), 0);
-                      return (
-                        <button
-                          type="button"
-                          key={entry.id}
-                          className={`lidc-template-plan ${isSelected ? 'is-selected' : ''}`}
-                          onClick={() => setTemplateId(entry.id)}
-                        >
-                          <div className="lidc-template-plan-main">
-                            <div className="lidc-template-plan-head">
-                              <span className={`lidc-template-radio ${isSelected ? 'is-selected' : ''}`} aria-hidden="true" />
-                              <div className="lidc-template-plan-title-wrap">
-                                <h4>{entry.name}</h4>
-                                {index === 0 && <span className="lidc-template-badge">{t('lidc.template.recommended')}</span>}
-                              </div>
-                            </div>
-
-                            <p>{entry.description || t('lidc.template.noDescription')}</p>
-
-                            <ul className="lidc-template-plan-features">
-                              {CATEGORY_META.map(({ key, labelKey }) => (
-                                <li key={key}>
-                                  <Check size={13} />
-                                  <span>{t(labelKey)}: <strong>{Number(entry?.caps?.[key] || 0)}</strong></span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-
-                          <div className="lidc-template-plan-footer">
-                            <span>{t('lidc.template.totalCap')}</span>
-                            <strong>{totalCap}</strong>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <LidcSpecializationPicker
+                    specializations={specializations}
+                    selectedIds={specializationIds}
+                    slots={SPECIALIZATION_SLOTS}
+                    onChange={setSpecializationIds}
+                  />
                 </section>
               )}
 
@@ -2870,49 +2817,12 @@ export default function LidcPage() {
                     <p>{t('lidc.wizard.sections.deckHint')}</p>
                   </header>
 
-                  <div className="lidc-deck-sections">
-                    {CATEGORY_META.map(({ key, labelKey }) => (
-                      <section key={key} className="lidc-deck-category">
-                        <header>
-                          <h3>{t(labelKey)}</h3>
-                          <span className={`lidc-cap-pill ${spentByCategory[key] > capsByCategory[key] ? 'is-over' : ''}`}>
-                            {t('lidc.deck.remaining')}: <strong>{remainingByCategory[key]}</strong>
-                          </span>
-                        </header>
-
-                        <div className="lidc-unit-list">
-                          {(unitsByCategory[key] || []).map((unit) => {
-                          const qty = Number(quantities[unit.id] || 0);
-                          const canIncrease = selectedTemplate && ((remainingByCategory[key] || 0) >= unit.cost || qty > 0);
-                          const isBlocked = qty <= 0 && !canIncrease;
-                          const rowClassName = [
-                            'lidc-unit-row',
-                            isBlocked ? 'is-blocked' : '',
-                          ].filter(Boolean).join(' ');
-
-                          return (
-                              <div key={unit.id} className={rowClassName}>
-                                <div className="lidc-unit-main">
-                                  <div className="lidc-unit-name"><strong>{unit.label}</strong></div>
-                                  <div className="lidc-unit-meta">
-                                    <span className={`lidc-unit-cost-chip ${qty > 0 ? 'is-selected' : ''}`} title={t('lidc.deck.unitCost', { cost: unit.cost })}>
-                                      <Coins size={13} />
-                                      <strong>{qty > 0 ? unit.cost * qty : unit.cost}</strong>
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="lidc-stepper-controls">
-                                  <button type="button" className="lidc-icon-btn" onClick={() => updateQuantity(unit, qty - 1)} disabled={qty <= 0}>-</button>
-                                  <span className="lidc-unit-qty">{qty}</span>
-                                  <button type="button" className="lidc-icon-btn" onClick={() => updateQuantity(unit, qty + 1)} disabled={!canIncrease}>+</button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </section>
-                    ))}
-                  </div>
+                  <LidcDeckBuilder
+                    units={units}
+                    quantities={quantities}
+                    caps={capsByCategory}
+                    onChange={setQuantities}
+                  />
                 </section>
               )}
 
@@ -2926,7 +2836,10 @@ export default function LidcPage() {
                   <div className="lidc-review-panel">
                     <div className="lidc-review-line"><span>{t('lidc.info.name')}</span><strong>{name || '-'}</strong></div>
                     <div className="lidc-review-line"><span>{t('lidc.info.base')}</span><strong>{previewBase?.displayName || '-'}</strong></div>
-                    <div className="lidc-review-line"><span>{t('lidc.template.title')}</span><strong>{selectedTemplate?.name || '-'}</strong></div>
+                    <div className="lidc-review-line">
+                      <span>{t('lidc.specializations.title')}</span>
+                      <strong>{selectedSpecializations.map((entry) => entry.name).join(' + ') || '-'}</strong>
+                    </div>
                     <div className="lidc-review-line"><span>{t('lidc.inviteCode.generatedOnCreate')}</span><strong>{t('lidc.inviteCode.yes')}</strong></div>
                     <div className="lidc-review-line"><span>{t('lidc.deck.totalUnits')}</span><strong>{totalDeckUnits}</strong></div>
 
@@ -3197,6 +3110,49 @@ export default function LidcPage() {
                   pendingSquadronAction === 'delete' ? <Trash2 size={14} /> : <X size={14} />
                 )}
                 {t('lidc.general.confirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isDeckEditorOpen && (
+        <div className="lidc-modal-root lidc-deck-editor-modal-root">
+          <button type="button" className="lidc-modal-backdrop" onClick={closeDeckEditor} />
+          <div className="lidc-modal-card lidc-deck-editor-modal-card" role="dialog" aria-modal="true">
+            <div className="lidc-modal-head">
+              <h3>{t('lidc.builder.editorTitle')}</h3>
+              <p>{t('lidc.builder.editorHint')}</p>
+            </div>
+
+            <div className="lidc-deck-editor-body">
+              <LidcDeckBuilder
+                units={units}
+                quantities={deckEditorQuantities}
+                caps={activeSquadronCaps}
+                onChange={setDeckEditorQuantities}
+              />
+            </div>
+
+            {deckEditorError && <div className="lidc-inline-error">{deckEditorError}</div>}
+
+            <div className="lidc-modal-actions">
+              <button
+                type="button"
+                className="lidc-btn lidc-btn-outline"
+                onClick={closeDeckEditor}
+                disabled={deckEditorSaving}
+              >
+                {t('lidc.general.cancel')}
+              </button>
+              <button
+                type="button"
+                className="lidc-btn lidc-btn-primary"
+                onClick={saveDeckEditor}
+                disabled={deckEditorSaving || deckEditorTotalUnits <= 0}
+              >
+                {deckEditorSaving ? <Loader2 size={14} className="spin" /> : <Save size={14} />}
+                {t('lidc.builder.saveDeck')}
               </button>
             </div>
           </div>

@@ -2140,10 +2140,10 @@ app.get('/api/lidc/link/status', (req, res) => {
 });
 
 /**
- * GET /api/lidc/templates - Get LIDC templates and unit catalog
+ * GET /api/lidc/specializations - Get LIDC specializations and unit catalog
  */
-app.get('/api/lidc/templates', (req, res) => {
-  const catalog = lidcService.getTemplatesCatalog();
+app.get('/api/lidc/specializations', (req, res) => {
+  const catalog = lidcService.getSpecializationsCatalog();
   res.json(catalog);
 });
 
@@ -2431,23 +2431,23 @@ app.delete('/api/lidc/squadrons/:id', (req, res) => {
 });
 
 /**
- * PUT /api/lidc/templates - Update LIDC templates and units (wiki editors only)
+ * PUT /api/lidc/specializations - Update LIDC specializations and units (wiki editors only)
  */
-app.put('/api/lidc/templates', async (req, res) => {
+app.put('/api/lidc/specializations', async (req, res) => {
   if (!req.session.user?.id) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
   const sessionUser = await ensureSessionUserPermissions(req);
   if (!sessionUser?.canEditWiki) {
-    return res.status(403).json({ error: 'Only allowed contributors can edit LIDC templates' });
+    return res.status(403).json({ error: 'Only allowed contributors can edit LIDC specializations' });
   }
 
   try {
-    const updated = lidcService.updateTemplatesCatalog(req.body || {});
+    const updated = lidcService.updateSpecializationsCatalog(req.body || {});
     return res.json(updated);
   } catch (error) {
-    return res.status(400).json({ error: String(error?.message || 'Failed to update templates') });
+    return res.status(400).json({ error: String(error?.message || 'Failed to update specializations') });
   }
 });
 

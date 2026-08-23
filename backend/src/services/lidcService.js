@@ -16,7 +16,8 @@ import {
 } from './lidcDcsBridge.js';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data/lidc');
-const TEMPLATES_FILE = path.join(DATA_DIR, 'templates.json');
+// Filename kept from the pre-specialization schema so existing deployments keep their catalog.
+const CATALOG_FILE = path.join(DATA_DIR, 'templates.json');
 const SQUADRONS_FILE = path.join(DATA_DIR, 'squadrons.json');
 const DISCORD_USERS_FILE = path.join(DATA_DIR, 'discord-users.json');
 const UCID_LINKS_FILE = path.join(DATA_DIR, 'ucid-links.json');
@@ -51,50 +52,74 @@ const LIDC_ROLE_PRIORITY = Object.freeze({
   member: 3,
 });
 
-const DEFAULT_TEMPLATES_SEED = Object.freeze({
-  templates: [
+export const SPECIALIZATION_SLOTS = 2;
+
+const DEFAULT_CATALOG_SEED = Object.freeze({
+  specializations: [
     {
-      id: 'group-helicopters',
-      name: 'Gruppo Elicotteri',
-      description: 'Focalizzato su rotanti e supporto avanzato.',
+      id: 'air-superiority',
+      name: 'Superiorita Aerea',
+      description: 'Caccia da intercettazione e controllo dello spazio aereo.',
       caps: {
-        aircrafts: 180,
-        helicopters: 460,
+        aircrafts: 260,
+        helicopters: 60,
+        logistics: 60,
+        groundAssets: 40,
+      },
+    },
+    {
+      id: 'strike-package',
+      name: 'Strike Package',
+      description: 'Attacco al suolo e interdizione a lungo raggio.',
+      caps: {
+        aircrafts: 220,
+        helicopters: 80,
+        logistics: 70,
+        groundAssets: 60,
+      },
+    },
+    {
+      id: 'rotary-wing',
+      name: 'Ala Rotante',
+      description: 'Elicotteri da attacco e ricognizione armata.',
+      caps: {
+        aircrafts: 50,
+        helicopters: 250,
+        logistics: 90,
+        groundAssets: 60,
+      },
+    },
+    {
+      id: 'air-assault',
+      name: 'Air Assault',
+      description: 'Trasporto tattico e inserimento rapido di truppe.',
+      caps: {
+        aircrafts: 60,
+        helicopters: 180,
+        logistics: 150,
+        groundAssets: 90,
+      },
+    },
+    {
+      id: 'sustainment',
+      name: 'Sustainment',
+      description: 'Rifornimento, trasporto strategico e supporto logistico.',
+      caps: {
+        aircrafts: 60,
+        helicopters: 90,
         logistics: 260,
-        groundAssets: 200,
+        groundAssets: 100,
       },
     },
     {
-      id: 'strike-wing',
-      name: 'Strike Wing',
-      description: 'Focalizzato su superiorita aerea e strike assets.',
+      id: 'ground-defense',
+      name: 'Difesa Terrestre',
+      description: 'Difesa aerea integrata e assetti corazzati.',
       caps: {
-        aircrafts: 420,
-        helicopters: 220,
-        logistics: 220,
-        groundAssets: 180,
-      },
-    },
-    {
-      id: 'task-force-logistics',
-      name: 'Task Force Logistica',
-      description: 'Focalizzato su sustainment, trasporto e supporto.',
-      caps: {
-        aircrafts: 160,
-        helicopters: 240,
-        logistics: 500,
-        groundAssets: 200,
-      },
-    },
-    {
-      id: 'combined-arms',
-      name: 'Combined Arms',
-      description: 'Bilanciato su tutte le categorie operative.',
-      caps: {
-        aircrafts: 300,
-        helicopters: 300,
-        logistics: 300,
-        groundAssets: 300,
+        aircrafts: 60,
+        helicopters: 70,
+        logistics: 90,
+        groundAssets: 250,
       },
     },
   ],
@@ -129,10 +154,10 @@ function ensureStorage() {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   }
 
-  if (!fs.existsSync(TEMPLATES_FILE)) {
-    writeJsonAtomic(TEMPLATES_FILE, {
-      templates: DEFAULT_TEMPLATES_SEED.templates,
-      units: DEFAULT_TEMPLATES_SEED.units,
+  if (!fs.existsSync(CATALOG_FILE)) {
+    writeJsonAtomic(CATALOG_FILE, {
+      specializations: DEFAULT_CATALOG_SEED.specializations,
+      units: DEFAULT_CATALOG_SEED.units,
       updatedAt: Date.now(),
     });
   }
@@ -206,7 +231,7 @@ function getRolePermissions(roleRaw) {
   };
 }
 
-function normalizeTemplateCaps(rawCaps) {
+function normalizeCapsMap(rawCaps) {
   const caps = {};
   DECK_CATEGORIES.forEach((category) => {
     caps[category] = normalizeCap(rawCaps?.[category]);
@@ -214,16 +239,27 @@ function normalizeTemplateCaps(rawCaps) {
   return caps;
 }
 
-function normalizeTemplate(rawTemplate, index = 0) {
-  const id = sanitizeText(rawTemplate?.id, 80) || `template_${Date.now()}_${index}`;
-  const name = sanitizeText(rawTemplate?.name, 120) || `Template ${index + 1}`;
-  const description = sanitizeText(rawTemplate?.description, 500);
+function normalizeSpecialization(rawSpecialization, index = 0) {
+  const id = sanitizeText(rawSpecialization?.id, 80) || `specialization_${Date.now()}_${index}`;
+  const name = sanitizeText(rawSpecialization?.name, 120) || `Specialization ${index + 1}`;
+  const description = sanitizeText(rawSpecialization?.description, 500);
   return {
     id,
     name,
     description,
-    caps: normalizeTemplateCaps(rawTemplate?.caps),
+    caps: normalizeCapsMap(rawSpecialization?.caps),
   };
+}
+
+function sumSpecializationCaps(specializations) {
+  const caps = {};
+  DECK_CATEGORIES.forEach((category) => {
+    caps[category] = (Array.isArray(specializations) ? specializations : []).reduce(
+      (sum, specialization) => sum + normalizeCap(specialization?.caps?.[category]),
+      0,
+    );
+  });
+  return caps;
 }
 
 function normalizeUnit(rawUnit, index = 0) {
@@ -253,50 +289,83 @@ function normalizeUnit(rawUnit, index = 0) {
   return unit;
 }
 
-function readTemplatesState() {
-  const raw = readJson(TEMPLATES_FILE, {
-    templates: DEFAULT_TEMPLATES_SEED.templates,
-    units: DEFAULT_TEMPLATES_SEED.units,
+/**
+ * Legacy catalogs stored one `templates` entry per squadron. Squadrons now combine
+ * SPECIALIZATION_SLOTS entries, so caps are divided to keep the total budget comparable.
+ */
+function migrateLegacyTemplatesToSpecializations(rawTemplates) {
+  return rawTemplates.map((entry, index) => {
+    const specialization = normalizeSpecialization(entry, index);
+    DECK_CATEGORIES.forEach((category) => {
+      specialization.caps[category] = Math.floor(specialization.caps[category] / SPECIALIZATION_SLOTS);
+    });
+    return specialization;
+  });
+}
+
+function readCatalogState() {
+  const raw = readJson(CATALOG_FILE, {
+    specializations: DEFAULT_CATALOG_SEED.specializations,
+    units: DEFAULT_CATALOG_SEED.units,
     updatedAt: Date.now(),
   });
-
-  const templates = Array.isArray(raw?.templates)
-    ? raw.templates.map((entry, index) => normalizeTemplate(entry, index)).filter(Boolean)
-    : [];
 
   const units = Array.isArray(raw?.units)
     ? raw.units.map((entry, index) => normalizeUnit(entry, index)).filter(Boolean)
     : [];
 
-  return {
-    templates,
-    units,
-    updatedAt: Number.isFinite(raw?.updatedAt) ? raw.updatedAt : Date.now(),
+  if (Array.isArray(raw?.specializations)) {
+    return {
+      specializations: raw.specializations
+        .map((entry, index) => normalizeSpecialization(entry, index))
+        .filter(Boolean),
+      units,
+      updatedAt: Number.isFinite(raw?.updatedAt) ? raw.updatedAt : Date.now(),
+    };
+  }
+
+  const specializations = Array.isArray(raw?.templates)
+    ? migrateLegacyTemplatesToSpecializations(raw.templates)
+    : DEFAULT_CATALOG_SEED.specializations.map((entry, index) => normalizeSpecialization(entry, index));
+
+  const migrated = {
+    specializations,
+    units: units.length > 0
+      ? units
+      : DEFAULT_CATALOG_SEED.units.map((entry, index) => normalizeUnit(entry, index)).filter(Boolean),
+    updatedAt: Date.now(),
   };
+
+  writeJsonAtomic(CATALOG_FILE, migrated);
+  return migrated;
 }
 
-function writeTemplatesState(state) {
-  const templates = Array.isArray(state?.templates)
-    ? state.templates.map((entry, index) => normalizeTemplate(entry, index)).filter(Boolean)
-    : [];
+function writeCatalogState(state) {
+  const rawSpecializations = Array.isArray(state?.specializations)
+    ? state.specializations
+    : (Array.isArray(state?.templates) ? state.templates : []);
+
+  const specializations = rawSpecializations
+    .map((entry, index) => normalizeSpecialization(entry, index))
+    .filter(Boolean);
 
   const units = Array.isArray(state?.units)
     ? state.units.map((entry, index) => normalizeUnit(entry, index)).filter(Boolean)
     : [];
 
-  if (templates.length === 0) {
-    throw new Error('At least one template is required');
+  if (specializations.length < SPECIALIZATION_SLOTS) {
+    throw new Error(`At least ${SPECIALIZATION_SLOTS} specializations are required`);
   }
   if (units.length === 0) {
     throw new Error('At least one unit is required');
   }
 
-  const dedupeTemplateIds = new Set();
-  templates.forEach((template) => {
-    if (dedupeTemplateIds.has(template.id)) {
-      throw new Error(`Duplicate template id: ${template.id}`);
+  const dedupeSpecializationIds = new Set();
+  specializations.forEach((specialization) => {
+    if (dedupeSpecializationIds.has(specialization.id)) {
+      throw new Error(`Duplicate specialization id: ${specialization.id}`);
     }
-    dedupeTemplateIds.add(template.id);
+    dedupeSpecializationIds.add(specialization.id);
   });
 
   const dedupeUnitIds = new Set();
@@ -308,12 +377,12 @@ function writeTemplatesState(state) {
   });
 
   const payload = {
-    templates,
+    specializations,
     units,
     updatedAt: Date.now(),
   };
 
-  writeJsonAtomic(TEMPLATES_FILE, payload);
+  writeJsonAtomic(CATALOG_FILE, payload);
   return payload;
 }
 
@@ -385,7 +454,7 @@ function normalizeDeckInput(rawDeck) {
   return normalizedDeck;
 }
 
-function calculateCostSummary({ deck, template, unitsById }) {
+function calculateCostSummary({ deck, caps: rawCaps, unitsById }) {
   const spent = {};
   const caps = {};
   const remaining = {};
@@ -395,7 +464,7 @@ function calculateCostSummary({ deck, template, unitsById }) {
 
   DECK_CATEGORIES.forEach((category) => {
     const entries = Array.isArray(deck?.[category]) ? deck[category] : [];
-    const cap = normalizeCap(template?.caps?.[category]);
+    const cap = normalizeCap(rawCaps?.[category]);
 
     let categorySpent = 0;
     entries.forEach((entry) => {
@@ -428,6 +497,62 @@ function calculateCostSummary({ deck, template, unitsById }) {
     totalSpent,
     totalUnits,
   };
+}
+
+function normalizeSpecializationIdsInput(rawIds, specializationsById) {
+  const list = Array.isArray(rawIds) ? rawIds : [];
+  const selected = [];
+
+  list.forEach((value) => {
+    const id = sanitizeText(value, 80);
+    if (!id || selected.includes(id)) return;
+    if (!specializationsById.has(id)) {
+      throw new Error(`Unknown specialization: ${id}`);
+    }
+    selected.push(id);
+  });
+
+  if (selected.length !== SPECIALIZATION_SLOTS) {
+    throw new Error(`Exactly ${SPECIALIZATION_SLOTS} distinct specializations are required`);
+  }
+
+  return selected;
+}
+
+function resolveSquadronSpecializations(squadron, specializationsById) {
+  const storedIds = Array.isArray(squadron?.specializationIds)
+    ? squadron.specializationIds
+    : [squadron?.templateId];
+
+  return storedIds
+    .map((id) => specializationsById.get(sanitizeText(id, 80)))
+    .filter(Boolean);
+}
+
+/**
+ * Squadrons created before specializations existed were budgeted against a single template.
+ * Their persisted caps are reused so an existing deck never becomes retroactively invalid.
+ */
+function resolveSquadronCaps(squadron, specializationsById) {
+  if (!Array.isArray(squadron?.specializationIds)) {
+    const storedCaps = squadron?.costSummary?.caps;
+    const hasStoredCaps = storedCaps
+      && DECK_CATEGORIES.some((category) => normalizeCap(storedCaps[category]) > 0);
+    if (hasStoredCaps) {
+      return normalizeCapsMap(storedCaps);
+    }
+  }
+
+  return sumSpecializationCaps(resolveSquadronSpecializations(squadron, specializationsById));
+}
+
+function readSquadronSpecializationNames(squadron) {
+  const stored = Array.isArray(squadron?.specializationNames) ? squadron.specializationNames : [];
+  const names = stored.map((value) => sanitizeText(value, 120)).filter(Boolean);
+  if (names.length > 0) return names;
+
+  const legacyName = sanitizeText(squadron?.templateName, 120);
+  return legacyName ? [legacyName] : [];
 }
 
 function normalizeInviteCode(value) {
@@ -652,8 +777,8 @@ function ensureSquadronAirframesPersistedById(squadronId) {
   const index = squadrons.findIndex((entry) => sanitizeText(entry?.id, 120) === targetId);
   if (index < 0) return null;
 
-  const templatesState = readTemplatesState();
-  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+  const catalogState = readCatalogState();
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
 
   const squadron = { ...squadrons[index] };
   const changed = syncSquadronAirframesInMemory(squadron, unitsById);
@@ -728,14 +853,14 @@ function listSquadronMembersForDisplay(squadron) {
     });
 }
 
-export function getTemplatesCatalog() {
+export function getSpecializationsCatalog() {
   ensureStorage();
-  return readTemplatesState();
+  return readCatalogState();
 }
 
-export function updateTemplatesCatalog(payload) {
+export function updateSpecializationsCatalog(payload) {
   ensureStorage();
-  return writeTemplatesState(payload);
+  return writeCatalogState(payload);
 }
 
 export function upsertDiscordUser(rawUser) {
@@ -805,27 +930,24 @@ export function createSquadron(payload, sessionUser) {
     throw new Error('Base is required');
   }
 
-  const templateId = sanitizeText(payload?.templateId, 80);
-  if (!templateId) {
-    throw new Error('Template is required');
-  }
-
   const logoDataUrl = sanitizeText(payload?.logoDataUrl, MAX_LOGO_DATA_URL_LENGTH);
   if (logoDataUrl.length > MAX_LOGO_DATA_URL_LENGTH) {
     throw new Error('Logo is too large');
   }
 
-  const templatesState = readTemplatesState();
-  const template = templatesState.templates.find((entry) => entry.id === templateId);
-  if (!template) {
-    throw new Error('Template not found');
-  }
+  const catalogState = readCatalogState();
+  const specializationsById = new Map(catalogState.specializations.map((entry) => [entry.id, entry]));
+  const specializationIds = normalizeSpecializationIdsInput(
+    payload?.specializationIds,
+    specializationsById,
+  );
+  const specializations = specializationIds.map((id) => specializationsById.get(id));
 
-  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
   const deck = normalizeDeckInput(payload?.deck || {});
   const costSummary = calculateCostSummary({
     deck,
-    template,
+    caps: sumSpecializationCaps(specializations),
     unitsById,
   });
 
@@ -848,8 +970,8 @@ export function createSquadron(payload, sessionUser) {
     description,
     logoDataUrl,
     baseId,
-    templateId: template.id,
-    templateName: template.name,
+    specializationIds,
+    specializationNames: specializations.map((entry) => entry.name),
     deck,
     inviteCode,
     members: [
@@ -918,20 +1040,16 @@ export function updateSquadronDeck({ squadronId, deck, actorUserId }) {
     throw new Error('Only the squadron owner can edit the deck');
   }
 
-  const templatesState = readTemplatesState();
-  const template = templatesState.templates.find(
-    (entry) => entry.id === sanitizeText(squadron?.templateId, 80),
-  );
-  if (!template) {
-    throw new Error('Template not found');
-  }
+  const catalogState = readCatalogState();
+  const specializationsById = new Map(catalogState.specializations.map((entry) => [entry.id, entry]));
+  const caps = resolveSquadronCaps(squadron, specializationsById);
 
-  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
   const previousDeck = squadron.deck;
   const nextDeck = normalizeDeckInput(deck || {});
   const costSummary = calculateCostSummary({
     deck: nextDeck,
-    template,
+    caps,
     unitsById,
   });
 
@@ -979,7 +1097,7 @@ export function listSquadrons() {
       id: sanitizeText(squadron?.id, 120),
       name: sanitizeText(squadron?.name, 120),
       logoDataUrl: sanitizeText(squadron?.logoDataUrl, MAX_LOGO_DATA_URL_LENGTH) || '',
-      templateName: sanitizeText(squadron?.templateName, 120),
+      specializationNames: readSquadronSpecializationNames(squadron),
       baseId: sanitizeText(squadron?.baseId, 120),
       memberCount: Array.isArray(squadron?.members) ? squadron.members.length : 0,
       createdAt: Number.isFinite(squadron?.createdAt) ? squadron.createdAt : null,
@@ -1000,6 +1118,7 @@ export function getSquadronById(squadronId, actorUserId = '') {
   const isMember = actorId && isUserMemberOfSquadron(squadron, actorId);
   const result = {
     ...squadron,
+    specializationNames: readSquadronSpecializationNames(squadron),
     memberProfiles: listSquadronMembersForDisplay(squadron),
   };
 
@@ -1053,8 +1172,8 @@ export function joinSquadronByInviteCode({ inviteCode, sessionUser }) {
     },
   ];
 
-  const templatesState = readTemplatesState();
-  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+  const catalogState = readCatalogState();
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
   syncSquadronAirframesInMemory(squadron, unitsById);
 
   squadrons[squadronIndex] = squadron;
@@ -1098,8 +1217,8 @@ export function updateAirframeAssignment({ squadronId, airframeId, pilotUserId, 
     throw new Error('Only leaders can manage airframe assignments');
   }
 
-  const templatesState = readTemplatesState();
-  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+  const catalogState = readCatalogState();
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
   syncSquadronAirframesInMemory(squadron, unitsById);
 
   const airframes = Array.isArray(squadron.airframes) ? squadron.airframes : [];
@@ -1265,8 +1384,8 @@ export function leaveSquadron({
 
   squadron.members = nextMembers;
 
-  const templatesState = readTemplatesState();
-  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+  const catalogState = readCatalogState();
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
   syncSquadronAirframesInMemory(squadron, unitsById);
 
   squadrons[squadronIndex] = squadron;
@@ -1365,7 +1484,7 @@ export function getUserLidcState(userIdRaw) {
       ? {
           id: sanitizeText(squadron?.id, 120),
           name: sanitizeText(squadron?.name, 120),
-          templateName: sanitizeText(squadron?.templateName, 120),
+          specializationNames: readSquadronSpecializationNames(squadron),
           baseId: sanitizeText(squadron?.baseId, 120),
           createdAt: Number.isFinite(squadron?.createdAt) ? squadron.createdAt : null,
         }
@@ -1576,8 +1695,8 @@ export function getUcidLinksMap() {
 }
 
 function buildAirframeRegistryPayload() {
-  const templatesState = readTemplatesState();
-  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+  const catalogState = readCatalogState();
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
   const links = readUcidLinks();
   const squadrons = readSquadrons();
   const nameToUcid = {};
@@ -1642,8 +1761,8 @@ function managedKey(type, airbase) {
 }
 
 function buildLidcPolicyPayload() {
-  const templatesState = readTemplatesState();
-  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+  const catalogState = readCatalogState();
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
   const ucidLinks = readUcidLinks();
   const squadrons = readSquadrons();
 
@@ -1787,8 +1906,8 @@ export function applyAirframeStateFromDcs(incomingAirframes = []) {
     exportLidcPolicy();
   }
 
-  const templatesState = readTemplatesState();
-  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+  const catalogState = readCatalogState();
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
   processDeferredWarehouseOps(nextSquadrons, unitsById);
 
   return { updated, squadrons: nextSquadrons, uiStates: DCS_STATE_TO_UI };
@@ -1799,8 +1918,9 @@ ensureStorage();
 export default {
   DECK_CATEGORIES,
   LIDC_MEMBER_ROLES,
-  getTemplatesCatalog,
-  updateTemplatesCatalog,
+  SPECIALIZATION_SLOTS,
+  getSpecializationsCatalog,
+  updateSpecializationsCatalog,
   upsertDiscordUser,
   getDiscordUsers,
   createSquadron,

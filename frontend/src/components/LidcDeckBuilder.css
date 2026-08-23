@@ -1,0 +1,524 @@
+/*
+ * Deck builder shell. Inherits the LIDC palette from `.lidc-page` / `.lidc-wizard-root`,
+ * with fallbacks so it also renders standalone.
+ */
+.lidc-deck-builder {
+  --deck-ink: var(--lidc-ink, #ffffff);
+  --deck-body: var(--lidc-body, #dadbdf);
+  --deck-mute: var(--lidc-mute, #7d8187);
+  --deck-hairline: var(--lidc-hairline, #4e4e4e);
+  --deck-canvas: var(--lidc-canvas, #0e0e0e);
+  --deck-canvas-soft: var(--lidc-canvas-soft, #1b1b1b);
+  --deck-gold: var(--lidc-accent-gold, #ffbb00);
+  --deck-orange: var(--lidc-accent-orange, #ff6b01);
+  --deck-danger: var(--lidc-danger, #ff7f7f);
+  --deck-radius: var(--lidc-row-radius, 15px);
+
+  position: relative;
+  display: grid;
+  gap: 14px;
+  font-family: var(--lidc-font, "Inter", "Segoe UI", sans-serif);
+  color: var(--deck-ink);
+}
+
+/* ---------- Summary bar ---------- */
+
+.lidc-deck-builder-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border: 1px solid var(--deck-hairline);
+  border-radius: var(--deck-radius);
+  background: var(--deck-canvas-soft);
+}
+
+.lidc-deck-builder-summary-main {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.lidc-deck-builder-summary-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--deck-mute);
+}
+
+.lidc-deck-builder-summary-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.lidc-deck-builder-summary-value strong {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--deck-gold);
+}
+
+.lidc-deck-builder-summary-value span {
+  font-size: 13px;
+  color: var(--deck-mute);
+}
+
+.lidc-deck-builder-summary-value.is-over strong {
+  color: var(--deck-danger);
+}
+
+.lidc-deck-builder-summary-units {
+  font-size: 12px;
+  color: var(--deck-mute);
+}
+
+.lidc-deck-builder-summary-units strong {
+  color: var(--deck-body);
+}
+
+.lidc-deck-builder-hint {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px dashed var(--deck-hairline);
+  border-radius: var(--deck-radius);
+  font-size: 12px;
+  color: var(--deck-mute);
+}
+
+/* ---------- Category racks ---------- */
+
+.lidc-deck-builder-categories {
+  display: grid;
+  gap: 12px;
+}
+
+.lidc-deck-cat {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--deck-hairline);
+  border-radius: var(--lidc-radius, 25px);
+  background: var(--deck-canvas);
+}
+
+.lidc-deck-cat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lidc-deck-cat-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--deck-body);
+}
+
+.lidc-deck-cat-title h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--deck-ink);
+}
+
+.lidc-deck-cat-budget {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--deck-mute);
+}
+
+.lidc-deck-cat-budget strong {
+  font-size: 15px;
+  color: var(--deck-ink);
+}
+
+.lidc-deck-cat-budget.is-over strong {
+  color: var(--deck-danger);
+}
+
+.lidc-deck-cat-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.lidc-deck-cat-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--deck-orange), var(--deck-gold));
+  transition: width 220ms ease;
+}
+
+.lidc-deck-cat-bar.is-over span {
+  background: var(--deck-danger);
+}
+
+.lidc-deck-cat-foot {
+  margin: 0;
+  font-size: 11px;
+  color: var(--deck-mute);
+}
+
+.lidc-deck-cat-foot strong {
+  color: var(--deck-body);
+}
+
+/* ---------- Slots ---------- */
+
+.lidc-deck-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 10px;
+}
+
+.lidc-deck-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--deck-hairline);
+  border-radius: var(--deck-radius);
+  background: var(--deck-canvas-soft);
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+
+.lidc-deck-card:hover {
+  border-color: rgba(255, 187, 0, 0.45);
+  transform: translateY(-1px);
+}
+
+.lidc-deck-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.lidc-deck-card-name {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--deck-ink);
+}
+
+.lidc-deck-card-remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--deck-mute);
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease;
+}
+
+.lidc-deck-card-remove:hover {
+  color: var(--deck-danger);
+  background: rgba(255, 127, 127, 0.12);
+}
+
+.lidc-deck-card-cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--deck-gold);
+}
+
+.lidc-deck-card-cost span {
+  font-size: 10px;
+  color: var(--deck-mute);
+}
+
+.lidc-deck-card-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.lidc-deck-card-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.lidc-deck-step-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--deck-ink);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.lidc-deck-step-btn:hover:not(:disabled) {
+  background: var(--deck-orange);
+  color: #121212;
+}
+
+.lidc-deck-step-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.lidc-deck-card-qty {
+  min-width: 26px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.lidc-deck-slot-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 96px;
+  border: 1px dashed var(--deck-hairline);
+  border-radius: var(--deck-radius);
+  background: transparent;
+  color: var(--deck-mute);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+}
+
+.lidc-deck-slot-add:hover:not(:disabled) {
+  border-color: var(--deck-gold);
+  color: var(--deck-gold);
+  background: rgba(255, 187, 0, 0.06);
+}
+
+.lidc-deck-slot-add:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.lidc-deck-slot-ghost {
+  min-height: 96px;
+  border: 1px dashed rgba(255, 255, 255, 0.07);
+  border-radius: var(--deck-radius);
+}
+
+/* ---------- Unit picker ---------- */
+
+/* Fixed so the picker stays centered in the viewport even when the builder is scrolled.
+   Sits above `.lidc-wizard-root` (5000) and `.lidc-modal-root` (6000). */
+.lidc-deck-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 6499;
+  border: 0;
+  background: rgba(6, 6, 6, 0.72);
+  backdrop-filter: blur(2px);
+  cursor: pointer;
+}
+
+.lidc-deck-picker {
+  position: fixed;
+  z-index: 6500;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 12px;
+  width: min(460px, calc(100vw - 32px));
+  max-height: min(520px, calc(100vh - 48px));
+  padding: 16px;
+  border: 1px solid var(--deck-hairline);
+  border-radius: var(--lidc-radius, 25px);
+  background: var(--deck-canvas);
+  box-shadow: var(--lidc-shadow, 0 22px 60px rgba(0, 0, 0, 0.55));
+}
+
+.lidc-deck-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lidc-deck-picker-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--deck-gold);
+}
+
+.lidc-deck-picker-title h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--deck-ink);
+}
+
+.lidc-deck-picker-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--deck-body);
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.lidc-deck-picker-close:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.lidc-deck-picker-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lidc-deck-picker-search {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--deck-hairline);
+  border-radius: 999px;
+  background: var(--deck-canvas-soft);
+  color: var(--deck-mute);
+}
+
+.lidc-deck-picker-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--deck-ink);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.lidc-deck-picker-budget {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--deck-mute);
+}
+
+.lidc-deck-picker-budget strong {
+  color: var(--deck-gold);
+}
+
+.lidc-deck-picker-list {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.lidc-deck-picker-empty {
+  margin: 0;
+  padding: 18px 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--deck-mute);
+}
+
+.lidc-deck-picker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--deck-radius);
+  background: var(--deck-canvas-soft);
+  color: var(--deck-ink);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.lidc-deck-picker-row:hover:not(:disabled) {
+  border-color: rgba(255, 187, 0, 0.45);
+  background: #212121;
+}
+
+.lidc-deck-picker-row.is-blocked {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.lidc-deck-picker-row-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lidc-deck-picker-row-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.lidc-deck-picker-row-badge {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 187, 0, 0.15);
+  color: var(--deck-gold);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.lidc-deck-picker-row-cost {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--deck-gold);
+}
+
+@media (max-width: 720px) {
+  .lidc-deck-slots {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+
+  .lidc-deck-slot-ghost {
+    display: none;
+  }
+}

@@ -1,47 +1,69 @@
 {
-  "templates": [
+  "specializations": [
     {
-      "id": "group-helicopters",
-      "name": "Gruppo Elicotteri",
-      "description": "Focalizzato su rotanti e supporto avanzato.",
+      "id": "air-superiority",
+      "name": "Superiorita Aerea",
+      "description": "Caccia da intercettazione e controllo dello spazio aereo.",
       "caps": {
-        "aircrafts": 180,
-        "helicopters": 460,
+        "aircrafts": 260,
+        "helicopters": 60,
+        "logistics": 60,
+        "groundAssets": 40
+      }
+    },
+    {
+      "id": "strike-package",
+      "name": "Strike Package",
+      "description": "Attacco al suolo e interdizione a lungo raggio.",
+      "caps": {
+        "aircrafts": 220,
+        "helicopters": 80,
+        "logistics": 70,
+        "groundAssets": 60
+      }
+    },
+    {
+      "id": "rotary-wing",
+      "name": "Ala Rotante",
+      "description": "Elicotteri da attacco e ricognizione armata.",
+      "caps": {
+        "aircrafts": 50,
+        "helicopters": 250,
+        "logistics": 90,
+        "groundAssets": 60
+      }
+    },
+    {
+      "id": "air-assault",
+      "name": "Air Assault",
+      "description": "Trasporto tattico e inserimento rapido di truppe.",
+      "caps": {
+        "aircrafts": 60,
+        "helicopters": 180,
+        "logistics": 150,
+        "groundAssets": 90
+      }
+    },
+    {
+      "id": "sustainment",
+      "name": "Sustainment",
+      "description": "Rifornimento, trasporto strategico e supporto logistico.",
+      "caps": {
+        "aircrafts": 60,
+        "helicopters": 90,
         "logistics": 260,
-        "groundAssets": 200
+        "groundAssets": 100
       }
     },
     {
-      "id": "strike-wing",
-      "name": "Strike Wing",
-      "description": "Focalizzato su superiorita aerea e strike assets.",
+      "id": "ground-defense",
+      "name": "Difesa Terrestre",
+      "description": "Difesa aerea integrata e assetti corazzati.",
       "caps": {
-        "aircrafts": 420,
-        "helicopters": 220,
-        "logistics": 220,
-        "groundAssets": 180
-      }
-    },
-    {
-      "id": "task-force-logistics",
-      "name": "Task Force Logistica",
-      "description": "Focalizzato su sustainment, trasporto e supporto.",
-      "caps": {
-        "aircrafts": 160,
-        "helicopters": 240,
-        "logistics": 500,
-        "groundAssets": 200
-      }
-    },
-    {
-      "id": "combined-arms",
-      "name": "Combined Arms",
-      "description": "Bilanciato su tutte le categorie operative.",
-      "caps": {
-        "aircrafts": 300,
-        "helicopters": 300,
-        "logistics": 300,
-        "groundAssets": 300
+        "aircrafts": 60,
+        "helicopters": 70,
+        "logistics": 90,
+        "groundAssets": 250
       }
     }
   ],
@@ -50,85 +72,99 @@
       "id": "f16c",
       "label": "F-16C",
       "category": "aircrafts",
-      "cost": 95
+      "cost": 95,
+      "dcsType": "F-16C_50"
     },
     {
       "id": "fa18c",
       "label": "F/A-18C Hornet",
       "category": "aircrafts",
-      "cost": 100
+      "cost": 100,
+      "dcsType": "F/A-18C_hornet"
     },
     {
       "id": "f15e",
       "label": "F-15E Strike Eagle",
       "category": "aircrafts",
-      "cost": 120
+      "cost": 120,
+      "dcsType": "F-15ESE"
     },
     {
       "id": "a10c2",
       "label": "A-10C II",
       "category": "aircrafts",
-      "cost": 85
+      "cost": 85,
+      "dcsType": "A-10C_2"
     },
     {
       "id": "m2000c",
       "label": "Mirage 2000C",
       "category": "aircrafts",
-      "cost": 80
+      "cost": 80,
+      "dcsType": "M-2000C"
     },
     {
       "id": "ah64d",
       "label": "AH-64D Apache",
       "category": "helicopters",
-      "cost": 110
+      "cost": 110,
+      "dcsType": "AH-64D_BLK_II"
     },
     {
       "id": "oh58d",
       "label": "OH-58D Kiowa",
       "category": "helicopters",
-      "cost": 65
+      "cost": 65,
+      "dcsType": "OH58D"
     },
     {
       "id": "ka50",
       "label": "Ka-50",
       "category": "helicopters",
-      "cost": 95
+      "cost": 95,
+      "dcsType": "Ka-50"
     },
     {
       "id": "mi24p",
       "label": "Mi-24P Hind",
       "category": "helicopters",
-      "cost": 100
+      "cost": 100,
+      "dcsType": "Mi-24P"
     },
     {
       "id": "sa342",
       "label": "SA-342 Gazelle",
       "category": "helicopters",
-      "cost": 55
+      "cost": 55,
+      "dcsType": "SA342M"
     },
     {
       "id": "c130j",
       "label": "C-130J Super Hercules",
       "category": "logistics",
-      "cost": 130
+      "cost": 130,
+      "dcsType": "C-130J-30"
     },
     {
       "id": "ch47f",
       "label": "CH-47F Chinook",
       "category": "logistics",
-      "cost": 115
+      "cost": 115,
+      "dcsType": "CH-47Fbl1"
     },
     {
       "id": "mi8mt",
       "label": "Mi-8MT",
       "category": "logistics",
-      "cost": 90
+      "cost": 90,
+      "dcsType": "Mi-8MT"
     },
     {
       "id": "uh1h",
       "label": "UH-1H Huey",
       "category": "logistics",
-      "cost": 70
+      "cost": 70,
+      "dcsType": "UH-1H"
     },
     {
       "id": "m1a2",

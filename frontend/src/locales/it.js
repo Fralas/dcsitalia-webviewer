@@ -326,7 +326,7 @@ export default {
     },
     steps: {
       info: 'Squadron Info',
-      template: 'Template',
+      specializations: 'Specializzazioni',
       deck: 'Deck',
       review: 'Review / Create'
     },
@@ -338,10 +338,10 @@ export default {
       sections: {
         infoTitle: 'Identita squadrone',
         infoHint: 'Inserisci nome, descrizione, base operativa e logo.',
-        templateTitle: 'Selezione template',
-        templateHint: 'Scegli il gruppo iniziale: definisce i limiti di costo per categoria.',
+        specializationsTitle: 'Selezione specializzazioni',
+        specializationsHint: 'Scegli {{count}} specializzazioni: i loro limiti si sommano nel budget del deck.',
         deckTitle: 'Composizione deck',
-        deckHint: 'Aggiungi unita per categoria rispettando il limite del template scelto.',
+        deckHint: 'Riempi gli slot di ogni categoria restando entro il budget disponibile.',
         reviewTitle: 'Controllo finale',
         reviewHint: 'Verifica i dati prima della creazione dello squadrone.'
       }
@@ -401,11 +401,12 @@ export default {
       loginButton: 'Accedi con Discord'
     },
     errors: {
-      catalogLoadFailed: 'Impossibile caricare catalogo template/unità.',
+      catalogLoadFailed: 'Impossibile caricare catalogo specializzazioni/unità.',
       infoRequired: 'Nome squadrone e base operativa sono obbligatori.',
-      templateRequired: 'Seleziona un template di partenza.',
+      specializationsRequired: 'Seleziona esattamente due specializzazioni.',
       deckEmpty: 'Aggiungi almeno una unità nel deck.',
       deckCapsExceeded: 'Il deck supera uno o più limiti di categoria.',
+      deckUpdateFailed: 'Impossibile aggiornare il deck dello squadrone.',
       loginRequired: 'Devi effettuare il login per creare lo squadrone.',
       logoUploadFailed: 'Impossibile elaborare il logo selezionato.',
       createFailed: 'Creazione squadrone non riuscita.',
@@ -425,11 +426,32 @@ export default {
       logo: 'Logo squadrone',
       logoUpload: 'Carica logo'
     },
-    template: {
-      title: 'Template',
+    specializations: {
+      title: 'Specializzazioni',
       noDescription: 'Nessuna descrizione',
-      recommended: 'consigliato',
-      totalCap: 'Capacita totale'
+      emptySlot: 'Slot vuoto',
+      clearSlot: 'Rimuovi specializzazione',
+      combinedCaps: 'Budget combinato',
+      cardTotal: 'Capacita totale'
+    },
+    builder: {
+      totalBudget: 'Budget deck',
+      noBudgetHint: 'Seleziona prima le specializzazioni per sbloccare il budget del deck.',
+      addUnit: 'Aggiungi unita',
+      removeUnit: 'Rimuovi {{unit}}',
+      increase: 'Aggiungi uno',
+      decrease: 'Rimuovi uno',
+      unitCostEach: '({{cost}} cad.)',
+      pickerTitle: 'Aggiungi a {{category}}',
+      closePicker: 'Chiudi selezione unita',
+      searchPlaceholder: 'Cerca unita...',
+      noUnitsFound: 'Nessuna unita corrisponde alla ricerca.',
+      notEnoughBudget: 'Budget insufficiente in questa categoria.',
+      inDeck: 'nel deck x{{count}}',
+      editDeck: 'Modifica deck',
+      editorTitle: 'Modifica deck squadrone',
+      editorHint: 'Cambia la composizione restando nel budget con cui e stato creato lo squadrone.',
+      saveDeck: 'Salva deck'
     },
     deck: {
       categories: {
@@ -525,16 +547,16 @@ export default {
       fallbackName: 'Nuovo Squadrone LIDC',
       fallbackDescription: 'Anteprima della configurazione operativa e del deck.',
       logoPlaceholder: 'Nessun logo',
-      templateCaps: 'Limiti template',
+      templateCaps: 'Budget deck',
       deckSummary: 'Riepilogo deck',
       emptyCategory: 'Nessuna unità'
     },
     admin: {
-      openEditor: 'Template Editor',
-      title: 'Editor Template LIDC',
-      subtitle: 'Modifica templates e catalogo unità (JSON)',
+      openEditor: 'Editor Catalogo',
+      title: 'Editor Catalogo LIDC',
+      subtitle: 'Modifica specializzazioni e catalogo unità (JSON)',
       invalidJson: 'JSON non valido.',
-      saveFailed: 'Salvataggio template non riuscito.',
+      saveFailed: 'Salvataggio catalogo non riuscito.',
       save: 'Salva modifiche'
     }
   },

@@ -326,7 +326,7 @@ export default {
     },
     steps: {
       info: 'Squadron Info',
-      template: 'Template',
+      specializations: 'Specializations',
       deck: 'Deck',
       review: 'Review / Create'
     },
@@ -338,10 +338,10 @@ export default {
       sections: {
         infoTitle: 'Squadron identity',
         infoHint: 'Provide name, description, operating base, and logo.',
-        templateTitle: 'Template selection',
-        templateHint: 'Choose the starting group. It defines category budget caps.',
+        specializationsTitle: 'Specialization selection',
+        specializationsHint: 'Pick {{count}} specializations. Their caps are summed into your deck budget.',
         deckTitle: 'Deck composition',
-        deckHint: 'Add units by category while staying under the selected template caps.',
+        deckHint: 'Fill the slots of each category while staying under its budget.',
         reviewTitle: 'Final review',
         reviewHint: 'Check all details before creating the squadron.'
       }
@@ -401,11 +401,12 @@ export default {
       loginButton: 'Login with Discord'
     },
     errors: {
-      catalogLoadFailed: 'Failed to load templates/units catalog.',
+      catalogLoadFailed: 'Failed to load specializations/units catalog.',
       infoRequired: 'Squadron name and operating base are required.',
-      templateRequired: 'Select a start template.',
+      specializationsRequired: 'Select exactly two specializations.',
       deckEmpty: 'Add at least one unit to the deck.',
       deckCapsExceeded: 'Deck exceeds one or more category caps.',
+      deckUpdateFailed: 'Failed to update the squadron deck.',
       loginRequired: 'You must login before creating a squadron.',
       logoUploadFailed: 'Unable to process the selected logo image.',
       createFailed: 'Failed to create squadron.',
@@ -425,11 +426,32 @@ export default {
       logo: 'Squadron logo',
       logoUpload: 'Upload logo'
     },
-    template: {
-      title: 'Template',
+    specializations: {
+      title: 'Specializations',
       noDescription: 'No description',
-      recommended: 'recommended',
-      totalCap: 'Total capacity'
+      emptySlot: 'Empty slot',
+      clearSlot: 'Remove specialization',
+      combinedCaps: 'Combined budget',
+      cardTotal: 'Total capacity'
+    },
+    builder: {
+      totalBudget: 'Deck budget',
+      noBudgetHint: 'Select your specializations first to unlock the deck budget.',
+      addUnit: 'Add unit',
+      removeUnit: 'Remove {{unit}}',
+      increase: 'Add one',
+      decrease: 'Remove one',
+      unitCostEach: '({{cost}} each)',
+      pickerTitle: 'Add to {{category}}',
+      closePicker: 'Close unit picker',
+      searchPlaceholder: 'Search unit...',
+      noUnitsFound: 'No unit matches your search.',
+      notEnoughBudget: 'Not enough budget left in this category.',
+      inDeck: 'in deck x{{count}}',
+      editDeck: 'Edit deck',
+      editorTitle: 'Edit squadron deck',
+      editorHint: 'Change the composition within the budget the squadron was created with.',
+      saveDeck: 'Save deck'
     },
     deck: {
       categories: {
@@ -525,16 +547,16 @@ export default {
       fallbackName: 'New LIDC Squadron',
       fallbackDescription: 'Preview of operational configuration and deck.',
       logoPlaceholder: 'No logo',
-      templateCaps: 'Template caps',
+      templateCaps: 'Deck budget',
       deckSummary: 'Deck summary',
       emptyCategory: 'No units'
     },
     admin: {
-      openEditor: 'Template Editor',
-      title: 'LIDC Template Editor',
-      subtitle: 'Edit templates and unit catalog (JSON)',
+      openEditor: 'Catalog Editor',
+      title: 'LIDC Catalog Editor',
+      subtitle: 'Edit specializations and unit catalog (JSON)',
       invalidJson: 'Invalid JSON.',
-      saveFailed: 'Failed to save templates.',
+      saveFailed: 'Failed to save catalog.',
       save: 'Save changes'
     }
   },
