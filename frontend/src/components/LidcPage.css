@@ -935,15 +935,24 @@ body.lidc-wizard-open {
   overflow: hidden;
 }
 
+#lidc-overlay-root {
+  position: relative;
+  z-index: 4900;
+  pointer-events: none;
+}
+
+#lidc-overlay-root > * {
+  pointer-events: auto;
+}
+
 .app-shell > header,
 .app-shell > main {
-  transition: filter 180ms ease, opacity 180ms ease;
+  transition: opacity 180ms ease;
 }
 
 .app-shell.lidc-wizard-open > header,
 .app-shell.lidc-wizard-open > main {
-  filter: blur(8px);
-  opacity: 0.74;
+  opacity: 0.82;
   pointer-events: none;
   user-select: none;
 }
@@ -1624,8 +1633,7 @@ body.lidc-deck-expanded-open {
 .lidc-airframe-table-wrap,
 .lidc-member-table-wrap,
 .lidc-airframe-log-list,
-.lidc-airframe-pilot-menu,
-.lidc-wizard-body {
+.lidc-airframe-pilot-menu {
   scrollbar-width: thin;
   scrollbar-color: var(--lidc-scroll-thumb) var(--lidc-scroll-track);
 }
@@ -1636,8 +1644,7 @@ body.lidc-deck-expanded-open {
 .lidc-airframe-table-wrap::-webkit-scrollbar,
 .lidc-member-table-wrap::-webkit-scrollbar,
 .lidc-airframe-log-list::-webkit-scrollbar,
-.lidc-airframe-pilot-menu::-webkit-scrollbar,
-.lidc-wizard-body::-webkit-scrollbar {
+.lidc-airframe-pilot-menu::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
@@ -1648,8 +1655,7 @@ body.lidc-deck-expanded-open {
 .lidc-airframe-table-wrap::-webkit-scrollbar-track,
 .lidc-member-table-wrap::-webkit-scrollbar-track,
 .lidc-airframe-log-list::-webkit-scrollbar-track,
-.lidc-airframe-pilot-menu::-webkit-scrollbar-track,
-.lidc-wizard-body::-webkit-scrollbar-track {
+.lidc-airframe-pilot-menu::-webkit-scrollbar-track {
   background: var(--lidc-scroll-track);
   border-left: 1px solid var(--lidc-hairline);
 }
@@ -1660,8 +1666,7 @@ body.lidc-deck-expanded-open {
 .lidc-airframe-table-wrap::-webkit-scrollbar-thumb,
 .lidc-member-table-wrap::-webkit-scrollbar-thumb,
 .lidc-airframe-log-list::-webkit-scrollbar-thumb,
-.lidc-airframe-pilot-menu::-webkit-scrollbar-thumb,
-.lidc-wizard-body::-webkit-scrollbar-thumb {
+.lidc-airframe-pilot-menu::-webkit-scrollbar-thumb {
   background: var(--lidc-scroll-thumb);
   border-radius: 999px;
   border: 2px solid var(--lidc-scroll-thumb-border);
@@ -1673,9 +1678,32 @@ body.lidc-deck-expanded-open {
 .lidc-airframe-table-wrap::-webkit-scrollbar-thumb:hover,
 .lidc-member-table-wrap::-webkit-scrollbar-thumb:hover,
 .lidc-airframe-log-list::-webkit-scrollbar-thumb:hover,
-.lidc-airframe-pilot-menu::-webkit-scrollbar-thumb:hover,
-.lidc-wizard-body::-webkit-scrollbar-thumb:hover {
+.lidc-airframe-pilot-menu::-webkit-scrollbar-thumb:hover {
   background: var(--lidc-scroll-thumb-hover);
+}
+
+.lidc-wizard-body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--lidc-accent-orange) transparent;
+}
+
+.lidc-wizard-body::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.lidc-wizard-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.lidc-wizard-body::-webkit-scrollbar-thumb {
+  background: var(--lidc-accent-orange);
+  border-radius: 999px;
+  border: 0;
+}
+
+.lidc-wizard-body::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--lidc-accent-orange) 82%, #ffffff);
 }
 
 .lidc-visual-panel {
@@ -1916,8 +1944,11 @@ body.lidc-deck-expanded-open {
 
 .lidc-center-stage-global {
   position: fixed;
+  inset: 0;
   z-index: 4900;
   background: rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .lidc-center-stage-global .lidc-center-card {
@@ -3221,37 +3252,40 @@ body.lidc-deck-expanded-open {
   padding: clamp(12px, 1.2vw, 28px);
   font-family: var(--lidc-font);
   color: var(--lidc-ink);
+  isolation: isolate;
 }
 
 .lidc-wizard-backdrop {
   position: absolute;
   inset: 0;
+  z-index: 0;
   background: rgba(0, 0, 0, 0.62);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .lidc-wizard-card {
   position: relative;
+  z-index: 1;
+  isolation: isolate;
   width: min(1120px, 96vw);
-  max-height: 92vh;
+  max-height: calc(100dvh - 2 * clamp(12px, 1.2vw, 28px));
   box-sizing: border-box;
   border: 1px solid var(--lidc-hairline);
   border-radius: var(--lidc-radius);
   background: var(--lidc-canvas);
   box-shadow: var(--lidc-shadow);
   padding:
+    clamp(14px, 1vw, 24px)
     clamp(16px, 1.1vw, 28px)
-    clamp(18px, 1.2vw, 32px)
-    clamp(18px, 1.2vw, 32px);
+    clamp(14px, 1vw, 24px);
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto auto;
-  gap: clamp(12px, 0.78vw, 18px);
+  gap: clamp(10px, 0.65vw, 14px);
 }
 
 .lidc-wizard-card--template {
-  max-height: none;
-  grid-template-rows: auto auto auto auto auto;
+  max-height: calc(100dvh - 2 * clamp(12px, 1.2vw, 28px));
 }
 
 .lidc-wizard-head {
@@ -3408,8 +3442,8 @@ body.lidc-deck-expanded-open {
 }
 
 .lidc-wizard-body--template {
-  overflow: visible;
-  min-height: auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .lidc-wizard-root .lidc-step-section-head {

@@ -2625,7 +2625,9 @@ export default function LidcPage() {
     );
   }
 
-  const wizardPortalTarget = typeof document !== 'undefined' ? document.body : null;
+  const wizardPortalTarget = typeof document !== 'undefined'
+    ? document.getElementById('lidc-overlay-root') || document.body
+    : null;
   const showNotInSquadronHomePopup = isLogged && !userHasSquadron && panelMode === 'home' && !loadingUserState;
   const showInlineCenterStage = !isWizardOpen
     && !isEntryWizardVisible

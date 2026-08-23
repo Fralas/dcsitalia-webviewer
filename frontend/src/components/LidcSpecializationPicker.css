@@ -149,19 +149,24 @@
   color: var(--spec-ink);
 }
 
-/* ---------- Specialization cards ---------- */
+/* ---------- Specialization rows ---------- */
 
-.lidc-spec-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+.lidc-spec-list {
+  display: flex;
+  flex-direction: column;
   gap: 10px;
 }
 
 .lidc-spec-card {
+  position: relative;
+  isolation: isolate;
   display: grid;
-  align-content: start;
-  gap: 10px;
-  padding: 14px;
+  grid-template-columns: minmax(148px, auto) minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 18px;
+  min-height: 132px;
+  padding: 18px 20px;
+  overflow: hidden;
   border: 1px solid var(--spec-hairline);
   border-radius: var(--lidc-radius, 25px);
   background: var(--spec-canvas);
@@ -172,6 +177,27 @@
   transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
 }
 
+.lidc-spec-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: var(--spec-flag-image);
+  background-size: cover;
+  background-position: center;
+  opacity: 0.12;
+  pointer-events: none;
+}
+
+.lidc-spec-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: rgba(14, 14, 14, 0.84);
+  pointer-events: none;
+}
+
 .lidc-spec-card:hover {
   border-color: rgba(255, 255, 255, 0.35);
   transform: translateY(-1px);
@@ -180,6 +206,17 @@
 .lidc-spec-card.is-selected {
   border-color: rgba(255, 187, 0, 0.6);
   box-shadow: inset 0 0 0 1px rgba(255, 187, 0, 0.25);
+}
+
+.lidc-spec-card.is-selected::after {
+  background: rgba(14, 14, 14, 0.76);
+}
+
+.lidc-spec-card-main,
+.lidc-spec-card-caps,
+.lidc-spec-card-side {
+  position: relative;
+  z-index: 1;
 }
 
 .lidc-spec-card-head {
@@ -204,6 +241,14 @@
   color: var(--spec-ink);
 }
 
+.lidc-spec-card-side {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  padding-left: 4px;
+}
+
 .lidc-spec-card-check {
   display: inline-flex;
   align-items: center;
@@ -222,25 +267,35 @@
 }
 
 .lidc-spec-card-desc {
-  margin: 0;
+  margin: 6px 0 0;
   font-size: 12px;
   line-height: 1.45;
   color: var(--spec-mute);
 }
 
+.lidc-spec-card-main {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
 .lidc-spec-card-caps {
-  display: grid;
-  gap: 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
   margin: 0;
-  padding: 0;
+  padding: 0 18px 0 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
   list-style: none;
 }
 
 .lidc-spec-card-caps li {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   font-size: 11px;
   color: var(--spec-mute);
 }
@@ -256,11 +311,11 @@
 
 .lidc-spec-card-foot {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  padding-top: 9px;
-  border-top: 1px solid var(--spec-hairline);
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding-top: 0;
+  border-top: 0;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.07em;
@@ -272,4 +327,24 @@
   font-size: 15px;
   letter-spacing: 0;
   color: var(--spec-ink);
+}
+
+@media (max-width: 820px) {
+  .lidc-spec-card {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 14px;
+    min-height: 0;
+  }
+
+  .lidc-spec-card-caps {
+    padding: 0 0 12px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .lidc-spec-card-side {
+    justify-content: flex-end;
+    padding-left: 0;
+  }
 }

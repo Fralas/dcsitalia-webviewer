@@ -61,7 +61,7 @@ const DEFAULT_CATALOG_SEED = Object.freeze({
       name: 'Superiorita Aerea',
       description: 'Caccia da intercettazione e controllo dello spazio aereo.',
       caps: {
-        aircrafts: 260,
+        aircrafts: 340,
         helicopters: 60,
         logistics: 60,
         groundAssets: 40,
@@ -72,7 +72,7 @@ const DEFAULT_CATALOG_SEED = Object.freeze({
       name: 'Strike Package',
       description: 'Attacco al suolo e interdizione a lungo raggio.',
       caps: {
-        aircrafts: 220,
+        aircrafts: 290,
         helicopters: 80,
         logistics: 70,
         groundAssets: 60,
@@ -84,7 +84,7 @@ const DEFAULT_CATALOG_SEED = Object.freeze({
       description: 'Elicotteri da attacco e ricognizione armata.',
       caps: {
         aircrafts: 50,
-        helicopters: 250,
+        helicopters: 300,
         logistics: 90,
         groundAssets: 60,
       },
@@ -95,7 +95,7 @@ const DEFAULT_CATALOG_SEED = Object.freeze({
       description: 'Trasporto tattico e inserimento rapido di truppe.',
       caps: {
         aircrafts: 60,
-        helicopters: 180,
+        helicopters: 200,
         logistics: 150,
         groundAssets: 90,
       },
@@ -105,7 +105,7 @@ const DEFAULT_CATALOG_SEED = Object.freeze({
       name: 'Sustainment',
       description: 'Rifornimento, trasporto strategico e supporto logistico.',
       caps: {
-        aircrafts: 60,
+        aircrafts: 50,
         helicopters: 90,
         logistics: 260,
         groundAssets: 100,
@@ -119,7 +119,7 @@ const DEFAULT_CATALOG_SEED = Object.freeze({
         aircrafts: 60,
         helicopters: 70,
         logistics: 90,
-        groundAssets: 250,
+        groundAssets: 280,
       },
     },
   ],

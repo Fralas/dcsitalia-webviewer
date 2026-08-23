@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Check } from 'lucide-react';
 import { t } from '../utils/locale';
 import { DECK_CATEGORY_META } from './LidcDeckBuilder';
+import americanFlagUrl from '../../img/american_flag.webp';
 import './LidcSpecializationPicker.css';
 
 export function sumSpecializationCaps(specializations) {
@@ -67,7 +68,10 @@ export default function LidcSpecializationPicker({
   }
 
   return (
-    <div className="lidc-spec-picker">
+    <div
+      className="lidc-spec-picker"
+      style={{ '--spec-flag-image': `url(${americanFlagUrl})` }}
+    >
       <div className="lidc-spec-slots">
         {Array.from({ length: slots }).map((_, index) => {
           const entry = selected[index] || null;
@@ -108,15 +112,11 @@ export default function LidcSpecializationPicker({
         </ul>
       </div>
 
-      <div className="lidc-spec-grid">
+      <div className="lidc-spec-list">
         {specializations.map((entry) => {
           const isSelected = selectedIds.includes(entry.id);
           const dominantKey = getDominantCategoryKey(entry);
           const dominantMeta = DECK_CATEGORY_META.find(({ key }) => key === dominantKey);
-          const total = DECK_CATEGORY_META.reduce(
-            (sum, { key }) => sum + Number(entry?.caps?.[key] || 0),
-            0,
-          );
 
           return (
             <button
@@ -126,20 +126,6 @@ export default function LidcSpecializationPicker({
               onClick={() => toggleSpecialization(entry.id)}
               aria-pressed={isSelected}
             >
-              <header className="lidc-spec-card-head">
-                <div className="lidc-spec-card-title">
-                  {dominantMeta && <dominantMeta.Icon size={15} />}
-                  <h4>{entry.name}</h4>
-                </div>
-                <span className={`lidc-spec-card-check ${isSelected ? 'is-selected' : ''}`}>
-                  {isSelected && <Check size={12} />}
-                </span>
-              </header>
-
-              <p className="lidc-spec-card-desc">
-                {entry.description || t('lidc.specializations.noDescription')}
-              </p>
-
               <ul className="lidc-spec-card-caps">
                 {DECK_CATEGORY_META.map(({ key, labelKey }) => (
                   <li key={key} className={key === dominantKey ? 'is-dominant' : ''}>
@@ -149,10 +135,24 @@ export default function LidcSpecializationPicker({
                 ))}
               </ul>
 
-              <footer className="lidc-spec-card-foot">
-                <span>{t('lidc.specializations.cardTotal')}</span>
-                <strong>{total}</strong>
-              </footer>
+              <div className="lidc-spec-card-main">
+                <header className="lidc-spec-card-head">
+                  <div className="lidc-spec-card-title">
+                    {dominantMeta && <dominantMeta.Icon size={15} />}
+                    <h4>{entry.name}</h4>
+                  </div>
+                </header>
+
+                <p className="lidc-spec-card-desc">
+                  {entry.description || t('lidc.specializations.noDescription')}
+                </p>
+              </div>
+
+              <div className="lidc-spec-card-side">
+                <span className={`lidc-spec-card-check ${isSelected ? 'is-selected' : ''}`}>
+                  {isSelected && <Check size={12} />}
+                </span>
+              </div>
             </button>
           );
         })}
