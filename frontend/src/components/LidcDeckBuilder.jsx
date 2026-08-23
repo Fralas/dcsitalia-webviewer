@@ -183,10 +183,14 @@ function CategoryDeckSlots({
         )}
       </div>
 
+      {!readOnly && isExpanded && (
+        <div className="lidc-deck-section-divider" role="separator" aria-hidden="true" />
+      )}
+
       {!readOnly && (
         <div className={`lidc-deck-picker-wrap ${isExpanded ? 'is-open' : ''}`}>
           <div className="lidc-deck-picker-inner">
-            {isExpanded && renderCategoryPicker(categoryKey, useCompactAdd)}
+            {isExpanded && renderCategoryPicker(categoryKey)}
           </div>
         </div>
       )}
@@ -360,26 +364,14 @@ export default function LidcDeckBuilder({
     );
   }
 
-  function renderCategoryPicker(categoryKey, compactToolbar = false) {
+  function renderCategoryPicker(categoryKey) {
     const remaining = (capsByCategory[categoryKey] || 0) - (spentByCategory[categoryKey] || 0);
     const candidates = unitsByCategory[categoryKey] || [];
+    const categoryMeta = DECK_CATEGORY_META.find(({ key }) => key === categoryKey);
+    const CategoryIcon = categoryMeta?.Icon || Plane;
 
     return (
       <div className="lidc-deck-picker">
-        <div className={`lidc-deck-picker-toolbar ${compactToolbar ? 'is-compact' : ''}`}>
-          <span className="lidc-deck-picker-budget">
-            {t('lidc.deck.remaining')}: <strong>{Math.max(0, remaining)}</strong>
-          </span>
-          <button
-            type="button"
-            className="lidc-deck-picker-close"
-            onClick={() => setExpandedCategory('')}
-            aria-label={t('lidc.builder.closePicker')}
-          >
-            <X size={14} />
-          </button>
-        </div>
-
         <div className="lidc-deck-picker-list">
           {candidates.length === 0 && (
             <p className="lidc-deck-picker-empty">{t('lidc.builder.noUnitsFound')}</p>
@@ -389,6 +381,7 @@ export default function LidcDeckBuilder({
             const quantity = Number(quantities[unit.id] || 0);
             const cost = Number(unit.cost || 0);
             const affordable = remaining >= cost;
+            const unitImageUrl = getLidcUnitImageUrl(unit.id);
 
             return (
               <button
@@ -400,6 +393,15 @@ export default function LidcDeckBuilder({
                 title={affordable ? undefined : t('lidc.builder.notEnoughBudget')}
               >
                 <span className="lidc-deck-picker-row-name">{unit.label}</span>
+
+                <div className="lidc-deck-picker-row-media" aria-hidden="true">
+                  {unitImageUrl ? (
+                    <img src={unitImageUrl} alt="" className="lidc-deck-picker-row-image" />
+                  ) : (
+                    <CategoryIcon size={28} strokeWidth={1.4} />
+                  )}
+                </div>
+
                 <span className="lidc-deck-picker-row-cost">
                   <Coins size={12} />
                   <strong>{cost}</strong>
@@ -479,8 +481,20 @@ export default function LidcDeckBuilder({
               />
 
               {!readOnly && cap > 0 && (
-                <p className="lidc-deck-cat-foot">
-                  {t('lidc.deck.remaining')}: <strong>{Math.max(0, remaining)}</strong>
+                <p className={`lidc-deck-cat-foot ${isExpanded ? 'has-close' : ''}`}>
+                  <span>
+                    {t('lidc.deck.remaining')}: <strong>{Math.max(0, remaining)}</strong>
+                  </span>
+                  {isExpanded && (
+                    <button
+                      type="button"
+                      className="lidc-deck-cat-foot-close"
+                      onClick={() => setExpandedCategory('')}
+                      aria-label={t('lidc.builder.closePicker')}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
                 </p>
               )}
             </section>

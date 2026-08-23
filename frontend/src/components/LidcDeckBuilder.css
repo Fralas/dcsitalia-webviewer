@@ -171,8 +171,33 @@
   color: var(--deck-mute);
 }
 
+.lidc-deck-cat-foot.has-close {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .lidc-deck-cat-foot strong {
   color: var(--deck-body);
+}
+
+.lidc-deck-cat-foot-close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  line-height: 1;
+  cursor: pointer;
+  transition: opacity 140ms ease;
+}
+
+.lidc-deck-cat-foot-close:hover {
+  opacity: 0.72;
 }
 
 /* ---------- Slots ---------- */
@@ -442,6 +467,14 @@
   cursor: not-allowed;
 }
 
+/* ---------- Deck / picker separator ---------- */
+
+.lidc-deck-section-divider {
+  height: 1px;
+  margin: 2px 12px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
 /* ---------- Unit picker ---------- */
 
 /* Inline expansion: the wrapper animates from 0fr to 1fr so the panel pushes
@@ -462,65 +495,10 @@
 }
 
 .lidc-deck-picker {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 10px;
-  margin-top: 10px;
+  margin-top: 8px;
   padding: 0;
   border: 0;
   background: transparent;
-}
-
-.lidc-deck-picker-close {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border: 0;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
-  color: var(--deck-body);
-  cursor: pointer;
-  transition: background 140ms ease;
-}
-
-.lidc-deck-picker-close:hover {
-  background: rgba(255, 255, 255, 0.16);
-}
-
-.lidc-deck-picker-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 26px;
-}
-
-.lidc-deck-picker-toolbar.is-compact .lidc-deck-picker-close {
-  width: auto;
-  height: auto;
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
-  color: #fff;
-  line-height: 1;
-}
-
-.lidc-deck-picker-toolbar.is-compact .lidc-deck-picker-close:hover {
-  background: transparent;
-  opacity: 0.72;
-}
-
-.lidc-deck-picker-budget {
-  flex-shrink: 0;
-  font-size: 11px;
-  color: var(--deck-mute);
-}
-
-.lidc-deck-picker-budget strong {
-  color: var(--deck-gold);
 }
 
 .lidc-deck-picker-list {
@@ -575,11 +553,32 @@
 
 .lidc-deck-picker-row-name {
   width: 100%;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
+  line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.lidc-deck-picker-row-media {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+  color: var(--deck-mute);
+}
+
+.lidc-deck-picker-row-image {
+  display: block;
+  width: 108px;
+  height: 68px;
+  object-fit: contain;
+  object-position: center;
+  pointer-events: none;
+  user-select: none;
 }
 
 .lidc-deck-picker-row-cost {
