@@ -178,6 +178,7 @@
 /* ---------- Slots ---------- */
 
 .lidc-deck-slots {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -415,6 +416,32 @@
   flex-shrink: 0;
 }
 
+.lidc-deck-slot-add-compact {
+  position: absolute;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--deck-mute);
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease;
+}
+
+.lidc-deck-slot-add-compact:hover:not(:disabled) {
+  color: var(--deck-gold);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.lidc-deck-slot-add-compact:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 /* ---------- Unit picker ---------- */
 
 /* Inline expansion: the wrapper animates from 0fr to 1fr so the panel pushes
@@ -468,6 +495,22 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  min-height: 26px;
+}
+
+.lidc-deck-picker-toolbar.is-compact .lidc-deck-picker-close {
+  width: auto;
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #fff;
+  line-height: 1;
+}
+
+.lidc-deck-picker-toolbar.is-compact .lidc-deck-picker-close:hover {
+  background: transparent;
+  opacity: 0.72;
 }
 
 .lidc-deck-picker-budget {

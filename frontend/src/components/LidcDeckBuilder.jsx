@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown,
+  ChevronRight,
   Coins,
   Forklift,
   Helicopter,
@@ -77,6 +78,120 @@ export function buildQuantitiesFromDeck(deck) {
   });
 
   return quantities;
+}
+
+function CategoryDeckSlots({
+  categoryKey,
+  selectedUnits,
+  ghostCount,
+  cap,
+  isExpanded,
+  readOnly,
+  onTogglePicker,
+  renderCategoryCard,
+  renderCategoryPicker,
+}) {
+  const slotsRef = useRef(null);
+  const [slotLayout, setSlotLayout] = useState({
+    useCompactAdd: false,
+    compactLeft: 0,
+    compactTop: 6,
+  });
+
+  const remeasureSlots = useCallback(() => {
+    const container = slotsRef.current;
+    if (!container) return;
+
+    const styles = getComputedStyle(container);
+    const slotWidth = parseFloat(styles.getPropertyValue('--deck-slot-width')) || 190;
+    const slotHeight = parseFloat(styles.getPropertyValue('--deck-slot-height')) || 128;
+    const gap = parseFloat(styles.gap) || 10;
+    const compactButtonSize = 26;
+    const compactGap = 4;
+    const width = container.clientWidth;
+    const perRow = Math.max(1, Math.floor((width + gap) / (slotWidth + gap)));
+
+    const visibleSlots = selectedUnits.length + ghostCount;
+    const totalWithAdd = visibleSlots + (readOnly ? 0 : 1);
+    const useCompactAdd = !readOnly && cap > 0 && totalWithAdd > perRow;
+
+    let compactLeft = 0;
+    let compactTop = 0;
+
+    if (useCompactAdd) {
+      const firstRowVisible = Math.max(1, Math.min(visibleSlots, perRow));
+      const anchorIndex = firstRowVisible - 1;
+      compactLeft = anchorIndex * (slotWidth + gap) + slotWidth + compactGap;
+      compactTop = (slotHeight - compactButtonSize) / 2;
+    }
+
+    setSlotLayout({ useCompactAdd, compactLeft, compactTop });
+  }, [selectedUnits.length, ghostCount, readOnly, cap]);
+
+  useEffect(() => {
+    remeasureSlots();
+
+    const container = slotsRef.current;
+    if (!container) return undefined;
+
+    const observer = new ResizeObserver(remeasureSlots);
+    observer.observe(container);
+    window.addEventListener('resize', remeasureSlots);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', remeasureSlots);
+    };
+  }, [remeasureSlots]);
+
+  const { useCompactAdd, compactLeft, compactTop } = slotLayout;
+
+  return (
+    <>
+      <div className="lidc-deck-slots" ref={slotsRef}>
+        {selectedUnits.map((unit) => renderCategoryCard(unit, categoryKey))}
+
+        {!readOnly && !useCompactAdd && (
+          <button
+            type="button"
+            className={`lidc-deck-slot-add ${isExpanded ? 'is-active' : ''}`}
+            onClick={onTogglePicker}
+            disabled={cap <= 0}
+            aria-expanded={isExpanded}
+          >
+            {isExpanded ? <ChevronDown size={18} /> : <Plus size={18} />}
+            <span>{isExpanded ? t('lidc.builder.closeUnitList') : t('lidc.builder.addUnit')}</span>
+          </button>
+        )}
+
+        {Array.from({ length: ghostCount }).map((_, index) => (
+          <span key={`ghost-${categoryKey}-${index}`} className="lidc-deck-slot-ghost" aria-hidden="true" />
+        ))}
+
+        {!readOnly && useCompactAdd && !isExpanded && (
+          <button
+            type="button"
+            className="lidc-deck-slot-add-compact"
+            style={{ left: `${compactLeft}px`, top: `${compactTop}px` }}
+            onClick={onTogglePicker}
+            disabled={cap <= 0}
+            aria-expanded={isExpanded}
+            aria-label={t('lidc.builder.addUnit')}
+          >
+            <ChevronRight size={14} />
+          </button>
+        )}
+      </div>
+
+      {!readOnly && (
+        <div className={`lidc-deck-picker-wrap ${isExpanded ? 'is-open' : ''}`}>
+          <div className="lidc-deck-picker-inner">
+            {isExpanded && renderCategoryPicker(categoryKey, useCompactAdd)}
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 export default function LidcDeckBuilder({
@@ -245,13 +360,13 @@ export default function LidcDeckBuilder({
     );
   }
 
-  function renderCategoryPicker(categoryKey) {
+  function renderCategoryPicker(categoryKey, compactToolbar = false) {
     const remaining = (capsByCategory[categoryKey] || 0) - (spentByCategory[categoryKey] || 0);
     const candidates = unitsByCategory[categoryKey] || [];
 
     return (
       <div className="lidc-deck-picker">
-        <div className="lidc-deck-picker-toolbar">
+        <div className={`lidc-deck-picker-toolbar ${compactToolbar ? 'is-compact' : ''}`}>
           <span className="lidc-deck-picker-budget">
             {t('lidc.deck.remaining')}: <strong>{Math.max(0, remaining)}</strong>
           </span>
@@ -351,34 +466,17 @@ export default function LidcDeckBuilder({
                 <span style={{ width: `${fillRatio * 100}%` }} />
               </div>
 
-              <div className="lidc-deck-slots">
-                {selectedUnits.map((unit) => renderCategoryCard(unit, key))}
-
-                {!readOnly && (
-                  <button
-                    type="button"
-                    className={`lidc-deck-slot-add ${isExpanded ? 'is-active' : ''}`}
-                    onClick={() => toggleCategoryPicker(key)}
-                    disabled={cap <= 0}
-                    aria-expanded={isExpanded}
-                  >
-                    {isExpanded ? <ChevronDown size={18} /> : <Plus size={18} />}
-                    <span>{isExpanded ? t('lidc.builder.closeUnitList') : t('lidc.builder.addUnit')}</span>
-                  </button>
-                )}
-
-                {Array.from({ length: ghostCount }).map((_, index) => (
-                  <span key={`ghost-${key}-${index}`} className="lidc-deck-slot-ghost" aria-hidden="true" />
-                ))}
-              </div>
-
-              {!readOnly && (
-                <div className={`lidc-deck-picker-wrap ${isExpanded ? 'is-open' : ''}`}>
-                  <div className="lidc-deck-picker-inner">
-                    {isExpanded && renderCategoryPicker(key)}
-                  </div>
-                </div>
-              )}
+              <CategoryDeckSlots
+                categoryKey={key}
+                selectedUnits={selectedUnits}
+                ghostCount={ghostCount}
+                cap={cap}
+                isExpanded={isExpanded}
+                readOnly={readOnly}
+                onTogglePicker={() => toggleCategoryPicker(key)}
+                renderCategoryCard={renderCategoryCard}
+                renderCategoryPicker={renderCategoryPicker}
+              />
 
               {!readOnly && cap > 0 && (
                 <p className="lidc-deck-cat-foot">
