@@ -539,7 +539,7 @@ const SPAWN_MENU_SECTIONS = [
     id: 'build',
     title: 'SPAWN CRATE FOR BUILD ASSET',
     spawnType: 'crate_spawn',
-    keywords: ['AMMO', 'FUEL', 'BUILD'],
+    keywords: ['AMMO', 'FUEL', 'BUILD', 'PPBUILD'],
   },
   {
     id: 'deployables',
