@@ -1,6 +1,31 @@
 {
   "links": {},
   "allow": {},
-  "managed": [],
-  "updatedAt": 1787491404292
+  "managed": [
+    {
+      "type": "F-15ESE",
+      "airbase": "Deir ez Zor"
+    },
+    {
+      "type": "F-16C_50",
+      "airbase": "Deir ez Zor"
+    },
+    {
+      "type": "F/A-18C_hornet",
+      "airbase": "Deir ez Zor"
+    },
+    {
+      "type": "M-2000C",
+      "airbase": "Deir ez Zor"
+    },
+    {
+      "type": "Ka-50",
+      "airbase": "Deir ez Zor"
+    },
+    {
+      "type": "C-130J-30",
+      "airbase": "Deir ez Zor"
+    }
+  ],
+  "updatedAt": 1787492485351
 }

@@ -2699,24 +2699,8 @@ export default function LidcPage() {
             className={`lidc-wizard-card ${currentStepKey === 'specializations' ? 'lidc-wizard-card--template' : ''}`}
             role="dialog"
             aria-modal="true"
-            aria-labelledby="lidc-wizard-title"
+            aria-label={t(`lidc.steps.${currentStepKey}`)}
           >
-            <header className="lidc-wizard-head">
-              <div className="lidc-wizard-head-main">
-                <h2 id="lidc-wizard-title">{t('lidc.wizard.title')}</h2>
-                <p>{t('lidc.wizard.subtitle')}</p>
-              </div>
-              <button
-                type="button"
-                className="lidc-wizard-close"
-                onClick={closeWizard}
-                aria-label={t('lidc.wizard.close')}
-                title={t('lidc.wizard.close')}
-              >
-                <X size={18} />
-              </button>
-            </header>
-
             <div className="lidc-wizard-stepper-shell">
               <div className="lidc-wizard-steps" aria-label="Wizard steps">
                 {WIZARD_STEPS.map((stepKey, index) => {
@@ -2751,6 +2735,16 @@ export default function LidcPage() {
                   );
                 })}
               </div>
+
+              <button
+                type="button"
+                className="lidc-wizard-close"
+                onClick={closeWizard}
+                aria-label={t('lidc.wizard.close')}
+                title={t('lidc.wizard.close')}
+              >
+                <X size={18} />
+              </button>
             </div>
 
             <div className={`lidc-wizard-body ${currentStepKey === 'specializations' ? 'lidc-wizard-body--template' : ''}`}>
