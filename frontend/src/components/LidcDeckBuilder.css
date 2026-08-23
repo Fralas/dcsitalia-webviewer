@@ -13,6 +13,8 @@
   --deck-orange: var(--lidc-accent-orange, #ff6b01);
   --deck-danger: var(--lidc-danger, #ff7f7f);
   --deck-radius: var(--lidc-row-radius, 15px);
+  --deck-slot-width: 190px;
+  --deck-slot-height: 128px;
 
   position: relative;
   display: grid;
@@ -155,7 +157,7 @@
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--deck-orange), var(--deck-gold));
+  background: var(--deck-gold);
   transition: width 220ms ease;
 }
 
@@ -176,42 +178,65 @@
 /* ---------- Slots ---------- */
 
 .lidc-deck-slots {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
 .lidc-deck-card {
-  display: grid;
-  gap: 8px;
-  padding: 10px 12px;
+  position: relative;
+  box-sizing: border-box;
+  width: var(--deck-slot-width);
+  height: var(--deck-slot-height);
+  padding: 8px 10px 10px;
   border: 1px solid var(--deck-hairline);
   border-radius: var(--deck-radius);
   background: var(--deck-canvas-soft);
-  transition: border-color 160ms ease, transform 160ms ease;
+  transition: border-color 160ms ease;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
 .lidc-deck-card:hover {
   border-color: rgba(255, 187, 0, 0.45);
-  transform: translateY(-1px);
 }
 
 .lidc-deck-card-head {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  right: 28px;
+  z-index: 2;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 6px;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+
+.lidc-deck-card-qty {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--deck-ink);
+  line-height: 1.2;
 }
 
 .lidc-deck-card-name {
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.25;
-  color: var(--deck-ink);
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--deck-body);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .lidc-deck-card-remove {
-  flex-shrink: 0;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -219,59 +244,87 @@
   height: 22px;
   border: 0;
   border-radius: 8px;
-  background: transparent;
+  background: rgba(14, 14, 14, 0.72);
   color: var(--deck-mute);
   cursor: pointer;
-  transition: color 140ms ease, background 140ms ease;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease, color 140ms ease, background 140ms ease;
+}
+
+.lidc-deck-card:hover .lidc-deck-card-remove {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .lidc-deck-card-remove:hover {
   color: var(--deck-danger);
-  background: rgba(255, 127, 127, 0.12);
+  background: rgba(255, 127, 127, 0.16);
 }
 
-.lidc-deck-card-cost {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: var(--deck-gold);
-}
-
-.lidc-deck-card-cost span {
-  font-size: 10px;
-  color: var(--deck-mute);
-}
-
-.lidc-deck-card-foot {
+.lidc-deck-card-body {
+  position: absolute;
+  inset: 22px 0 28px;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: center;
 }
 
-.lidc-deck-card-stepper {
-  display: inline-flex;
+.lidc-deck-card-media {
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 3px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
+  justify-content: center;
+  width: 108px;
+  height: 68px;
+  background: transparent;
+  color: var(--deck-mute);
+  overflow: visible;
+}
+
+.lidc-deck-card-image {
+  display: block;
+  width: 108px;
+  height: 68px;
+  object-fit: contain;
+  object-position: center;
+  pointer-events: none;
+  user-select: none;
 }
 
 .lidc-deck-step-btn {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border: 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.12);
   color: var(--deck-ink);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
-  transition: background 140ms ease;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: opacity 140ms ease, background 140ms ease;
+}
+
+.lidc-deck-card:hover .lidc-deck-step-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.lidc-deck-step-btn--minus {
+  left: 6px;
+}
+
+.lidc-deck-step-btn--plus {
+  right: 6px;
 }
 
 .lidc-deck-step-btn:hover:not(:disabled) {
@@ -280,24 +333,43 @@
 }
 
 .lidc-deck-step-btn:disabled {
-  opacity: 0.35;
+  opacity: 0;
   cursor: not-allowed;
 }
 
-.lidc-deck-card-qty {
-  min-width: 26px;
-  text-align: center;
+.lidc-deck-card:hover .lidc-deck-step-btn:disabled {
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.lidc-deck-card-cost {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transform: translateX(-50%);
   font-size: 12px;
+  color: var(--deck-gold);
+}
+
+.lidc-deck-card-cost strong {
+  font-size: 13px;
   font-weight: 700;
 }
 
 .lidc-deck-slot-add {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  min-height: 96px;
+  width: var(--deck-slot-width);
+  height: var(--deck-slot-height);
   border: 1px dashed var(--deck-hairline);
   border-radius: var(--deck-radius);
   background: transparent;
@@ -309,6 +381,7 @@
   text-transform: uppercase;
   cursor: pointer;
   transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+  flex-shrink: 0;
 }
 
 .lidc-deck-slot-add:hover:not(:disabled) {
@@ -317,73 +390,62 @@
   background: rgba(255, 187, 0, 0.06);
 }
 
+.lidc-deck-slot-add.is-active {
+  border-style: solid;
+  border-color: var(--deck-gold);
+  color: var(--deck-gold);
+  background: rgba(255, 187, 0, 0.1);
+}
+
+.lidc-deck-slot-add.is-active svg {
+  transform: rotate(180deg);
+}
+
 .lidc-deck-slot-add:disabled {
   opacity: 0.35;
   cursor: not-allowed;
 }
 
 .lidc-deck-slot-ghost {
-  min-height: 96px;
+  box-sizing: border-box;
+  width: var(--deck-slot-width);
+  height: var(--deck-slot-height);
   border: 1px dashed rgba(255, 255, 255, 0.07);
   border-radius: var(--deck-radius);
+  flex-shrink: 0;
 }
 
 /* ---------- Unit picker ---------- */
 
-/* Fixed so the picker stays centered in the viewport even when the builder is scrolled.
-   Sits above `.lidc-wizard-root` (5000) and `.lidc-modal-root` (6000). */
-.lidc-deck-picker-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 6499;
-  border: 0;
-  background: rgba(6, 6, 6, 0.72);
-  backdrop-filter: blur(2px);
-  cursor: pointer;
+/* Inline expansion: the wrapper animates from 0fr to 1fr so the panel pushes
+   the rest of the category down instead of overlaying it. */
+.lidc-deck-picker-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 260ms ease;
+}
+
+.lidc-deck-picker-wrap.is-open {
+  grid-template-rows: 1fr;
+}
+
+.lidc-deck-picker-inner {
+  overflow: hidden;
+  min-height: 0;
 }
 
 .lidc-deck-picker {
-  position: fixed;
-  z-index: 6500;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
-  gap: 12px;
-  width: min(460px, calc(100vw - 32px));
-  max-height: min(520px, calc(100vh - 48px));
-  padding: 16px;
-  border: 1px solid var(--deck-hairline);
-  border-radius: var(--lidc-radius, 25px);
-  background: var(--deck-canvas);
-  box-shadow: var(--lidc-shadow, 0 22px 60px rgba(0, 0, 0, 0.55));
-}
-
-.lidc-deck-picker-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.lidc-deck-picker-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--deck-gold);
-}
-
-.lidc-deck-picker-title h4 {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--deck-ink);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .lidc-deck-picker-close {
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -404,30 +466,8 @@
 .lidc-deck-picker-toolbar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
-}
-
-.lidc-deck-picker-search {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border: 1px solid var(--deck-hairline);
-  border-radius: 999px;
-  background: var(--deck-canvas-soft);
-  color: var(--deck-mute);
-}
-
-.lidc-deck-picker-search input {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  color: var(--deck-ink);
-  font-family: inherit;
-  font-size: 13px;
-  outline: none;
 }
 
 .lidc-deck-picker-budget {
@@ -441,14 +481,17 @@
 }
 
 .lidc-deck-picker-list {
-  display: grid;
-  align-content: start;
-  gap: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 10px;
+  max-height: 260px;
   overflow-y: auto;
   padding-right: 4px;
 }
 
 .lidc-deck-picker-empty {
+  width: 100%;
   margin: 0;
   padding: 18px 0;
   text-align: center;
@@ -457,12 +500,16 @@
 }
 
 .lidc-deck-picker-row {
+  box-sizing: border-box;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
+  width: var(--deck-slot-width);
+  height: var(--deck-slot-height);
   padding: 10px 12px;
-  border: 1px solid transparent;
+  border: 1px solid var(--deck-hairline);
   border-radius: var(--deck-radius);
   background: var(--deck-canvas-soft);
   color: var(--deck-ink);
@@ -470,6 +517,7 @@
   text-align: left;
   cursor: pointer;
   transition: border-color 140ms ease, background 140ms ease;
+  flex-shrink: 0;
 }
 
 .lidc-deck-picker-row:hover:not(:disabled) {
@@ -482,30 +530,17 @@
   cursor: not-allowed;
 }
 
-.lidc-deck-picker-row-main {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
 .lidc-deck-picker-row-name {
+  width: 100%;
   font-size: 13px;
   font-weight: 600;
-}
-
-.lidc-deck-picker-row-badge {
-  flex-shrink: 0;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(255, 187, 0, 0.15);
-  color: var(--deck-gold);
-  font-size: 10px;
-  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .lidc-deck-picker-row-cost {
-  flex-shrink: 0;
+  align-self: flex-end;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -514,10 +549,6 @@
 }
 
 @media (max-width: 720px) {
-  .lidc-deck-slots {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  }
-
   .lidc-deck-slot-ghost {
     display: none;
   }

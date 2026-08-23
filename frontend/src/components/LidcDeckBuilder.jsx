@@ -6,12 +6,12 @@ import {
   Helicopter,
   Plane,
   Plus,
-  Search,
   Shield,
   Trash2,
   X,
 } from 'lucide-react';
 import { t } from '../utils/locale';
+import { getLidcUnitImageUrl } from '../utils/lidcUnitImages';
 import './LidcDeckBuilder.css';
 
 export const DECK_CATEGORY_META = Object.freeze([
@@ -87,7 +87,6 @@ export default function LidcDeckBuilder({
   readOnly = false,
 }) {
   const [expandedCategory, setExpandedCategory] = useState('');
-  const [pickerQuery, setPickerQuery] = useState('');
 
   const unitsByCategory = useMemo(() => {
     const map = {};
@@ -174,7 +173,6 @@ export default function LidcDeckBuilder({
 
   function toggleCategoryPicker(categoryKey) {
     if (readOnly) return;
-    setPickerQuery('');
     setExpandedCategory((prev) => (prev === categoryKey ? '' : categoryKey));
   }
 
@@ -182,97 +180,89 @@ export default function LidcDeckBuilder({
     const quantity = Number(quantities[unit.id] || 0);
     const remaining = (capsByCategory[categoryKey] || 0) - (spentByCategory[categoryKey] || 0);
     const canIncrease = !readOnly && remaining >= Number(unit.cost || 0);
+    const categoryMeta = DECK_CATEGORY_META.find(({ key }) => key === categoryKey);
+    const CategoryIcon = categoryMeta?.Icon || Plane;
+    const totalCost = Number(unit.cost || 0) * quantity;
+    const unitImageUrl = getLidcUnitImageUrl(unit.id);
 
     return (
-      <article key={unit.id} className="lidc-deck-card">
-        <header className="lidc-deck-card-head">
-          <span className="lidc-deck-card-name" title={unit.label}>{unit.label}</span>
+      <article key={unit.id} className="lidc-deck-card" title={unit.label}>
+        <div className="lidc-deck-card-head">
+          <span className="lidc-deck-card-qty">x{quantity}</span>
+          <span className="lidc-deck-card-name">{unit.label}</span>
+        </div>
+
+        {!readOnly && (
+          <button
+            type="button"
+            className="lidc-deck-card-remove"
+            onClick={() => setUnitQuantity(unit, 0)}
+            aria-label={t('lidc.builder.removeUnit', { unit: unit.label })}
+          >
+            <Trash2 size={13} />
+          </button>
+        )}
+
+        <div className="lidc-deck-card-body">
           {!readOnly && (
             <button
               type="button"
-              className="lidc-deck-card-remove"
-              onClick={() => setUnitQuantity(unit, 0)}
-              aria-label={t('lidc.builder.removeUnit', { unit: unit.label })}
-            >
-              <Trash2 size={13} />
-            </button>
-          )}
-        </header>
-
-        <div className="lidc-deck-card-cost">
-          <Coins size={12} />
-          <strong>{Number(unit.cost || 0) * quantity}</strong>
-          <span>{t('lidc.builder.unitCostEach', { cost: unit.cost })}</span>
-        </div>
-
-        <footer className="lidc-deck-card-foot">
-          <div className="lidc-deck-card-stepper">
-            <button
-              type="button"
-              className="lidc-deck-step-btn"
+              className="lidc-deck-step-btn lidc-deck-step-btn--minus"
               onClick={() => setUnitQuantity(unit, quantity - 1)}
-              disabled={readOnly || quantity <= 0}
+              disabled={quantity <= 0}
               aria-label={t('lidc.builder.decrease')}
             >
               -
             </button>
-            <span className="lidc-deck-card-qty">x{quantity}</span>
+          )}
+
+          <div className="lidc-deck-card-media" aria-hidden="true">
+            {unitImageUrl ? (
+              <img src={unitImageUrl} alt="" className="lidc-deck-card-image" />
+            ) : (
+              <CategoryIcon size={28} strokeWidth={1.4} />
+            )}
+          </div>
+
+          {!readOnly && (
             <button
               type="button"
-              className="lidc-deck-step-btn"
+              className="lidc-deck-step-btn lidc-deck-step-btn--plus"
               onClick={() => setUnitQuantity(unit, quantity + 1)}
               disabled={!canIncrease}
               aria-label={t('lidc.builder.increase')}
             >
               +
             </button>
-          </div>
-        </footer>
+          )}
+        </div>
+
+        <div className="lidc-deck-card-cost">
+          <Coins size={12} />
+          <strong>{totalCost}</strong>
+        </div>
       </article>
     );
   }
 
-  function renderPicker() {
-    const meta = DECK_CATEGORY_META.find(({ key }) => key === pickerCategory);
-    if (!meta) return null;
-
-    const remaining = (capsByCategory[meta.key] || 0) - (spentByCategory[meta.key] || 0);
-    const query = pickerQuery.trim().toLowerCase();
-    const candidates = (unitsByCategory[meta.key] || []).filter((unit) => {
-      if (!query) return true;
-      return String(unit.label).toLowerCase().includes(query);
-    });
+  function renderCategoryPicker(categoryKey) {
+    const remaining = (capsByCategory[categoryKey] || 0) - (spentByCategory[categoryKey] || 0);
+    const candidates = unitsByCategory[categoryKey] || [];
 
     return (
-      <div className="lidc-deck-picker" role="dialog" aria-modal="true" aria-label={t(meta.labelKey)}>
-        <header className="lidc-deck-picker-head">
-          <div className="lidc-deck-picker-title">
-            <meta.Icon size={15} />
-            <h4>{t('lidc.builder.pickerTitle', { category: t(meta.labelKey) })}</h4>
-          </div>
-          <button
-            type="button"
-            className="lidc-deck-picker-close"
-            onClick={() => setPickerCategory('')}
-            aria-label={t('lidc.builder.closePicker')}
-          >
-            <X size={15} />
-          </button>
-        </header>
-
+      <div className="lidc-deck-picker">
         <div className="lidc-deck-picker-toolbar">
-          <label className="lidc-deck-picker-search">
-            <Search size={14} />
-            <input
-              value={pickerQuery}
-              onChange={(event) => setPickerQuery(event.target.value)}
-              placeholder={t('lidc.builder.searchPlaceholder')}
-              autoFocus
-            />
-          </label>
           <span className="lidc-deck-picker-budget">
             {t('lidc.deck.remaining')}: <strong>{Math.max(0, remaining)}</strong>
           </span>
+          <button
+            type="button"
+            className="lidc-deck-picker-close"
+            onClick={() => setExpandedCategory('')}
+            aria-label={t('lidc.builder.closePicker')}
+          >
+            <X size={14} />
+          </button>
         </div>
 
         <div className="lidc-deck-picker-list">
@@ -294,12 +284,7 @@ export default function LidcDeckBuilder({
                 disabled={!affordable}
                 title={affordable ? undefined : t('lidc.builder.notEnoughBudget')}
               >
-                <span className="lidc-deck-picker-row-main">
-                  <span className="lidc-deck-picker-row-name">{unit.label}</span>
-                  {quantity > 0 && (
-                    <span className="lidc-deck-picker-row-badge">{t('lidc.builder.inDeck', { count: quantity })}</span>
-                  )}
-                </span>
+                <span className="lidc-deck-picker-row-name">{unit.label}</span>
                 <span className="lidc-deck-picker-row-cost">
                   <Coins size={12} />
                   <strong>{cost}</strong>
@@ -347,9 +332,10 @@ export default function LidcDeckBuilder({
             0,
             MIN_SLOTS_PER_CATEGORY - selectedUnits.length - (readOnly ? 0 : 1),
           );
+          const isExpanded = expandedCategory === key;
 
           return (
-            <section key={key} className="lidc-deck-cat">
+            <section key={key} className={`lidc-deck-cat ${isExpanded ? 'is-expanded' : ''}`}>
               <header className="lidc-deck-cat-head">
                 <div className="lidc-deck-cat-title">
                   <Icon size={15} />
@@ -371,12 +357,13 @@ export default function LidcDeckBuilder({
                 {!readOnly && (
                   <button
                     type="button"
-                    className="lidc-deck-slot-add"
-                    onClick={() => openPicker(key)}
+                    className={`lidc-deck-slot-add ${isExpanded ? 'is-active' : ''}`}
+                    onClick={() => toggleCategoryPicker(key)}
                     disabled={cap <= 0}
+                    aria-expanded={isExpanded}
                   >
-                    <Plus size={18} />
-                    <span>{t('lidc.builder.addUnit')}</span>
+                    {isExpanded ? <ChevronDown size={18} /> : <Plus size={18} />}
+                    <span>{isExpanded ? t('lidc.builder.closeUnitList') : t('lidc.builder.addUnit')}</span>
                   </button>
                 )}
 
@@ -384,6 +371,14 @@ export default function LidcDeckBuilder({
                   <span key={`ghost-${key}-${index}`} className="lidc-deck-slot-ghost" aria-hidden="true" />
                 ))}
               </div>
+
+              {!readOnly && (
+                <div className={`lidc-deck-picker-wrap ${isExpanded ? 'is-open' : ''}`}>
+                  <div className="lidc-deck-picker-inner">
+                    {isExpanded && renderCategoryPicker(key)}
+                  </div>
+                </div>
+              )}
 
               {!readOnly && cap > 0 && (
                 <p className="lidc-deck-cat-foot">
@@ -394,18 +389,6 @@ export default function LidcDeckBuilder({
           );
         })}
       </div>
-
-      {pickerCategory && (
-        <>
-          <button
-            type="button"
-            className="lidc-deck-picker-backdrop"
-            onClick={() => setPickerCategory('')}
-            aria-label={t('lidc.builder.closePicker')}
-          />
-          {renderPicker()}
-        </>
-      )}
     </div>
   );
 }
