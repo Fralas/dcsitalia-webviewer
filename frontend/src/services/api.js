@@ -890,6 +890,17 @@ export async function spawnAirportCrate(airportId, keyword, lat, lon, quantity =
   });
 }
 
+/**
+ * Spawn a map right-click asset (CAS, MBT, BOMB, HELISUPPLY, etc.) at the clicked coordinates.
+ */
+export async function spawnMapAction(type, keyword, lat, lon) {
+  return fetchAPI('/map/actions/spawn', {
+    method: 'POST',
+    body: JSON.stringify({ type, keyword, lat, lon }),
+    credentials: 'include',
+  });
+}
+
 export async function getDbuildCatalog() {
   return fetchAPI('/dbuild/catalog');
 }
@@ -1146,6 +1157,7 @@ export default {
   requestProductionPointUpgrade,
   spawnAirportInfantry,
   spawnAirportCrate,
+  spawnMapAction,
   spawnTanker,
   getDbuildCatalog,
   getDbuildPlacements,

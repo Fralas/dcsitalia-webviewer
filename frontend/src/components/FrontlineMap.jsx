@@ -22,7 +22,7 @@ import airports from '../config/airports';
 import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
 import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
-import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, declineFrontlineZone, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getLogisticsRouteVisibility, getMissions, getServerTime, getTankerOptions, getTankerRoutes, setAirportLogisticsRoutePriority, getProductionPoints, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate, spawnTanker } from '../services/api';
+import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, declineFrontlineZone, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getLogisticsRouteVisibility, getMissions, getServerTime, getTankerOptions, getTankerRoutes, setAirportLogisticsRoutePriority, getProductionPoints, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate, spawnMapAction, spawnTanker } from '../services/api';
 import ZoneMissionCard from './map/ZoneMissionCard';
 import LiveFeedPanel from './map/LiveFeedPanel';
 import MapFilterBar from './map/MapFilterBar';
@@ -6146,13 +6146,27 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
 
   const tankerWp1 = tankerMode?.wp1 || null;
 
-  const handleSelectMapAction = useCallback((action) => {
+  const handleSelectMapAction = useCallback(async (action) => {
     setMapContextMenu(null);
-    showCommandToast({
-      ok: false,
-      message: `${action.label}${action.subtitle ? ` (${action.subtitle})` : ''} is not available from the map yet.`,
-      balance: null,
-    });
+    const { type, keyword, lat, lon } = action || {};
+    if (!type || !keyword) return;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      showCommandToast({ ok: false, message: 'Invalid map coordinates.', balance: null });
+      return;
+    }
+
+    setSubmittingCommand(true);
+    try {
+      const response = await spawnMapAction(type, keyword, lat, lon);
+      if (response?.commandId) {
+        pendingCommandIdsRef.current.add(response.commandId);
+      }
+    } catch (error) {
+      console.error('Failed to submit map action:', error);
+      showCommandToast({ ok: false, message: error.message || 'Failed to send map action.', balance: null });
+    } finally {
+      setSubmittingCommand(false);
+    }
   }, [showCommandToast]);
 
   const handleCreateDbuildDraft = useCallback(async (buildType) => {

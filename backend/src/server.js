@@ -15,6 +15,12 @@ import session from 'express-session';
 import cookieParser from 'cookie-parser';
 
 import airports, { getAirportById } from './config/airports.config.js';
+import {
+  WEB_MAP_ACTION_OPTIONS,
+  WEB_MAP_ACTION_TYPES,
+  normalizeMapActionCommandType,
+  resolveMapActionOption,
+} from './config/webMapActions.config.js';
 import { isImportantWeapon, getWeaponPriority, getOrderQuantityForWeapon, getWeaponThresholds, getIsoFillForWeapon } from './config/rules.config.js';
 import * as dataBuffer from './services/dataBuffer.js';
 import * as historicalData from './services/historicalData.js';
@@ -877,6 +883,37 @@ function buildWebCommandFeedEvent(command, stored) {
     };
   }
 
+  if (WEB_MAP_ACTION_TYPES.includes(cmdType)) {
+    const keyword = formatSpawnKeywordLabel(command.keyword);
+    if (stored.ok) {
+      return {
+        type: 'dcore.map_action.completed',
+        title: 'Map action completed',
+        message: `${actor} placed ${keyword} on the map`,
+        actor: command.requested_by_id || '',
+        metadata: {
+          command_id: stored.id,
+          keyword: command.keyword,
+          spawn_type: cmdType,
+          ok: true,
+        },
+      };
+    }
+
+    return {
+      type: 'dcore.map_action.failed',
+      title: 'Map action failed',
+      message: `${actor} failed to place ${keyword}: ${stored.message || 'unknown error'}`,
+      actor: command.requested_by_id || '',
+      metadata: {
+        command_id: stored.id,
+        keyword: command.keyword,
+        spawn_type: cmdType,
+        ok: false,
+      },
+    };
+  }
+
   if (cmdType === 'inf_spawn' || cmdType === 'crate_spawn') {
     const airportName = getAirportDisplayName(command.airport_id);
     const keyword = formatSpawnKeywordLabel(command.keyword);
@@ -924,7 +961,7 @@ function buildWebCommandFeedEvent(command, stored) {
 function maybePushWebCommandFeedEvent(command, stored) {
   if (!command || !stored?.id) return;
   const cmdType = stored.type || command.type;
-  if (!['pp_upgrade', 'pp_retrieve', 'inf_spawn', 'crate_spawn', 'dbuild_confirm', 'tanker_spawn'].includes(cmdType)) return;
+  if (!['pp_upgrade', 'pp_retrieve', 'inf_spawn', 'crate_spawn', 'dbuild_confirm', 'tanker_spawn', ...WEB_MAP_ACTION_TYPES].includes(cmdType)) return;
   if (webCommandFeedEmittedIds.has(stored.id)) return;
 
   const event = buildWebCommandFeedEvent(command, stored);
@@ -3097,6 +3134,13 @@ app.get('/api/tanker/options', (req, res) => {
 });
 
 /**
+ * GET /api/map/actions/options - Map right-click spawn catalog (CAS, MBT, BOMB, etc.).
+ */
+app.get('/api/map/actions/options', (req, res) => {
+  res.json({ actions: WEB_MAP_ACTION_OPTIONS });
+});
+
+/**
  * GET /api/tanker/routes - Active tanker racetracks exported by DMAS.
  */
 app.get('/api/tanker/routes', (req, res) => {
@@ -3341,6 +3385,44 @@ app.post('/api/tanker/spawn', (req, res) => {
     lon: wp1Lon,
     lat2: wp2Lat,
     lon2: wp2Lon,
+    requested_by: actor.name,
+    requested_by_id: actor.id,
+    ts: Date.now(),
+  });
+
+  respondQueued(res, command);
+});
+
+/**
+ * POST /api/map/actions/spawn - Body { type: air-asset|ground-asset|..., keyword, lat, lon }
+ */
+app.post('/api/map/actions/spawn', (req, res) => {
+  const actor = getSessionActor(req);
+  if (!actor) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const commandType = normalizeMapActionCommandType(req.body?.type);
+  const keyword = String(req.body?.keyword || '').trim().toUpperCase();
+  const option = resolveMapActionOption(commandType, keyword);
+  if (!option) {
+    return res.status(400).json({ error: 'Invalid map action type or keyword' });
+  }
+
+  const lat = Number(req.body?.lat);
+  const lon = Number(req.body?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return res.status(400).json({ error: 'Valid lat/lon are required' });
+  }
+
+  const command = enqueueWebCommand({
+    id: randomUUID(),
+    type: commandType,
+    production_point_id: null,
+    airport_id: null,
+    keyword,
+    lat,
+    lon,
     requested_by: actor.name,
     requested_by_id: actor.id,
     ts: Date.now(),

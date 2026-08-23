@@ -90,7 +90,7 @@ export const MAP_CONTEXT_MENU_ROOT = {
           children: [
             { id: 'firtina', label: 'FIRTINA', cost: 50, icon: 'tank', action: { type: 'ground-asset', keyword: 'FIRTINA' } },
             { id: 'atacms', label: 'ATACMS', cost: 50, icon: 'rocket', action: { type: 'ground-asset', keyword: 'ATACMS' } },
-            { id: 'gmlrs', label: 'GMRLS', cost: 50, icon: 'rocket', action: { type: 'ground-asset', keyword: 'GMRLS' } },
+            { id: 'gmlrs', label: 'GMRLS', cost: 50, icon: 'rocket', action: { type: 'ground-asset', keyword: 'GMLRS' } },
           ],
         },
         {
