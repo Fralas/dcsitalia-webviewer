@@ -298,6 +298,28 @@ function formatInviteCode(code) {
   return `${normalized.slice(0, 4)}-${normalized.slice(4)}`;
 }
 
+function normalizeUcidLinkResponse(response) {
+  if (response?.linked) {
+    return {
+      linked: true,
+      pending: null,
+      link: response.link || null,
+    };
+  }
+
+  const pending = response?.pending || (
+    response?.code
+      ? { code: response.code, expiresAt: response.expiresAt }
+      : null
+  );
+
+  return {
+    linked: false,
+    pending,
+    link: null,
+  };
+}
+
 function isAuthenticationError(error) {
   const status = Number(error?.status);
   const message = String(error?.message || '').toLowerCase();
@@ -343,7 +365,6 @@ export default function LidcPage() {
   const [joinError, setJoinError] = useState('');
   const [joiningSquadron, setJoiningSquadron] = useState(false);
   const [inviteCodeCopied, setInviteCodeCopied] = useState(false);
-  const [inviteCodeRevealed, setInviteCodeRevealed] = useState(false);
   const [isDeckPanelFullscreen, setIsDeckPanelFullscreen] = useState(false);
   const [deckBoardExpanded, setDeckBoardExpanded] = useState(false);
   const [isMapPanelFullscreen, setIsMapPanelFullscreen] = useState(false);
@@ -401,7 +422,6 @@ export default function LidcPage() {
   const [ucidLinkStatus, setUcidLinkStatus] = useState({ linked: false, pending: null, link: null });
   const [ucidLinkLoading, setUcidLinkLoading] = useState(false);
   const [ucidLinkError, setUcidLinkError] = useState('');
-  const [ucidLinkStarting, setUcidLinkStarting] = useState(false);
 
   function applyUserLidcState(response) {
     const nextState = {
@@ -661,7 +681,7 @@ export default function LidcPage() {
     };
   }, [user]);
 
-  async function refreshUcidLinkStatus() {
+  async function refreshUcidLinkStatus({ ensureCode = false } = {}) {
     if (!user?.id) {
       setUcidLinkStatus({ linked: false, pending: null, link: null });
       return;
@@ -670,12 +690,11 @@ export default function LidcPage() {
     setUcidLinkLoading(true);
     setUcidLinkError('');
     try {
-      const response = await api.getLidcUcidLinkStatus();
-      setUcidLinkStatus({
-        linked: Boolean(response?.linked),
-        pending: response?.pending || null,
-        link: response?.link || null,
-      });
+      let response = await api.getLidcUcidLinkStatus();
+      if (ensureCode && !response?.linked && !response?.pending?.code) {
+        response = await api.startLidcUcidLink();
+      }
+      setUcidLinkStatus(normalizeUcidLinkResponse(response));
     } catch (error) {
       if (!isAuthenticationError(error)) {
         setUcidLinkError(error.message || t('lidc.link.error'));
@@ -686,7 +705,7 @@ export default function LidcPage() {
   }
 
   useEffect(() => {
-    refreshUcidLinkStatus();
+    refreshUcidLinkStatus({ ensureCode: true });
   }, [user?.id]);
 
   useEffect(() => {
@@ -720,7 +739,7 @@ export default function LidcPage() {
 
     const handleLinked = (payload) => {
       if (!payload?.discordId || payload.discordId !== user?.id) return;
-      refreshUcidLinkStatus();
+      refreshUcidLinkStatus({ ensureCode: false });
     };
 
     socket.on('lidc:linked', handleLinked);
@@ -728,34 +747,6 @@ export default function LidcPage() {
       socket.off('lidc:linked', handleLinked);
     };
   }, [user?.id]);
-
-  async function handleStartUcidLink() {
-    setUcidLinkStarting(true);
-    setUcidLinkError('');
-    try {
-      const response = await api.startLidcUcidLink();
-      if (response?.linked) {
-        setUcidLinkStatus({
-          linked: true,
-          pending: null,
-          link: response.link || null,
-        });
-      } else {
-        setUcidLinkStatus({
-          linked: false,
-          pending: {
-            code: response.code,
-            expiresAt: response.expiresAt,
-          },
-          link: null,
-        });
-      }
-    } catch (error) {
-      setUcidLinkError(error.message || t('lidc.link.error'));
-    } finally {
-      setUcidLinkStarting(false);
-    }
-  }
 
   useEffect(() => {
     setSelectedAirframeDraft(null);
@@ -802,7 +793,6 @@ export default function LidcPage() {
   }, [user?.id, userLidcState?.hasSquadron, userLidcState?.squadron?.id]);
 
   useEffect(() => {
-    setInviteCodeRevealed(false);
     setInviteCodeCopied(false);
   }, [activeSquadron?.id, activeSquadron?.inviteCode]);
 
@@ -1069,8 +1059,6 @@ export default function LidcPage() {
     const formatted = formatInviteCode(code);
     if (!formatted) return;
 
-    setInviteCodeRevealed(true);
-
     try {
       await navigator.clipboard.writeText(formatted);
       setInviteCodeCopied(true);
@@ -1078,10 +1066,6 @@ export default function LidcPage() {
     } catch (_) {
       // Clipboard unavailable.
     }
-  }
-
-  function toggleInviteCodeVisibility() {
-    setInviteCodeRevealed((prev) => !prev);
   }
 
   function resetMapExpansion() {
@@ -2480,45 +2464,6 @@ export default function LidcPage() {
           </div>
         )}
 
-        {isLogged && (
-          <div className="lidc-link-box">
-            <span className="lidc-link-box-label">{t('lidc.link.title')}</span>
-            {ucidLinkLoading ? (
-              <p className="lidc-link-box-hint">{t('lidc.general.loadingUserState')}</p>
-            ) : ucidLinkStatus.linked ? (
-              <p className="lidc-link-box-status is-linked">
-                {t('lidc.link.linked')}
-                {ucidLinkStatus.link?.name ? ` — ${ucidLinkStatus.link.name}` : ''}
-              </p>
-            ) : (
-              <>
-                {ucidLinkStatus.pending?.code ? (
-                  <>
-                    <div className="lidc-link-code-row">
-                      <strong className="lidc-link-code-value">{ucidLinkStatus.pending.code}</strong>
-                    </div>
-                    <p className="lidc-link-box-hint">{t('lidc.link.codeHint')}</p>
-                    <p className="lidc-link-box-hint">{t('lidc.link.waiting')}</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="lidc-link-box-hint">{t('lidc.link.notLinked')}</p>
-                    <button
-                      type="button"
-                      className="lidc-panel-squadron-action-btn"
-                      onClick={handleStartUcidLink}
-                      disabled={ucidLinkStarting}
-                    >
-                      {ucidLinkStarting ? t('lidc.general.loading') : t('lidc.link.generateCode')}
-                    </button>
-                  </>
-                )}
-              </>
-            )}
-            {ucidLinkError && <div className="lidc-inline-error">{ucidLinkError}</div>}
-          </div>
-        )}
-
         {isLogged && catalogError && <div className="lidc-inline-error lidc-panel-inline-error">{catalogError}</div>}
 
         {showNoSquadronActions && (
@@ -2543,28 +2488,60 @@ export default function LidcPage() {
           </div>
         )}
 
-        {userHasSquadron && activeSquadron?.inviteCode && (
-          <div className="lidc-invite-code-box">
-            <span className="lidc-invite-code-label">{t('lidc.inviteCode.shareLabel')}</span>
-            <div className="lidc-invite-code-row">
-              <button
-                type="button"
-                className={`lidc-invite-code-value ${inviteCodeRevealed ? 'is-revealed' : 'is-blurred'}`}
-                onClick={toggleInviteCodeVisibility}
-                title={inviteCodeRevealed ? t('lidc.inviteCode.hide') : t('lidc.inviteCode.reveal')}
-              >
-                {formatInviteCode(activeSquadron.inviteCode)}
-              </button>
-              <button
-                type="button"
-                className="lidc-invite-code-copy"
-                onClick={() => copyInviteCode(activeSquadron.inviteCode)}
-              >
-                {inviteCodeCopied ? <Check size={14} /> : <Copy size={14} />}
-                {inviteCodeCopied ? t('lidc.inviteCode.copied') : t('lidc.inviteCode.copy')}
-              </button>
+        {isLogged && !showNoSquadronActions && (
+          <div className="lidc-codes-stack">
+            <div className="lidc-code-box">
+              <span className="lidc-code-box-label">{t('lidc.link.title')}</span>
+              {ucidLinkLoading ? (
+                <p className="lidc-code-box-hint">{t('lidc.general.loadingUserState')}</p>
+              ) : ucidLinkStatus.linked ? (
+                <p className="lidc-link-box-status is-linked">
+                  {t('lidc.link.linked')}
+                  {ucidLinkStatus.link?.name ? ` — ${ucidLinkStatus.link.name}` : ''}
+                </p>
+              ) : ucidLinkStatus.pending?.code ? (
+                <>
+                  <div className="lidc-secret-code-row">
+                    <strong
+                      className="lidc-secret-code-value"
+                      tabIndex={0}
+                      title={t('lidc.link.reveal')}
+                    >
+                      {ucidLinkStatus.pending.code}
+                    </strong>
+                  </div>
+                  <p className="lidc-code-box-hint">{t('lidc.link.codeHint')}</p>
+                </>
+              ) : (
+                <p className="lidc-code-box-hint">{t('lidc.link.notLinked')}</p>
+              )}
+              {ucidLinkError && <div className="lidc-inline-error">{ucidLinkError}</div>}
             </div>
-            <p className="lidc-invite-code-hint">{t('lidc.inviteCode.shareHint')}</p>
+
+            {userHasSquadron && activeSquadron?.inviteCode && (
+              <div className="lidc-code-box">
+                <span className="lidc-code-box-label">{t('lidc.inviteCode.shareLabel')}</span>
+                <div className="lidc-secret-code-row">
+                  <strong
+                    className="lidc-secret-code-value"
+                    tabIndex={0}
+                    title={t('lidc.inviteCode.reveal')}
+                  >
+                    {formatInviteCode(activeSquadron.inviteCode)}
+                  </strong>
+                  <button
+                    type="button"
+                    className="lidc-secret-code-copy"
+                    onClick={() => copyInviteCode(activeSquadron.inviteCode)}
+                    title={inviteCodeCopied ? t('lidc.inviteCode.copied') : t('lidc.inviteCode.copy')}
+                    aria-label={inviteCodeCopied ? t('lidc.inviteCode.copied') : t('lidc.inviteCode.copy')}
+                  >
+                    {inviteCodeCopied ? <Check size={14} /> : <Copy size={14} />}
+                  </button>
+                </div>
+                <p className="lidc-code-box-hint">{t('lidc.inviteCode.shareHint')}</p>
+              </div>
+            )}
           </div>
         )}
 

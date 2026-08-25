@@ -1556,11 +1556,18 @@ export function startUcidLink(userId) {
   }
 
   const codes = pruneExpiredLinkCodes();
-  Object.entries(codes).forEach(([code, entry]) => {
-    if (sanitizeText(entry?.discordId, 80) === normalizedUserId) {
-      delete codes[code];
-    }
-  });
+  const existingPending = Object.entries(codes).find(([, entry]) => (
+    sanitizeText(entry?.discordId, 80) === normalizedUserId
+  ));
+  if (existingPending) {
+    const [existingCode, existingEntry] = existingPending;
+    return {
+      linked: false,
+      code: existingCode,
+      expiresAt: existingEntry.expiresAt,
+      instructions: 'Type this code in DCS chat while connected to the server.',
+    };
+  }
 
   let code = '';
   for (let attempt = 0; attempt < 50; attempt += 1) {

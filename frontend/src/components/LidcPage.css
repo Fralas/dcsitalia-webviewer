@@ -283,10 +283,14 @@ body.lidc-map-fullscreen-open {
   overflow: hidden;
 }
 
+.lidc-panel-squadron {
+  overflow-y: auto;
+}
+
 .lidc-panel-squadron .lidc-panel-rows {
-  flex: 0 0 auto;
-  min-height: auto;
-  overflow: visible;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .lidc-panel-list .lidc-panel-rows {
@@ -787,99 +791,37 @@ body.lidc-map-fullscreen-open {
   border-color: transparent;
 }
 
-.lidc-invite-code-box {
+.lidc-codes-stack {
   margin-top: auto;
-  padding: 14px 16px;
-  border: 1px solid var(--lidc-border);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 8px;
+  min-height: 0;
 }
 
-.lidc-invite-code-label {
+.lidc-code-box {
+  padding: 10px 12px;
+  border: 1px solid var(--lidc-hairline);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  min-width: 0;
+}
+
+.lidc-code-box-label {
   display: block;
-  margin-bottom: 8px;
-  font-size: 12px;
+  margin-bottom: 6px;
+  font-size: 11px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--lidc-text-muted);
+  color: var(--lidc-mute);
 }
 
-.lidc-invite-code-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.lidc-invite-code-value {
-  flex: 1;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--lidc-border);
-  background: rgba(0, 0, 0, 0.35);
-  color: var(--lidc-accent-gold);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 18px;
-  letter-spacing: 0.12em;
-  text-align: left;
-  cursor: pointer;
-  transition: filter 160ms ease;
-}
-
-.lidc-invite-code-value.is-blurred {
-  filter: blur(8px);
-  user-select: none;
-}
-
-.lidc-invite-code-value.is-revealed {
-  filter: none;
-}
-
-.lidc-invite-code-copy {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--lidc-border);
-  background: transparent;
-  color: var(--lidc-text);
-  cursor: pointer;
-}
-
-.lidc-invite-code-copy:hover {
-  border-color: var(--lidc-accent-gold);
-  color: var(--lidc-accent-gold);
-}
-
-.lidc-invite-code-hint {
-  margin: 10px 0 0;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--lidc-text-muted);
-}
-
-.lidc-link-box {
-  margin-top: 14px;
-  padding: 14px 16px;
-  border: 1px solid var(--lidc-border);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.lidc-link-box-label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--lidc-text-muted);
-}
-
-.lidc-link-box-hint {
-  margin: 0 0 8px;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--lidc-text-muted);
+.lidc-code-box-hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--lidc-mute);
 }
 
 .lidc-link-box-status.is-linked {
@@ -888,21 +830,62 @@ body.lidc-map-fullscreen-open {
   color: #8fd9a8;
 }
 
-.lidc-link-code-row {
+.lidc-secret-code-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
 }
 
-.lidc-link-code-value {
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--lidc-border);
+.lidc-secret-code-value {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--lidc-hairline);
   background: rgba(0, 0, 0, 0.35);
   color: var(--lidc-accent-gold);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 18px;
-  letter-spacing: 0.12em;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  filter: blur(7px);
+  user-select: none;
+  cursor: default;
+  transition: filter 160ms ease;
+}
+
+.lidc-secret-code-row:hover .lidc-secret-code-value,
+.lidc-secret-code-row:focus-within .lidc-secret-code-value {
+  filter: none;
+  user-select: text;
+}
+
+.lidc-secret-code-value:focus-visible {
+  outline: 1px solid var(--lidc-accent-gold);
+  outline-offset: 1px;
+}
+
+.lidc-secret-code-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--lidc-hairline);
+  background: transparent;
+  color: var(--lidc-body);
+  cursor: pointer;
+}
+
+.lidc-secret-code-copy:hover {
+  border-color: var(--lidc-accent-gold);
+  color: var(--lidc-accent-gold);
 }
 
 .lidc-join-code-panel {
