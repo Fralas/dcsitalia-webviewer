@@ -323,6 +323,7 @@ export default {
     },
     debug: {
       leaveSquadron: 'Debug: Abbandona squadrone',
+      deleteSquadron: 'Debug: Cancella squadrone',
     },
     steps: {
       info: 'Squadron Info',

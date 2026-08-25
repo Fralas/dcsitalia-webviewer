@@ -3,85 +3,15 @@
   "nameToUcid": {},
   "airframes": [
     {
-      "id": "airframe_f15e_1_88fac3",
-      "squadronId": "lidc_1787492402773_49dab2",
+      "id": "airframe_a10c2_1_928c79",
+      "squadronId": "lidc_1787600507211_976821",
       "ucid": null,
       "pilotName": null,
-      "dcsType": "F-15ESE",
-      "homeAirbase": "Deir ez Zor",
-      "currentAirbase": "Deir ez Zor",
-      "state": "in_hangar"
-    },
-    {
-      "id": "airframe_f16c_1_3c03f8",
-      "squadronId": "lidc_1787492402773_49dab2",
-      "ucid": null,
-      "pilotName": null,
-      "dcsType": "F-16C_50",
-      "homeAirbase": "Deir ez Zor",
-      "currentAirbase": "Deir ez Zor",
-      "state": "in_hangar"
-    },
-    {
-      "id": "airframe_fa18c_1_d1fa9c",
-      "squadronId": "lidc_1787492402773_49dab2",
-      "ucid": null,
-      "pilotName": null,
-      "dcsType": "F/A-18C_hornet",
-      "homeAirbase": "Deir ez Zor",
-      "currentAirbase": "Deir ez Zor",
-      "state": "in_hangar"
-    },
-    {
-      "id": "airframe_fa18c_2_103178",
-      "squadronId": "lidc_1787492402773_49dab2",
-      "ucid": null,
-      "pilotName": null,
-      "dcsType": "F/A-18C_hornet",
-      "homeAirbase": "Deir ez Zor",
-      "currentAirbase": "Deir ez Zor",
-      "state": "in_hangar"
-    },
-    {
-      "id": "airframe_fa18c_3_b43eb0",
-      "squadronId": "lidc_1787492402773_49dab2",
-      "ucid": null,
-      "pilotName": null,
-      "dcsType": "F/A-18C_hornet",
-      "homeAirbase": "Deir ez Zor",
-      "currentAirbase": "Deir ez Zor",
-      "state": "in_hangar"
-    },
-    {
-      "id": "airframe_m2000c_1_93c999",
-      "squadronId": "lidc_1787492402773_49dab2",
-      "ucid": null,
-      "pilotName": null,
-      "dcsType": "M-2000C",
-      "homeAirbase": "Deir ez Zor",
-      "currentAirbase": "Deir ez Zor",
-      "state": "in_hangar"
-    },
-    {
-      "id": "airframe_ka50_1_100c80",
-      "squadronId": "lidc_1787492402773_49dab2",
-      "ucid": null,
-      "pilotName": null,
-      "dcsType": "Ka-50",
-      "homeAirbase": "Deir ez Zor",
-      "currentAirbase": "Deir ez Zor",
-      "state": "in_hangar"
-    },
-    {
-      "id": "airframe_c130j_1_a5cb25",
-      "squadronId": "lidc_1787492402773_49dab2",
-      "ucid": null,
-      "pilotName": null,
-      "dcsType": "C-130J-30",
-      "homeAirbase": "Deir ez Zor",
-      "currentAirbase": "Deir ez Zor",
+      "dcsType": "A-10C_2",
+      "homeAirbase": "Rene Mouawad",
+      "currentAirbase": "Rene Mouawad",
       "state": "in_hangar"
     }
   ],
-  "updatedAt": 1787493907943
+  "updatedAt": 1787600507217
 }

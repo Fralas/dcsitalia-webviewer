@@ -3,29 +3,9 @@
   "allow": {},
   "managed": [
     {
-      "type": "F-15ESE",
-      "airbase": "Deir ez Zor"
-    },
-    {
-      "type": "F-16C_50",
-      "airbase": "Deir ez Zor"
-    },
-    {
-      "type": "F/A-18C_hornet",
-      "airbase": "Deir ez Zor"
-    },
-    {
-      "type": "M-2000C",
-      "airbase": "Deir ez Zor"
-    },
-    {
-      "type": "Ka-50",
-      "airbase": "Deir ez Zor"
-    },
-    {
-      "type": "C-130J-30",
-      "airbase": "Deir ez Zor"
+      "type": "A-10C_2",
+      "airbase": "Rene Mouawad"
     }
   ],
-  "updatedAt": 1787493997952
+  "updatedAt": 1787607735817
 }

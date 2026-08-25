@@ -203,6 +203,20 @@
   align-items: center;
 }
 
+.app-header__debug-leave {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(360px, 42vw);
+}
+
+.app-header__debug-error {
+  font-size: 10px;
+  line-height: 1.2;
+  color: #ff8a8a;
+  max-width: 140px;
+}
+
 .app-header__nav-btn--debug {
   border-color: rgba(255, 140, 0, 0.55);
   color: #ffb347;

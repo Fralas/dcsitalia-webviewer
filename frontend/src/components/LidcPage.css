@@ -4146,6 +4146,10 @@ body.lidc-deck-expanded-open {
   justify-content: flex-end;
 }
 
+.lidc-confirm-modal-error {
+  margin-top: 10px;
+}
+
 .lidc-modal-card {
   position: relative;
   width: min(860px, 95vw);

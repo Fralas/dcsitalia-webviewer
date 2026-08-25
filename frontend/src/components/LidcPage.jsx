@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Copy,
@@ -359,6 +359,7 @@ export default function LidcPage() {
   const [leavingSquadron, setLeavingSquadron] = useState(false);
   const [deletingSquadron, setDeletingSquadron] = useState(false);
   const [pendingSquadronAction, setPendingSquadronAction] = useState('');
+  const [headerDebugSlot, setHeaderDebugSlot] = useState(null);
   const [userLidcState, setUserLidcState] = useState({
     hasSquadron: false,
     squadron: null,
@@ -598,6 +599,17 @@ export default function LidcPage() {
       document.body.classList.remove('lidc-map-fullscreen-open');
     };
   }, [mapBoardExpanded]);
+
+  useLayoutEffect(() => {
+    if (!SHOW_SQUADRON_LEAVE_DEBUG_HEADER) {
+      setHeaderDebugSlot(null);
+      return undefined;
+    }
+
+    setHeaderDebugSlot(document.getElementById('app-header-debug-slot'));
+
+    return undefined;
+  });
 
   useEffect(() => {
     let mounted = true;
@@ -1366,20 +1378,26 @@ export default function LidcPage() {
     if (isSquadronActionBusy) return;
     if (action !== 'leave' && action !== 'delete') return;
     if (action === 'delete' && !isCurrentUserOwner) return;
+    setUserStateError('');
     setPendingSquadronAction(action);
   }
 
   function closeSquadronActionConfirm() {
     if (isSquadronActionBusy) return;
     setPendingSquadronAction('');
+    setUserStateError('');
   }
 
   async function handleLeaveSquadron() {
     const squadronId = activeSquadron?.id || userLidcState?.squadron?.id || '';
-    if (!squadronId || leavingSquadron) return;
+    if (!squadronId || leavingSquadron) {
+      if (!squadronId && !leavingSquadron) {
+        setUserStateError(t('lidc.errors.squadronLoadFailed'));
+      }
+      return false;
+    }
 
     setLeavingSquadron(true);
-    setPendingSquadronAction('');
     setUserStateError('');
     setSquadronDetailsError('');
     setAirframeUpdateError('');
@@ -1407,8 +1425,12 @@ export default function LidcPage() {
       } catch (_) {
         // Non-blocking refresh after leave.
       }
+
+      setPendingSquadronAction('');
+      return true;
     } catch (error) {
       setUserStateError(error.message || t('lidc.errors.leaveFailed'));
+      return false;
     } finally {
       setLeavingSquadron(false);
     }
@@ -1416,10 +1438,14 @@ export default function LidcPage() {
 
   async function handleDeleteSquadron() {
     const squadronId = activeSquadron?.id || userLidcState?.squadron?.id || '';
-    if (!squadronId || deletingSquadron) return;
+    if (!squadronId || deletingSquadron) {
+      if (!squadronId && !deletingSquadron) {
+        setUserStateError(t('lidc.errors.squadronLoadFailed'));
+      }
+      return false;
+    }
 
     setDeletingSquadron(true);
-    setPendingSquadronAction('');
     setUserStateError('');
     setSquadronDetailsError('');
     setAirframeUpdateError('');
@@ -1447,11 +1473,27 @@ export default function LidcPage() {
       } catch (_) {
         // Non-blocking refresh after delete.
       }
+
+      setPendingSquadronAction('');
+      return true;
     } catch (error) {
       setUserStateError(error.message || t('lidc.errors.deleteFailed'));
+      return false;
     } finally {
       setDeletingSquadron(false);
     }
+  }
+
+  async function handleDebugLeaveSquadron() {
+    if (isSquadronActionBusy) return;
+    setUserStateError('');
+
+    if (isCurrentUserOwner) {
+      await handleDeleteSquadron();
+      return;
+    }
+
+    await handleLeaveSquadron();
   }
 
   async function confirmPendingSquadronAction() {
@@ -1829,28 +1871,35 @@ export default function LidcPage() {
   }
 
   function renderDebugLeaveHeaderButton() {
-    if (!SHOW_SQUADRON_LEAVE_DEBUG_HEADER || !isLogged || !userHasSquadron) {
+    if (!SHOW_SQUADRON_LEAVE_DEBUG_HEADER || !isLogged || !userHasSquadron || !headerDebugSlot) {
       return null;
     }
 
-    const headerDebugSlot = typeof document !== 'undefined'
-      ? document.getElementById('app-header-debug-slot')
-      : null;
-
-    if (!headerDebugSlot) return null;
-
     return createPortal(
-      <button
-        type="button"
-        className="app-header__nav-btn app-header__nav-btn--lang app-header__nav-btn--debug"
-        onClick={() => openSquadronActionConfirm('leave')}
-        disabled={isSquadronActionBusy}
-        title={t('lidc.debug.leaveSquadron')}
-        aria-label={t('lidc.debug.leaveSquadron')}
-      >
-        {leavingSquadron ? <Loader2 size={14} className="spin" /> : <X size={14} />}
-        <span>{t('lidc.debug.leaveSquadron')}</span>
-      </button>,
+      <div className="app-header__debug-leave">
+        <button
+          type="button"
+          className="app-header__nav-btn app-header__nav-btn--lang app-header__nav-btn--debug"
+          onClick={handleDebugLeaveSquadron}
+          disabled={isSquadronActionBusy}
+          title={isCurrentUserOwner
+            ? t('lidc.debug.deleteSquadron')
+            : t('lidc.debug.leaveSquadron')}
+          aria-label={isCurrentUserOwner
+            ? t('lidc.debug.deleteSquadron')
+            : t('lidc.debug.leaveSquadron')}
+        >
+          {(leavingSquadron || deletingSquadron)
+            ? <Loader2 size={14} className="spin" />
+            : <X size={14} />}
+          <span>{isCurrentUserOwner
+            ? t('lidc.debug.deleteSquadron')
+            : t('lidc.debug.leaveSquadron')}</span>
+        </button>
+        {userStateError && (
+          <span className="app-header__debug-error" role="alert">{userStateError}</span>
+        )}
+      </div>,
       headerDebugSlot,
     );
   }
@@ -3083,6 +3132,9 @@ export default function LidcPage() {
             <div className="lidc-modal-head">
               <h3>{t('lidc.center.confirmTitle')}</h3>
               <p>{t('lidc.center.confirmQuestion', { action: getPendingSquadronActionText() })}</p>
+              {userStateError && (
+                <div className="lidc-inline-error lidc-confirm-modal-error">{userStateError}</div>
+              )}
             </div>
 
             <div className="lidc-modal-actions lidc-confirm-modal-actions">
