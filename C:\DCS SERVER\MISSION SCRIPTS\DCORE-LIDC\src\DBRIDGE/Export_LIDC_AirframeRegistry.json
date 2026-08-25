@@ -3,35 +3,75 @@
   "nameToUcid": {},
   "airframes": [
     {
-      "id": "airframe_uh1h_1_7ef104",
-      "squadronId": "lidc_1787699269062_f952f0",
+      "id": "airframe_a10c2_1_e85bdb",
+      "squadronId": "lidc_1787699621847_989539",
       "ucid": null,
       "pilotName": null,
-      "dcsType": "UH-1H",
-      "homeAirbase": "Palmyra",
-      "currentAirbase": "Palmyra",
+      "dcsType": "A-10C_2",
+      "homeAirbase": "Deir ez Zor",
+      "currentAirbase": "Deir ez Zor",
       "state": "in_hangar"
     },
     {
-      "id": "airframe_uh1h_2_f8ae93",
-      "squadronId": "lidc_1787699269062_f952f0",
+      "id": "airframe_a10c2_2_c66d4f",
+      "squadronId": "lidc_1787699621847_989539",
       "ucid": null,
       "pilotName": null,
-      "dcsType": "UH-1H",
-      "homeAirbase": "Palmyra",
-      "currentAirbase": "Palmyra",
+      "dcsType": "A-10C_2",
+      "homeAirbase": "Deir ez Zor",
+      "currentAirbase": "Deir ez Zor",
       "state": "in_hangar"
     },
     {
-      "id": "airframe_uh1h_3_46c540",
-      "squadronId": "lidc_1787699269062_f952f0",
+      "id": "airframe_f16c_1_e94e52",
+      "squadronId": "lidc_1787699621847_989539",
       "ucid": null,
       "pilotName": null,
-      "dcsType": "UH-1H",
-      "homeAirbase": "Palmyra",
-      "currentAirbase": "Palmyra",
+      "dcsType": "F-16C_50",
+      "homeAirbase": "Deir ez Zor",
+      "currentAirbase": "Deir ez Zor",
+      "state": "in_hangar"
+    },
+    {
+      "id": "airframe_f16c_2_764b8a",
+      "squadronId": "lidc_1787699621847_989539",
+      "ucid": null,
+      "pilotName": null,
+      "dcsType": "F-16C_50",
+      "homeAirbase": "Deir ez Zor",
+      "currentAirbase": "Deir ez Zor",
+      "state": "in_hangar"
+    },
+    {
+      "id": "airframe_fa18c_1_5a921e",
+      "squadronId": "lidc_1787699621847_989539",
+      "ucid": null,
+      "pilotName": null,
+      "dcsType": "F/A-18C_hornet",
+      "homeAirbase": "Deir ez Zor",
+      "currentAirbase": "Deir ez Zor",
+      "state": "in_hangar"
+    },
+    {
+      "id": "airframe_m2000c_1_3ec16c",
+      "squadronId": "lidc_1787699621847_989539",
+      "ucid": null,
+      "pilotName": null,
+      "dcsType": "M-2000C",
+      "homeAirbase": "Deir ez Zor",
+      "currentAirbase": "Deir ez Zor",
+      "state": "in_hangar"
+    },
+    {
+      "id": "airframe_m2000c_2_333881",
+      "squadronId": "lidc_1787699621847_989539",
+      "ucid": null,
+      "pilotName": null,
+      "dcsType": "M-2000C",
+      "homeAirbase": "Deir ez Zor",
+      "currentAirbase": "Deir ez Zor",
       "state": "in_hangar"
     }
   ],
-  "updatedAt": 1787699269107
+  "updatedAt": 1787699621858
 }

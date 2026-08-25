@@ -1971,8 +1971,8 @@ body.lidc-deck-expanded-open {
 .lidc-deck-base-aircrafts {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px 18px;
-  padding: 0 4px 2px;
+  gap: 18px 20px;
+  padding: 8px 18px 10px;
 }
 
 .lidc-deck-airframe {
@@ -1980,16 +1980,18 @@ body.lidc-deck-expanded-open {
   border: 0;
   background: transparent;
   color: inherit;
-  padding: 4px 6px 6px;
+  padding: 4px 6px 10px;
   margin: 0;
-  width: 120px;
+  width: 280px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 0;
   font: inherit;
   text-align: center;
   cursor: default;
+  position: relative;
+  overflow: visible;
 }
 
 .lidc-deck-airframe.is-clickable {
@@ -2013,34 +2015,36 @@ body.lidc-deck-expanded-open {
 
 .lidc-deck-airframe-media {
   position: relative;
-  width: 108px;
-  height: 68px;
+  width: 280px;
+  height: 176px;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: visible;
 }
 
 .lidc-deck-airframe-board {
   position: absolute;
-  top: -2px;
+  top: 18px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 1;
+  z-index: 2;
   color: var(--lidc-accent-gold);
   font-family: GeistMono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 11px;
+  font-size: 16px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
+  line-height: 1;
   text-transform: uppercase;
   white-space: nowrap;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.9);
   pointer-events: none;
 }
 
 .lidc-deck-airframe-image {
   display: block;
-  width: 108px;
-  height: 68px;
+  width: 280px;
+  height: 176px;
   object-fit: contain;
   object-position: center;
   pointer-events: none;
@@ -2051,8 +2055,8 @@ body.lidc-deck-expanded-open {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 108px;
-  height: 68px;
+  width: 280px;
+  height: 176px;
   color: var(--lidc-mute);
   font-size: 10px;
   letter-spacing: 0.04em;
@@ -2060,12 +2064,19 @@ body.lidc-deck-expanded-open {
 }
 
 .lidc-deck-airframe-pilot {
-  width: 34px;
-  height: 34px;
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  z-index: 3;
+  width: 26px;
+  height: 26px;
+  margin: 0;
+  transform: translateX(-50%);
   border-radius: 999px;
   border: 1px solid var(--lidc-hairline);
   object-fit: cover;
   background: #2a2a2a;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
 }
 
 .lidc-deck-airframe-pilot-fallback {
@@ -2073,7 +2084,7 @@ body.lidc-deck-expanded-open {
   align-items: center;
   justify-content: center;
   color: var(--lidc-body);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
 }
 

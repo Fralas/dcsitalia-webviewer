@@ -3,9 +3,21 @@
   "allow": {},
   "managed": [
     {
-      "type": "UH-1H",
-      "airbase": "Palmyra"
+      "type": "A-10C_2",
+      "airbase": "Deir ez Zor"
+    },
+    {
+      "type": "F-16C_50",
+      "airbase": "Deir ez Zor"
+    },
+    {
+      "type": "F/A-18C_hornet",
+      "airbase": "Deir ez Zor"
+    },
+    {
+      "type": "M-2000C",
+      "airbase": "Deir ez Zor"
     }
   ],
-  "updatedAt": 1787699330032
+  "updatedAt": 1787699690051
 }

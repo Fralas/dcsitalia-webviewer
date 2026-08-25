@@ -55,7 +55,35 @@
       "dcsType": "UH-1H",
       "delta": 3,
       "createdAt": 1787699269105
+    },
+    {
+      "opId": "whop_1787699621856_21ae2865",
+      "base": "Deir ez Zor",
+      "dcsType": "F-16C_50",
+      "delta": 2,
+      "createdAt": 1787699621856
+    },
+    {
+      "opId": "whop_1787699621856_4fa79b9a",
+      "base": "Deir ez Zor",
+      "dcsType": "F/A-18C_hornet",
+      "delta": 1,
+      "createdAt": 1787699621856
+    },
+    {
+      "opId": "whop_1787699621856_3c4f8e05",
+      "base": "Deir ez Zor",
+      "dcsType": "A-10C_2",
+      "delta": 2,
+      "createdAt": 1787699621856
+    },
+    {
+      "opId": "whop_1787699621856_fe601c3e",
+      "base": "Deir ez Zor",
+      "dcsType": "M-2000C",
+      "delta": 2,
+      "createdAt": 1787699621856
     }
   ],
-  "updatedAt": 1787699269106
+  "updatedAt": 1787699621857
 }
