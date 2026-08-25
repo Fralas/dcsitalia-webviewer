@@ -365,6 +365,7 @@ export default function LidcPage() {
   const [joinError, setJoinError] = useState('');
   const [joiningSquadron, setJoiningSquadron] = useState(false);
   const [inviteCodeCopied, setInviteCodeCopied] = useState(false);
+  const [linkCodeCopied, setLinkCodeCopied] = useState(false);
   const [isDeckPanelFullscreen, setIsDeckPanelFullscreen] = useState(false);
   const [deckBoardExpanded, setDeckBoardExpanded] = useState(false);
   const [isMapPanelFullscreen, setIsMapPanelFullscreen] = useState(false);
@@ -796,6 +797,10 @@ export default function LidcPage() {
     setInviteCodeCopied(false);
   }, [activeSquadron?.id, activeSquadron?.inviteCode]);
 
+  useEffect(() => {
+    setLinkCodeCopied(false);
+  }, [ucidLinkStatus.pending?.code]);
+
   function clearSidebarTimers() {
     if (sidebarOpenTimerRef.current) {
       clearTimeout(sidebarOpenTimerRef.current);
@@ -1063,6 +1068,19 @@ export default function LidcPage() {
       await navigator.clipboard.writeText(formatted);
       setInviteCodeCopied(true);
       window.setTimeout(() => setInviteCodeCopied(false), 2000);
+    } catch (_) {
+      // Clipboard unavailable.
+    }
+  }
+
+  async function copyLinkCode(code) {
+    const normalized = String(code || '').trim();
+    if (!normalized) return;
+
+    try {
+      await navigator.clipboard.writeText(normalized);
+      setLinkCodeCopied(true);
+      window.setTimeout(() => setLinkCodeCopied(false), 2000);
     } catch (_) {
       // Clipboard unavailable.
     }
@@ -2458,6 +2476,15 @@ export default function LidcPage() {
                     >
                       {ucidLinkStatus.pending.code}
                     </strong>
+                    <button
+                      type="button"
+                      className="lidc-secret-code-copy"
+                      onClick={() => copyLinkCode(ucidLinkStatus.pending.code)}
+                      title={linkCodeCopied ? t('lidc.inviteCode.copied') : t('lidc.inviteCode.copy')}
+                      aria-label={linkCodeCopied ? t('lidc.inviteCode.copied') : t('lidc.inviteCode.copy')}
+                    >
+                      {linkCodeCopied ? <Check size={14} /> : <Copy size={14} />}
+                    </button>
                   </div>
                   <p className="lidc-code-box-hint">{t('lidc.link.codeHint')}</p>
                 </>

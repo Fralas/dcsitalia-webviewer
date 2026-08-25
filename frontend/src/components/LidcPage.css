@@ -197,12 +197,12 @@ body.lidc-map-fullscreen-open {
     visibility 0s linear var(--lidc-deck-expand-ms);
 }
 
-.lidc-board.is-deck-expanded .lidc-board-slot-list.is-collapsed {
+.lidc-board.is-deck-expanded .lidc-board-slot-squadron.is-collapsed {
   transform: translateY(-80px);
   transition-delay: 0ms;
 }
 
-.lidc-board.is-deck-expanded .lidc-board-slot-squadron.is-collapsed {
+.lidc-board.is-deck-expanded .lidc-board-slot-list.is-collapsed {
   transform: translateY(-80px);
   transition-delay: 60ms;
 }
@@ -212,12 +212,12 @@ body.lidc-map-fullscreen-open {
   transition-delay: 100ms;
 }
 
-.lidc-board.is-map-expanded .lidc-board-slot-list.is-collapsed {
+.lidc-board.is-map-expanded .lidc-board-slot-squadron.is-collapsed {
   transform: translateX(-96px);
   transition-delay: 0ms;
 }
 
-.lidc-board.is-map-expanded .lidc-board-slot-squadron.is-collapsed {
+.lidc-board.is-map-expanded .lidc-board-slot-list.is-collapsed {
   transform: translateY(-80px);
   transition-delay: 60ms;
 }
@@ -234,12 +234,12 @@ body.lidc-map-fullscreen-open {
   width: 100%;
 }
 
-.lidc-board-slot-list {
+.lidc-board-slot-squadron {
   grid-column: 1;
   grid-row: 1;
 }
 
-.lidc-board-slot-squadron {
+.lidc-board-slot-list {
   grid-column: 2;
   grid-row: 1;
 }
@@ -285,6 +285,10 @@ body.lidc-map-fullscreen-open {
 
 .lidc-panel-squadron {
   overflow-y: auto;
+}
+
+.lidc-panel-squadron .lidc-panel-title {
+  margin-bottom: clamp(10px, 0.55vw, 16px);
 }
 
 .lidc-panel-list .lidc-panel-rows {
@@ -786,64 +790,77 @@ body.lidc-map-fullscreen-open {
 }
 
 .lidc-codes-stack {
-  margin-top: auto;
-  flex: 0 0 auto;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
-  gap: 8px;
+  flex: 1 1 auto;
   min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(16px, 1.1vw, 24px);
 }
 
 .lidc-code-box {
-  padding: 10px 12px;
-  border: 1px solid var(--lidc-hairline);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
+  flex: 0 1 auto;
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  container-type: inline-size;
 }
 
 .lidc-code-box-label {
   display: block;
-  margin-bottom: 6px;
-  font-size: 11px;
+  margin-bottom: 8px;
+  font-size: clamp(11px, 0.6vw, 14px);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--lidc-mute);
+  flex-shrink: 0;
 }
 
 .lidc-code-box-hint {
-  margin: 6px 0 0;
-  font-size: 11px;
+  margin: 8px 0 0;
+  font-size: clamp(11px, 0.58vw, 13px);
   line-height: 1.4;
   color: var(--lidc-mute);
+  flex-shrink: 0;
 }
 
 .lidc-link-box-status.is-linked {
   margin: 0;
-  font-size: 13px;
+  font-size: clamp(13px, 0.75vw, 16px);
   color: #8fd9a8;
 }
 
 .lidc-secret-code-row {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 8px;
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .lidc-secret-code-value {
   flex: 1;
   min-width: 0;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--lidc-hairline);
+  display: block;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 0;
   background: rgba(0, 0, 0, 0.35);
   color: var(--lidc-accent-gold);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 15px;
+  font-size: clamp(16px, 7.2cqi, 22px);
   font-weight: 700;
-  letter-spacing: 0.1em;
-  text-align: left;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -869,17 +886,17 @@ body.lidc-map-fullscreen-open {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  padding: 8px;
-  border-radius: 8px;
-  border: 1px solid var(--lidc-hairline);
-  background: transparent;
+  padding: 12px;
+  border-radius: 14px;
+  border: 0;
+  background: rgba(0, 0, 0, 0.35);
   color: var(--lidc-body);
   cursor: pointer;
 }
 
 .lidc-secret-code-copy:hover {
-  border-color: var(--lidc-accent-gold);
   color: var(--lidc-accent-gold);
+  background: rgba(255, 187, 0, 0.12);
 }
 
 .lidc-join-code-panel {
@@ -4217,12 +4234,12 @@ body.lidc-deck-expanded-open {
     grid-template-rows: minmax(220px, 0.9fr) minmax(220px, 0.9fr) minmax(280px, 1.1fr);
   }
 
-  .lidc-board-slot-list {
+  .lidc-board-slot-squadron {
     grid-column: 1;
     grid-row: 1;
   }
 
-  .lidc-board-slot-squadron {
+  .lidc-board-slot-list {
     grid-column: 2;
     grid-row: 1;
   }
