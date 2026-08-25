@@ -7,17 +7,12 @@ import {
   ChevronDown,
   ChevronRight,
   Disc3,
-  Forklift,
-  Helicopter,
   Loader2,
-  Plane,
   Save,
   Settings,
   Trash2,
   Upload,
-  Users,
   UserPlus,
-  Warehouse,
   Maximize2,
   X,
 } from 'lucide-react';
@@ -45,7 +40,6 @@ const CATEGORY_META = DECK_CATEGORY_META;
 
 const LIDC_SIDEBAR_VIEWS = Object.freeze({
   SQUADRON_DECK: 'squadronDeck',
-  SQUADRON_MEMBERS: 'squadronMembers',
 });
 
 const DECK_SLOT_FLIP_MS = 680;
@@ -206,11 +200,6 @@ function formatUserLabel(entry) {
 function getUserInitial(entry) {
   const label = formatUserLabel(entry);
   const trimmed = String(label || '').trim();
-  return trimmed ? trimmed.charAt(0).toUpperCase() : '?';
-}
-
-function getSquadronInitial(name) {
-  const trimmed = String(name || '').trim();
   return trimmed ? trimmed.charAt(0).toUpperCase() : '?';
 }
 
@@ -386,8 +375,6 @@ export default function LidcPage() {
     hasSquadron: false,
     squadron: null,
   });
-  const [memberActionMenuForId, setMemberActionMenuForId] = useState('');
-  const memberActionMenuRef = useRef(null);
   const deckSlotRef = useRef(null);
   const mapSlotRef = useRef(null);
   const deckLayoutTransitionRef = useRef({
@@ -401,10 +388,6 @@ export default function LidcPage() {
     layoutExpanded: false,
   });
   const [activeSquadron, setActiveSquadron] = useState(null);
-  const [listedSquadrons, setListedSquadrons] = useState([]);
-  const [loadingListedSquadrons, setLoadingListedSquadrons] = useState(true);
-  const [listedSquadronsError, setListedSquadronsError] = useState('');
-  const [selectedListSquadronId, setSelectedListSquadronId] = useState('');
   const [loadingSquadronDetails, setLoadingSquadronDetails] = useState(false);
   const [squadronDetailsError, setSquadronDetailsError] = useState('');
   const [updatingAirframeId, setUpdatingAirframeId] = useState('');
@@ -491,62 +474,11 @@ export default function LidcPage() {
   }, [user?.id]);
 
   useEffect(() => {
-    let mounted = true;
-
-    async function loadListedSquadrons() {
-      if (!user?.id) {
-        if (!mounted) return;
-        setListedSquadrons([]);
-        setListedSquadronsError('');
-        setLoadingListedSquadrons(false);
-        return;
-      }
-
-      setLoadingListedSquadrons(true);
-      setListedSquadronsError('');
-
-      try {
-        const response = await api.getLidcSquadrons();
-        if (!mounted) return;
-        setListedSquadrons(Array.isArray(response?.squadrons) ? response.squadrons : []);
-      } catch (error) {
-        if (!mounted) return;
-        setListedSquadrons([]);
-        setListedSquadronsError(error.message || t('lidc.errors.squadronsListFailed'));
-      } finally {
-        if (mounted) setLoadingListedSquadrons(false);
-      }
-    }
-
-    loadListedSquadrons();
-
-    return () => {
-      mounted = false;
-    };
-  }, [user?.id]);
-
-  useEffect(() => {
     const validViews = Object.values(LIDC_SIDEBAR_VIEWS);
     if (!validViews.includes(activeView)) {
       setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK);
     }
   }, [activeView]);
-
-  useEffect(() => {
-    if (listedSquadrons.length === 0) return;
-
-    const hasCurrentSelection = selectedListSquadronId
-      && listedSquadrons.some((entry) => entry.id === selectedListSquadronId);
-    if (hasCurrentSelection) return;
-
-    const preferredId = userLidcState?.squadron?.id || '';
-    if (preferredId && listedSquadrons.some((entry) => entry.id === preferredId)) {
-      setSelectedListSquadronId(preferredId);
-      return;
-    }
-
-    setSelectedListSquadronId(listedSquadrons[0].id);
-  }, [listedSquadrons, userLidcState?.squadron?.id, selectedListSquadronId]);
 
   const isEntryWizardVisible = !isWizardOpen
     && !loadingUserState
@@ -950,12 +882,8 @@ export default function LidcPage() {
   const currentStepKey = WIZARD_STEPS[currentStep] || WIZARD_STEPS[0];
   const isLogged = Boolean(user?.id);
   const userHasSquadron = Boolean(userLidcState.hasSquadron);
-  const isManagementFocusView = userHasSquadron
-    && activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS;
-  const isDeckFocusView = userHasSquadron
-    && activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_DECK;
-  const isTableFocusView = isDeckPanelFullscreen || isManagementFocusView || isDeckFocusView;
-  const showMemberManagementView = isManagementFocusView;
+  const isDeckFocusView = userHasSquadron;
+  const isTableFocusView = isDeckPanelFullscreen || isDeckFocusView;
   const showDeckManagementView = isDeckFocusView;
   const effectivePreviewBaseId = baseId
     || activeSquadron?.baseId
@@ -1026,19 +954,11 @@ export default function LidcPage() {
 
       if (joined) {
         setActiveSquadron(joined);
-        setSelectedListSquadronId(joined.id);
       }
 
       setPanelMode('home');
       setJoinInviteCode('');
       setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK);
-
-      try {
-        const listResponse = await api.getLidcSquadrons();
-        setListedSquadrons(Array.isArray(listResponse?.squadrons) ? listResponse.squadrons : []);
-      } catch (_) {
-        // Non-blocking refresh after join.
-      }
     } catch (error) {
       if (Number(error?.status) === 409) {
         try {
@@ -1100,7 +1020,6 @@ export default function LidcPage() {
     deckLayoutTransitionRef.current.layoutExpanded = false;
     setDeckBoardExpanded(false);
     setIsDeckPanelFullscreen(false);
-    setMemberActionMenuForId('');
     setIsPilotMenuOpen(false);
   }
 
@@ -1111,8 +1030,6 @@ export default function LidcPage() {
 
     if (view === 'deck') {
       setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK);
-    } else if (view === 'members') {
-      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS);
     }
 
     const transitionId = ++deckLayoutTransitionRef.current.id;
@@ -1123,7 +1040,6 @@ export default function LidcPage() {
       setBoardPanelsCollapsed(true);
       setDeckBoardExpanded(true);
       setIsDeckPanelFullscreen(true);
-      setMemberActionMenuForId('');
       setIsPilotMenuOpen(false);
       return;
     }
@@ -1139,7 +1055,6 @@ export default function LidcPage() {
         setDeckBoardExpanded(true);
         deckLayoutTransitionRef.current.layoutExpanded = true;
         setIsDeckPanelFullscreen(true);
-        setMemberActionMenuForId('');
         setIsPilotMenuOpen(false);
         scheduleDeckLayoutTransition(deckSlot, firstRect, deckLayoutTransitionRef, { transitionId });
       });
@@ -1159,7 +1074,6 @@ export default function LidcPage() {
       setBoardPanelsCollapsed(false);
       setDeckBoardExpanded(false);
       setIsDeckPanelFullscreen(false);
-      setMemberActionMenuForId('');
       return;
     }
 
@@ -1167,8 +1081,6 @@ export default function LidcPage() {
     const firstRect = deckSlot?.getBoundingClientRect();
 
     setIsDeckPanelFullscreen(false);
-    setMemberActionMenuForId('');
-
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (transitionId !== deckLayoutTransitionRef.current.id) return;
@@ -1342,14 +1254,6 @@ export default function LidcPage() {
             createdAt: created.createdAt,
           },
         }));
-        setSelectedListSquadronId(created.id);
-      }
-
-      try {
-        const listResponse = await api.getLidcSquadrons();
-        setListedSquadrons(Array.isArray(listResponse?.squadrons) ? listResponse.squadrons : []);
-      } catch (_) {
-        // Non-blocking refresh after create.
       }
 
       closeWizard();
@@ -1407,8 +1311,6 @@ export default function LidcPage() {
     setSelectedAirframeDraft(null);
     setAirframeEditorError('');
     setAirframeEditorSaving(false);
-    setMemberActionMenuForId('');
-
     try {
       await api.leaveLidcSquadron(squadronId);
 
@@ -1417,16 +1319,8 @@ export default function LidcPage() {
 
       setCreatedSquadron(null);
       setActiveSquadron(null);
-      setSelectedListSquadronId('');
       setPanelMode('home');
       setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK);
-
-      try {
-        const listResponse = await api.getLidcSquadrons();
-        setListedSquadrons(Array.isArray(listResponse?.squadrons) ? listResponse.squadrons : []);
-      } catch (_) {
-        // Non-blocking refresh after leave.
-      }
 
       setPendingSquadronAction('');
       return true;
@@ -1455,8 +1349,6 @@ export default function LidcPage() {
     setSelectedAirframeDraft(null);
     setAirframeEditorError('');
     setAirframeEditorSaving(false);
-    setMemberActionMenuForId('');
-
     try {
       await api.deleteLidcSquadron(squadronId);
 
@@ -1465,16 +1357,8 @@ export default function LidcPage() {
 
       setCreatedSquadron(null);
       setActiveSquadron(null);
-      setSelectedListSquadronId('');
       setPanelMode('home');
       setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK);
-
-      try {
-        const listResponse = await api.getLidcSquadrons();
-        setListedSquadrons(Array.isArray(listResponse?.squadrons) ? listResponse.squadrons : []);
-      } catch (_) {
-        // Non-blocking refresh after delete.
-      }
 
       setPendingSquadronAction('');
       return true;
@@ -1681,29 +1565,17 @@ export default function LidcPage() {
       const roleLabel = role === 'owner'
         ? t('lidc.members.owner')
         : (role === 'admin' ? t('lidc.members.admin') : t('lidc.members.member'));
-      const displayName = formatUserLabel(member);
-      const counts = airframeRows.reduce((acc, row) => {
-        if (String(row?.pilotUserId || '') !== memberId) return acc;
-        const category = String(row?.category || '').toLowerCase();
-        if (category === 'aircrafts') acc.a += 1;
-        if (category === 'helicopters') acc.h += 1;
-        if (category === 'logistics') acc.l += 1;
-        return acc;
-      }, { a: 0, h: 0, l: 0 });
 
       return {
         memberId,
-        displayName,
+        displayName: formatUserLabel(member),
         role,
         roleLabel,
         avatarUrl: String(member?.avatarUrl || ''),
         avatarFallback: getUserInitial(member),
-        assignedAircraftCountA: counts.a,
-        assignedAircraftCountH: counts.h,
-        assignedAircraftCountL: counts.l,
       };
     });
-  }, [squadronMembers, airframeRows]);
+  }, [squadronMembers]);
 
   const selectedAirframeRow = useMemo(() => {
     const selectedId = String(selectedAirframeDraft?.id || '');
@@ -1739,30 +1611,6 @@ export default function LidcPage() {
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [selectedAirframeDraft, isPilotMenuOpen]);
-
-  useEffect(() => {
-    if (!memberActionMenuForId) return undefined;
-
-    const handlePointerDown = (event) => {
-      if (memberActionMenuRef.current && !memberActionMenuRef.current.contains(event.target)) {
-        setMemberActionMenuForId('');
-      }
-    };
-
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        setMemberActionMenuForId('');
-      }
-    };
-
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [memberActionMenuForId]);
 
   useEffect(() => {
     if (!pendingSquadronAction) return undefined;
@@ -1998,135 +1846,6 @@ export default function LidcPage() {
     );
   }
 
-  function renderMembersTable({ interactive = false, flush = false } = {}) {
-    if (loadingSquadronDetails) {
-      return (
-        <div className="lidc-loading">
-          <Loader2 size={14} className="spin" />
-          <span>{t('lidc.general.loading')}</span>
-        </div>
-      );
-    }
-
-    if (squadronDetailsError) {
-      return <div className="lidc-inline-error">{squadronDetailsError}</div>;
-    }
-
-    if (memberRows.length === 0) {
-      return <div className="lidc-muted-box">{t('lidc.members.empty')}</div>;
-    }
-
-    return (
-      <div className={`lidc-airframe-table-wrap lidc-member-table-wrap ${interactive ? 'is-interactive' : 'is-readonly'} ${flush ? 'is-flush' : ''}`}>
-        <table className="lidc-airframe-table lidc-member-table">
-          <thead>
-            <tr>
-              <th>{t('lidc.members.columns.user')}</th>
-              <th title={t('lidc.members.columns.aircrafts')}>
-                <span className="lidc-member-count-head">
-                  <Plane size={14} />
-                  <span className="lidc-member-count-head-label">{t('lidc.members.columns.aircraftsShort')}</span>
-                </span>
-              </th>
-              <th title={t('lidc.members.columns.helicopters')}>
-                <span className="lidc-member-count-head">
-                  <Helicopter size={14} />
-                  <span className="lidc-member-count-head-label">{t('lidc.members.columns.helicoptersShort')}</span>
-                </span>
-              </th>
-              <th title={t('lidc.members.columns.logistics')}>
-                <span className="lidc-member-count-head">
-                  <Forklift size={14} />
-                  <span className="lidc-member-count-head-label">{t('lidc.members.columns.logisticsShort')}</span>
-                </span>
-              </th>
-              <th>{t('lidc.members.columns.role')}</th>
-              {interactive && <th>{t('lidc.members.columns.actions')}</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {memberRows.map((member) => (
-              <tr key={member.memberId}>
-                <td>
-                  <div className="lidc-member-user-cell">
-                    {member.avatarUrl ? (
-                      <img src={member.avatarUrl} alt={member.displayName} className="lidc-member-table-avatar" />
-                    ) : (
-                      <span className="lidc-member-table-avatar lidc-member-table-avatar-fallback">{member.avatarFallback}</span>
-                    )}
-                    <div className="lidc-airframe-cell-main">
-                      <strong>{member.displayName}</strong>
-                    </div>
-                  </div>
-                </td>
-                <td className="lidc-member-count-cell">
-                  <span className={`lidc-member-count-badge ${member.assignedAircraftCountA === 0 ? 'is-zero' : ''}`}>
-                    {member.assignedAircraftCountA}
-                  </span>
-                </td>
-                <td className="lidc-member-count-cell">
-                  <span className={`lidc-member-count-badge ${member.assignedAircraftCountH === 0 ? 'is-zero' : ''}`}>
-                    {member.assignedAircraftCountH}
-                  </span>
-                </td>
-                <td className="lidc-member-count-cell">
-                  <span className={`lidc-member-count-badge ${member.assignedAircraftCountL === 0 ? 'is-zero' : ''}`}>
-                    {member.assignedAircraftCountL}
-                  </span>
-                </td>
-                <td>
-                  <span className={`lidc-member-role-chip ${member.role === 'owner' ? 'is-owner' : ''} ${member.role === 'admin' ? 'is-admin' : ''}`}>
-                    {member.roleLabel}
-                  </span>
-                </td>
-                {interactive && (
-                  <td>
-                    <div className="lidc-member-actions" ref={memberActionMenuForId === member.memberId ? memberActionMenuRef : null}>
-                      <button
-                        type="button"
-                        className={`lidc-member-action-trigger ${memberActionMenuForId === member.memberId ? 'is-open' : ''}`}
-                        onClick={() => setMemberActionMenuForId((prev) => (prev === member.memberId ? '' : member.memberId))}
-                      >
-                        {t('lidc.members.actions.label')}
-                        <ChevronDown size={12} />
-                      </button>
-
-                      {memberActionMenuForId === member.memberId && (
-                        <div className="lidc-member-action-menu" role="menu">
-                          <button
-                            type="button"
-                            className="lidc-member-action-menu-item"
-                            disabled={member.role === 'owner' || member.role === 'admin'}
-                          >
-                            {t('lidc.members.actions.promote')}
-                          </button>
-                          <button
-                            type="button"
-                            className="lidc-member-action-menu-item"
-                            disabled={member.role === 'owner' || member.role !== 'admin'}
-                          >
-                            {t('lidc.members.actions.demote')}
-                          </button>
-                          <button
-                            type="button"
-                            className="lidc-member-action-menu-item is-danger"
-                            disabled={member.role === 'owner'}
-                          >
-                            {t('lidc.members.actions.remove')}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  }
-
   function renderTableExpandHint() {
     if (
       isDeckPanelFullscreen
@@ -2137,8 +1856,6 @@ export default function LidcPage() {
       return null;
     }
 
-    const hintKey = isManagementFocusView ? 'lidc.members.expandHint' : 'lidc.deck.expandHint';
-
     return (
       <button
         type="button"
@@ -2146,7 +1863,7 @@ export default function LidcPage() {
         onClick={() => openFullscreenPanel()}
       >
         <Maximize2 size={13} />
-        {t(hintKey)}
+        {t('lidc.deck.expandHint')}
       </button>
     );
   }
@@ -2156,7 +1873,6 @@ export default function LidcPage() {
       <header className={`lidc-panel-deck-head ${isDeckPanelFullscreen ? 'is-fullscreen' : ''}`}>
         <div className="lidc-panel-deck-head-main">
           <h2 className="lidc-panel-title">SQUADRON DECK</h2>
-          {renderDeckViewNav()}
           {showDeckManagementView && activeSquadron && isCurrentUserOwner && (
             <button
               type="button"
@@ -2198,18 +1914,6 @@ export default function LidcPage() {
 
     if (squadronDetailsError) {
       return <div className="lidc-inline-error">{squadronDetailsError}</div>;
-    }
-
-    if (showMemberManagementView) {
-      if (interactive) {
-        return (
-          <div className="lidc-panel-deck-expanded-content is-members-expanded">
-            {renderSquadronManagementActions()}
-            {renderMembersTable({ interactive: true, flush: true })}
-          </div>
-        );
-      }
-      return renderMemberManagementView();
     }
 
     if (showDeckManagementView) {
@@ -2289,16 +1993,6 @@ export default function LidcPage() {
     });
   }
 
-  function renderMemberManagementView() {
-    return renderExpandableTablePreview({
-      view: 'members',
-      title: t('lidc.sidebar.memberManagement'),
-      hint: t('lidc.members.expandHint'),
-      flush: true,
-      children: renderMembersTable({ interactive: false, flush: true }),
-    });
-  }
-
   function renderCenterStage() {
     const adminEditorButton = user?.canEditWiki ? (
       <button type="button" className="lidc-btn lidc-btn-outline" onClick={openTemplateEditor}>
@@ -2373,48 +2067,52 @@ export default function LidcPage() {
     return null;
   }
 
-  function renderSquadronListPanel() {
+  function renderMembersListPanel() {
+    let body;
+
+    if (!isLogged || !userHasSquadron) {
+      body = <div className="lidc-muted-box">{t('lidc.members.empty')}</div>;
+    } else if (loadingSquadronDetails) {
+      body = (
+        <div className="lidc-panel-row lidc-panel-row--static">
+          <Loader2 size={18} className="spin" />
+          <span>{t('lidc.general.loading')}</span>
+        </div>
+      );
+    } else if (squadronDetailsError) {
+      body = <div className="lidc-inline-error">{squadronDetailsError}</div>;
+    } else if (memberRows.length === 0) {
+      body = <div className="lidc-muted-box">{t('lidc.members.empty')}</div>;
+    } else {
+      body = memberRows.map((member) => (
+        <div
+          key={member.memberId}
+          className="lidc-panel-row lidc-panel-row--member"
+        >
+          {member.avatarUrl ? (
+            <img src={member.avatarUrl} alt="" className="lidc-panel-row-logo" />
+          ) : (
+            <span className="lidc-panel-row-logo lidc-panel-row-logo-fallback" aria-hidden="true">
+              {member.avatarFallback}
+            </span>
+          )}
+          <span className="lidc-panel-row-name">{member.displayName}</span>
+          {(member.role === 'owner' || member.role === 'admin') && (
+            <span className={`lidc-member-role-label ${member.role === 'owner' ? 'is-owner' : 'is-admin'}`}>
+              {member.roleLabel}
+            </span>
+          )}
+        </div>
+      ));
+    }
+
     return (
       <section className="lidc-panel lidc-panel-list">
-        <h2 className="lidc-panel-title">{t('lidc.sidebar.squadronList')}</h2>
-        <div className="lidc-panel-rows">
-          {isLogged && loadingListedSquadrons && (
-            <div className="lidc-panel-row lidc-panel-row--static">
-              <Loader2 size={18} className="spin" />
-              <span>{t('lidc.general.loading')}</span>
-            </div>
-          )}
-
-          {isLogged && !loadingListedSquadrons && listedSquadronsError && (
-            <div className="lidc-inline-error">{listedSquadronsError}</div>
-          )}
-
-          {isLogged && !loadingListedSquadrons && !listedSquadronsError && listedSquadrons.length === 0 && (
-            <div className="lidc-muted-box">{t('lidc.squadrons.listEmpty')}</div>
-          )}
-
-          {isLogged && !loadingListedSquadrons && listedSquadrons.map((squadron) => {
-            const isSelected = selectedListSquadronId === squadron.id;
-            const logo = String(squadron.logoDataUrl || '');
-
-            return (
-              <button
-                key={squadron.id}
-                type="button"
-                className={`lidc-panel-row lidc-panel-row--squadron ${isSelected ? 'is-active' : ''}`}
-                onClick={() => setSelectedListSquadronId(squadron.id)}
-              >
-                {logo ? (
-                  <img src={logo} alt="" className="lidc-panel-row-logo" />
-                ) : (
-                  <span className="lidc-panel-row-logo lidc-panel-row-logo-fallback" aria-hidden="true">
-                    {getSquadronInitial(squadron.name)}
-                  </span>
-                )}
-                <span className="lidc-panel-row-name">{squadron.name}</span>
-              </button>
-            );
-          })}
+        <h2 className="lidc-panel-title">{t('lidc.members.listTitle')}</h2>
+        <div className="lidc-panel-list-body">
+          <div className="lidc-panel-rows">
+            {body}
+          </div>
         </div>
       </section>
     );
@@ -2536,34 +2234,6 @@ export default function LidcPage() {
     );
   }
 
-  function renderDeckViewNav() {
-    if (!userHasSquadron) return null;
-
-    return (
-      <div className="lidc-deck-view-nav">
-        <button
-          type="button"
-          className={`lidc-deck-view-nav-btn ${activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_DECK ? 'is-active' : ''}`}
-          onClick={() => setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK)}
-          aria-label={t('lidc.views.deck')}
-          title={t('lidc.views.deck')}
-        >
-          <Warehouse size={16} />
-        </button>
-        <span className="lidc-deck-view-nav-sep" aria-hidden="true">|</span>
-        <button
-          type="button"
-          className={`lidc-deck-view-nav-btn ${activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS ? 'is-active' : ''}`}
-          onClick={() => setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS)}
-          aria-label={t('lidc.sidebar.memberManagement')}
-          title={t('lidc.sidebar.memberManagement')}
-        >
-          <Users size={16} />
-        </button>
-      </div>
-    );
-  }
-
   function renderSquadronDeckPanel() {
     const showLockedOverlay = !userHasSquadron && !loadingUserState && !isDeckPanelFullscreen;
 
@@ -2649,7 +2319,7 @@ export default function LidcPage() {
             className={`lidc-board-slot lidc-board-slot-list ${boardPanelsCollapsed ? 'is-collapsed' : ''}`}
             aria-hidden={boardPanelsCollapsed}
           >
-            {renderSquadronListPanel()}
+            {renderMembersListPanel()}
           </div>
           <div
             className={`lidc-board-slot lidc-board-slot-squadron ${boardPanelsCollapsed ? 'is-collapsed' : ''}`}

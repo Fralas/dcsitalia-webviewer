@@ -482,6 +482,7 @@ export default {
       yes: 'Generato automaticamente'
     },
     members: {
+      listTitle: 'Membri squadrone',
       empty: 'Nessun membro disponibile nello squadrone.',
       owner: 'Owner',
       admin: 'Admin',
