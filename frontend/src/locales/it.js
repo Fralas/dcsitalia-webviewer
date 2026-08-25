@@ -484,6 +484,7 @@ export default {
     members: {
       listTitle: 'Membri non assegnati',
       empty: 'Nessun membro disponibile nello squadrone.',
+      unassignedEmpty: 'Tutti i membri sono assegnati a un velivolo.',
       owner: 'Owner',
       admin: 'Admin',
       member: 'Membro',
@@ -515,7 +516,7 @@ export default {
       empty: 'Nessun velivolo acquistato nel deck.',
       assignedPilot: 'Pilota assegnato',
       unassigned: 'Non assegnato',
-      rowHint: 'Clicca un velivolo per modificare i dati e aprire i log operativi (mock).',
+      rowHint: 'Trascina un membro non assegnato su un velivolo vuoto. Tasto destro sul pilota per disassociarlo.',
       editorTitle: 'Dettaglio velivolo',
       editorHint: 'Modello, base, board number e status sono in sola lettura (mock). Puoi assegnare solo il pilota.',
       logsTitle: 'Log operativi',

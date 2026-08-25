@@ -309,7 +309,7 @@ body.lidc-map-fullscreen-open {
   content: '';
   position: absolute;
   left: 0;
-  right: 14px;
+  right: 8px;
   height: clamp(22px, 1.4vw, 36px);
   pointer-events: none;
   z-index: 2;
@@ -328,7 +328,7 @@ body.lidc-map-fullscreen-open {
 .lidc-panel-list .lidc-panel-rows {
   align-content: start;
   grid-auto-rows: max-content;
-  padding-right: 12px;
+  padding-right: 6px;
   padding-bottom: clamp(10px, 0.7vw, 18px);
   overflow-x: hidden;
   overflow-y: auto;
@@ -558,7 +558,23 @@ body.lidc-map-fullscreen-open {
   justify-content: space-between;
   gap: clamp(10px, 0.78vw, 20px);
   flex-shrink: 0;
-  margin-bottom: clamp(12px, 0.91vw, 35px);
+  position: relative;
+  z-index: 3;
+  margin-bottom: 0;
+  padding-bottom: 8px;
+  background: var(--lidc-canvas);
+}
+
+.lidc-panel-deck-head::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 6px;
+  top: 100%;
+  height: clamp(12px, 0.8vw, 22px);
+  pointer-events: none;
+  z-index: 4;
+  background: linear-gradient(to bottom, var(--lidc-canvas) 0%, rgba(14, 14, 14, 0) 100%);
 }
 
 .lidc-panel-deck-head-main {
@@ -707,6 +723,7 @@ body.lidc-map-fullscreen-open {
 }
 
 .lidc-panel-deck-body {
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -723,7 +740,8 @@ body.lidc-map-fullscreen-open {
 }
 
 .lidc-panel-deck.is-table-focus .lidc-panel-deck-body {
-  margin-inline: calc(-1 * clamp(14px, 1.07vw, 41px));
+  margin-left: calc(-1 * clamp(14px, 1.07vw, 41px));
+  margin-right: 0;
   margin-bottom: calc(-1 * clamp(16px, 1.35vw, 52px));
   flex: 1;
   min-height: 0;
@@ -999,6 +1017,18 @@ body.lidc-wizard-open {
 
 .lidc-panel-row--member.is-actionable {
   cursor: context-menu;
+}
+
+.lidc-panel-row--member.is-draggable {
+  cursor: grab;
+}
+
+.lidc-panel-row--member.is-draggable.is-actionable {
+  cursor: grab;
+}
+
+.lidc-panel-row--member.is-dragging {
+  opacity: 0.45;
 }
 
 .lidc-member-context-menu {
@@ -1776,31 +1806,46 @@ body.lidc-deck-expanded-open {
 }
 
 .lidc-wizard-body,
-.lidc-panel-list .lidc-panel-rows {
+.lidc-panel-list .lidc-panel-rows,
+.lidc-deck-board-wrap,
+.lidc-panel-deck .lidc-deck-table-wrap,
+.lidc-panel-deck-body {
   scrollbar-width: thin;
   scrollbar-color: var(--lidc-accent-orange) transparent;
 }
 
 .lidc-wizard-body::-webkit-scrollbar,
-.lidc-panel-list .lidc-panel-rows::-webkit-scrollbar {
+.lidc-panel-list .lidc-panel-rows::-webkit-scrollbar,
+.lidc-deck-board-wrap::-webkit-scrollbar,
+.lidc-panel-deck .lidc-deck-table-wrap::-webkit-scrollbar,
+.lidc-panel-deck-body::-webkit-scrollbar {
   width: 5px;
   height: 5px;
 }
 
 .lidc-wizard-body::-webkit-scrollbar-track,
-.lidc-panel-list .lidc-panel-rows::-webkit-scrollbar-track {
+.lidc-panel-list .lidc-panel-rows::-webkit-scrollbar-track,
+.lidc-deck-board-wrap::-webkit-scrollbar-track,
+.lidc-panel-deck .lidc-deck-table-wrap::-webkit-scrollbar-track,
+.lidc-panel-deck-body::-webkit-scrollbar-track {
   background: transparent;
 }
 
 .lidc-wizard-body::-webkit-scrollbar-thumb,
-.lidc-panel-list .lidc-panel-rows::-webkit-scrollbar-thumb {
+.lidc-panel-list .lidc-panel-rows::-webkit-scrollbar-thumb,
+.lidc-deck-board-wrap::-webkit-scrollbar-thumb,
+.lidc-panel-deck .lidc-deck-table-wrap::-webkit-scrollbar-thumb,
+.lidc-panel-deck-body::-webkit-scrollbar-thumb {
   background: var(--lidc-accent-orange);
   border-radius: 999px;
   border: 0;
 }
 
 .lidc-wizard-body::-webkit-scrollbar-thumb:hover,
-.lidc-panel-list .lidc-panel-rows::-webkit-scrollbar-thumb:hover {
+.lidc-panel-list .lidc-panel-rows::-webkit-scrollbar-thumb:hover,
+.lidc-deck-board-wrap::-webkit-scrollbar-thumb:hover,
+.lidc-panel-deck .lidc-deck-table-wrap::-webkit-scrollbar-thumb:hover,
+.lidc-panel-deck-body::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--lidc-accent-orange) 82%, #ffffff);
 }
 
@@ -1919,9 +1964,12 @@ body.lidc-deck-expanded-open {
   overflow-y: auto;
 }
 
-.lidc-deck-table-wrap {
+.lidc-deck-table-wrap,
+.lidc-deck-board-wrap {
   overflow-x: hidden;
   overflow-y: auto;
+  padding-right: 6px;
+  box-sizing: border-box;
 }
 
 .lidc-deck-board-wrap {
@@ -1969,10 +2017,10 @@ body.lidc-deck-expanded-open {
 }
 
 .lidc-deck-base-aircrafts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px 20px;
-  padding: 8px 18px 10px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 8px;
+  padding: 8px 4px 10px;
 }
 
 .lidc-deck-airframe {
@@ -1980,9 +2028,10 @@ body.lidc-deck-expanded-open {
   border: 0;
   background: transparent;
   color: inherit;
-  padding: 4px 6px 10px;
+  padding: 4px 4px 10px;
   margin: 0;
-  width: 280px;
+  width: 100%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2004,6 +2053,23 @@ body.lidc-deck-expanded-open {
   background: rgba(255, 255, 255, 0.05);
 }
 
+.lidc-deck-airframe.is-droppable.is-drop-target {
+  background: rgba(255, 187, 0, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 187, 0, 0.55);
+}
+
+.lidc-deck-board-wrap.is-assigning .lidc-deck-airframe.is-droppable {
+  box-shadow: inset 0 0 0 1px rgba(255, 187, 0, 0.22);
+}
+
+.lidc-deck-board-wrap.is-assigning .lidc-deck-airframe.is-drop-blocked {
+  opacity: 0.55;
+}
+
+.lidc-deck-airframe.is-assigned {
+  cursor: context-menu;
+}
+
 .lidc-deck-airframe.is-updating {
   opacity: 0.55;
 }
@@ -2015,8 +2081,10 @@ body.lidc-deck-expanded-open {
 
 .lidc-deck-airframe-media {
   position: relative;
-  width: 280px;
-  height: 176px;
+  width: 100%;
+  max-width: 280px;
+  aspect-ratio: 280 / 176;
+  height: auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2043,8 +2111,8 @@ body.lidc-deck-expanded-open {
 
 .lidc-deck-airframe-image {
   display: block;
-  width: 280px;
-  height: 176px;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   object-position: center;
   pointer-events: none;
@@ -2055,8 +2123,8 @@ body.lidc-deck-expanded-open {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 280px;
-  height: 176px;
+  width: 100%;
+  height: 100%;
   color: var(--lidc-mute);
   font-size: 10px;
   letter-spacing: 0.04em;
@@ -2068,8 +2136,8 @@ body.lidc-deck-expanded-open {
   left: 50%;
   bottom: 18px;
   z-index: 3;
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   margin: 0;
   transform: translateX(-50%);
   border-radius: 999px;
@@ -2084,7 +2152,7 @@ body.lidc-deck-expanded-open {
   align-items: center;
   justify-content: center;
   color: var(--lidc-body);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
 }
 

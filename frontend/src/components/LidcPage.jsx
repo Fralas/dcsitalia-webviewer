@@ -252,6 +252,29 @@ function resolveAirframeBase(airframe, airportList, fallbackBaseId = '') {
   return null;
 }
 
+function preserveLocalMockAirframeAssignments(previousSquadron, nextSquadron) {
+  if (!nextSquadron) return nextSquadron;
+
+  const previousAirframes = Array.isArray(previousSquadron?.airframes) ? previousSquadron.airframes : [];
+  const previousById = new Map(
+    previousAirframes.map((entry) => [String(entry?.id || ''), entry]),
+  );
+  const nextAirframes = Array.isArray(nextSquadron.airframes) ? nextSquadron.airframes : [];
+
+  return {
+    ...nextSquadron,
+    airframes: nextAirframes.map((airframe) => {
+      const previous = previousById.get(String(airframe?.id || ''));
+      const previousPilot = String(previous?.assignedPilotUserId || '');
+      const nextPilot = String(airframe?.assignedPilotUserId || '');
+      if (!nextPilot && previousPilot.startsWith('mock_member_')) {
+        return { ...airframe, assignedPilotUserId: previousPilot };
+      }
+      return airframe;
+    }),
+  };
+}
+
 function buildMockAirframeLogs({ airframe, baseLabel, pilotLabel, status }) {
   const createdAt = Number.isFinite(airframe?.createdAt) ? airframe.createdAt : Date.now() - (12 * 60 * 60 * 1000);
   const board = airframe?.boardNumber || '---AA';
@@ -403,6 +426,8 @@ export default function LidcPage() {
   const [airframeEditorError, setAirframeEditorError] = useState('');
   const [airframeEditorSaving, setAirframeEditorSaving] = useState(false);
   const [isPilotMenuOpen, setIsPilotMenuOpen] = useState(false);
+  const [draggedMemberId, setDraggedMemberId] = useState('');
+  const [dropTargetAirframeId, setDropTargetAirframeId] = useState('');
   const pilotMenuRef = useRef(null);
 
   const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false);
@@ -657,8 +682,8 @@ export default function LidcPage() {
       const squadronId = activeSquadron?.id || userLidcState?.squadron?.id;
       if (!squadronId) return;
       try {
-        const squadron = await api.getLidcSquadron(squadronId);
-        setActiveSquadron(squadron);
+        const response = await api.getLidcSquadron(squadronId);
+        setActiveSquadron((prev) => preserveLocalMockAirframeAssignments(prev, response?.squadron || null));
       } catch (error) {
         if (!isAuthenticationError(error)) {
           console.error('Failed to refresh LIDC squadron state:', error);
@@ -715,7 +740,7 @@ export default function LidcPage() {
       try {
         const response = await api.getLidcSquadron(squadronId);
         if (!mounted) return;
-        setActiveSquadron(response?.squadron || null);
+        setActiveSquadron((prev) => preserveLocalMockAirframeAssignments(prev, response?.squadron || null));
       } catch (error) {
         if (!mounted) return;
         setActiveSquadron(null);
@@ -1535,6 +1560,11 @@ export default function LidcPage() {
   const currentUserRole = String(currentUserProfile?.role || '').toLowerCase();
   const isCurrentUserOwner = currentUserRole === 'owner'
     || (currentUserId !== '' && currentUserId === String(activeSquadron?.createdBy?.id || ''));
+  const canAssignAirframes = Boolean(
+    isLogged
+    && userHasSquadron
+    && (isCurrentUserOwner || currentUserRole === 'owner' || currentUserRole === 'admin' || currentUserRole === 'leader'),
+  );
   const isSquadronActionBusy = leavingSquadron || deletingSquadron;
 
   function closeMemberContextMenu() {
@@ -1710,6 +1740,19 @@ export default function LidcPage() {
     });
   }, [squadronMembers]);
 
+  const assignedPilotUserIds = useMemo(() => {
+    const ids = new Set();
+    airframeRows.forEach((airframe) => {
+      const pilotUserId = String(airframe?.pilotUserId || '');
+      if (pilotUserId) ids.add(pilotUserId);
+    });
+    return ids;
+  }, [airframeRows]);
+
+  const unassignedMemberRows = useMemo(() => {
+    return memberRows.filter((member) => !assignedPilotUserIds.has(member.memberId));
+  }, [memberRows, assignedPilotUserIds]);
+
   const selectedAirframeRow = useMemo(() => {
     const selectedId = String(selectedAirframeDraft?.id || '');
     if (!selectedId) return null;
@@ -1791,6 +1834,79 @@ export default function LidcPage() {
     setIsPilotMenuOpen(false);
   }
 
+  async function assignAirframePilot(airframe, nextPilotUserIdRaw, { closeEditor = false } = {}) {
+    if (!airframe?.id || !canAssignAirframes) return false;
+
+    const nextPilotUserId = String(nextPilotUserIdRaw || '');
+    const currentPilotUserId = String(airframe.assignedPilotUserId || airframe.pilotUserId || '');
+    if (nextPilotUserId === currentPilotUserId) {
+      if (closeEditor) closeAirframeEditor();
+      return true;
+    }
+
+    if (nextPilotUserId && !squadronMembersById.has(nextPilotUserId)) {
+      const message = t('lidc.airframes.validation.pilotMustBeMember');
+      if (closeEditor) setAirframeEditorError(message);
+      else setAirframeUpdateError(message);
+      return false;
+    }
+
+    if (nextPilotUserId && assignedPilotUserIds.has(nextPilotUserId) && nextPilotUserId !== currentPilotUserId) {
+      return false;
+    }
+
+    const member = nextPilotUserId ? squadronMembersById.get(nextPilotUserId) : null;
+    const isMockMember = Boolean(member?.isMock) || String(nextPilotUserId).startsWith('mock_member_');
+
+    if (closeEditor) {
+      setAirframeEditorError('');
+      setAirframeEditorSaving(true);
+    }
+    setAirframeUpdateError('');
+    setUpdatingAirframeId(airframe.id);
+
+    try {
+      if (isMockMember || (nextPilotUserId === '' && String(currentPilotUserId).startsWith('mock_member_'))) {
+        setActiveSquadron((prev) => {
+          if (!prev) return prev;
+          const airframes = Array.isArray(prev.airframes) ? prev.airframes : [];
+          return {
+            ...prev,
+            airframes: airframes.map((entry) => (
+              String(entry?.id) === String(airframe.id)
+                ? { ...entry, assignedPilotUserId: nextPilotUserId || null }
+                : entry
+            )),
+          };
+        });
+        if (closeEditor) closeAirframeEditor();
+        return true;
+      }
+
+      const squadronId = activeSquadron?.id || userLidcState?.squadron?.id || '';
+      if (!squadronId) {
+        throw new Error(t('lidc.errors.airframeAssignFailed'));
+      }
+
+      const response = await api.assignLidcAirframePilot(
+        squadronId,
+        airframe.id,
+        nextPilotUserId || null,
+      );
+      setActiveSquadron((prev) => preserveLocalMockAirframeAssignments(prev, response?.squadron || prev));
+      if (closeEditor) closeAirframeEditor();
+      return true;
+    } catch (error) {
+      const message = error.message || t('lidc.errors.airframeAssignFailed');
+      if (closeEditor) setAirframeEditorError(message);
+      else setAirframeUpdateError(message);
+      return false;
+    } finally {
+      setUpdatingAirframeId('');
+      if (closeEditor) setAirframeEditorSaving(false);
+    }
+  }
+
   async function saveAirframeEditorDraft() {
     if (!selectedAirframeDraft) return;
 
@@ -1800,37 +1916,57 @@ export default function LidcPage() {
       return;
     }
 
-    const pilotUserId = String(selectedAirframeDraft.pilotUserId || '');
+    await assignAirframePilot(row, selectedAirframeDraft.pilotUserId, { closeEditor: true });
+  }
 
-    if (pilotUserId && !squadronMembersById.has(pilotUserId)) {
-      setAirframeEditorError(t('lidc.airframes.validation.pilotMustBeMember'));
+  function handleMemberDragStart(event, member) {
+    if (!canAssignAirframes || !member?.memberId) {
+      event.preventDefault();
       return;
     }
 
-    setAirframeEditorError('');
-    setAirframeEditorSaving(true);
-    setAirframeUpdateError('');
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', member.memberId);
+    setDraggedMemberId(member.memberId);
+    setDropTargetAirframeId('');
+  }
 
-    try {
-      const squadronId = activeSquadron?.id || userLidcState?.squadron?.id || '';
-      const currentPilotUserId = String(row.assignedPilotUserId || '');
-      if (squadronId && pilotUserId !== currentPilotUserId) {
-        setUpdatingAirframeId(row.id);
-        const response = await api.assignLidcAirframePilot(
-          squadronId,
-          row.id,
-          pilotUserId || null,
-        );
-        setActiveSquadron(response?.squadron || null);
-      }
+  function handleMemberDragEnd() {
+    setDraggedMemberId('');
+    setDropTargetAirframeId('');
+  }
 
-      closeAirframeEditor();
-    } catch (error) {
-      setAirframeEditorError(error.message || t('lidc.errors.airframeAssignFailed'));
-    } finally {
-      setUpdatingAirframeId('');
-      setAirframeEditorSaving(false);
+  function handleAirframeDragOver(event, airframe) {
+    if (!canAssignAirframes || !draggedMemberId || airframe?.pilotUserId) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    if (dropTargetAirframeId !== airframe.id) {
+      setDropTargetAirframeId(airframe.id);
     }
+  }
+
+  function handleAirframeDragLeave(event, airframe) {
+    if (event.currentTarget.contains(event.relatedTarget)) return;
+    if (dropTargetAirframeId === airframe.id) {
+      setDropTargetAirframeId('');
+    }
+  }
+
+  async function handleAirframeDrop(event, airframe) {
+    event.preventDefault();
+    event.stopPropagation();
+    const memberId = String(event.dataTransfer.getData('text/plain') || draggedMemberId || '');
+    setDraggedMemberId('');
+    setDropTargetAirframeId('');
+    if (!memberId || airframe?.pilotUserId) return;
+    await assignAirframePilot(airframe, memberId);
+  }
+
+  function handleAirframeContextMenu(event, airframe) {
+    if (!canAssignAirframes || !airframe?.pilotUserId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    assignAirframePilot(airframe, null);
   }
 
   function getPendingSquadronActionText() {
@@ -1924,12 +2060,15 @@ export default function LidcPage() {
       return <div className="lidc-muted-box">{t('lidc.airframes.empty')}</div>;
     }
 
+    const allowAssign = canAssignAirframes;
+    const isDraggingMember = Boolean(draggedMemberId);
+
     return (
       <>
-        {interactive && airframeUpdateError && (
+        {allowAssign && airframeUpdateError && (
           <div className="lidc-inline-error">{airframeUpdateError}</div>
         )}
-        <div className={`lidc-airframe-table-wrap lidc-deck-board-wrap ${flush ? 'lidc-deck-table-wrap is-flush' : ''} ${interactive ? 'is-interactive' : 'is-readonly'}`}>
+        <div className={`lidc-airframe-table-wrap lidc-deck-board-wrap ${flush ? 'lidc-deck-table-wrap is-flush' : ''} ${interactive ? 'is-interactive' : 'is-readonly'} ${isDraggingMember ? 'is-assigning' : ''}`}>
           <div className="lidc-deck-board">
             {airframeGroupsByBase.map((group) => (
               <section key={group.id} className="lidc-deck-base-group">
@@ -1941,6 +2080,8 @@ export default function LidcPage() {
                   {group.airframes.map((airframe) => {
                     const isUpdating = updatingAirframeId === airframe.id;
                     const statusLabel = getAirframeStatusLabel(airframe.status);
+                    const isEmpty = !airframe.pilotUserId;
+                    const isDropTarget = allowAssign && isEmpty && dropTargetAirframeId === airframe.id;
                     const Tag = interactive ? 'button' : 'div';
 
                     return (
@@ -1952,8 +2093,16 @@ export default function LidcPage() {
                           `is-${airframe.status}`,
                           isUpdating ? 'is-updating' : '',
                           interactive ? 'is-clickable' : '',
+                          allowAssign && isEmpty ? 'is-droppable' : '',
+                          allowAssign && !isEmpty ? 'is-assigned' : '',
+                          isDropTarget ? 'is-drop-target' : '',
+                          isDraggingMember && !isEmpty ? 'is-drop-blocked' : '',
                         ].filter(Boolean).join(' ')}
                         onClick={interactive ? () => openAirframeEditor(airframe) : undefined}
+                        onContextMenu={allowAssign ? (event) => handleAirframeContextMenu(event, airframe) : undefined}
+                        onDragOver={allowAssign ? (event) => handleAirframeDragOver(event, airframe) : undefined}
+                        onDragLeave={allowAssign ? (event) => handleAirframeDragLeave(event, airframe) : undefined}
+                        onDrop={allowAssign ? (event) => handleAirframeDrop(event, airframe) : undefined}
                         title={`${airframe.model} · ${airframe.boardNumber || '-'} · ${airframe.pilotLabel} · ${statusLabel}`}
                       >
                         <div className="lidc-deck-airframe-media">
@@ -1963,6 +2112,7 @@ export default function LidcPage() {
                               src={airframe.unitImageUrl}
                               alt={airframe.model}
                               className="lidc-deck-airframe-image"
+                              draggable={false}
                             />
                           ) : (
                             <span className="lidc-deck-airframe-image-fallback" aria-hidden="true">
@@ -1975,6 +2125,7 @@ export default function LidcPage() {
                             src={airframe.pilotAvatarUrl}
                             alt={airframe.pilotLabel}
                             className="lidc-deck-airframe-pilot"
+                            draggable={false}
                           />
                         ) : (
                           <span
@@ -1991,9 +2142,6 @@ export default function LidcPage() {
               </section>
             ))}
           </div>
-          {interactive && (
-            <div className="lidc-airframe-table-hint">{t('lidc.airframes.rowHint')}</div>
-          )}
         </div>
       </>
     );
@@ -2234,17 +2382,20 @@ export default function LidcPage() {
       );
     } else if (squadronDetailsError) {
       body = <div className="lidc-inline-error">{squadronDetailsError}</div>;
-    } else if (memberRows.length === 0) {
-      body = <div className="lidc-muted-box">{t('lidc.members.empty')}</div>;
+    } else if (unassignedMemberRows.length === 0) {
+      body = <div className="lidc-muted-box">{t('lidc.members.unassignedEmpty')}</div>;
     } else {
-      body = memberRows.map((member) => (
+      body = unassignedMemberRows.map((member) => (
         <div
           key={member.memberId}
-          className={`lidc-panel-row lidc-panel-row--member ${isCurrentUserOwner && member.role !== 'owner' && member.memberId !== currentUserId ? 'is-actionable' : ''}`}
+          className={`lidc-panel-row lidc-panel-row--member ${isCurrentUserOwner && member.role !== 'owner' && member.memberId !== currentUserId ? 'is-actionable' : ''} ${canAssignAirframes ? 'is-draggable' : ''} ${draggedMemberId === member.memberId ? 'is-dragging' : ''}`}
+          draggable={canAssignAirframes}
+          onDragStart={(event) => handleMemberDragStart(event, member)}
+          onDragEnd={handleMemberDragEnd}
           onContextMenu={(event) => openMemberContextMenu(event, member)}
         >
           {member.avatarUrl ? (
-            <img src={member.avatarUrl} alt="" className="lidc-panel-row-logo" />
+            <img src={member.avatarUrl} alt="" className="lidc-panel-row-logo" draggable={false} />
           ) : (
             <span className="lidc-panel-row-logo lidc-panel-row-logo-fallback" aria-hidden="true">
               {member.avatarFallback}

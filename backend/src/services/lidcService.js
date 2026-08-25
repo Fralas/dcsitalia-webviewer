@@ -196,6 +196,12 @@ function sanitizeText(value, maxLen = 500) {
   return value.trim().slice(0, maxLen);
 }
 
+function sanitizeUserId(value, maxLen = 80) {
+  if (value == null || value === '') return '';
+  const source = typeof value === 'string' ? value : String(value);
+  return source.trim().slice(0, maxLen);
+}
+
 function normalizeCategory(value) {
   const key = sanitizeText(value, 40);
   return DECK_CATEGORIES.includes(key) ? key : null;
@@ -227,7 +233,7 @@ function getRolePermissions(roleRaw) {
     role,
     canManageRoles: role === 'owner',
     canPurchaseAirframes: role === 'admin',
-    canManageAssignedAirframes: role === 'leader',
+    canManageAssignedAirframes: role === 'owner' || role === 'admin' || role === 'leader',
   };
 }
 
@@ -624,14 +630,14 @@ function generateBoardNumber(taken) {
 function buildSquadronMemberUserIdSet(squadron) {
   const memberIds = new Set();
 
-  const createdById = sanitizeText(squadron?.createdBy?.id, 80);
+  const createdById = sanitizeUserId(squadron?.createdBy?.id, 80);
   if (createdById) {
     memberIds.add(createdById);
   }
 
   const members = Array.isArray(squadron?.members) ? squadron.members : [];
   members.forEach((entry) => {
-    const userId = sanitizeText(entry?.userId, 80);
+    const userId = sanitizeUserId(entry?.userId, 80);
     if (userId) {
       memberIds.add(userId);
     }
@@ -661,7 +667,7 @@ function toAirframeSortKey(unit) {
 }
 
 function sanitizeAirframeAssignmentUserId(rawUserId, memberUserIds) {
-  const userId = sanitizeText(rawUserId, 80);
+  const userId = sanitizeUserId(rawUserId, 80);
   if (!userId) return null;
   return memberUserIds.has(userId) ? userId : null;
 }
@@ -1190,8 +1196,8 @@ export function updateAirframeAssignment({ squadronId, airframeId, pilotUserId, 
 
   const normalizedSquadronId = sanitizeText(squadronId, 120);
   const normalizedAirframeId = sanitizeText(airframeId, 160);
-  const normalizedActorUserId = sanitizeText(actorUserId, 80);
-  const normalizedPilotUserId = sanitizeText(pilotUserId, 80);
+  const normalizedActorUserId = sanitizeUserId(actorUserId, 80);
+  const normalizedPilotUserId = sanitizeUserId(pilotUserId, 80);
 
   if (!normalizedSquadronId || !normalizedAirframeId) {
     throw new Error('squadronId and airframeId are required');

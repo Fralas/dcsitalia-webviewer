@@ -484,6 +484,7 @@ export default {
     members: {
       listTitle: 'Unassigned members',
       empty: 'No squadron members available.',
+      unassignedEmpty: 'All members are assigned to an airframe.',
       owner: 'Owner',
       admin: 'Admin',
       member: 'Member',
@@ -515,7 +516,7 @@ export default {
       empty: 'No purchased airframes found in this deck.',
       assignedPilot: 'Assigned pilot',
       unassigned: 'Unassigned',
-      rowHint: 'Click an aircraft to edit details and open movement/takeoff logs (mock for now).',
+      rowHint: 'Drag an unassigned member onto an empty airframe. Right-click an assigned pilot to unassign.',
       editorTitle: 'Airframe details',
       editorHint: 'Model, base, board number, and status are read-only (mock). Only pilot assignment is editable.',
       logsTitle: 'Operational logs',
