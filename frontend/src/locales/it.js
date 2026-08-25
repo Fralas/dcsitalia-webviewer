@@ -482,7 +482,7 @@ export default {
       yes: 'Generato automaticamente'
     },
     members: {
-      listTitle: 'Membri squadrone',
+      listTitle: 'Membri non assegnati',
       empty: 'Nessun membro disponibile nello squadrone.',
       owner: 'Owner',
       admin: 'Admin',
@@ -504,7 +504,8 @@ export default {
         label: 'Azioni',
         promote: 'Promuovi',
         demote: 'Degrada',
-        remove: 'Rimuovi',
+        remove: 'Espelli',
+        failed: 'Impossibile aggiornare il membro.',
       },
     },
     squadrons: {

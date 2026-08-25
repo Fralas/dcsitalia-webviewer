@@ -355,6 +355,12 @@ export default function LidcPage() {
   const [joiningSquadron, setJoiningSquadron] = useState(false);
   const [inviteCodeCopied, setInviteCodeCopied] = useState(false);
   const [linkCodeCopied, setLinkCodeCopied] = useState(false);
+  const [memberContextMenu, setMemberContextMenu] = useState(null);
+  const [memberActionError, setMemberActionError] = useState('');
+  const [memberActionBusy, setMemberActionBusy] = useState(false);
+  const [mockMemberProfiles, setMockMemberProfiles] = useState(() => (
+    MOCK_MEMBER_PROFILES.map((entry) => ({ ...entry }))
+  ));
   const [isDeckPanelFullscreen, setIsDeckPanelFullscreen] = useState(false);
   const [deckBoardExpanded, setDeckBoardExpanded] = useState(false);
   const [isMapPanelFullscreen, setIsMapPanelFullscreen] = useState(false);
@@ -732,6 +738,25 @@ export default function LidcPage() {
   useEffect(() => {
     setLinkCodeCopied(false);
   }, [ucidLinkStatus.pending?.code]);
+
+  useEffect(() => {
+    if (!memberContextMenu) return undefined;
+
+    const closeMenu = () => setMemberContextMenu(null);
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') closeMenu();
+    };
+
+    window.addEventListener('click', closeMenu);
+    window.addEventListener('scroll', closeMenu, true);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('click', closeMenu);
+      window.removeEventListener('scroll', closeMenu, true);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [memberContextMenu]);
 
   function clearSidebarTimers() {
     if (sidebarOpenTimerRef.current) {
@@ -1481,17 +1506,17 @@ export default function LidcPage() {
       map.set(memberId, member);
     });
 
-    MOCK_MEMBER_PROFILES.forEach((mockMember) => {
+    mockMemberProfiles.forEach((mockMember) => {
       const memberId = String(mockMember.userId || '');
       if (!memberId) return;
       if (!map.has(memberId)) {
-        map.set(memberId, mockMember);
+        map.set(memberId, { ...mockMember, isMock: true });
       }
     });
 
     return Array.from(map.values())
       .sort((a, b) => formatUserLabel(a).localeCompare(formatUserLabel(b), 'en', { sensitivity: 'base' }));
-  }, [activeSquadron]);
+  }, [activeSquadron, mockMemberProfiles]);
 
   const squadronMembersById = useMemo(() => {
     const map = new Map();
@@ -1510,6 +1535,84 @@ export default function LidcPage() {
   const isCurrentUserOwner = currentUserRole === 'owner'
     || (currentUserId !== '' && currentUserId === String(activeSquadron?.createdBy?.id || ''));
   const isSquadronActionBusy = leavingSquadron || deletingSquadron;
+
+  function closeMemberContextMenu() {
+    setMemberContextMenu(null);
+  }
+
+  function openMemberContextMenu(event, member) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!isCurrentUserOwner || memberActionBusy) return;
+    if (!member?.memberId || member.memberId === currentUserId || member.role === 'owner') return;
+
+    const menuWidth = 176;
+    const menuHeight = 132;
+    const pad = 10;
+    const x = Math.min(event.clientX, window.innerWidth - menuWidth - pad);
+    const y = Math.min(event.clientY, window.innerHeight - menuHeight - pad);
+    setMemberActionError('');
+    setMemberContextMenu({
+      memberId: member.memberId,
+      x: Math.max(pad, x),
+      y: Math.max(pad, y),
+    });
+  }
+
+  async function applyMemberAction(memberId, action) {
+    if (!memberId || memberActionBusy) return;
+
+    const target = memberRows.find((entry) => entry.memberId === memberId);
+    const isMockMember = Boolean(target?.isMock) || memberId.startsWith('mock_member_');
+
+    setMemberActionBusy(true);
+    setMemberActionError('');
+    closeMemberContextMenu();
+
+    try {
+      if (isMockMember) {
+        setMockMemberProfiles((prev) => {
+          if (action === 'remove') {
+            return prev.filter((entry) => String(entry.userId) !== memberId);
+          }
+          if (action === 'promote') {
+            return prev.map((entry) => (
+              String(entry.userId) === memberId ? { ...entry, role: 'admin' } : entry
+            ));
+          }
+          if (action === 'demote') {
+            return prev.map((entry) => (
+              String(entry.userId) === memberId ? { ...entry, role: 'member' } : entry
+            ));
+          }
+          return prev;
+        });
+        return;
+      }
+
+      const squadronId = String(activeSquadron?.id || '');
+      if (!squadronId) return;
+
+      let response;
+      if (action === 'promote') {
+        response = await api.updateLidcMemberRole(squadronId, memberId, 'admin');
+      } else if (action === 'demote') {
+        response = await api.updateLidcMemberRole(squadronId, memberId, 'member');
+      } else if (action === 'remove') {
+        response = await api.removeLidcMember(squadronId, memberId);
+      } else {
+        return;
+      }
+
+      if (response?.squadron) {
+        setActiveSquadron(response.squadron);
+      }
+    } catch (error) {
+      setMemberActionError(error.message || t('lidc.members.actions.failed'));
+    } finally {
+      setMemberActionBusy(false);
+    }
+  }
 
   const squadronAirframes = useMemo(() => {
     const list = Array.isArray(activeSquadron?.airframes) ? activeSquadron.airframes : [];
@@ -1573,6 +1676,7 @@ export default function LidcPage() {
         roleLabel,
         avatarUrl: String(member?.avatarUrl || ''),
         avatarFallback: getUserInitial(member),
+        isMock: Boolean(member?.isMock) || memberId.startsWith('mock_member_'),
       };
     });
   }, [squadronMembers]);
@@ -2087,7 +2191,8 @@ export default function LidcPage() {
       body = memberRows.map((member) => (
         <div
           key={member.memberId}
-          className="lidc-panel-row lidc-panel-row--member"
+          className={`lidc-panel-row lidc-panel-row--member ${isCurrentUserOwner && member.role !== 'owner' && member.memberId !== currentUserId ? 'is-actionable' : ''}`}
+          onContextMenu={(event) => openMemberContextMenu(event, member)}
         >
           {member.avatarUrl ? (
             <img src={member.avatarUrl} alt="" className="lidc-panel-row-logo" />
@@ -2109,12 +2214,62 @@ export default function LidcPage() {
     return (
       <section className="lidc-panel lidc-panel-list">
         <h2 className="lidc-panel-title">{t('lidc.members.listTitle')}</h2>
+        {memberActionError && <div className="lidc-inline-error">{memberActionError}</div>}
         <div className="lidc-panel-list-body">
           <div className="lidc-panel-rows">
             {body}
           </div>
         </div>
       </section>
+    );
+  }
+
+  function renderMemberContextMenu() {
+    if (!memberContextMenu) return null;
+
+    const member = memberRows.find((entry) => entry.memberId === memberContextMenu.memberId);
+    if (!member) return null;
+
+    const canPromote = member.role === 'member' || member.role === 'leader';
+    const canDemote = member.role === 'admin' || member.role === 'leader';
+
+    return createPortal(
+      <div
+        className="lidc-member-context-menu"
+        style={{ left: memberContextMenu.x, top: memberContextMenu.y }}
+        role="menu"
+        onClick={(event) => event.stopPropagation()}
+        onContextMenu={(event) => event.preventDefault()}
+      >
+        <button
+          type="button"
+          className="lidc-member-action-menu-item"
+          role="menuitem"
+          disabled={memberActionBusy || !canPromote}
+          onClick={() => applyMemberAction(member.memberId, 'promote')}
+        >
+          {t('lidc.members.actions.promote')}
+        </button>
+        <button
+          type="button"
+          className="lidc-member-action-menu-item"
+          role="menuitem"
+          disabled={memberActionBusy || !canDemote}
+          onClick={() => applyMemberAction(member.memberId, 'demote')}
+        >
+          {t('lidc.members.actions.demote')}
+        </button>
+        <button
+          type="button"
+          className="lidc-member-action-menu-item is-danger"
+          role="menuitem"
+          disabled={memberActionBusy}
+          onClick={() => applyMemberAction(member.memberId, 'remove')}
+        >
+          {t('lidc.members.actions.remove')}
+        </button>
+      </div>,
+      document.body,
     );
   }
 
@@ -2355,6 +2510,7 @@ export default function LidcPage() {
       </div>
 
       {renderDebugLeaveHeaderButton()}
+      {renderMemberContextMenu()}
 
       {isEntryWizardVisible && wizardPortalTarget && createPortal(
         <div className="lidc-center-stage lidc-center-stage-global">

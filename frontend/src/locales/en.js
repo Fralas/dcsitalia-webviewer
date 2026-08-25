@@ -482,7 +482,7 @@ export default {
       yes: 'Generated automatically'
     },
     members: {
-      listTitle: 'Squadron members',
+      listTitle: 'Unassigned members',
       empty: 'No squadron members available.',
       owner: 'Owner',
       admin: 'Admin',
@@ -504,7 +504,8 @@ export default {
         label: 'Actions',
         promote: 'Promote',
         demote: 'Demote',
-        remove: 'Remove',
+        remove: 'Expel',
+        failed: 'Unable to update this member.',
       },
     },
     squadrons: {

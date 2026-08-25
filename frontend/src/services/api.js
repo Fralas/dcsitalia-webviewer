@@ -772,6 +772,19 @@ export async function updateLidcMemberRole(squadronId, memberUserId, role) {
 }
 
 /**
+ * Remove a LIDC squadron member (owner only)
+ */
+export async function removeLidcMember(squadronId, memberUserId) {
+  return fetchAPI(
+    `/lidc/squadrons/${encodeURIComponent(squadronId)}/members/${encodeURIComponent(memberUserId)}`,
+    {
+      method: 'DELETE',
+      credentials: 'include',
+    },
+  );
+}
+
+/**
  * Leave a LIDC squadron as the current user
  */
 export async function leaveLidcSquadron(squadronId) {
@@ -1144,6 +1157,7 @@ export default {
   updateLidcSquadronDeck,
   assignLidcAirframePilot,
   updateLidcMemberRole,
+  removeLidcMember,
   leaveLidcSquadron,
   deleteLidcSquadron,
   updateLidcSpecializations,

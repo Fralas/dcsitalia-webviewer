@@ -2398,6 +2398,44 @@ app.put('/api/lidc/squadrons/:id/members/:memberId/role', (req, res) => {
 });
 
 /**
+ * DELETE /api/lidc/squadrons/:id/members/:memberId - Remove a squadron member (owner only)
+ */
+app.delete('/api/lidc/squadrons/:id/members/:memberId', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const result = lidcService.removeSquadronMember({
+      squadronId: req.params.id,
+      targetUserId: req.params.memberId,
+      actorUserId: req.session.user.id,
+    });
+
+    return res.json(result);
+  } catch (error) {
+    const message = String(error?.message || 'Failed to remove squadron member');
+    const lowered = message.toLowerCase();
+    let status = 400;
+
+    if (lowered.includes('authentication required')) {
+      status = 401;
+    } else if (lowered.includes('not found')) {
+      status = 404;
+    } else if (
+      lowered.includes('only owners')
+      || lowered.includes('only squadron members')
+      || lowered.includes('cannot remove squadron owner')
+      || lowered.includes('cannot remove themselves')
+    ) {
+      status = 403;
+    }
+
+    return res.status(status).json({ error: message });
+  }
+});
+
+/**
  * POST /api/lidc/squadrons/:id/leave - Leave squadron as current user
  */
 app.post('/api/lidc/squadrons/:id/leave', (req, res) => {

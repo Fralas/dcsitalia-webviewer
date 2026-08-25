@@ -997,6 +997,42 @@ body.lidc-wizard-open {
   cursor: default;
 }
 
+.lidc-panel-row--member.is-actionable {
+  cursor: context-menu;
+}
+
+.lidc-member-context-menu {
+  position: fixed;
+  z-index: 80;
+  min-width: 168px;
+  border: 1px solid #4e4e4e;
+  border-radius: 15px;
+  background: #1b1b1b;
+  color: #dadbdf;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.55);
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+}
+
+.lidc-member-context-menu .lidc-member-action-menu-item {
+  color: #dadbdf;
+}
+
+.lidc-member-context-menu .lidc-member-action-menu-item:hover:not(:disabled) {
+  background: #242424;
+  color: #ffffff;
+}
+
+.lidc-member-context-menu .lidc-member-action-menu-item.is-danger {
+  color: #ffb4b4;
+}
+
+.lidc-member-context-menu .lidc-member-action-menu-item.is-danger:hover:not(:disabled) {
+  background: rgba(255, 80, 80, 0.12);
+  color: #ffd0d0;
+}
+
 .lidc-panel-row--member:hover {
   background: var(--lidc-canvas-soft);
 }

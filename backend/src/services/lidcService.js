@@ -1341,6 +1341,79 @@ export function updateSquadronMemberRole({
   };
 }
 
+export function removeSquadronMember({
+  squadronId,
+  targetUserId,
+  actorUserId,
+}) {
+  ensureStorage();
+
+  const normalizedSquadronId = sanitizeText(squadronId, 120);
+  const normalizedTargetUserId = sanitizeText(targetUserId, 80);
+  const normalizedActorUserId = sanitizeText(actorUserId, 80);
+
+  if (!normalizedSquadronId || !normalizedTargetUserId) {
+    throw new Error('squadronId and targetUserId are required');
+  }
+  if (!normalizedActorUserId) {
+    throw new Error('Authentication required');
+  }
+
+  const squadrons = readSquadrons();
+  const squadronIndex = squadrons.findIndex((entry) => sanitizeText(entry?.id, 120) === normalizedSquadronId);
+  if (squadronIndex < 0) {
+    throw new Error('Squadron not found');
+  }
+
+  const squadron = { ...squadrons[squadronIndex] };
+  if (!isUserMemberOfSquadron(squadron, normalizedActorUserId)) {
+    throw new Error('Only squadron members can manage members');
+  }
+
+  const actorPermissions = getRolePermissions(getMemberRoleInSquadron(squadron, normalizedActorUserId));
+  if (!actorPermissions.canManageRoles) {
+    throw new Error('Only owners can manage members');
+  }
+
+  const ownerId = sanitizeText(squadron?.createdBy?.id, 80);
+  if (normalizedTargetUserId === ownerId) {
+    throw new Error('Cannot remove squadron owner');
+  }
+  if (normalizedTargetUserId === normalizedActorUserId) {
+    throw new Error('Owner cannot remove themselves');
+  }
+
+  if (!isUserMemberOfSquadron(squadron, normalizedTargetUserId)) {
+    throw new Error('Target user must be a squadron member');
+  }
+
+  const currentMembers = Array.isArray(squadron.members) ? squadron.members : [];
+  const nextMembers = currentMembers.filter(
+    (entry) => sanitizeText(entry?.userId, 80) !== normalizedTargetUserId,
+  );
+
+  if (nextMembers.length === currentMembers.length) {
+    throw new Error('Target user must be a squadron member');
+  }
+
+  squadron.members = nextMembers;
+
+  const catalogState = readCatalogState();
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
+  syncSquadronAirframesInMemory(squadron, unitsById);
+
+  squadrons[squadronIndex] = squadron;
+  writeSquadrons(squadrons);
+
+  return {
+    squadron: {
+      ...squadron,
+      memberProfiles: listSquadronMembersForDisplay(squadron),
+    },
+    removedUserId: normalizedTargetUserId,
+  };
+}
+
 export function leaveSquadron({
   squadronId,
   actorUserId,
@@ -1937,6 +2010,7 @@ export default {
   joinSquadronByInviteCode,
   updateAirframeAssignment,
   updateSquadronMemberRole,
+  removeSquadronMember,
   leaveSquadron,
   deleteSquadron,
   getUserPrimarySquadron,
