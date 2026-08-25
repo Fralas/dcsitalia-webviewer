@@ -515,7 +515,7 @@ export default {
       empty: 'No purchased airframes found in this deck.',
       assignedPilot: 'Assigned pilot',
       unassigned: 'Unassigned',
-      rowHint: 'Click a row to edit details and open movement/takeoff logs (mock for now).',
+      rowHint: 'Click an aircraft to edit details and open movement/takeoff logs (mock for now).',
       editorTitle: 'Airframe details',
       editorHint: 'Model, base, board number, and status are read-only (mock). Only pilot assignment is editable.',
       logsTitle: 'Operational logs',

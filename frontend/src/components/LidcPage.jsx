@@ -22,6 +22,7 @@ import * as api from '../services/api';
 import socketService from '../services/socket';
 import { t } from '../utils/locale';
 import { normalizeSquadronLogo } from '../utils/normalizeSquadronLogo';
+import { getLidcUnitImageUrl } from '../utils/lidcUnitImages';
 import LidcTheaterMap from './LidcTheaterMap';
 import LidcDeckBuilder, {
   DECK_CATEGORY_META,
@@ -1650,8 +1651,11 @@ export default function LidcPage() {
       return {
         ...airframe,
         model,
+        unitImageUrl: getLidcUnitImageUrl(airframe.unitId),
         pilotUserId,
         pilotLabel,
+        pilotAvatarUrl: String(pilotProfile?.avatarUrl || ''),
+        pilotInitial: getUserInitial(pilotProfile),
         baseId: baseIdValue,
         baseLabel,
         boardNumber,
@@ -1660,6 +1664,31 @@ export default function LidcPage() {
       };
     });
   }, [squadronAirframes, squadronMembersById, activeSquadron?.baseId, userLidcState?.squadron?.baseId]);
+
+  const airframeGroupsByBase = useMemo(() => {
+    const homeBaseId = String(activeSquadron?.baseId || userLidcState?.squadron?.baseId || '');
+    const groups = new Map();
+
+    airframeRows.forEach((airframe) => {
+      const key = airframe.baseId || airframe.baseLabel || '_unknown';
+      if (!groups.has(key)) {
+        groups.set(key, {
+          id: key,
+          baseId: airframe.baseId,
+          baseLabel: airframe.baseLabel,
+          airframes: [],
+        });
+      }
+      groups.get(key).airframes.push(airframe);
+    });
+
+    return Array.from(groups.values()).sort((a, b) => {
+      const aHome = a.baseId && a.baseId === homeBaseId ? 0 : 1;
+      const bHome = b.baseId && b.baseId === homeBaseId ? 0 : 1;
+      if (aHome !== bHome) return aHome - bHome;
+      return String(a.baseLabel || '').localeCompare(String(b.baseLabel || ''), 'en', { sensitivity: 'base' });
+    });
+  }, [airframeRows, activeSquadron?.baseId, userLidcState?.squadron?.baseId]);
 
   const memberRows = useMemo(() => {
     return squadronMembers.map((member) => {
@@ -1900,51 +1929,71 @@ export default function LidcPage() {
         {interactive && airframeUpdateError && (
           <div className="lidc-inline-error">{airframeUpdateError}</div>
         )}
-        <div className={`lidc-airframe-table-wrap ${flush ? 'lidc-deck-table-wrap is-flush' : ''} ${interactive ? 'is-interactive' : 'is-readonly'}`}>
-        <table className="lidc-airframe-table">
-          <thead>
-            <tr>
-              <th>{t('lidc.airframes.columns.model')}</th>
-              <th>{t('lidc.airframes.columns.base')}</th>
-              <th>{t('lidc.airframes.columns.pilot')}</th>
-              <th>{t('lidc.airframes.columns.status')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {airframeRows.map((airframe) => {
-              const statusClassName = `lidc-status-pill is-${airframe.status}`;
-              const isUpdating = updatingAirframeId === airframe.id;
+        <div className={`lidc-airframe-table-wrap lidc-deck-board-wrap ${flush ? 'lidc-deck-table-wrap is-flush' : ''} ${interactive ? 'is-interactive' : 'is-readonly'}`}>
+          <div className="lidc-deck-board">
+            {airframeGroupsByBase.map((group) => (
+              <section key={group.id} className="lidc-deck-base-group">
+                <div className="lidc-panel-row lidc-panel-row--static lidc-deck-base-row">
+                  <span className="lidc-deck-base-row-name">{group.baseLabel}</span>
+                  <span className="lidc-deck-base-row-count">{group.airframes.length}</span>
+                </div>
+                <div className="lidc-deck-base-aircrafts">
+                  {group.airframes.map((airframe) => {
+                    const isUpdating = updatingAirframeId === airframe.id;
+                    const statusLabel = getAirframeStatusLabel(airframe.status);
+                    const Tag = interactive ? 'button' : 'div';
 
-              return (
-                <tr
-                  key={airframe.id}
-                  className={[
-                    isUpdating ? 'is-updating' : '',
-                    interactive ? 'is-clickable' : '',
-                  ].filter(Boolean).join(' ')}
-                  onClick={interactive ? () => openAirframeEditor(airframe) : undefined}
-                >
-                  <td>
-                    <div className="lidc-airframe-cell-main">
-                      <strong>{airframe.model}</strong>
-                      <span className="lidc-airframe-cell-board">{airframe.boardNumber || '-'}</span>
-                    </div>
-                  </td>
-                  <td>{airframe.baseLabel}</td>
-                  <td>{airframe.pilotLabel}</td>
-                  <td>
-                    <span className={statusClassName}>
-                      {getAirframeStatusLabel(airframe.status)}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {interactive && (
-          <div className="lidc-airframe-table-hint">{t('lidc.airframes.rowHint')}</div>
-        )}
+                    return (
+                      <Tag
+                        key={airframe.id}
+                        type={interactive ? 'button' : undefined}
+                        className={[
+                          'lidc-deck-airframe',
+                          `is-${airframe.status}`,
+                          isUpdating ? 'is-updating' : '',
+                          interactive ? 'is-clickable' : '',
+                        ].filter(Boolean).join(' ')}
+                        onClick={interactive ? () => openAirframeEditor(airframe) : undefined}
+                        title={`${airframe.model} · ${airframe.boardNumber || '-'} · ${airframe.pilotLabel} · ${statusLabel}`}
+                      >
+                        <div className="lidc-deck-airframe-media">
+                          <span className="lidc-deck-airframe-board">{airframe.boardNumber || '-'}</span>
+                          {airframe.unitImageUrl ? (
+                            <img
+                              src={airframe.unitImageUrl}
+                              alt={airframe.model}
+                              className="lidc-deck-airframe-image"
+                            />
+                          ) : (
+                            <span className="lidc-deck-airframe-image-fallback" aria-hidden="true">
+                              {airframe.model}
+                            </span>
+                          )}
+                        </div>
+                        {airframe.pilotAvatarUrl ? (
+                          <img
+                            src={airframe.pilotAvatarUrl}
+                            alt={airframe.pilotLabel}
+                            className="lidc-deck-airframe-pilot"
+                          />
+                        ) : (
+                          <span
+                            className={`lidc-deck-airframe-pilot lidc-deck-airframe-pilot-fallback ${airframe.pilotUserId ? '' : 'is-unassigned'}`}
+                            aria-label={airframe.pilotLabel}
+                          >
+                            {airframe.pilotUserId ? airframe.pilotInitial : ''}
+                          </span>
+                        )}
+                      </Tag>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+          </div>
+          {interactive && (
+            <div className="lidc-airframe-table-hint">{t('lidc.airframes.rowHint')}</div>
+          )}
         </div>
       </>
     );

@@ -515,7 +515,7 @@ export default {
       empty: 'Nessun velivolo acquistato nel deck.',
       assignedPilot: 'Pilota assegnato',
       unassigned: 'Non assegnato',
-      rowHint: 'Clicca una riga per modificare dati e aprire i log operativi (mock).',
+      rowHint: 'Clicca un velivolo per modificare i dati e aprire i log operativi (mock).',
       editorTitle: 'Dettaglio velivolo',
       editorHint: 'Modello, base, board number e status sono in sola lettura (mock). Puoi assegnare solo il pilota.',
       logsTitle: 'Log operativi',

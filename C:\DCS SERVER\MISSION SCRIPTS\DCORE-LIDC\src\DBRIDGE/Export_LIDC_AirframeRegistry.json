@@ -3,15 +3,35 @@
   "nameToUcid": {},
   "airframes": [
     {
-      "id": "airframe_a10c2_1_928c79",
-      "squadronId": "lidc_1787600507211_976821",
+      "id": "airframe_uh1h_1_7ef104",
+      "squadronId": "lidc_1787699269062_f952f0",
       "ucid": null,
       "pilotName": null,
-      "dcsType": "A-10C_2",
-      "homeAirbase": "Rene Mouawad",
-      "currentAirbase": "Rene Mouawad",
+      "dcsType": "UH-1H",
+      "homeAirbase": "Palmyra",
+      "currentAirbase": "Palmyra",
+      "state": "in_hangar"
+    },
+    {
+      "id": "airframe_uh1h_2_f8ae93",
+      "squadronId": "lidc_1787699269062_f952f0",
+      "ucid": null,
+      "pilotName": null,
+      "dcsType": "UH-1H",
+      "homeAirbase": "Palmyra",
+      "currentAirbase": "Palmyra",
+      "state": "in_hangar"
+    },
+    {
+      "id": "airframe_uh1h_3_46c540",
+      "squadronId": "lidc_1787699269062_f952f0",
+      "ucid": null,
+      "pilotName": null,
+      "dcsType": "UH-1H",
+      "homeAirbase": "Palmyra",
+      "currentAirbase": "Palmyra",
       "state": "in_hangar"
     }
   ],
-  "updatedAt": 1787698399411
+  "updatedAt": 1787699269107
 }

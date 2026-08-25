@@ -48,7 +48,14 @@
       "dcsType": "A-10C_2",
       "delta": 1,
       "createdAt": 1787600507214
+    },
+    {
+      "opId": "whop_1787699269105_50d46219",
+      "base": "Palmyra",
+      "dcsType": "UH-1H",
+      "delta": 3,
+      "createdAt": 1787699269105
     }
   ],
-  "updatedAt": 1787698399408
+  "updatedAt": 1787699269106
 }

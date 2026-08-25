@@ -1924,6 +1924,177 @@ body.lidc-deck-expanded-open {
   overflow-y: auto;
 }
 
+.lidc-deck-board-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.lidc-deck-board {
+  display: grid;
+  gap: clamp(16px, 1.1vw, 28px);
+  padding: 12px clamp(14px, 1.07vw, 28px) 18px;
+  align-content: start;
+}
+
+.lidc-deck-base-group {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.lidc-deck-base-row {
+  width: 100%;
+  min-height: clamp(44px, 2.1vw, 64px);
+  cursor: default;
+}
+
+.lidc-panel-row--static span.lidc-deck-base-row-name {
+  min-width: 0;
+  flex: 1;
+  color: var(--lidc-ink);
+  font-size: clamp(13px, 0.58vw, 18px);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lidc-panel-row--static span.lidc-deck-base-row-count {
+  flex: 0 0 auto;
+  color: var(--lidc-mute);
+  font-family: GeistMono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+}
+
+.lidc-deck-base-aircrafts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 18px;
+  padding: 0 4px 2px;
+}
+
+.lidc-deck-airframe {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 4px 6px 6px;
+  margin: 0;
+  width: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+  text-align: center;
+  cursor: default;
+}
+
+.lidc-deck-airframe.is-clickable {
+  cursor: pointer;
+  border-radius: 12px;
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+.lidc-deck-airframe.is-clickable:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.lidc-deck-airframe.is-updating {
+  opacity: 0.55;
+}
+
+.lidc-deck-airframe.is-destroyed {
+  opacity: 0.45;
+  filter: grayscale(0.45);
+}
+
+.lidc-deck-airframe-media {
+  position: relative;
+  width: 108px;
+  height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lidc-deck-airframe-board {
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  color: var(--lidc-accent-gold);
+  font-family: GeistMono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+}
+
+.lidc-deck-airframe-image {
+  display: block;
+  width: 108px;
+  height: 68px;
+  object-fit: contain;
+  object-position: center;
+  pointer-events: none;
+  user-select: none;
+}
+
+.lidc-deck-airframe-image-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 108px;
+  height: 68px;
+  color: var(--lidc-mute);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lidc-deck-airframe-pilot {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--lidc-hairline);
+  object-fit: cover;
+  background: #2a2a2a;
+}
+
+.lidc-deck-airframe-pilot-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--lidc-body);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.lidc-deck-airframe-pilot-fallback.is-unassigned {
+  border-style: dashed;
+  background: transparent;
+  color: transparent;
+}
+
+.lidc-deck-airframe.is-airborne .lidc-deck-airframe-pilot {
+  box-shadow: 0 0 0 1px rgba(255, 187, 0, 0.55);
+}
+
+.lidc-deck-board-wrap.is-readonly .lidc-deck-airframe.is-clickable {
+  cursor: default;
+}
+
+.lidc-deck-board-wrap .lidc-airframe-table-hint {
+  margin-top: auto;
+}
+
 .lidc-visual-card-members .lidc-member-cards {
   height: 100%;
   min-height: 0;
