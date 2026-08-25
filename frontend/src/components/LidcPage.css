@@ -2167,7 +2167,7 @@ body.lidc-deck-expanded-open {
 }
 
 .lidc-deck-board-wrap.is-readonly .lidc-deck-airframe.is-clickable {
-  cursor: default;
+  cursor: pointer;
 }
 
 .lidc-deck-board-wrap .lidc-airframe-table-hint {

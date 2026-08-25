@@ -2082,23 +2082,22 @@ export default function LidcPage() {
                     const statusLabel = getAirframeStatusLabel(airframe.status);
                     const isEmpty = !airframe.pilotUserId;
                     const isDropTarget = allowAssign && isEmpty && dropTargetAirframeId === airframe.id;
-                    const Tag = interactive ? 'button' : 'div';
 
                     return (
-                      <Tag
+                      <button
                         key={airframe.id}
-                        type={interactive ? 'button' : undefined}
+                        type="button"
                         className={[
                           'lidc-deck-airframe',
                           `is-${airframe.status}`,
                           isUpdating ? 'is-updating' : '',
-                          interactive ? 'is-clickable' : '',
+                          'is-clickable',
                           allowAssign && isEmpty ? 'is-droppable' : '',
                           allowAssign && !isEmpty ? 'is-assigned' : '',
                           isDropTarget ? 'is-drop-target' : '',
                           isDraggingMember && !isEmpty ? 'is-drop-blocked' : '',
                         ].filter(Boolean).join(' ')}
-                        onClick={interactive ? () => openAirframeEditor(airframe) : undefined}
+                        onClick={() => openAirframeEditor(airframe)}
                         onContextMenu={allowAssign ? (event) => handleAirframeContextMenu(event, airframe) : undefined}
                         onDragOver={allowAssign ? (event) => handleAirframeDragOver(event, airframe) : undefined}
                         onDragLeave={allowAssign ? (event) => handleAirframeDragLeave(event, airframe) : undefined}
@@ -2135,7 +2134,7 @@ export default function LidcPage() {
                             {airframe.pilotUserId ? airframe.pilotInitial : ''}
                           </span>
                         )}
-                      </Tag>
+                      </button>
                     );
                   })}
                 </div>
