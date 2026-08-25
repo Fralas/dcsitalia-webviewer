@@ -508,8 +508,6 @@ export default {
     },
     squadrons: {
       listEmpty: 'No squadrons available.',
-      totalPersonnel: 'Total personnel',
-      totalAirframes: 'Total aircraft'
     },
     airframes: {
       empty: 'No purchased airframes found in this deck.',

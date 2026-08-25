@@ -287,12 +287,6 @@ body.lidc-map-fullscreen-open {
   overflow-y: auto;
 }
 
-.lidc-panel-squadron .lidc-panel-rows {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-}
-
 .lidc-panel-list .lidc-panel-rows {
   align-content: start;
   grid-auto-rows: max-content;

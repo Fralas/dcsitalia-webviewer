@@ -508,8 +508,6 @@ export default {
     },
     squadrons: {
       listEmpty: 'Nessuno squadrone disponibile.',
-      totalPersonnel: 'Personale totale',
-      totalAirframes: 'Velivoli totali'
     },
     airframes: {
       empty: 'Nessun velivolo acquistato nel deck.',

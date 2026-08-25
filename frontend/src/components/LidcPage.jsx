@@ -1687,20 +1687,6 @@ export default function LidcPage() {
     });
   }, [squadronMembers, airframeRows]);
 
-  const squadronSummaryStats = useMemo(() => {
-    const memberProfiles = Array.isArray(activeSquadron?.memberProfiles) ? activeSquadron.memberProfiles : [];
-    const totalPersonnel = memberRows.length > 0 ? memberRows.length : memberProfiles.length;
-    const totalAirframes = airframeRows.filter((row) => {
-      const category = String(row?.category || '').toLowerCase();
-      return category === 'aircrafts' || category === 'helicopters';
-    }).length;
-
-    return {
-      totalPersonnel,
-      totalAirframes,
-    };
-  }, [memberRows, airframeRows, activeSquadron?.memberProfiles]);
-
   const selectedAirframeRow = useMemo(() => {
     const selectedId = String(selectedAirframeDraft?.id || '');
     if (!selectedId) return null;
@@ -2416,37 +2402,6 @@ export default function LidcPage() {
     );
   }
 
-  function renderMySquadronRows() {
-    if (loadingUserState) {
-      return (
-        <div className="lidc-panel-row lidc-panel-row--static">
-          <Loader2 size={18} className="spin" />
-          <span>{t('lidc.general.loadingUserState')}</span>
-        </div>
-      );
-    }
-
-    if (!isLogged) {
-      return null;
-    }
-
-    if (!userHasSquadron) {
-      return null;
-    }
-
-    const rows = [
-      { label: t('lidc.squadrons.totalPersonnel'), value: String(squadronSummaryStats.totalPersonnel) },
-      { label: t('lidc.squadrons.totalAirframes'), value: String(squadronSummaryStats.totalAirframes) },
-    ];
-
-    return rows.map((row) => (
-      <div key={row.label} className="lidc-panel-row lidc-panel-row--static">
-        <span>{row.label}</span>
-        <strong>{row.value}</strong>
-      </div>
-    ));
-  }
-
   function renderMySquadronPanel() {
     const showNoSquadronActions = isLogged && !userHasSquadron && !loadingUserState;
     const showDiscordCta = !isLogged && !loadingUserState;
@@ -2457,12 +2412,6 @@ export default function LidcPage() {
     return (
       <section className="lidc-panel lidc-panel-squadron">
         <h2 className="lidc-panel-title">{squadronTitle}</h2>
-
-        {isLogged && !showNoSquadronActions && (
-          <div className="lidc-panel-rows">
-            {renderMySquadronRows()}
-          </div>
-        )}
 
         {isLogged && catalogError && <div className="lidc-inline-error lidc-panel-inline-error">{catalogError}</div>}
 
