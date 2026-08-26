@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { TrendingUp, Calendar } from 'lucide-react';
 import { getWeaponHistory } from '../services/api';
 import { t } from '../utils/locale';
+import InlineError from './InlineError';
 
 /**
  * Get weapon display name (remove prefix)
@@ -97,7 +98,7 @@ export default function WeaponChart({ airportId, weaponId, days = 7 }) {
   if (error) {
     return (
       <div className="bg-yt-bg-secondary rounded-lg p-8 text-center">
-        <p className="text-yellow-400">{error}</p>
+        <InlineError message={error} />
         <p className="text-xs text-yt-text-secondary mt-2">{t('weaponChart.snapshotInfo')}</p>
       </div>
     );

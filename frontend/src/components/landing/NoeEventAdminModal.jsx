@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { X, Trash2, Save, Plus, Loader2 } from 'lucide-react';
 import { formatEventDate, parseEventDateInput, toApiDateField } from './dateFormat';
 import * as api from '../../services/api';
+import InlineError from '../InlineError';
 
 const LABELS = {
   en: {
@@ -194,7 +195,7 @@ export default function NoeEventAdminModal({ events = [], language = 'en', onClo
               />
             </label>
 
-            {error && <div className="noe-modal__error">{error}</div>}
+            <InlineError message={error} align="start" />
 
             <div className="noe-modal__actions">
               {editingId && (

@@ -3,6 +3,7 @@ import { Award, ChevronDown, Loader2, Pencil, Trash2, Trophy, Upload, User as Us
 import { createPortal } from 'react-dom';
 import { useUser } from '../contexts/UserContext';
 import * as api from '../services/api';
+import InlineError from './InlineError';
 import velcroTextureImg from '../../img/velcrotexture.jpg';
 
 function formatDate(timestamp) {
@@ -792,11 +793,7 @@ export default function UserProfile() {
             Caricamento dati profilo...
           </div>
         )}
-        {error && (
-          <div className="mb-3 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-            {error}
-          </div>
-        )}
+        <InlineError message={error} className="mb-3" />
 
         {userAchievements.length === 0 ? (
           <div className="rounded-xl border border-yt-border/70 bg-yt-bg-tertiary/60 px-4 py-5 text-sm text-yt-text-secondary">

@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   ChevronDown,
   ChevronRight,
-  CircleAlert,
   Disc3,
   Loader2,
   Save,
@@ -34,6 +33,7 @@ import LidcDeckBuilder, {
 } from './LidcDeckBuilder';
 import LidcSpecializationPicker, { sumSpecializationCaps } from './LidcSpecializationPicker';
 import LidcSquadronIdentityStep from './LidcSquadronIdentityStep';
+import InlineError from './InlineError';
 import './LidcPage.css';
 
 const WIZARD_STEPS = ['info', 'specializations', 'deck', 'review'];
@@ -47,59 +47,8 @@ const LIDC_SIDEBAR_VIEWS = Object.freeze({
 
 const DECK_SLOT_FLIP_MS = 680;
 const DECK_SLOT_FLIP_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
-const WIZARD_ERROR_ANIM_MS = 320;
 const SHOW_SQUADRON_LEAVE_DELETE_UI = false;
 const SHOW_SQUADRON_LEAVE_DEBUG_HEADER = true;
-
-function WizardFooterError({ message = '' }) {
-  const [displayed, setDisplayed] = useState('');
-  const [phase, setPhase] = useState('closed');
-  const hideTimerRef = useRef(null);
-
-  useEffect(() => {
-    if (hideTimerRef.current) {
-      window.clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = null;
-    }
-
-    if (message) {
-      setDisplayed(message);
-      setPhase('open');
-      return undefined;
-    }
-
-    setPhase((current) => (current === 'closed' ? 'closed' : 'closing'));
-    hideTimerRef.current = window.setTimeout(() => {
-      setDisplayed('');
-      setPhase('closed');
-      hideTimerRef.current = null;
-    }, WIZARD_ERROR_ANIM_MS);
-
-    return () => {
-      if (hideTimerRef.current) {
-        window.clearTimeout(hideTimerRef.current);
-      }
-    };
-  }, [message]);
-
-  return (
-    <div
-      className={`lidc-wizard-error-slot ${phase === 'open' ? 'is-open' : ''} ${phase === 'closing' ? 'is-closing' : ''}`}
-      role="status"
-      aria-live="polite"
-      aria-hidden={phase !== 'open'}
-    >
-      <div className="lidc-wizard-error-clip">
-        {displayed ? (
-          <div className="lidc-inline-error lidc-wizard-error" title={displayed}>
-            <CircleAlert size={16} aria-hidden="true" />
-            <span>{displayed}</span>
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
 
 function cancelDeckSlotFlip(deckSlot, transitionRef) {
   if (!deckSlot) return;
@@ -2065,7 +2014,7 @@ export default function LidcPage() {
             : t('lidc.debug.leaveSquadron')}</span>
         </button>
         {userStateError && (
-          <span className="app-header__debug-error" role="alert">{userStateError}</span>
+          <InlineError message={userStateError} compact className="app-header__debug-error" />
         )}
       </div>,
       headerDebugSlot,
@@ -2116,7 +2065,7 @@ export default function LidcPage() {
     }
 
     if (squadronDetailsError) {
-      return <div className="lidc-inline-error">{squadronDetailsError}</div>;
+      return <InlineError message={squadronDetailsError} />;
     }
 
     if (airframeRows.length === 0) {
@@ -2129,7 +2078,7 @@ export default function LidcPage() {
     return (
       <>
         {allowAssign && airframeUpdateError && (
-          <div className="lidc-inline-error">{airframeUpdateError}</div>
+          <InlineError message={airframeUpdateError} />
         )}
         <div className={`lidc-airframe-table-wrap lidc-deck-board-wrap ${flush ? 'lidc-deck-table-wrap is-flush' : ''} ${interactive ? 'is-interactive' : 'is-readonly'} ${isDraggingMember ? 'is-assigning' : ''}`}>
           <div className="lidc-deck-board">
@@ -2276,7 +2225,7 @@ export default function LidcPage() {
     }
 
     if (squadronDetailsError) {
-      return <div className="lidc-inline-error">{squadronDetailsError}</div>;
+      return <InlineError message={squadronDetailsError} />;
     }
 
     if (showDeckManagementView) {
@@ -2396,7 +2345,7 @@ export default function LidcPage() {
                 spellCheck={false}
               />
             </label>
-            {joinError && <div className="lidc-inline-error">{joinError}</div>}
+            <InlineError message={joinError} />
           </div>
 
           <div className="lidc-center-actions">
@@ -2443,7 +2392,7 @@ export default function LidcPage() {
         </div>
       );
     } else if (squadronDetailsError) {
-      body = <div className="lidc-inline-error">{squadronDetailsError}</div>;
+      body = <InlineError message={squadronDetailsError} />;
     } else if (unassignedMemberRows.length === 0) {
       body = <div className="lidc-muted-box">{t('lidc.members.unassignedEmpty')}</div>;
     } else {
@@ -2476,7 +2425,7 @@ export default function LidcPage() {
     return (
       <section className="lidc-panel lidc-panel-list">
         <h2 className="lidc-panel-title">{t('lidc.members.listTitle')}</h2>
-        {memberActionError && <div className="lidc-inline-error">{memberActionError}</div>}
+        <InlineError message={memberActionError} />
         <div className="lidc-panel-list-body">
           <div className="lidc-panel-rows">
             {body}
@@ -2546,7 +2495,7 @@ export default function LidcPage() {
       <section className="lidc-panel lidc-panel-squadron">
         <h2 className="lidc-panel-title">{squadronTitle}</h2>
 
-        {isLogged && catalogError && <div className="lidc-inline-error lidc-panel-inline-error">{catalogError}</div>}
+        {isLogged && <InlineError message={catalogError} className="lidc-panel-inline-error" />}
 
         {showNoSquadronActions && (
           <div className="lidc-panel-squadron-actions">
@@ -2606,7 +2555,7 @@ export default function LidcPage() {
               ) : (
                 <p className="lidc-code-box-hint">{t('lidc.link.notLinked')}</p>
               )}
-              {ucidLinkError && <div className="lidc-inline-error">{ucidLinkError}</div>}
+              <InlineError message={ucidLinkError} />
             </div>
 
             {userHasSquadron && activeSquadron?.inviteCode && (
@@ -2954,7 +2903,7 @@ export default function LidcPage() {
                 {t('lidc.general.back')}
               </button>
 
-              <WizardFooterError message={wizardFooterError} />
+              <InlineError message={wizardFooterError} compact className="lidc-wizard-error-host" />
 
               {currentStep < WIZARD_STEPS.length - 1 ? (
                 <button type="button" className="lidc-btn lidc-btn-primary" onClick={goToNextStep} disabled={!canGoNextStep}>
@@ -3117,7 +3066,7 @@ export default function LidcPage() {
             )}
 
             {(airframeEditorError || airframeUpdateError) && (
-              <div className="lidc-inline-error">{airframeEditorError || airframeUpdateError}</div>
+              <InlineError message={airframeEditorError || airframeUpdateError} />
             )}
 
             <div className="lidc-modal-actions lidc-airframe-modal-actions">
@@ -3150,7 +3099,7 @@ export default function LidcPage() {
               <h3>{t('lidc.center.confirmTitle')}</h3>
               <p>{t('lidc.center.confirmQuestion', { action: getPendingSquadronActionText() })}</p>
               {userStateError && (
-                <div className="lidc-inline-error lidc-confirm-modal-error">{userStateError}</div>
+                <InlineError message={userStateError} className="lidc-confirm-modal-error" />
               )}
             </div>
 
@@ -3199,7 +3148,7 @@ export default function LidcPage() {
               />
             </div>
 
-            {deckEditorError && <div className="lidc-inline-error">{deckEditorError}</div>}
+            <InlineError message={deckEditorError} />
 
             <div className="lidc-modal-actions">
               <button
@@ -3240,7 +3189,7 @@ export default function LidcPage() {
               spellCheck={false}
             />
 
-            {templateEditorError && <div className="lidc-inline-error">{templateEditorError}</div>}
+            <InlineError message={templateEditorError} />
 
             <div className="lidc-modal-actions">
               <button type="button" className="lidc-btn lidc-btn-outline" onClick={() => setIsTemplateEditorOpen(false)}>

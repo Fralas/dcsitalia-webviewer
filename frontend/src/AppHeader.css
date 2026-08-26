@@ -211,10 +211,7 @@
 }
 
 .app-header__debug-error {
-  font-size: 10px;
-  line-height: 1.2;
-  color: #ff8a8a;
-  max-width: 140px;
+  max-width: min(280px, 42vw);
 }
 
 .app-header__nav-btn--debug {

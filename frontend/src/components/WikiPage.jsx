@@ -57,6 +57,7 @@ import scoutImg from '../../img/wiki/veh/SCOUT.png';
 import shipImg from '../../img/wiki/veh/SHIP.png';
 import towImg from '../../img/wiki/veh/TOW.png';
 import { useUser } from '../contexts/UserContext';
+import InlineError from './InlineError';
 import * as api from '../services/api';
 
 function normalizeGameplayIconKey(iconKey) {
@@ -2097,8 +2098,8 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
           </div>
         )}
         {wikiError && (
-          <div className="mt-4 rounded-xl border border-red-500/35 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-            {wikiError}
+          <div className="mt-4">
+            <InlineError message={wikiError} />
           </div>
         )}
       </section>

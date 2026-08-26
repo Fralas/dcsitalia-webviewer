@@ -8,6 +8,7 @@ import {
   getLidcAirportById,
 } from '../config/lidcAfghanistanAirports';
 import LidcTheaterMap from './LidcTheaterMap';
+import InlineError from './InlineError';
 import './LidcSquadronIdentityStep.css';
 
 const NAME_MAX = 120;
@@ -78,7 +79,7 @@ export default function LidcSquadronIdentityStep({
               hidden
             />
           </button>
-          {logoUploadError && <div className="lidc-inline-error">{logoUploadError}</div>}
+          <InlineError message={logoUploadError} align="start" />
         </div>
 
         <label className="lidc-identity-field lidc-identity-field--name">

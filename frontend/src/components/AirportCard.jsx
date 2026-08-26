@@ -9,6 +9,7 @@ import { isImportantWeapon, importantWeaponsAirports, importantWeaponsHeliports,
 import { formatWeight } from '../utils/weightFormatter';
 import { t, formatElapsedTime, formatRemainingTime, getStatusLabel } from '../utils/locale';
 import { useUser } from '../contexts/UserContext';
+import InlineError from './InlineError';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import discordLogo from '../../img/discord_logo.png';
 
@@ -877,8 +878,8 @@ export default function AirportCard({
                       {t('airportCard.charts.loading')}
                     </div>
                   ) : chartsError ? (
-                    <div className="h-full flex items-center justify-center text-sm text-red-400">
-                      {chartsError}
+                    <div className="h-full flex items-center justify-center p-3">
+                      <InlineError message={chartsError} />
                     </div>
                   ) : chartsAvailable && chartsList.length > 0 ? (
                     <div className="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto pr-1">

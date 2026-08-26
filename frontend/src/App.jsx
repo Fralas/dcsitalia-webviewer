@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { AlertCircle, BookOpen, CalendarSync, ChevronDown, TowerControl } from 'lucide-react';
+import { BookOpen, CalendarSync, ChevronDown, TowerControl } from 'lucide-react';
 import FrontlineMap from './components/FrontlineMap';
 import LandingPage from './components/landing/LandingPage';
 import UserMenu from './components/UserMenu';
@@ -17,6 +17,7 @@ import itFlagImg from '../img/flags/it.svg';
 import { useUser } from './contexts/UserContext';
 import CampaignHeaderTabs from './components/CampaignHeaderTabs';
 import BootSplash from './components/BootSplash';
+import InlineError from './components/InlineError';
 import {
   DEFAULT_CAMPAIGN_ID,
   getCampaignNavTarget,
@@ -439,10 +440,9 @@ function App() {
 
       {bootReady && error ? (
         <div className="min-h-screen bg-yt-bg-primary flex items-center justify-center">
-          <div className="text-center max-w-md">
-            <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-            <p className="text-xl text-red-400 mb-2">{t('general.errorTitle')}</p>
-            <p className="text-yt-text-secondary mb-4">{error}</p>
+          <div className="text-center max-w-md px-4">
+            <p className="text-xl text-white mb-4">{t('general.errorTitle')}</p>
+            <InlineError message={error} className="mb-4" />
             <button
               onClick={loadData}
               className="px-6 py-2 bg-yt-accent hover:bg-yt-accent/80 text-white rounded font-bold transition-all"

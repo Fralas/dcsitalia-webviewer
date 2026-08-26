@@ -14,6 +14,7 @@ import ch47ModelUrl from '../assets/3D/ch47.glb';
 import t72ModelUrl from '../assets/3D/t90.glb';
 import kc135ModelUrl from '../assets/3D/kc-135_dcs_world.glb';
 import { Ambulance, Anchor, Blend, Box, Boxes, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChessRook, Clock3, Factory, Forklift, Fuel, Hammer, MapPin, PersonStanding, Satellite, TowerControl, Warehouse, X } from 'lucide-react';
+import InlineError from './InlineError';
 import frontlineZones from '../config/frontlineZones.json';
 import { getDefaultTacticalMap, getTacticalMapByCampaignId } from '../config/tacticalMaps';
 import { buildZoneConnections, getNeighborZoneIds, normalizeZoneId } from '../config/zoneConfini';
@@ -6638,8 +6639,8 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                     </div>
                   )}
                   {selectedDbuildPlacement.error && (
-                    <div className="mt-2 text-[11px] text-red-300">
-                      {selectedDbuildPlacement.error}
+                    <div className="mt-2">
+                      <InlineError message={selectedDbuildPlacement.error} align="start" />
                     </div>
                   )}
                 </div>

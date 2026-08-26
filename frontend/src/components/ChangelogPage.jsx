@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarSync, GitPullRequestCreateArrow, ImagePlus, Languages, Loader2, Pencil, Plus, Save, Trash2, Upload, Video, X } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import * as api from '../services/api';
+import InlineError from './InlineError';
 
 const ALLOWED_AUTHOR_IDS = new Set([
   '153370631772045313',
@@ -928,11 +929,7 @@ export default function ChangelogPage({ language = 'en' }) {
         </div>
       )}
 
-      {error && (
-        <div className="rounded-xl border border-red-500/35 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-          {error}
-        </div>
-      )}
+      <InlineError message={error} className="mb-3" />
 
       <div className="space-y-3 pb-4">
         {loadingPosts && (
