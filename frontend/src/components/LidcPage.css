@@ -3168,10 +3168,11 @@ body.lidc-deck-expanded-open {
 
 .lidc-airframe-modal-root {
   z-index: 6050;
+  font-family: var(--lidc-font);
 }
 
 .lidc-airframe-modal-backdrop {
-  background: rgba(0, 0, 0, 0.72);
+  background: rgba(14, 14, 14, 0.72);
   backdrop-filter: blur(10px) saturate(120%);
   -webkit-backdrop-filter: blur(10px) saturate(120%);
 }
@@ -3184,6 +3185,7 @@ body.lidc-deck-expanded-open {
   border: 1px solid var(--lidc-hairline);
   border-radius: var(--lidc-radius);
   background: var(--lidc-canvas);
+  color: var(--lidc-ink);
   box-shadow: var(--lidc-shadow);
   overflow: hidden;
 }
@@ -3208,13 +3210,15 @@ body.lidc-deck-expanded-open {
   font-size: clamp(16px, 0.83vw, 24px);
   font-weight: 700;
   line-height: 1.22;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--lidc-ink);
 }
 
 .lidc-airframe-modal-subtitle {
   margin: 0;
   font-size: 12px;
-  color: var(--lidc-body);
+  color: var(--lidc-mute);
   letter-spacing: 0.02em;
 }
 
@@ -3249,7 +3253,7 @@ body.lidc-deck-expanded-open {
   border: 0;
   border-right: 1px solid var(--lidc-hairline);
   border-radius: 0;
-  background: var(--lidc-canvas);
+  background: var(--lidc-canvas-soft);
   padding: 10px 12px;
   display: grid;
   gap: 6px;
@@ -3265,7 +3269,7 @@ body.lidc-deck-expanded-open {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--lidc-body);
+  color: var(--lidc-mute);
 }
 
 .lidc-airframe-readonly-item strong {
@@ -3280,6 +3284,28 @@ body.lidc-deck-expanded-open {
 
 .lidc-airframe-readonly-item .lidc-status-pill {
   width: fit-content;
+  border-radius: var(--lidc-pill);
+  border-color: var(--lidc-hairline);
+  background: var(--lidc-canvas);
+  color: var(--lidc-body);
+}
+
+.lidc-airframe-readonly-item .lidc-status-pill.is-airborne {
+  border-color: rgba(255, 187, 0, 0.45);
+  background: rgba(255, 187, 0, 0.1);
+  color: var(--lidc-accent-gold);
+}
+
+.lidc-airframe-readonly-item .lidc-status-pill.is-grounded {
+  border-color: var(--lidc-hairline);
+  background: var(--lidc-canvas);
+  color: var(--lidc-body);
+}
+
+.lidc-airframe-readonly-item .lidc-status-pill.is-destroyed {
+  border-color: rgba(255, 127, 127, 0.4);
+  background: rgba(255, 127, 127, 0.1);
+  color: var(--lidc-danger);
 }
 
 .lidc-airframe-inline-field {
@@ -3290,7 +3316,7 @@ body.lidc-deck-expanded-open {
 }
 
 .lidc-airframe-inline-field span {
-  color: var(--lidc-body);
+  color: var(--lidc-mute);
   font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -3355,8 +3381,8 @@ body.lidc-deck-expanded-open {
 
 .lidc-airframe-pilot-trigger:hover,
 .lidc-airframe-pilot-trigger.is-open {
-  border-color: rgba(255, 255, 255, 0.34);
-  background: var(--lidc-canvas-soft);
+  border-color: var(--lidc-accent-gold);
+  background: rgba(255, 187, 0, 0.08);
 }
 
 .lidc-airframe-pilot-trigger-main {
@@ -3481,7 +3507,8 @@ body.lidc-deck-expanded-open {
 
 .lidc-airframe-log-panel header .lidc-chip {
   font-size: 10px;
-  color: var(--lidc-mute);
+  color: var(--lidc-accent-gold);
+  border-color: rgba(255, 187, 0, 0.35);
 }
 
 .lidc-airframe-log-list {
@@ -3518,32 +3545,20 @@ body.lidc-deck-expanded-open {
   padding: 8px 12px;
 }
 
-.lidc-airframe-log-line.is-handover .lidc-airframe-log-line-text {
-  color: #98c6ff;
+.lidc-airframe-log-line.is-handover .lidc-airframe-log-line-text,
+.lidc-airframe-log-line.is-takeoff .lidc-airframe-log-line-text,
+.lidc-airframe-log-line.is-airborne .lidc-airframe-log-line-text {
+  color: var(--lidc-accent-gold);
 }
 
-.lidc-airframe-log-line.is-startup .lidc-airframe-log-line-text {
-  color: #a8edc6;
+.lidc-airframe-log-line.is-startup .lidc-airframe-log-line-text,
+.lidc-airframe-log-line.is-landing .lidc-airframe-log-line-text {
+  color: var(--lidc-accent-orange);
 }
 
-.lidc-airframe-log-line.is-taxi .lidc-airframe-log-line-text {
-  color: #f3dc9a;
-}
-
-.lidc-airframe-log-line.is-takeoff .lidc-airframe-log-line-text {
-  color: #9fd7ff;
-}
-
+.lidc-airframe-log-line.is-taxi .lidc-airframe-log-line-text,
 .lidc-airframe-log-line.is-position .lidc-airframe-log-line-text {
   color: var(--lidc-body);
-}
-
-.lidc-airframe-log-line.is-airborne .lidc-airframe-log-line-text {
-  color: #80c6ff;
-}
-
-.lidc-airframe-log-line.is-landing .lidc-airframe-log-line-text {
-  color: #9ee2bc;
 }
 
 .lidc-airframe-log-line.is-loss .lidc-airframe-log-line-text {
@@ -3552,7 +3567,21 @@ body.lidc-deck-expanded-open {
 
 .lidc-airframe-modal-actions {
   padding-top: 4px;
-  border-top: 1px solid var(--lidc-hairline);
+}
+
+.lidc-airframe-modal-card .lidc-btn-outline:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.44);
+  background: var(--lidc-canvas-soft);
+}
+
+.lidc-airframe-modal-card .lidc-btn-primary {
+  background: var(--lidc-accent-orange);
+  border-color: var(--lidc-accent-orange);
+  color: var(--lidc-on-primary);
+}
+
+.lidc-airframe-modal-card .lidc-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.06);
 }
 
 .lidc-preview-chip-list {
