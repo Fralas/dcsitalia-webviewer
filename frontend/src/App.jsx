@@ -99,6 +99,39 @@ function viewFromLocation() {
   return { view: 'landing', tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
 }
 
+function isSplashPreviewUrl() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  return new URLSearchParams(window.location.search).has('splash');
+}
+
+function setSplashPreviewUrl(enabled) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  const url = new URL(window.location.href);
+  if (enabled) {
+    url.searchParams.set('splash', '1');
+  } else {
+    url.searchParams.delete('splash');
+  }
+  const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+  const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (nextUrl !== currentUrl) {
+    window.history.replaceState({}, '', nextUrl);
+  }
+}
+
+function isTypingTarget(target) {
+  if (!target || typeof target !== 'object') {
+    return false;
+  }
+  const element = target;
+  const tag = String(element.tagName || '').toLowerCase();
+  return tag === 'input' || tag === 'textarea' || tag === 'select' || Boolean(element.isContentEditable);
+}
+
 function syncUrlWithView(view, { replace = false, tacticalMapId = null } = {}) {
   if (typeof window === 'undefined') {
     return;
@@ -146,9 +179,32 @@ function App() {
   const { user, loading: userLoading } = useUser();
   const showAtc = canAccessAtc(user?.id);
   const bootStartedAt = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const bootRevealDone = useRef(false);
   const [splashVisible, setSplashVisible] = useState(true);
   const [splashFading, setSplashFading] = useState(false);
+  const [splashKey, setSplashKey] = useState(0);
+  const [splashPreview, setSplashPreview] = useState(() => isSplashPreviewUrl());
   const bootReady = !loading && !userLoading;
+
+  const hideSplash = () => {
+    setSplashFading(true);
+    window.setTimeout(() => {
+      setSplashVisible(false);
+      setSplashFading(false);
+    }, BOOT_FADE_MS);
+  };
+
+  const replaySplash = () => {
+    setSplashFading(false);
+    setSplashVisible(true);
+    setSplashKey((key) => key + 1);
+  };
+
+  const closeSplashPreview = () => {
+    setSplashPreview(false);
+    setSplashPreviewUrl(false);
+    hideSplash();
+  };
 
   const goToView = (view, options = {}) => {
     const normalized = normalizeView(view);
@@ -208,7 +264,12 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!bootReady) {
+    if (splashPreview) {
+      bootRevealDone.current = true;
+      return undefined;
+    }
+
+    if (!bootReady || bootRevealDone.current) {
       return undefined;
     }
 
@@ -239,6 +300,7 @@ function App() {
       });
       if (cancelled) return;
 
+      bootRevealDone.current = true;
       setSplashFading(true);
       fadeTimerId = window.setTimeout(() => {
         if (!cancelled) {
@@ -253,7 +315,35 @@ function App() {
       cancelled = true;
       window.clearTimeout(fadeTimerId);
     };
-  }, [bootReady]);
+  }, [bootReady, splashPreview]);
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (isTypingTarget(event.target)) {
+        return;
+      }
+
+      if (event.key === 'Escape' && splashVisible) {
+        event.preventDefault();
+        if (splashPreview) {
+          closeSplashPreview();
+        } else {
+          hideSplash();
+        }
+        return;
+      }
+
+      if ((event.key === 'S' || event.key === 's') && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        event.preventDefault();
+        replaySplash();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [splashVisible, splashFading, splashPreview]);
 
   useEffect(() => {
     // Canonicalize URL (supports old ?view=changelogs links and unknown paths).
@@ -331,9 +421,15 @@ function App() {
     <>
       {splashVisible && (
         <BootSplash
+          key={splashKey}
           fading={splashFading}
+          preview={splashPreview}
           status={t('general.bootStatus')}
-          hint={t('general.bootHint')}
+          hint={splashPreview ? t('general.bootPreviewHint') : t('general.bootHint')}
+          replayLabel={t('general.bootReplay')}
+          closeLabel={t('general.bootClose')}
+          onReplay={replaySplash}
+          onClose={closeSplashPreview}
         />
       )}
 

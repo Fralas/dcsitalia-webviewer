@@ -5,6 +5,9 @@ export default {
     loading: 'Caricamento DCS Warehouse Viewer...',
     bootStatus: 'Inizializzazione sistemi',
     bootHint: 'Allineamento dati campagna e interfaccia',
+    bootPreviewHint: 'Anteprima splash — Shift+S riavvia, Esc chiude',
+    bootReplay: 'Riavvia',
+    bootClose: 'Chiudi',
     errorTitle: 'Errore nel caricamento dei dati',
     retry: 'Riprova',
     connection: {

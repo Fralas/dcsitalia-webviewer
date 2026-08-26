@@ -1,7 +1,7 @@
 .boot-splash {
   position: fixed;
   inset: 0;
-  z-index: 4000;
+  z-index: 10000;
   overflow: hidden;
   background: #000;
   color: #ededed;
@@ -53,8 +53,8 @@
 }
 
 .boot-splash__mark {
-  width: 56px;
-  height: 56px;
+  width: 68px;
+  height: 68px;
   object-fit: contain;
   filter: drop-shadow(0 0 18px rgba(255, 140, 0, 0.35));
 }
@@ -109,6 +109,32 @@
   background: #ff8c00;
   transform: translateX(-120%);
   animation: boot-splash-scan 1.35s ease-in-out infinite;
+}
+
+.boot-splash__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+  pointer-events: auto;
+}
+
+.boot-splash__btn {
+  appearance: none;
+  border: 1px solid #ff8c00;
+  background: #ff8c00;
+  color: #111;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.boot-splash__btn--ghost {
+  background: transparent;
+  color: #ededed;
+  border-color: rgba(237, 237, 237, 0.35);
 }
 
 @keyframes boot-splash-scan {

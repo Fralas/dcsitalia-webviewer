@@ -39,6 +39,7 @@ const ParticleWave: React.FC<ParticleWaveProps> = ({ className = '' }) => {
   const particleVertex = `
     attribute float scale;
     uniform float uTime;
+    varying float vStripe;
     void main() {
       vec3 p = position;
       float s = scale;
@@ -46,15 +47,21 @@ const ParticleWave: React.FC<ParticleWaveProps> = ({ className = '' }) => {
       p.x += (sin(p.y + uTime) * 0.5);
       s += (sin(p.x + uTime) * 0.5) + (cos(p.y + uTime) * 0.1) * 2.0;
       vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
-      gl_PointSize = s * 15.0 * (1.0 / -mvPosition.z);
+      gl_PointSize = s * 18.0 * (1.0 / -mvPosition.z);
       gl_Position = projectionMatrix * mvPosition;
+      vStripe = position.x / 42.0;
     }
   `;
 
   const particleFragment = `
-    uniform vec3 uColor;
+    varying float vStripe;
     void main() {
-      gl_FragColor = vec4(uColor, 0.5);
+      float x = clamp(vStripe * 0.5 + 0.5, 0.0, 1.0);
+      vec3 green = vec3(0.18, 1.0, 0.52);
+      vec3 white = vec3(1.0, 1.0, 1.0);
+      vec3 red = vec3(1.0, 0.22, 0.26);
+      vec3 flagColor = x < 0.46 ? green : (x < 0.70 ? white : red);
+      gl_FragColor = vec4(flagColor, 0.95);
     }
   `;
 
@@ -68,7 +75,8 @@ const ParticleWave: React.FC<ParticleWaveProps> = ({ className = '' }) => {
 
     // Camera
     const camera = new THREE.PerspectiveCamera(75, aspectRatio, 0.01, 1000);
-    camera.position.set(0, 6, 5);
+    const gridAngle = Math.PI / 4;
+    camera.position.set(Math.sin(gridAngle) * 5, 6, Math.cos(gridAngle) * 5);
 
     // Scene
     const scene = new THREE.Scene();
@@ -87,8 +95,8 @@ const ParticleWave: React.FC<ParticleWaveProps> = ({ className = '' }) => {
 
     // Particles
     const gap = 0.3;
-    const amountX = 200;
-    const amountY = 200;
+    const amountX = 280;
+    const amountY = 280;
     const particleNum = amountX * amountY;
     const particlePositions = new Float32Array(particleNum * 3);
     const particleScales = new Float32Array(particleNum);
@@ -121,6 +129,7 @@ const ParticleWave: React.FC<ParticleWaveProps> = ({ className = '' }) => {
     });
 
     const particles = new THREE.Points(particleGeometry, particleMaterial);
+    particles.rotation.y = Math.PI / 4 + Math.PI / 6;
     scene.add(particles);
 
     const mouse = new THREE.Vector2(-10, -10);
@@ -141,7 +150,7 @@ const ParticleWave: React.FC<ParticleWaveProps> = ({ className = '' }) => {
 
     const { scene, camera, renderer, particleMaterial } = sceneRef.current;
 
-    particleMaterial.uniforms.uTime.value += 0.05;
+    particleMaterial.uniforms.uTime.value -= 0.05;
 
     // Update particle color and background based on current theme
     const currentTheme = getCurrentTheme();

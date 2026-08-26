@@ -2,7 +2,16 @@ import { ParticleWave } from '@/components/ui/particle-wave';
 import bannerImg from '../../img/DCS_ITALIA_ICON.png';
 import './BootSplash.css';
 
-export default function BootSplash({ fading = false, status = '', hint = '' }) {
+export default function BootSplash({
+  fading = false,
+  preview = false,
+  status = '',
+  hint = '',
+  replayLabel = 'Replay',
+  closeLabel = 'Close',
+  onReplay,
+  onClose,
+}) {
   return (
     <div
       className={`boot-splash${fading ? ' boot-splash--out' : ''}`}
@@ -30,6 +39,16 @@ export default function BootSplash({ fading = false, status = '', hint = '' }) {
           <div className="boot-splash__track" aria-hidden="true">
             <span className="boot-splash__bar" />
           </div>
+          {preview ? (
+            <div className="boot-splash__actions">
+              <button type="button" className="boot-splash__btn" onClick={onReplay}>
+                {replayLabel}
+              </button>
+              <button type="button" className="boot-splash__btn boot-splash__btn--ghost" onClick={onClose}>
+                {closeLabel}
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
