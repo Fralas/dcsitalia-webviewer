@@ -3,6 +3,8 @@ export default {
     appTitle: 'DCS Frontline',
     appSubtitle: 'Gestione Campagna Dinamica',
     loading: 'Caricamento DCS Warehouse Viewer...',
+    bootStatus: 'Inizializzazione sistemi',
+    bootHint: 'Allineamento dati campagna e interfaccia',
     errorTitle: 'Errore nel caricamento dei dati',
     retry: 'Riprova',
     connection: {

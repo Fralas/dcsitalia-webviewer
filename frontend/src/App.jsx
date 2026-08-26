@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Activity, AlertCircle, BookOpen, CalendarSync, ChevronDown, TowerControl } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { AlertCircle, BookOpen, CalendarSync, ChevronDown, TowerControl } from 'lucide-react';
 import FrontlineMap from './components/FrontlineMap';
 import LandingPage from './components/landing/LandingPage';
 import UserMenu from './components/UserMenu';
@@ -16,6 +16,7 @@ import enFlagImg from '../img/flags/en.svg';
 import itFlagImg from '../img/flags/it.svg';
 import { useUser } from './contexts/UserContext';
 import CampaignHeaderTabs from './components/CampaignHeaderTabs';
+import BootSplash from './components/BootSplash';
 import {
   DEFAULT_CAMPAIGN_ID,
   getCampaignNavTarget,
@@ -27,6 +28,10 @@ import {
 } from './config/tacticalMaps';
 import { canAccessAtc } from './config/featureAccess';
 import './AppHeader.css';
+
+const MIN_BOOT_MS = 1600;
+const BOOT_SETTLE_MS = 480;
+const BOOT_FADE_MS = 700;
 
 const VIEW_TO_PATH = Object.freeze({
   landing: '/',
@@ -138,8 +143,12 @@ function App() {
   const [airbaseStatus, setAirbaseStatus] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { user } = useUser();
+  const { user, loading: userLoading } = useUser();
   const showAtc = canAccessAtc(user?.id);
+  const bootStartedAt = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const [splashVisible, setSplashVisible] = useState(true);
+  const [splashFading, setSplashFading] = useState(false);
+  const bootReady = !loading && !userLoading;
 
   const goToView = (view, options = {}) => {
     const normalized = normalizeView(view);
@@ -197,6 +206,54 @@ function App() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (!bootReady) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let fadeTimerId = 0;
+
+    const waitForPaint = () => new Promise((resolve) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(resolve);
+      });
+    });
+
+    const reveal = async () => {
+      const elapsed = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - bootStartedAt.current;
+      const remaining = Math.max(0, MIN_BOOT_MS - elapsed);
+      const fontsReady = document.fonts?.ready ?? Promise.resolve();
+
+      await Promise.all([
+        fontsReady.catch(() => undefined),
+        new Promise((resolve) => {
+          window.setTimeout(resolve, remaining);
+        }),
+      ]);
+
+      await waitForPaint();
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, BOOT_SETTLE_MS);
+      });
+      if (cancelled) return;
+
+      setSplashFading(true);
+      fadeTimerId = window.setTimeout(() => {
+        if (!cancelled) {
+          setSplashVisible(false);
+        }
+      }, BOOT_FADE_MS);
+    };
+
+    reveal();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(fadeTimerId);
+    };
+  }, [bootReady]);
 
   useEffect(() => {
     // Canonicalize URL (supports old ?view=changelogs links and unknown paths).
@@ -270,37 +327,38 @@ function App() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-yt-bg-primary flex items-center justify-center">
-        <div className="text-center">
-          <Activity className="w-16 h-16 text-yt-accent animate-spin mx-auto mb-4" />
-          <p className="text-xl text-yt-text-secondary">{t('general.loading')}</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-yt-bg-primary flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-          <p className="text-xl text-red-400 mb-2">{t('general.errorTitle')}</p>
-          <p className="text-yt-text-secondary mb-4">{error}</p>
-          <button
-            onClick={loadData}
-            className="px-6 py-2 bg-yt-accent hover:bg-yt-accent/80 text-white rounded font-bold transition-all"
-          >
-            {t('general.retry')}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className={`app-shell h-screen flex flex-col overflow-hidden ${(currentView === 'landing' || currentView === 'lidc') ? 'bg-[#0E0E0E]' : 'bg-yt-bg-primary'}`}>
+    <>
+      {splashVisible && (
+        <BootSplash
+          fading={splashFading}
+          status={t('general.bootStatus')}
+          hint={t('general.bootHint')}
+        />
+      )}
+
+      {bootReady && error ? (
+        <div className="min-h-screen bg-yt-bg-primary flex items-center justify-center">
+          <div className="text-center max-w-md">
+            <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+            <p className="text-xl text-red-400 mb-2">{t('general.errorTitle')}</p>
+            <p className="text-yt-text-secondary mb-4">{error}</p>
+            <button
+              onClick={loadData}
+              className="px-6 py-2 bg-yt-accent hover:bg-yt-accent/80 text-white rounded font-bold transition-all"
+            >
+              {t('general.retry')}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {!error && (bootReady || !splashVisible) ? (
+    <div
+      className={`app-shell h-screen flex flex-col overflow-hidden ${(currentView === 'landing' || currentView === 'lidc') ? 'bg-[#0E0E0E]' : 'bg-yt-bg-primary'}`}
+      aria-hidden={splashVisible}
+      {...(splashVisible ? { inert: '' } : {})}
+    >
       <header className={`app-header${currentView === 'landing' ? ' app-header--landing' : ''}${currentView === 'lidc' ? ' app-header--lidc' : ''}${currentView === 'frontline' ? ' app-header--frontline' : ''}`}>
         <div className="app-header__inner">
           <div className="app-header__left">
@@ -432,6 +490,8 @@ function App() {
         </footer>
       )}
     </div>
+      ) : null}
+    </>
   );
 }
 
