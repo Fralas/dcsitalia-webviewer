@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { getLidcAirportById } from '../config/lidcAfghanistanAirports';
 import LidcMapAirportPointers from './LidcMapAirportPointers';
 
 /** Approximate Afghanistan theater viewport [west, south, east, north]. */
 const AFGHANISTAN_THEATER_BOUNDS = [58.0, 29.5, 71.5, 38.2];
 const MIN_PITCH = 0;
 const MAX_PITCH = 85;
-const MAX_ZOOM = 16;
+const BASE_FOCUS_ZOOM = 6;
 
 const MAP_STYLE = {
   version: 8,
@@ -40,6 +41,18 @@ const MAP_STYLE = {
   ],
 };
 
+function flyToAirport(map, airportId) {
+  const airport = getLidcAirportById(airportId);
+  if (!map || !airport) return;
+
+  map.flyTo({
+    center: [airport.lon, airport.lat],
+    zoom: BASE_FOCUS_ZOOM,
+    essential: true,
+    duration: 1100,
+  });
+}
+
 function fitTheaterBounds(map) {
   const [west, south, east, north] = AFGHANISTAN_THEATER_BOUNDS;
   map.fitBounds([[west, south], [east, north]], {
@@ -48,7 +61,11 @@ function fitTheaterBounds(map) {
   });
 }
 
-export default function LidcTheaterMap({ layoutKey = 0 }) {
+export default function LidcTheaterMap({
+  layoutKey = 0,
+  selectedAirportId = '',
+  onSelectAirport = null,
+}) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const [mapInstance, setMapInstance] = useState(null);
@@ -65,7 +82,7 @@ export default function LidcTheaterMap({ layoutKey = 0 }) {
       pitch: MIN_PITCH,
       bearing: 0,
       minZoom: 4,
-      maxZoom: MAX_ZOOM,
+      maxZoom: BASE_FOCUS_ZOOM,
       minPitch: MIN_PITCH,
       maxPitch: MAX_PITCH,
       attributionControl: false,
@@ -108,6 +125,12 @@ export default function LidcTheaterMap({ layoutKey = 0 }) {
     };
   }, [layoutKey]);
 
+  useEffect(() => {
+    if (!mapInstance || !selectedAirportId) return undefined;
+    flyToAirport(mapInstance, selectedAirportId);
+    return undefined;
+  }, [mapInstance, selectedAirportId]);
+
   return (
     <div className="lidc-theater-map-root">
       <div
@@ -116,7 +139,13 @@ export default function LidcTheaterMap({ layoutKey = 0 }) {
         role="application"
         aria-label="Interactive Afghanistan theater map"
       />
-      {mapInstance && <LidcMapAirportPointers map={mapInstance} />}
+      {mapInstance && (
+        <LidcMapAirportPointers
+          map={mapInstance}
+          selectedAirportId={selectedAirportId}
+          onSelectAirport={onSelectAirport}
+        />
+      )}
     </div>
   );
 }

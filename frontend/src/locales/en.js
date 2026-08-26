@@ -331,7 +331,7 @@ export default {
       deleteSquadron: 'Debug: Delete squadron',
     },
     steps: {
-      info: 'Squadron Info',
+      info: 'Identity',
       specializations: 'Specializations',
       deck: 'Deck',
       review: 'Review / Create'
@@ -343,7 +343,7 @@ export default {
       requiredToContinue: 'Complete required fields to continue',
       sections: {
         infoTitle: 'Squadron identity',
-        infoHint: 'Provide name, description, operating base, and logo.',
+        infoHint: 'Set the patch, callsign, and home airbase on the Afghan theater.',
         specializationsTitle: 'Specialization selection',
         specializationsHint: 'Pick {{count}} specializations. Their caps are summed into your deck budget.',
         deckTitle: 'Deck composition',
@@ -407,7 +407,7 @@ export default {
     },
     errors: {
       catalogLoadFailed: 'Failed to load specializations/units catalog.',
-      infoRequired: 'Squadron name and operating base are required.',
+      infoRequired: 'Callsign and home base are required.',
       specializationsRequired: 'Select exactly two specializations.',
       deckEmpty: 'Add at least one unit to the deck.',
       deckCapsExceeded: 'Deck exceeds one or more category caps.',
@@ -424,12 +424,18 @@ export default {
       deleteFailed: 'Failed to delete squadron.'
     },
     info: {
-      name: 'Squadron name',
-      description: 'Description',
-      base: 'Operating base',
-      basePlaceholder: 'Select base...',
-      logo: 'Squadron logo',
-      logoUpload: 'Upload logo'
+      name: 'Callsign',
+      namePlaceholder: 'e.g. 23rd Fighter Squadron',
+      description: 'Briefing',
+      descriptionPlaceholder: 'Role, area of operations, notes for members...',
+      base: 'Home base',
+      basePlaceholder: 'Select a base',
+      baseHint: 'Click a map pointer or a base below.',
+      logo: 'Squadron patch',
+      logoUpload: 'Upload patch',
+      logoChange: 'Change',
+      logoRemove: 'Remove',
+      logoDrop: 'Drop or click'
     },
     specializations: {
       title: 'Specializations',

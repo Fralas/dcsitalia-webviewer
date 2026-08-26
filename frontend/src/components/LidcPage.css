@@ -493,6 +493,15 @@ body.lidc-map-fullscreen-open {
   stroke-width: 1.5;
 }
 
+.lidc-map-pointers__group.is-selected .lidc-map-pointers__line {
+  stroke: var(--pointer-accent, #ffbb00);
+}
+
+.lidc-map-pointers__group.is-selected .lidc-map-pointers__dot {
+  fill: var(--pointer-accent, #ffbb00);
+  stroke: rgba(255, 187, 0, 0.45);
+}
+
 .lidc-map-pointers__label {
   position: absolute;
   display: flex;
@@ -502,8 +511,20 @@ body.lidc-map-fullscreen-open {
   min-width: 0;
   box-sizing: border-box;
   padding: 0 0 2px;
+  border: 0;
+  background: none;
+  font-family: inherit;
   text-align: left;
   pointer-events: none;
+}
+
+.lidc-map-pointers.is-selectable .lidc-map-pointers__label.is-selectable {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.lidc-map-pointers__label.is-selected .lidc-map-pointers__label-name {
+  color: #ffffff;
 }
 
 .lidc-map-pointers__label-type {
@@ -3862,6 +3883,7 @@ body.lidc-deck-expanded-open {
 
 .lidc-wizard-root .lidc-step-section-head {
   border-bottom: 1px solid var(--lidc-hairline);
+  padding-top: 16px;
   padding-bottom: 10px;
 }
 

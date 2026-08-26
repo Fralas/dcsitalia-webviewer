@@ -1,8 +1,20 @@
 /** Standard square output for squadron logos uploaded during creation. */
 export const SQUADRON_LOGO_SIZE = 256;
 export const SQUADRON_LOGO_BACKGROUND = '#2a2a2a';
-export const SQUADRON_LOGO_MIME = 'image/jpeg';
-export const SQUADRON_LOGO_QUALITY = 0.9;
+export const SQUADRON_LOGO_JPEG_QUALITY = 0.9;
+export const SQUADRON_LOGO_ACCEPT = 'image/png,image/jpeg,.png,.jpg,.jpeg';
+
+function resolveLogoFormat(file) {
+  const mime = String(file?.type || '').toLowerCase();
+  if (mime === 'image/png') return 'png';
+  if (mime === 'image/jpeg' || mime === 'image/jpg') return 'jpeg';
+
+  const name = String(file?.name || '').toLowerCase();
+  if (name.endsWith('.png')) return 'png';
+  if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'jpeg';
+
+  return null;
+}
 
 function loadImageFromFile(file) {
   return new Promise((resolve, reject) => {
@@ -25,11 +37,13 @@ function loadImageFromFile(file) {
 
 /**
  * Resize and letterbox uploaded squadron logos to a common square size.
+ * PNG stays PNG (transparent letterbox); JPEG stays JPEG.
  * @param {File} file
- * @returns {Promise<string>} normalized JPEG data URL
+ * @returns {Promise<string>} normalized data URL
  */
 export async function normalizeSquadronLogo(file) {
-  if (!file || !String(file.type || '').startsWith('image/')) {
+  const format = resolveLogoFormat(file);
+  if (!format) {
     throw new Error('Invalid image file');
   }
 
@@ -43,8 +57,12 @@ export async function normalizeSquadronLogo(file) {
     throw new Error('Canvas is not supported');
   }
 
-  context.fillStyle = SQUADRON_LOGO_BACKGROUND;
-  context.fillRect(0, 0, SQUADRON_LOGO_SIZE, SQUADRON_LOGO_SIZE);
+  if (format === 'png') {
+    context.clearRect(0, 0, SQUADRON_LOGO_SIZE, SQUADRON_LOGO_SIZE);
+  } else {
+    context.fillStyle = SQUADRON_LOGO_BACKGROUND;
+    context.fillRect(0, 0, SQUADRON_LOGO_SIZE, SQUADRON_LOGO_SIZE);
+  }
 
   const scale = Math.min(
     SQUADRON_LOGO_SIZE / image.width,
@@ -57,5 +75,9 @@ export async function normalizeSquadronLogo(file) {
 
   context.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
 
-  return canvas.toDataURL(SQUADRON_LOGO_MIME, SQUADRON_LOGO_QUALITY);
+  if (format === 'png') {
+    return canvas.toDataURL('image/png');
+  }
+
+  return canvas.toDataURL('image/jpeg', SQUADRON_LOGO_JPEG_QUALITY);
 }

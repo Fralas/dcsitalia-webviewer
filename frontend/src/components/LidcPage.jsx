@@ -11,13 +11,13 @@ import {
   Save,
   Settings,
   Trash2,
-  Upload,
   UserPlus,
   Maximize2,
   X,
 } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import airports from '../config/airports';
+import { formatLidcAirportLabel, getLidcAirportById } from '../config/lidcAfghanistanAirports';
 import * as api from '../services/api';
 import socketService from '../services/socket';
 import { t } from '../utils/locale';
@@ -32,6 +32,7 @@ import LidcDeckBuilder, {
   createEmptyDeckCategoryMap,
 } from './LidcDeckBuilder';
 import LidcSpecializationPicker, { sumSpecializationCaps } from './LidcSpecializationPicker';
+import LidcSquadronIdentityStep from './LidcSquadronIdentityStep';
 import './LidcPage.css';
 
 const WIZARD_STEPS = ['info', 'specializations', 'deck', 'review'];
@@ -941,10 +942,17 @@ export default function LidcPage() {
     || createdSquadron?.baseId
     || userLidcState?.squadron?.baseId
     || '';
-  const previewBase = useMemo(
-    () => airports.find((entry) => entry.id === effectivePreviewBaseId) || null,
-    [effectivePreviewBaseId],
-  );
+  const previewBase = useMemo(() => {
+    const lidcAirport = getLidcAirportById(effectivePreviewBaseId);
+    if (lidcAirport) {
+      return {
+        id: lidcAirport.id,
+        name: lidcAirport.name,
+        displayName: formatLidcAirportLabel(lidcAirport),
+      };
+    }
+    return airports.find((entry) => entry.id === effectivePreviewBaseId) || null;
+  }, [effectivePreviewBaseId]);
 
   const previewIdentity = useMemo(() => {
     const baseSquadron = userHasSquadron
@@ -1222,9 +1230,7 @@ export default function LidcPage() {
     openFullscreenPanel(view);
   }
 
-  function handleLogoUpload(event) {
-    const file = event.target.files?.[0];
-    event.target.value = '';
+  function handleLogoFile(file) {
     if (!file) return;
 
     setLogoUploadError('');
@@ -2723,7 +2729,7 @@ export default function LidcPage() {
           <div className="lidc-wizard-backdrop" onClick={closeWizard} aria-hidden="true" />
 
           <section
-            className={`lidc-wizard-card ${currentStepKey === 'specializations' ? 'lidc-wizard-card--template' : ''}`}
+            className={`lidc-wizard-card ${currentStepKey === 'specializations' || currentStepKey === 'info' ? 'lidc-wizard-card--template' : ''}`}
             role="dialog"
             aria-modal="true"
             aria-label={t(`lidc.steps.${currentStepKey}`)}
@@ -2774,7 +2780,7 @@ export default function LidcPage() {
               </button>
             </div>
 
-            <div className={`lidc-wizard-body ${currentStepKey === 'specializations' ? 'lidc-wizard-body--template' : ''}`}>
+            <div className={`lidc-wizard-body ${currentStepKey === 'specializations' || currentStepKey === 'info' ? 'lidc-wizard-body--template' : ''}`}>
               {currentStepKey === 'info' && (
                 <section className="lidc-step-section">
                   <header className="lidc-step-section-head">
@@ -2782,38 +2788,18 @@ export default function LidcPage() {
                     <p>{t('lidc.wizard.sections.infoHint')}</p>
                   </header>
 
-                  <div className="lidc-form-stack">
-                    <label className="lidc-field">
-                      <span>{t('lidc.info.name')}</span>
-                      <input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} />
-                    </label>
-
-                    <label className="lidc-field">
-                      <span>{t('lidc.info.description')}</span>
-                      <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={4} maxLength={1200} />
-                    </label>
-
-                    <label className="lidc-field">
-                      <span>{t('lidc.info.base')}</span>
-                      <select value={baseId} onChange={(event) => setBaseId(event.target.value)}>
-                        <option value="">{t('lidc.info.basePlaceholder')}</option>
-                        {airports.map((entry) => (
-                          <option key={entry.id} value={entry.id}>{entry.displayName || entry.name}</option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <div className="lidc-field">
-                      <span>{t('lidc.info.logo')}</span>
-                      <label className="lidc-upload-btn">
-                        <Upload size={14} />
-                        <span>{t('lidc.info.logoUpload')}</span>
-                        <input type="file" accept="image/*" onChange={handleLogoUpload} />
-                      </label>
-                      {logoDataUrl && <img src={logoDataUrl} alt="Logo preview" className="lidc-logo-preview" />}
-                      {logoUploadError && <div className="lidc-inline-error">{logoUploadError}</div>}
-                    </div>
-                  </div>
+                  <LidcSquadronIdentityStep
+                    name={name}
+                    description={description}
+                    baseId={baseId}
+                    logoDataUrl={logoDataUrl}
+                    logoUploadError={logoUploadError}
+                    onNameChange={setName}
+                    onDescriptionChange={setDescription}
+                    onBaseChange={setBaseId}
+                    onLogoFile={handleLogoFile}
+                    onLogoClear={() => setLogoDataUrl('')}
+                  />
                 </section>
               )}
 

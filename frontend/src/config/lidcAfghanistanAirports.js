@@ -46,3 +46,17 @@ export const LIDC_AFGHANISTAN_AIRPORTS = [
     highlightColor: '#E32C2C',
   },
 ];
+
+export function getLidcAirportById(id) {
+  const target = String(id || '');
+  if (!target) return null;
+  return LIDC_AFGHANISTAN_AIRPORTS.find((entry) => entry.id === target) || null;
+}
+
+export function formatLidcAirportLabel(airport) {
+  if (!airport) return '';
+  const name = String(airport.name || '').trim();
+  const subtitle = String(airport.subtitle || '').trim();
+  if (name && subtitle) return `${name} · ${subtitle}`;
+  return name || subtitle;
+}

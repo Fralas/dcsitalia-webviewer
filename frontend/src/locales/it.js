@@ -331,7 +331,7 @@ export default {
       deleteSquadron: 'Debug: Cancella squadrone',
     },
     steps: {
-      info: 'Squadron Info',
+      info: 'Identità',
       specializations: 'Specializzazioni',
       deck: 'Deck',
       review: 'Review / Create'
@@ -342,8 +342,8 @@ export default {
       close: 'Chiudi',
       requiredToContinue: 'Per continuare completa i campi richiesti',
       sections: {
-        infoTitle: 'Identita squadrone',
-        infoHint: 'Inserisci nome, descrizione, base operativa e logo.',
+        infoTitle: 'Identità squadrone',
+        infoHint: 'Patch, nominativo e home base sul teatro afgano.',
         specializationsTitle: 'Selezione specializzazioni',
         specializationsHint: 'Scegli {{count}} specializzazioni: i loro limiti si sommano nel budget del deck.',
         deckTitle: 'Composizione deck',
@@ -407,7 +407,7 @@ export default {
     },
     errors: {
       catalogLoadFailed: 'Impossibile caricare catalogo specializzazioni/unità.',
-      infoRequired: 'Nome squadrone e base operativa sono obbligatori.',
+      infoRequired: 'Nominativo e home base sono obbligatori.',
       specializationsRequired: 'Seleziona esattamente due specializzazioni.',
       deckEmpty: 'Aggiungi almeno una unità nel deck.',
       deckCapsExceeded: 'Il deck supera uno o più limiti di categoria.',
@@ -424,12 +424,18 @@ export default {
       deleteFailed: 'Impossibile cancellare lo squadrone.'
     },
     info: {
-      name: 'Nome squadrone',
-      description: 'Descrizione',
-      base: 'Base operativa',
-      basePlaceholder: 'Seleziona base...',
-      logo: 'Logo squadrone',
-      logoUpload: 'Carica logo'
+      name: 'Nominativo',
+      namePlaceholder: 'Es. 23rd Fighter Squadron',
+      description: 'Briefing',
+      descriptionPlaceholder: 'Ruolo, area di operazioni, note per i membri...',
+      base: 'Home base',
+      basePlaceholder: 'Seleziona una base',
+      baseHint: 'Clicca un puntatore sulla mappa o una base sotto.',
+      logo: 'Patch squadrone',
+      logoUpload: 'Carica patch',
+      logoChange: 'Cambia',
+      logoRemove: 'Rimuovi',
+      logoDrop: 'Trascina o clicca'
     },
     specializations: {
       title: 'Specializzazioni',

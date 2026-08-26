@@ -97,8 +97,13 @@ function buildPointerFrames(map, airports) {
     .filter(Boolean);
 }
 
-export default function LidcMapAirportPointers({ map }) {
+export default function LidcMapAirportPointers({
+  map,
+  selectedAirportId = '',
+  onSelectAirport = null,
+}) {
   const [frames, setFrames] = useState([]);
+  const selectable = typeof onSelectAirport === 'function';
 
   useEffect(() => {
     if (!map) return undefined;
@@ -122,55 +127,69 @@ export default function LidcMapAirportPointers({ map }) {
   }, [map]);
 
   return (
-    <div className="lidc-map-pointers" aria-hidden={frames.length === 0}>
+    <div
+      className={`lidc-map-pointers ${selectable ? 'is-selectable' : ''}`}
+      aria-hidden={selectable ? undefined : frames.length === 0}
+    >
       <svg className="lidc-map-pointers__svg">
-        {frames.map((frame) => (
-          <g
-            key={frame.airport.id}
-            className="lidc-map-pointers__group"
-            style={{ '--pointer-accent': frame.airport.highlightColor }}
-          >
-            <path
-              className="lidc-map-pointers__line"
-              d={frame.pathD}
-              strokeWidth={frame.strokeWidth}
-            />
-            <circle
-              className="lidc-map-pointers__dot"
-              cx={frame.anchor.x}
-              cy={frame.anchor.y}
-              r={frame.dotRadius}
-              strokeWidth={Math.max(1, frame.strokeWidth * 0.6)}
-            />
-          </g>
-        ))}
+        {frames.map((frame) => {
+          const isSelected = frame.airport.id === selectedAirportId;
+          return (
+            <g
+              key={frame.airport.id}
+              className={`lidc-map-pointers__group ${isSelected ? 'is-selected' : ''}`}
+              style={{ '--pointer-accent': isSelected ? '#ffbb00' : frame.airport.highlightColor }}
+            >
+              <path
+                className="lidc-map-pointers__line"
+                d={frame.pathD}
+                strokeWidth={frame.strokeWidth}
+              />
+              <circle
+                className="lidc-map-pointers__dot"
+                cx={frame.anchor.x}
+                cy={frame.anchor.y}
+                r={frame.dotRadius}
+                strokeWidth={Math.max(1, frame.strokeWidth * 0.6)}
+              />
+            </g>
+          );
+        })}
       </svg>
-      {frames.map((frame) => (
-        <div
-          key={`${frame.airport.id}-label`}
-          className="lidc-map-pointers__label"
-          style={{
-            left: `${frame.label.x}px`,
-            top: `${frame.label.y}px`,
-            width: `${frame.labelWidth}px`,
-            transform: 'translate(0, -100%)',
-            '--pointer-accent': frame.airport.highlightColor,
-          }}
-        >
-          <span
-            className="lidc-map-pointers__label-type"
-            style={{ fontSize: `${frame.typeFontSize}px` }}
+      {frames.map((frame) => {
+        const isSelected = frame.airport.id === selectedAirportId;
+        const LabelTag = selectable ? 'button' : 'div';
+        return (
+          <LabelTag
+            key={`${frame.airport.id}-label`}
+            type={selectable ? 'button' : undefined}
+            className={`lidc-map-pointers__label ${selectable ? 'is-selectable' : ''} ${isSelected ? 'is-selected' : ''}`}
+            style={{
+              left: `${frame.label.x}px`,
+              top: `${frame.label.y}px`,
+              width: `${frame.labelWidth}px`,
+              transform: 'translate(0, -100%)',
+              '--pointer-accent': isSelected ? '#ffbb00' : frame.airport.highlightColor,
+            }}
+            onClick={selectable ? () => onSelectAirport(frame.airport.id) : undefined}
+            aria-pressed={selectable ? isSelected : undefined}
+            aria-label={selectable ? `${frame.airport.name} ${frame.airport.subtitle}` : undefined}
           >
-            {frame.airport.subtitle}
-          </span>
-          <span
-            className="lidc-map-pointers__label-name"
-            style={{ fontSize: `${frame.nameFontSize}px` }}
-          >
-            {frame.airport.name}
-          </span>
-        </div>
-      ))}
+            <span
+              className="lidc-map-pointers__label-type"
+              style={{ fontSize: `${frame.typeFontSize}px` }}
+            >
+              {frame.airport.subtitle}
+            </span>
+            <span
+              className="lidc-map-pointers__label-name"
+              style={{ fontSize: `${frame.nameFontSize}px` }}
+            >
+              {frame.airport.name}
+            </span>
+          </LabelTag>
+        );
+      })}
     </div>
   );
 }
