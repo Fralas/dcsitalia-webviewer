@@ -374,6 +374,10 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (splashVisible && !splashFading) {
+      return undefined;
+    }
+
     socketService.connect();
 
     const unsubscribeInitial = socketService.on('data:initial', (data) => {
@@ -394,7 +398,7 @@ function App() {
       unsubscribeAirbaseStatus();
       socketService.disconnect();
     };
-  }, []);
+  }, [splashVisible, splashFading]);
 
   const loadData = async () => {
     try {
@@ -449,7 +453,7 @@ function App() {
         </div>
       ) : null}
 
-      {!error && (bootReady || !splashVisible) ? (
+      {!error && bootReady && (!splashVisible || splashFading) ? (
     <div
       className={`app-shell h-screen flex flex-col overflow-hidden ${(currentView === 'landing' || currentView === 'lidc') ? 'bg-[#0E0E0E]' : 'bg-yt-bg-primary'}`}
       aria-hidden={splashVisible}

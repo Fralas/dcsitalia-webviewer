@@ -15,6 +15,7 @@ const ParticleWave: React.FC<ParticleWaveProps> = ({ className = '' }) => {
     particleMaterial: THREE.ShaderMaterial;
     animationId: number | null;
     mouse: THREE.Vector2;
+    clock: THREE.Clock;
   } | null>(null);
 
   // Function to detect current theme
@@ -36,16 +37,14 @@ const ParticleWave: React.FC<ParticleWaveProps> = ({ className = '' }) => {
       : new THREE.Vector3(0.0, 0.0, 0.0); // Black particles for light theme
   };
 
-  const particleVertex = `
-    attribute float scale;
+    const particleVertex = `
     uniform float uTime;
     varying float vStripe;
     void main() {
       vec3 p = position;
-      float s = scale;
       p.y += (sin(p.x + uTime) * 0.5) + (cos(p.y + uTime) * 0.1) * 2.0;
       p.x += (sin(p.y + uTime) * 0.5);
-      s += (sin(p.x + uTime) * 0.5) + (cos(p.y + uTime) * 0.1) * 2.0;
+      float s = 1.0 + (sin(p.x + uTime) * 0.5) + (cos(p.y + uTime) * 0.1) * 2.0;
       vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
       gl_PointSize = s * 18.0 * (1.0 / -mvPosition.z);
       gl_Position = projectionMatrix * mvPosition;
@@ -84,53 +83,52 @@ const ParticleWave: React.FC<ParticleWaveProps> = ({ className = '' }) => {
     // Renderer
     const renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: true,
+      antialias: false,
+      alpha: false,
+      powerPreference: 'high-performance',
+      stencil: false,
+      depth: true,
     });
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
     renderer.setSize(winWidth, winHeight);
-
-    // Set initial background color based on theme
-    const currentTheme = getCurrentTheme();
-    renderer.setClearColor(getBackgroundColor(currentTheme));
+    renderer.setClearColor(getBackgroundColor(getCurrentTheme()));
 
     // Particles
-    const gap = 0.3;
-    const amountX = 280;
-    const amountY = 280;
+    const gap = 0.42;
+    const amountX = 200;
+    const amountY = 200;
     const particleNum = amountX * amountY;
     const particlePositions = new Float32Array(particleNum * 3);
-    const particleScales = new Float32Array(particleNum);
 
     let i = 0;
-    let j = 0;
     for (let ix = 0; ix < amountX; ix++) {
       for (let iy = 0; iy < amountY; iy++) {
         particlePositions[i] = ix * gap - ((amountX * gap) / 2);
         particlePositions[i + 1] = 0;
         particlePositions[i + 2] = iy * gap - ((amountX * gap) / 2);
-        particleScales[j] = 1;
         i += 3;
-        j++;
       }
     }
 
     const particleGeometry = new THREE.BufferGeometry();
     particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-    particleGeometry.setAttribute('scale', new THREE.BufferAttribute(particleScales, 1));
 
     const particleMaterial = new THREE.ShaderMaterial({
       transparent: true,
+      depthWrite: false,
       vertexShader: particleVertex,
       fragmentShader: particleFragment,
       uniforms: {
-        uTime: { type: 'f', value: 0 },
-        uColor: { type: 'v3', value: getParticleColor(getCurrentTheme()) }
+        uTime: { value: 0 }
       }
     });
 
     const particles = new THREE.Points(particleGeometry, particleMaterial);
+    particles.frustumCulled = false;
     particles.rotation.y = Math.PI / 4 + Math.PI / 6;
     scene.add(particles);
+
+    camera.lookAt(scene.position);
 
     const mouse = new THREE.Vector2(-10, -10);
 
@@ -141,25 +139,18 @@ const ParticleWave: React.FC<ParticleWaveProps> = ({ className = '' }) => {
       particles,
       particleMaterial,
       animationId: null,
-      mouse
+      mouse,
+      clock: new THREE.Clock()
     };
   };
 
   const animate = () => {
     if (!sceneRef.current) return;
 
-    const { scene, camera, renderer, particleMaterial } = sceneRef.current;
-
-    particleMaterial.uniforms.uTime.value -= 0.05;
-
-    // Update particle color and background based on current theme
-    const currentTheme = getCurrentTheme();
-    particleMaterial.uniforms.uColor.value = getParticleColor(currentTheme);
-    renderer.setClearColor(getBackgroundColor(currentTheme));
-
-    camera.lookAt(scene.position);
-    renderer.render(scene, camera);
-
+    const { camera, renderer, particleMaterial, clock } = sceneRef.current;
+    const delta = Math.min(clock.getDelta(), 0.05);
+    particleMaterial.uniforms.uTime.value -= delta * 3.0;
+    renderer.render(sceneRef.current.scene, camera);
     sceneRef.current.animationId = requestAnimationFrame(animate);
   };
 
@@ -172,14 +163,8 @@ const ParticleWave: React.FC<ParticleWaveProps> = ({ className = '' }) => {
 
     camera.aspect = winWidth / winHeight;
     camera.updateProjectionMatrix();
+    renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
     renderer.setSize(winWidth, winHeight);
-  };
-
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!sceneRef.current) return;
-
-    sceneRef.current.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-    sceneRef.current.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
   };
 
   useEffect(() => {
@@ -187,17 +172,14 @@ const ParticleWave: React.FC<ParticleWaveProps> = ({ className = '' }) => {
     animate();
 
     const handleResizeEvent = () => handleResize();
-    const handleMouseMoveEvent = (e: MouseEvent) => handleMouseMove(e);
 
     window.addEventListener('resize', handleResizeEvent);
-    window.addEventListener('mousemove', handleMouseMoveEvent);
 
     return () => {
       if (sceneRef.current?.animationId) {
         cancelAnimationFrame(sceneRef.current.animationId);
       }
       window.removeEventListener('resize', handleResizeEvent);
-      window.removeEventListener('mousemove', handleMouseMoveEvent);
 
       // Cleanup Three.js resources
       if (sceneRef.current) {
