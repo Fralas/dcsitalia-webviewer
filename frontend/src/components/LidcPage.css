@@ -3678,7 +3678,7 @@ body.lidc-deck-expanded-open {
     clamp(16px, 1.1vw, 28px)
     clamp(14px, 1vw, 24px);
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: clamp(10px, 0.65vw, 14px);
 }
 
@@ -4020,8 +4020,90 @@ body.lidc-deck-expanded-open {
   border-top: 1px solid var(--lidc-hairline);
 }
 
+.lidc-wizard-error-slot {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lidc-wizard-error-clip {
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
 .lidc-wizard-error {
-  margin-top: -4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  max-width: 100%;
+  padding: 7px 12px;
+  border: 1px solid #ff3b3b;
+  border-radius: 999px;
+  background: rgba(255, 28, 28, 0.16);
+  color: #ff4d4d;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  clip-path: inset(0 50% 0 50% round 999px);
+  transform-origin: center;
+  box-shadow:
+    0 0 0 1px rgba(255, 59, 59, 0.22),
+    0 0 14px rgba(255, 40, 40, 0.45);
+}
+
+.lidc-wizard-error-slot.is-open .lidc-wizard-error {
+  animation: lidc-wizard-error-expand 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.lidc-wizard-error-slot.is-closing .lidc-wizard-error {
+  animation: lidc-wizard-error-collapse 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes lidc-wizard-error-expand {
+  from {
+    opacity: 0;
+    clip-path: inset(0 50% 0 50% round 999px);
+  }
+
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 999px);
+  }
+}
+
+@keyframes lidc-wizard-error-collapse {
+  from {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 999px);
+  }
+
+  to {
+    opacity: 0;
+    clip-path: inset(0 50% 0 50% round 999px);
+  }
+}
+
+.lidc-wizard-error svg {
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 6px rgba(255, 60, 60, 0.85));
+}
+
+.lidc-wizard-error span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lidc-wizard-actions .lidc-btn {
+  flex-shrink: 0;
 }
 
 .lidc-form-stack,
