@@ -394,6 +394,7 @@ export default function LidcPage() {
   const [boardPanelsCollapsed, setBoardPanelsCollapsed] = useState(false);
 
   const [submitError, setSubmitError] = useState('');
+  const [wizardAdvanceAttempted, setWizardAdvanceAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [createdSquadron, setCreatedSquadron] = useState(null);
 
@@ -983,6 +984,7 @@ export default function LidcPage() {
     setJoinInviteCode('');
     setJoinError('');
     setSubmitError('');
+    setWizardAdvanceAttempted(false);
     setCreatedSquadron(null);
   }
 
@@ -995,6 +997,7 @@ export default function LidcPage() {
     setIsWizardOpen(false);
     setCurrentStep(0);
     setSubmitError('');
+    setWizardAdvanceAttempted(false);
     setLogoUploadError('');
   }
 
@@ -1268,16 +1271,29 @@ export default function LidcPage() {
   }
 
   const currentStepBlockingError = getStepBlockingError(currentStepKey);
-  const canGoNextStep = currentStep < (WIZARD_STEPS.length - 1) && currentStepBlockingError === '';
   const wizardFooterError = currentStep < WIZARD_STEPS.length - 1
-    ? (currentStepBlockingError
+    ? (wizardAdvanceAttempted && currentStepBlockingError
       ? `${t('lidc.wizard.requiredToContinue')}: ${currentStepBlockingError}`
       : '')
-    : (submitError || currentStepBlockingError || '');
+    : (submitError || '');
+
+  function goToWizardStep(nextIndex) {
+    setWizardAdvanceAttempted(false);
+    setSubmitError('');
+    setCurrentStep(nextIndex);
+  }
 
   function goToNextStep() {
-    if (!canGoNextStep) return;
-    setCurrentStep((prev) => Math.min(WIZARD_STEPS.length - 1, prev + 1));
+    if (currentStep >= WIZARD_STEPS.length - 1) return;
+    if (currentStepBlockingError) {
+      setWizardAdvanceAttempted(true);
+      return;
+    }
+    goToWizardStep(Math.min(WIZARD_STEPS.length - 1, currentStep + 1));
+  }
+
+  function goToPreviousStep() {
+    goToWizardStep(Math.max(0, currentStep - 1));
   }
 
   async function handleCreateSquadron() {
@@ -2611,14 +2627,15 @@ export default function LidcPage() {
           isTableFocusView ? 'is-table-focus' : '',
           deckBoardExpanded ? 'is-expanded' : '',
           isDeckPanelFullscreen ? 'is-borderless' : '',
+          showLockedOverlay ? 'is-locked' : '',
         ].filter(Boolean).join(' ')}
         aria-expanded={deckBoardExpanded}
       >
         {renderDeckPanelHeader()}
         <div className="lidc-panel-deck-body">
           {renderDeckPanelBodyContent({ interactive: isDeckPanelFullscreen })}
+          {showLockedOverlay && <div className="lidc-panel-overlay" aria-hidden="true" />}
         </div>
-        {showLockedOverlay && <div className="lidc-panel-overlay" aria-hidden="true" />}
       </section>
     );
   }
@@ -2751,7 +2768,7 @@ export default function LidcPage() {
                     <div key={stepKey} className="lidc-wizard-step-col">
                       <button
                         type="button"
-                        onClick={() => isComplete && setCurrentStep(index)}
+                        onClick={() => isComplete && goToWizardStep(index)}
                         disabled={!isComplete}
                         className={`lidc-progress-node ${
                           isComplete ? 'is-complete' : isActive ? 'is-active' : 'is-upcoming'
@@ -2896,7 +2913,7 @@ export default function LidcPage() {
               <button
                 type="button"
                 className="lidc-btn lidc-btn-outline"
-                onClick={() => setCurrentStep((prev) => Math.max(0, prev - 1))}
+                onClick={goToPreviousStep}
                 disabled={currentStep === 0}
               >
                 <ChevronLeft size={14} />
@@ -2906,7 +2923,7 @@ export default function LidcPage() {
               <InlineError message={wizardFooterError} compact className="lidc-wizard-error-host" />
 
               {currentStep < WIZARD_STEPS.length - 1 ? (
-                <button type="button" className="lidc-btn lidc-btn-primary" onClick={goToNextStep} disabled={!canGoNextStep}>
+                <button type="button" className="lidc-btn lidc-btn-primary" onClick={goToNextStep}>
                   {t('lidc.general.next')}
                   <ChevronRight size={14} />
                 </button>
@@ -2915,7 +2932,7 @@ export default function LidcPage() {
                   type="button"
                   className="lidc-btn lidc-btn-primary"
                   onClick={handleCreateSquadron}
-                  disabled={!validation.canSubmit || submitting}
+                  disabled={submitting}
                 >
                   {submitting ? <Loader2 size={14} className="spin" /> : <Disc3 size={14} />}
                   {t('lidc.review.createButton')}

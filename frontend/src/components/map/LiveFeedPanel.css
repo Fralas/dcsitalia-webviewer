@@ -138,11 +138,14 @@
   flex-shrink: 0;
   width: var(--lf-toggle-size);
   height: var(--lf-toggle-size);
-  border: 1px solid #4e4e4e;
-  background: #0e0e0e;
+  padding: 0;
+  border: none;
+  background: transparent;
   color: #c8ced8;
   border-radius: 9px;
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .live-feed-card__toggle:hover {
@@ -153,6 +156,11 @@
 .live-feed-card__toggle-icon {
   width: 14px;
   height: 14px;
+  display: block;
+  overflow: visible;
+  border: none;
+  outline: none;
+  box-shadow: none;
   transform: rotate(0deg);
   transition: transform 180ms ease;
 }

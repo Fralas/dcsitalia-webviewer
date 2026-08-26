@@ -431,7 +431,7 @@ export default {
       base: 'Home base',
       basePlaceholder: 'Select a base',
       baseHint: 'Click a map pointer or a base below.',
-      logo: 'Squadron patch',
+      logo: 'Logo',
       logoUpload: 'Upload patch',
       logoChange: 'Change',
       logoRemove: 'Remove',

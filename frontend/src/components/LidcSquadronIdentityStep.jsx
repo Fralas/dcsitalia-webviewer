@@ -50,7 +50,8 @@ export default function LidcSquadronIdentityStep({
   return (
     <div className="lidc-identity">
       <div className="lidc-identity-dossier">
-        <div className="lidc-identity-patch-col">
+        <div className="lidc-identity-field lidc-identity-patch-col">
+          <span>{t('lidc.info.logo')}</span>
           <button
             type="button"
             className={`lidc-identity-patch ${logoDataUrl ? 'has-logo' : ''} ${isDragOver ? 'is-dragover' : ''}`}

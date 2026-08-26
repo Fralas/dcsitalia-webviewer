@@ -1,4 +1,18 @@
 {
-  "commands": [],
-  "updatedAt": "2026-08-06T13:36:32.622Z"
+  "commands": [
+    {
+      "id": "af5e9d3c-014f-4a52-9790-a2029a01135a",
+      "type": "crate_spawn",
+      "production_point_id": null,
+      "airport_id": "tabqa",
+      "keyword": "BUILD",
+      "lat": 35.74874138089811,
+      "lon": 38.53900909423829,
+      "quantity": 1,
+      "requested_by": "Fralas",
+      "requested_by_id": "675706661570347041",
+      "ts": 1787756384779
+    }
+  ],
+  "updatedAt": "2026-08-26T14:59:44.779Z"
 }

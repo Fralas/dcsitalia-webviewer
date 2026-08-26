@@ -598,6 +598,10 @@ body.lidc-map-fullscreen-open {
   background: linear-gradient(to bottom, var(--lidc-canvas) 0%, rgba(14, 14, 14, 0) 100%);
 }
 
+.lidc-panel-deck.is-locked .lidc-panel-deck-head::after {
+  content: none;
+}
+
 .lidc-panel-deck-head-main {
   display: flex;
   align-items: center;
@@ -782,6 +786,11 @@ body.lidc-map-fullscreen-open {
   background: var(--lidc-overlay);
   pointer-events: none;
   z-index: 2;
+}
+
+.lidc-panel-deck-body > .lidc-panel-overlay {
+  border-radius: 0;
+  z-index: 5;
 }
 
 .lidc-panel-inline-error {
