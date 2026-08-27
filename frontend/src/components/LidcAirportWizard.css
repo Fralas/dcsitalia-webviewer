@@ -279,8 +279,8 @@
 
 .lidc-airport-wizard-shop {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .lidc-airport-wizard-shop-card {
@@ -289,10 +289,10 @@
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  min-height: 280px;
-  padding: 18px 16px 16px;
+  min-height: 0;
+  padding: 12px 10px 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 18px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.03);
   color: inherit;
   font: inherit;
@@ -311,23 +311,23 @@
 
 .lidc-airport-wizard-shop-card__transport {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 8px;
+  right: 8px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   color: var(--lidc-mute);
 }
 
 .lidc-airport-wizard-shop-card img {
-  width: min(180px, 72%);
-  height: 140px;
+  width: min(120px, 78%);
+  height: 86px;
   object-fit: contain;
-  margin: 28px 0 8px;
+  margin: 22px 0 4px;
 }
 
 .lidc-airport-wizard-shop-card strong {
-  font-size: 13px;
+  font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -336,10 +336,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  margin-top: 10px;
+  gap: 5px;
+  margin-top: 6px;
   color: var(--lidc-accent-gold);
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 800;
 }
 
@@ -350,6 +350,6 @@
 
   .lidc-airport-wizard-resource-grid,
   .lidc-airport-wizard-shop {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

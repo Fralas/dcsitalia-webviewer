@@ -101,8 +101,8 @@ export default function LidcAirportPresencePanel({
                     ? t('lidc.map.occupancy.home')
                     : t('lidc.map.occupancy.visiting')}
                 </span>
+                <SquadronKindCounts counts={squadron.counts} />
               </div>
-              <SquadronKindCounts counts={squadron.counts} />
             </div>
             <ChevronRight size={16} className="lidc-occupancy-squadron__open" aria-hidden="true" />
           </button>

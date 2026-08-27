@@ -660,7 +660,7 @@ body.lidc-map-fullscreen-open {
   min-height: 34px;
   max-height: 34px;
   height: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 0;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.04);
   color: var(--lidc-ink);
@@ -672,8 +672,8 @@ body.lidc-map-fullscreen-open {
 }
 
 .lidc-occupancy-menu:hover {
-  border-color: var(--lidc-accent-gold);
   color: var(--lidc-accent-gold);
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .lidc-occupancy-panel__body {
@@ -702,8 +702,8 @@ body.lidc-map-fullscreen-open {
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 8px 10px;
+  border: 0;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.03);
   color: inherit;
@@ -716,7 +716,7 @@ body.lidc-map-fullscreen-open {
 }
 
 .lidc-occupancy-squadron.is-button:hover {
-  border-color: rgba(255, 187, 0, 0.45);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .lidc-occupancy-squadron__open {
@@ -727,8 +727,9 @@ body.lidc-map-fullscreen-open {
 .lidc-occupancy-counts {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: 5px;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .lidc-occupancy-count {
@@ -779,6 +780,7 @@ body.lidc-map-fullscreen-open {
   align-items: center;
   gap: 8px;
   min-width: 0;
+  width: 100%;
 }
 
 .lidc-occupancy-squadron__copy h4 {
