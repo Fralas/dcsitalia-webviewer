@@ -702,6 +702,15 @@ export async function getLidcSquadrons() {
 }
 
 /**
+ * Squadrons and airframes currently present at a LIDC Afghanistan airbase
+ */
+export async function getLidcAirportOccupancy(baseId) {
+  return fetchAPI(`/lidc/airports/${encodeURIComponent(baseId)}/occupancy`, {
+    credentials: 'include',
+  });
+}
+
+/**
  * Create a new LIDC squadron
  */
 export async function createLidcSquadron(payload) {

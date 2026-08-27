@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Copy,
@@ -24,6 +24,7 @@ import { t } from '../utils/locale';
 import { normalizeSquadronLogo } from '../utils/normalizeSquadronLogo';
 import { getLidcUnitImageUrl } from '../utils/lidcUnitImages';
 import LidcTheaterMap from './LidcTheaterMap';
+import LidcAirportPresencePanel from './LidcAirportPresencePanel';
 import LidcDeckBuilder, {
   DECK_CATEGORY_META,
   buildDeckPayloadFromQuantities,
@@ -392,6 +393,10 @@ export default function LidcPage() {
   const [isMapPanelFullscreen, setIsMapPanelFullscreen] = useState(false);
   const [mapBoardExpanded, setMapBoardExpanded] = useState(false);
   const [boardPanelsCollapsed, setBoardPanelsCollapsed] = useState(false);
+  const [selectedMapAirportId, setSelectedMapAirportId] = useState('');
+  const [airportOccupancy, setAirportOccupancy] = useState(null);
+  const [airportOccupancyLoading, setAirportOccupancyLoading] = useState(false);
+  const [airportOccupancyError, setAirportOccupancyError] = useState('');
 
   const [submitError, setSubmitError] = useState('');
   const [wizardAdvanceAttempted, setWizardAdvanceAttempted] = useState(false);
@@ -547,6 +552,10 @@ export default function LidcPage() {
 
     const handleKeyDown = (event) => {
       if (event.key !== 'Escape' || selectedAirframeDraft) return;
+      if (selectedMapAirportId) {
+        setSelectedMapAirportId('');
+        return;
+      }
       if (isMapPanelFullscreen) {
         closeMapFullscreen();
       } else if (isDeckPanelFullscreen) {
@@ -561,7 +570,7 @@ export default function LidcPage() {
       document.body.classList.remove('lidc-deck-expanded-open');
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isDeckPanelFullscreen, isMapPanelFullscreen, selectedAirframeDraft]);
+  }, [isDeckPanelFullscreen, isMapPanelFullscreen, selectedAirframeDraft, selectedMapAirportId]);
 
   useEffect(() => {
     if (!mapBoardExpanded || typeof document === 'undefined') return undefined;
@@ -683,13 +692,26 @@ export default function LidcPage() {
 
     const handleLidcUpdated = async () => {
       const squadronId = activeSquadron?.id || userLidcState?.squadron?.id;
-      if (!squadronId) return;
+      if (squadronId) {
+        try {
+          const response = await api.getLidcSquadron(squadronId);
+          setActiveSquadron((prev) => preserveLocalMockAirframeAssignments(prev, response?.squadron || null));
+        } catch (error) {
+          if (!isAuthenticationError(error)) {
+            console.error('Failed to refresh LIDC squadron state:', error);
+          }
+        }
+      }
+
+      const occupancyAirportId = selectedMapAirportId;
+      if (!occupancyAirportId) return;
       try {
-        const response = await api.getLidcSquadron(squadronId);
-        setActiveSquadron((prev) => preserveLocalMockAirframeAssignments(prev, response?.squadron || null));
+        const occupancy = await api.getLidcAirportOccupancy(occupancyAirportId);
+        setAirportOccupancy(occupancy);
+        setAirportOccupancyError('');
       } catch (error) {
         if (!isAuthenticationError(error)) {
-          console.error('Failed to refresh LIDC squadron state:', error);
+          console.error('Failed to refresh LIDC airport occupancy:', error);
         }
       }
     };
@@ -698,7 +720,7 @@ export default function LidcPage() {
     return () => {
       socket.off('lidc:updated', handleLidcUpdated);
     };
-  }, [activeSquadron?.id, userLidcState?.squadron?.id]);
+  }, [activeSquadron?.id, userLidcState?.squadron?.id, selectedMapAirportId, user?.id]);
 
   useEffect(() => {
     socketService.connect();
@@ -935,6 +957,66 @@ export default function LidcPage() {
 
   const currentStepKey = WIZARD_STEPS[currentStep] || WIZARD_STEPS[0];
   const isLogged = Boolean(user?.id);
+  const selectedMapAirport = useMemo(
+    () => getLidcAirportById(selectedMapAirportId),
+    [selectedMapAirportId],
+  );
+
+  const handleSelectMapAirport = useCallback((airportId) => {
+    const nextId = String(airportId || '');
+    setSelectedMapAirportId((prev) => (prev === nextId ? '' : nextId));
+  }, []);
+
+  const handleClearMapAirport = useCallback(() => {
+    setSelectedMapAirportId('');
+  }, []);
+
+  useEffect(() => {
+    if (!selectedMapAirportId) {
+      setAirportOccupancy(null);
+      setAirportOccupancyError('');
+      setAirportOccupancyLoading(false);
+      return undefined;
+    }
+
+    let mounted = true;
+
+    async function loadAirportOccupancy() {
+      setAirportOccupancyLoading(true);
+      setAirportOccupancyError('');
+      try {
+        const occupancy = await api.getLidcAirportOccupancy(selectedMapAirportId);
+        if (!mounted) return;
+        setAirportOccupancy(occupancy);
+      } catch (error) {
+        if (!mounted) return;
+        setAirportOccupancy(null);
+        setAirportOccupancyError(error.message || t('lidc.map.occupancy.loadFailed'));
+      } finally {
+        if (mounted) setAirportOccupancyLoading(false);
+      }
+    }
+
+    loadAirportOccupancy();
+    return () => {
+      mounted = false;
+    };
+  }, [selectedMapAirportId]);
+
+  useEffect(() => {
+    if (!selectedMapAirportId || isMapPanelFullscreen) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setSelectedMapAirportId('');
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedMapAirportId, isMapPanelFullscreen]);
   const userHasSquadron = Boolean(userLidcState.hasSquadron);
   const isDeckFocusView = userHasSquadron;
   const isTableFocusView = isDeckPanelFullscreen || isDeckFocusView;
@@ -2652,7 +2734,12 @@ export default function LidcPage() {
         aria-expanded={mapBoardExpanded}
       >
         <div className="lidc-map-frame">
-          <LidcTheaterMap layoutKey={Number(mapBoardExpanded) + Number(isMapPanelFullscreen)} />
+          <LidcTheaterMap
+            layoutKey={Number(mapBoardExpanded) + Number(isMapPanelFullscreen)}
+            selectedAirportId={selectedMapAirportId}
+            onSelectAirport={handleSelectMapAirport}
+            onClearAirport={handleClearMapAirport}
+          />
           <header className={`lidc-panel-map-overlay ${mapBoardExpanded ? 'is-fullscreen' : ''}`}>
             <h2 className="lidc-panel-title">{t('lidc.map.title')}</h2>
             {mapBoardExpanded ? (
@@ -2675,6 +2762,15 @@ export default function LidcPage() {
               </button>
             )}
           </header>
+          {selectedMapAirport && (
+            <LidcAirportPresencePanel
+              airport={selectedMapAirport}
+              occupancy={airportOccupancy}
+              loading={airportOccupancyLoading}
+              error={airportOccupancyError}
+              onClose={handleClearMapAirport}
+            />
+          )}
         </div>
       </aside>
     );

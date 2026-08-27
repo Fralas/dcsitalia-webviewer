@@ -137,7 +137,7 @@ export default function LidcMapAirportPointers({
           return (
             <g
               key={frame.airport.id}
-              className={`lidc-map-pointers__group ${isSelected ? 'is-selected' : ''}`}
+              className={`lidc-map-pointers__group ${isSelected ? 'is-selected' : ''} ${selectable ? 'is-selectable' : ''}`}
               style={{ '--pointer-accent': isSelected ? '#ffbb00' : frame.airport.highlightColor }}
             >
               <path
@@ -145,6 +145,18 @@ export default function LidcMapAirportPointers({
                 d={frame.pathD}
                 strokeWidth={frame.strokeWidth}
               />
+              {selectable && (
+                <circle
+                  className="lidc-map-pointers__hit"
+                  cx={frame.anchor.x}
+                  cy={frame.anchor.y}
+                  r={Math.max(16, frame.dotRadius * 3.2)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSelectAirport(frame.airport.id);
+                  }}
+                />
+              )}
               <circle
                 className="lidc-map-pointers__dot"
                 cx={frame.anchor.x}
@@ -171,7 +183,10 @@ export default function LidcMapAirportPointers({
               transform: 'translate(0, -100%)',
               '--pointer-accent': isSelected ? '#ffbb00' : frame.airport.highlightColor,
             }}
-            onClick={selectable ? () => onSelectAirport(frame.airport.id) : undefined}
+            onClick={selectable ? (event) => {
+              event.stopPropagation();
+              onSelectAirport(frame.airport.id);
+            } : undefined}
             aria-pressed={selectable ? isSelected : undefined}
             aria-label={selectable ? `${frame.airport.name} ${frame.airport.subtitle}` : undefined}
           >

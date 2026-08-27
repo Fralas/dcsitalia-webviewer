@@ -2141,6 +2141,19 @@ app.put('/api/profile', (req, res) => {
   res.json(savedProfile);
 });
 
+/**
+ * GET /api/lidc/airports/:baseId/occupancy
+ * Public theater occupancy: squadrons and airframes present at an Afghanistan airbase.
+ */
+app.get('/api/lidc/airports/:baseId/occupancy', (req, res) => {
+  const occupancy = lidcService.getAirportOccupancy(req.params.baseId);
+  if (!occupancy) {
+    return res.status(404).json({ error: 'Airport not found' });
+  }
+
+  res.json(occupancy);
+});
+
 app.use('/api/lidc', requireFeatureAccess(LIDC_DISCORD_IDS));
 app.use('/api/atc', requireFeatureAccess(ATC_DISCORD_IDS));
 

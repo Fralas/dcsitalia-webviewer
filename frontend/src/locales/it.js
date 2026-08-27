@@ -325,6 +325,16 @@ export default {
     map: {
       title: 'MAPPA TEATRO',
       expandHint: 'Clicca per aprire a schermo intero',
+      occupancy: {
+        close: 'Chiudi dettagli aeroporto',
+        squadrons: 'Squadroni',
+        aircraft: 'Aerei in stazione',
+        empty: 'Nessuno squadrone o aereo in questo aeroporto.',
+        emptyAirframes: 'Nessun aereo attualmente in rampa.',
+        home: 'Base',
+        visiting: 'In transito',
+        loadFailed: 'Impossibile caricare la presenza in aeroporto.',
+      },
     },
     debug: {
       leaveSquadron: 'Debug: Abbandona squadrone',

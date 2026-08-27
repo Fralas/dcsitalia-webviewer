@@ -65,6 +65,7 @@ export default function LidcTheaterMap({
   layoutKey = 0,
   selectedAirportId = '',
   onSelectAirport = null,
+  onClearAirport = null,
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
@@ -130,6 +131,20 @@ export default function LidcTheaterMap({
     flyToAirport(mapInstance, selectedAirportId);
     return undefined;
   }, [mapInstance, selectedAirportId]);
+
+  useEffect(() => {
+    if (!mapInstance || typeof onClearAirport !== 'function') return undefined;
+
+    const handleMapClick = (event) => {
+      if (event?.originalEvent?.defaultPrevented) return;
+      onClearAirport();
+    };
+
+    mapInstance.on('click', handleMapClick);
+    return () => {
+      mapInstance.off('click', handleMapClick);
+    };
+  }, [mapInstance, onClearAirport]);
 
   return (
     <div className="lidc-theater-map-root">

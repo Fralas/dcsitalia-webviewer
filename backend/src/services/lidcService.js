@@ -14,6 +14,7 @@ import {
   resolveDcsAirbaseName,
   writeJsonAtomic,
 } from './lidcDcsBridge.js';
+import { getLidcAirportById } from '../config/lidcAfghanistanAirports.js';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data/lidc');
 // Filename kept from the pre-specialization schema so existing deployments keep their catalog.
@@ -1112,6 +1113,106 @@ export function listSquadrons() {
     .sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
 }
 
+function normalizeAirportAlias(value) {
+  return sanitizeText(value, 120).toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function airframeMatchesAirport(airframe, airport, homeBaseId) {
+  const airportId = sanitizeText(airport?.id, 120);
+  const currentBaseId = sanitizeText(airframe?.currentBaseId, 120);
+  if (currentBaseId) {
+    return currentBaseId === airportId;
+  }
+
+  const currentAirbase = normalizeAirportAlias(airframe?.currentAirbase);
+  if (currentAirbase) {
+    const aliases = [airport.id, airport.name, airport.subtitle]
+      .map((entry) => normalizeAirportAlias(entry))
+      .filter(Boolean);
+    return aliases.includes(currentAirbase);
+  }
+
+  return sanitizeText(homeBaseId, 120) === airportId;
+}
+
+function isAirframePresentOnRamp(airframe) {
+  const state = sanitizeText(airframe?.dcsState, 40).toLowerCase();
+  return state !== 'in_use' && state !== 'destroyed';
+}
+
+function toOccupancyAirframe(airframe) {
+  const category = sanitizeText(airframe?.category, 40);
+  if (category === 'groundAssets') return null;
+
+  return {
+    id: sanitizeText(airframe?.id, 160),
+    unitId: sanitizeText(airframe?.unitId, 80),
+    unitLabel: sanitizeText(airframe?.unitLabel, 120),
+    category,
+    boardNumber: sanitizeText(airframe?.boardNumber, 16).toUpperCase(),
+    dcsState: sanitizeText(airframe?.dcsState, 40) || 'in_hangar',
+  };
+}
+
+export function getAirportOccupancy(baseId) {
+  ensureStorage();
+
+  const airport = getLidcAirportById(baseId);
+  if (!airport) return null;
+
+  const catalogState = readCatalogState();
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
+  const squadrons = readSquadrons();
+
+  const occupancySquadrons = squadrons
+    .map((rawSquadron) => {
+      const squadron = { ...rawSquadron };
+      syncSquadronAirframesInMemory(squadron, unitsById);
+
+      const homeBaseId = sanitizeText(squadron?.baseId, 120);
+      const isHome = homeBaseId === airport.id;
+      const airframes = (Array.isArray(squadron.airframes) ? squadron.airframes : [])
+        .filter((airframe) => airframeMatchesAirport(airframe, airport, homeBaseId))
+        .filter((airframe) => isAirframePresentOnRamp(airframe))
+        .map((airframe) => toOccupancyAirframe(airframe))
+        .filter((airframe) => airframe?.id && airframe?.unitId);
+
+      airframes.sort((a, b) => {
+        const categoryCompare = String(a.category || '').localeCompare(String(b.category || ''), 'en', { sensitivity: 'base' });
+        if (categoryCompare !== 0) return categoryCompare;
+        const labelCompare = String(a.unitLabel || '').localeCompare(String(b.unitLabel || ''), 'en', { sensitivity: 'base' });
+        if (labelCompare !== 0) return labelCompare;
+        return String(a.boardNumber || '').localeCompare(String(b.boardNumber || ''), 'en', { numeric: true, sensitivity: 'base' });
+      });
+
+      if (!isHome && airframes.length === 0) return null;
+
+      return {
+        id: sanitizeText(squadron?.id, 120),
+        name: sanitizeText(squadron?.name, 120),
+        logoDataUrl: sanitizeText(squadron?.logoDataUrl, MAX_LOGO_DATA_URL_LENGTH) || '',
+        specializationNames: readSquadronSpecializationNames(squadron),
+        memberCount: Array.isArray(squadron?.members) ? squadron.members.length : 0,
+        isHome,
+        airframes,
+      };
+    })
+    .filter((entry) => entry?.id && entry?.name)
+    .sort((a, b) => {
+      if (a.isHome !== b.isHome) return a.isHome ? -1 : 1;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'en', { sensitivity: 'base' });
+    });
+
+  return {
+    airport: {
+      id: airport.id,
+      name: airport.name,
+      subtitle: airport.subtitle,
+    },
+    squadrons: occupancySquadrons,
+  };
+}
+
 export function getSquadronById(squadronId, actorUserId = '') {
   ensureStorage();
   const targetId = sanitizeText(squadronId, 120);
@@ -2012,6 +2113,7 @@ export default {
   createSquadron,
   updateSquadronDeck,
   listSquadrons,
+  getAirportOccupancy,
   getSquadronById,
   joinSquadronByInviteCode,
   updateAirframeAssignment,

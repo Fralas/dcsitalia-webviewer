@@ -563,6 +563,241 @@ body.lidc-map-fullscreen-open {
   cursor: grabbing;
 }
 
+.lidc-map-pointers__hit {
+  fill: transparent;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.lidc-occupancy-panel {
+  grid-area: 1 / 1;
+  align-self: end;
+  justify-self: start;
+  position: relative;
+  z-index: 3;
+  width: min(360px, calc(100% - 28px));
+  max-height: min(62%, 520px);
+  margin: 0 0 14px 14px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(18, 18, 18, 0.94) 0%, rgba(10, 10, 10, 0.9) 100%);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  pointer-events: auto;
+}
+
+.lidc-occupancy-panel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 14px 8px;
+}
+
+.lidc-occupancy-panel__type {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: #E32C2C;
+  text-transform: uppercase;
+}
+
+.lidc-occupancy-panel__name {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.lidc-occupancy-panel__close {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lidc-mute);
+  cursor: pointer;
+}
+
+.lidc-occupancy-panel__close:hover {
+  color: var(--lidc-ink);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.lidc-occupancy-panel__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px 10px;
+  color: var(--lidc-mute);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lidc-occupancy-panel__body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lidc-occupancy-panel__hint {
+  margin: 0;
+  padding: 10px 4px 6px;
+  color: var(--lidc-mute);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.lidc-occupancy-panel__hint.is-compact {
+  padding: 0 2px 2px 46px;
+}
+
+.lidc-occupancy-squadron {
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.lidc-occupancy-squadron__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.lidc-occupancy-squadron__logo {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #161616;
+}
+
+.lidc-occupancy-squadron__logo.is-empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--lidc-body);
+}
+
+.lidc-occupancy-squadron__copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.lidc-occupancy-squadron__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lidc-occupancy-squadron__copy h4 {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.lidc-occupancy-squadron__copy p {
+  margin: 3px 0 0;
+  color: var(--lidc-mute);
+  font-size: 11px;
+}
+
+.lidc-occupancy-badge {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lidc-occupancy-badge.is-home {
+  color: #121212;
+  background: var(--lidc-accent-gold);
+}
+
+.lidc-occupancy-badge.is-visiting {
+  color: #ffd27a;
+  background: rgba(255, 187, 0, 0.12);
+}
+
+.lidc-occupancy-airframes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.lidc-occupancy-airframe {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 54px;
+  padding: 14px 4px 4px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.lidc-occupancy-airframe-board {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.lidc-occupancy-airframe-image {
+  width: 100%;
+  max-height: 38px;
+  object-fit: contain;
+}
+
+.lidc-occupancy-airframe-fallback {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--lidc-body);
+  text-align: center;
+}
+
+.lidc-page.is-map-fullscreen .lidc-occupancy-panel {
+  width: min(400px, calc(100% - 48px));
+  max-height: min(70%, 640px);
+  margin: 0 0 24px 24px;
+}
+
 .lidc-panel-deck {
   transition:
     border-color 520ms ease,

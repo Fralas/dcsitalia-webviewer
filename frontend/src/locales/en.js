@@ -325,6 +325,16 @@ export default {
     map: {
       title: 'THEATER MAP',
       expandHint: 'Click to open full screen',
+      occupancy: {
+        close: 'Close airbase details',
+        squadrons: 'Squadrons',
+        aircraft: 'Aircraft on station',
+        empty: 'No squadrons or aircraft at this airbase.',
+        emptyAirframes: 'No aircraft currently on the ramp.',
+        home: 'Home',
+        visiting: 'Visiting',
+        loadFailed: 'Could not load airbase occupancy.',
+      },
     },
     debug: {
       leaveSquadron: 'Debug: Leave squadron',
