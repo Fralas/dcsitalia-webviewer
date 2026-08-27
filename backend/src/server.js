@@ -2168,6 +2168,7 @@ app.post('/api/lidc/airports/:baseId/logistics/purchase', (req, res) => {
       baseId: req.params.baseId,
       itemId: req.body?.itemId,
       quantity: req.body?.quantity,
+      items: req.body?.items,
       userId: req.session.user.id,
     });
     return res.json(result);

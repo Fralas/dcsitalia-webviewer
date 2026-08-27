@@ -1,8 +1,208 @@
+.lidc-airport-wizard-shell {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 12px;
+  max-width: 100%;
+}
+
 .lidc-wizard-card.lidc-airport-wizard-card {
   width: min(980px, 96vw);
   height: min(760px, calc(100dvh - 48px));
   max-height: min(760px, calc(100dvh - 48px));
   grid-template-rows: auto auto minmax(0, 1fr);
+  transition: width 480ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lidc-airport-wizard-shell.is-cart-open .lidc-airport-wizard-card {
+  width: min(980px, calc(96vw - 332px));
+}
+
+.lidc-airport-wizard-cart {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: 0;
+  min-width: 0;
+  height: min(760px, calc(100dvh - 48px));
+  max-height: min(760px, calc(100dvh - 48px));
+  box-sizing: border-box;
+  padding: 16px 0;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: var(--lidc-radius);
+  background: var(--lidc-canvas);
+  box-shadow: none;
+  opacity: 0;
+  transform: translateX(28px);
+  pointer-events: none;
+  transition:
+    width 480ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 480ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 360ms ease,
+    transform 480ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 360ms ease,
+    box-shadow 360ms ease;
+}
+
+.lidc-airport-wizard-cart.is-open {
+  width: min(320px, 34vw);
+  padding: 16px 14px;
+  border-color: var(--lidc-hairline);
+  box-shadow: var(--lidc-shadow);
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.lidc-airport-wizard-cart header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.lidc-airport-wizard-cart header h3 {
+  margin: 0;
+  color: var(--lidc-mute);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.lidc-airport-wizard-cart header strong {
+  min-width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--lidc-accent-gold);
+  color: #121212;
+  font-size: 11px;
+}
+
+.lidc-airport-wizard-cart__body {
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lidc-airport-wizard-cart__line {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  row-gap: 6px;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.lidc-airport-wizard-cart__line img {
+  grid-row: 1 / span 2;
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
+
+.lidc-airport-wizard-cart__line strong {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lidc-airport-wizard-cart__line span {
+  color: var(--lidc-mute);
+  font-size: 10px;
+}
+
+.lidc-airport-wizard-cart__line b {
+  grid-column: 3;
+  grid-row: 1;
+  align-self: start;
+  color: var(--lidc-accent-gold);
+  font-size: 12px;
+}
+
+.lidc-airport-wizard-cart__qty {
+  grid-column: 2 / span 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lidc-airport-wizard-cart__qty button {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.lidc-airport-wizard-cart__qty button.is-add:hover:not(:disabled) {
+  background: var(--lidc-accent-gold);
+  color: #121212;
+}
+
+.lidc-airport-wizard-cart__qty button.is-remove:hover:not(:disabled) {
+  background: #e23d3d;
+  color: #ffffff;
+}
+
+.lidc-airport-wizard-cart__qty button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.lidc-airport-wizard-cart__qty em {
+  min-width: 16px;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.lidc-airport-wizard-cart footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+}
+
+.lidc-airport-wizard-cart footer div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--lidc-mute);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lidc-airport-wizard-cart footer strong {
+  color: var(--lidc-accent-gold);
+  font-size: 16px;
+}
+
+.lidc-airport-wizard-cart footer .lidc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .lidc-airport-wizard-head {
@@ -112,7 +312,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .lidc-airport-wizard-tab-glider,
-  .lidc-airport-wizard-panes {
+  .lidc-airport-wizard-panes,
+  .lidc-wizard-card.lidc-airport-wizard-card,
+  .lidc-airport-wizard-cart {
     transition: none;
   }
 }

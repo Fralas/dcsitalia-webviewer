@@ -1,11 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Coins,
   Droplets,
   Helicopter,
   Loader2,
+  Minus,
   Plane,
+  Plus,
   Shield,
+  Trash2,
   X,
 } from 'lucide-react';
 import * as mgrs from 'mgrs';
@@ -35,10 +38,7 @@ function contentsLabel(item) {
     .join(' · ');
 }
 
-function ShopCard({ item, credits, canPurchase, buyingKey, onPurchase }) {
-  const isBuying = buyingKey === item.id;
-  const canAfford = credits >= item.cost;
-  const enabled = canPurchase && canAfford && !isBuying;
+function ShopCard({ item, canAdd, onAdd }) {
   const transport = Array.isArray(item.transport) ? item.transport : [];
   const imageUrl = shopImageFor(item);
   const contents = contentsLabel(item);
@@ -47,9 +47,9 @@ function ShopCard({ item, credits, canPurchase, buyingKey, onPurchase }) {
     <button
       type="button"
       className="lidc-airport-wizard-shop-card"
-      disabled={!enabled}
+      disabled={!canAdd}
       title={contents}
-      onClick={() => onPurchase(item.id)}
+      onClick={() => onAdd(item.id)}
     >
       <span className="lidc-airport-wizard-shop-card__transport" aria-hidden="true">
         <Plane size={14} />
@@ -62,14 +62,14 @@ function ShopCard({ item, credits, canPurchase, buyingKey, onPurchase }) {
       <em>{t(`lidc.map.airportWizard.${item.kind}`)}</em>
       <p>{contents}</p>
       <span className="lidc-airport-wizard-shop-card__cost">
-        {isBuying ? <Loader2 size={14} className="spin" /> : <Coins size={14} />}
+        <Coins size={14} />
         {formatStock(item.cost)}
       </span>
     </button>
   );
 }
 
-function ShopGroup({ items, credits, canPurchase, buyingKey, onPurchase }) {
+function ShopGroup({ items, remainingCredits, canPurchase, onAdd }) {
   if (!items.length) return null;
 
   return (
@@ -78,10 +78,8 @@ function ShopGroup({ items, credits, canPurchase, buyingKey, onPurchase }) {
         <ShopCard
           key={item.id}
           item={item}
-          credits={credits}
-          canPurchase={canPurchase}
-          buyingKey={buyingKey}
-          onPurchase={onPurchase}
+          canAdd={canPurchase && remainingCredits >= item.cost}
+          onAdd={onAdd}
         />
       ))}
     </div>
@@ -150,7 +148,8 @@ export default function LidcAirportWizard({
   onClose,
   onLogisticsUpdated,
 }) {
-  const [buyingKey, setBuyingKey] = useState('');
+  const [cart, setCart] = useState({});
+  const [confirming, setConfirming] = useState(false);
   const [purchaseError, setPurchaseError] = useState('');
   const catalogAirport = getLidcAirportById(airport?.id) || airport;
   const squadrons = Array.isArray(occupancy?.squadrons) ? occupancy.squadrons : [];
@@ -168,6 +167,64 @@ export default function LidcAirportWizard({
   const shopper = occupancy?.shopper || null;
   const squadronCredits = Number(shopper?.credits || 0);
 
+  const shopById = useMemo(() => {
+    return new Map(shop.map((item) => [item.id, item]));
+  }, [shop]);
+
+  const cartLines = useMemo(() => {
+    return Object.entries(cart)
+      .map(([itemId, quantity]) => {
+        const item = shopById.get(itemId);
+        const qty = Math.max(0, Math.floor(Number(quantity) || 0));
+        if (!item || qty < 1) return null;
+        return {
+          item,
+          quantity: qty,
+          cost: item.cost * qty,
+        };
+      })
+      .filter(Boolean);
+  }, [cart, shopById]);
+
+  const cartTotal = useMemo(
+    () => cartLines.reduce((sum, line) => sum + line.cost, 0),
+    [cartLines],
+  );
+  const remainingCredits = Math.max(0, squadronCredits - cartTotal);
+  const canPurchase = isLogged && Boolean(shopper);
+  const shouldShowCart = activeTab === 'logistics' && cartLines.length > 0;
+  const [cartMounted, setCartMounted] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
+  const cartLinesSnapshot = useRef([]);
+
+  if (cartLines.length > 0) {
+    cartLinesSnapshot.current = cartLines;
+  }
+
+  const visibleCartLines = cartLines.length > 0 ? cartLines : cartLinesSnapshot.current;
+  const visibleCartTotal = visibleCartLines.reduce((sum, line) => sum + line.cost, 0);
+  const visibleCartCount = visibleCartLines.length;
+
+  useEffect(() => {
+    if (shouldShowCart) {
+      setCartMounted(true);
+      const frame = window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => setCartOpen(true));
+      });
+      return () => window.cancelAnimationFrame(frame);
+    }
+
+    setCartOpen(false);
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reducedMotion || !cartMounted) {
+      setCartMounted(false);
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(() => setCartMounted(false), 520);
+    return () => window.clearTimeout(timeout);
+  }, [shouldShowCart, cartMounted]);
+
   const totals = useMemo(() => {
     return squadrons.reduce((acc, squadron) => {
       acc.aircrafts += Number(squadron?.counts?.aircrafts || 0);
@@ -178,23 +235,52 @@ export default function LidcAirportWizard({
     }, { aircrafts: 0, helicopters: 0, groundAssets: 0, members: 0 });
   }, [squadrons]);
 
-  async function handlePurchase(itemId) {
-    if (!isLogged || !shopper || !airport?.id) return;
-    setBuyingKey(itemId);
+  function addToCart(itemId) {
+    const item = shopById.get(itemId);
+    if (!item || !canPurchase) return;
+    if (remainingCredits < item.cost) return;
+    setPurchaseError('');
+    setCart((prev) => ({
+      ...prev,
+      [itemId]: Math.max(0, Math.floor(Number(prev[itemId]) || 0)) + 1,
+    }));
+  }
+
+  function setCartQuantity(itemId, nextQuantity) {
+    const qty = Math.max(0, Math.floor(Number(nextQuantity) || 0));
+    setCart((prev) => {
+      const next = { ...prev };
+      if (qty < 1) {
+        delete next[itemId];
+      } else {
+        next[itemId] = qty;
+      }
+      return next;
+    });
+  }
+
+  async function confirmOrder() {
+    if (!canPurchase || !airport?.id || cartLines.length === 0 || remainingCredits < 0) return;
+    if (cartTotal > squadronCredits) return;
+    setConfirming(true);
     setPurchaseError('');
     try {
-      const result = await api.purchaseLidcAirportLogistics(airport.id, { itemId, quantity: 1 });
+      const result = await api.purchaseLidcAirportLogistics(airport.id, {
+        items: cartLines.map((line) => ({ itemId: line.item.id, quantity: line.quantity })),
+      });
+      setCart({});
       onLogisticsUpdated?.(result);
     } catch (error) {
       setPurchaseError(error.message || t('lidc.map.airportWizard.purchaseFailed'));
     } finally {
-      setBuyingKey('');
+      setConfirming(false);
     }
   }
 
   return (
     <div className="lidc-wizard-root lidc-airport-wizard-root">
       <div className="lidc-wizard-backdrop" onClick={onClose} aria-hidden="true" />
+      <div className={`lidc-airport-wizard-shell ${cartOpen ? 'is-cart-open' : ''}`}>
       <section
         className="lidc-wizard-card lidc-airport-wizard-card"
         role="dialog"
@@ -361,10 +447,9 @@ export default function LidcAirportWizard({
                 <h3>{t('lidc.map.airportWizard.shopAircraft')}</h3>
                 <ShopGroup
                   items={aircraftShop}
-                  credits={squadronCredits}
-                  canPurchase={isLogged && Boolean(shopper)}
-                  buyingKey={buyingKey}
-                  onPurchase={handlePurchase}
+                  remainingCredits={remainingCredits}
+                  canPurchase={canPurchase}
+                  onAdd={addToCart}
                 />
               </section>
 
@@ -372,10 +457,9 @@ export default function LidcAirportWizard({
                 <h3>{t('lidc.map.airportWizard.shopHelicopters')}</h3>
                 <ShopGroup
                   items={helicopterShop}
-                  credits={squadronCredits}
-                  canPurchase={isLogged && Boolean(shopper)}
-                  buyingKey={buyingKey}
-                  onPurchase={handlePurchase}
+                  remainingCredits={remainingCredits}
+                  canPurchase={canPurchase}
+                  onAdd={addToCart}
                 />
               </section>
               </div>
@@ -383,6 +467,67 @@ export default function LidcAirportWizard({
           </div>
         </div>
       </section>
+
+      {cartMounted && (
+        <aside
+          className={`lidc-airport-wizard-cart ${cartOpen ? 'is-open' : ''}`}
+          aria-hidden={!cartOpen}
+          aria-label={t('lidc.map.airportWizard.cart')}
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          <header>
+            <h3>{t('lidc.map.airportWizard.cart')}</h3>
+            <strong>{visibleCartCount}</strong>
+          </header>
+          <div className="lidc-airport-wizard-cart__body">
+            {visibleCartLines.map((line) => (
+              <article key={line.item.id} className="lidc-airport-wizard-cart__line">
+                <img src={shopImageFor(line.item)} alt="" draggable={false} />
+                <div>
+                  <strong>{line.item.name}</strong>
+                  <span>{t(`lidc.map.airportWizard.${line.item.kind}`)}</span>
+                </div>
+                <div className="lidc-airport-wizard-cart__qty">
+                  <button
+                    type="button"
+                    className="is-remove"
+                    onClick={() => setCartQuantity(line.item.id, line.quantity - 1)}
+                    aria-label={t('lidc.map.airportWizard.removeItem')}
+                  >
+                    {line.quantity <= 1 ? <Trash2 size={12} /> : <Minus size={12} />}
+                  </button>
+                  <em>{line.quantity}</em>
+                  <button
+                    type="button"
+                    className="is-add"
+                    disabled={!canPurchase || remainingCredits < line.item.cost}
+                    onClick={() => addToCart(line.item.id)}
+                  >
+                    <Plus size={12} />
+                  </button>
+                </div>
+                <b>{formatStock(line.cost)}</b>
+              </article>
+            ))}
+          </div>
+          <footer>
+            <div>
+              <span>{t('lidc.map.airportWizard.cartTotal')}</span>
+              <strong>{formatStock(cartLines.length > 0 ? cartTotal : visibleCartTotal)}</strong>
+            </div>
+            <button
+              type="button"
+              className="lidc-btn lidc-btn-primary lidc-btn-block"
+              disabled={!canPurchase || confirming || cartLines.length === 0 || cartTotal > squadronCredits}
+              onClick={confirmOrder}
+            >
+              {confirming ? <Loader2 size={14} className="spin" /> : null}
+              {t('lidc.map.airportWizard.confirmOrder')}
+            </button>
+          </footer>
+        </aside>
+      )}
+      </div>
     </div>
   );
 }

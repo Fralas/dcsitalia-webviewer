@@ -1504,7 +1504,7 @@ export function getAirportOccupancy(baseId, actorUserId = '') {
   };
 }
 
-export function purchaseAirportLogistics({ baseId, itemId, quantity, userId }) {
+export function purchaseAirportLogistics({ baseId, itemId, quantity, items, userId }) {
   ensureStorage();
 
   const actorId = sanitizeText(userId, 80);
@@ -1517,16 +1517,41 @@ export function purchaseAirportLogistics({ baseId, itemId, quantity, userId }) {
     throw new Error('Airport not found');
   }
 
-  const itemKey = sanitizeText(itemId, 80);
-  const catalogItem = LOGISTICS_SHOP_CATALOG.find((entry) => entry.id === itemKey);
-  if (!catalogItem) {
-    throw new Error('Item not found');
-  }
+  const rawLines = Array.isArray(items) && items.length > 0
+    ? items
+    : [{ itemId, quantity: quantity || 1 }];
 
-  const buyQuantity = Math.floor(Number(quantity));
-  if (!Number.isFinite(buyQuantity) || buyQuantity < 1) {
+  const aggregated = new Map();
+  rawLines.forEach((line) => {
+    const key = sanitizeText(line?.itemId, 80);
+    const qty = Math.floor(Number(line?.quantity));
+    if (!key || !Number.isFinite(qty) || qty < 1) return;
+    aggregated.set(key, (aggregated.get(key) || 0) + qty);
+  });
+
+  if (aggregated.size < 1) {
     throw new Error('Invalid purchase quantity');
   }
+
+  const catalogById = new Map(LOGISTICS_SHOP_CATALOG.map((entry) => [entry.id, entry]));
+  const purchaseLines = [];
+  let totalCost = 0;
+
+  aggregated.forEach((qty, key) => {
+    const catalogItem = catalogById.get(key);
+    if (!catalogItem) {
+      throw new Error('Item not found');
+    }
+    const lineCost = catalogItem.cost * qty;
+    totalCost += lineCost;
+    purchaseLines.push({
+      itemId: catalogItem.id,
+      kind: catalogItem.kind,
+      name: catalogItem.name,
+      quantity: qty,
+      cost: lineCost,
+    });
+  });
 
   const squadrons = readSquadrons();
   const shopperSquadron = getUserPrimarySquadron(actorId);
@@ -1538,18 +1563,19 @@ export function purchaseAirportLogistics({ baseId, itemId, quantity, userId }) {
   }
 
   const squadron = squadrons[squadronIndex];
-  const cost = catalogItem.cost * buyQuantity;
   const credits = getSquadronCredits(squadron);
-  if (credits < cost) {
+  if (credits < totalCost) {
     throw new Error('Insufficient squadron credits');
   }
 
   const cargo = getWarehouseStock(squadron, airport.id);
-  cargo[catalogItem.id] = (cargo[catalogItem.id] || 0) + buyQuantity;
+  purchaseLines.forEach((line) => {
+    cargo[line.itemId] = (cargo[line.itemId] || 0) + line.quantity;
+  });
 
   const nextSquadron = {
     ...squadron,
-    credits: credits - cost,
+    credits: credits - totalCost,
     warehouses: {
       ...(squadron.warehouses && typeof squadron.warehouses === 'object' ? squadron.warehouses : {}),
       [airport.id]: cargo,
@@ -1562,10 +1588,8 @@ export function purchaseAirportLogistics({ baseId, itemId, quantity, userId }) {
     shop: listLogisticsShop(),
     shopper: toShopper(nextSquadron, airport.id),
     purchase: {
-      itemId: catalogItem.id,
-      kind: catalogItem.kind,
-      quantity: buyQuantity,
-      cost,
+      items: purchaseLines,
+      cost: totalCost,
     },
   };
 }
