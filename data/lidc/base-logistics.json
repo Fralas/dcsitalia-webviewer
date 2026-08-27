@@ -1,0 +1,445 @@
+{
+  "bases": {
+    "herat": {
+      "baseId": "herat",
+      "credits": 17984,
+      "fuel": [
+        {
+          "id": "jet-a1",
+          "label": "Jet A-1",
+          "unit": "kg",
+          "quantity": 42002,
+          "capacity": 90000,
+          "unitCost": 8
+        },
+        {
+          "id": "jp8",
+          "label": "JP-8",
+          "unit": "kg",
+          "quantity": 26000,
+          "capacity": 60000,
+          "unitCost": 9
+        },
+        {
+          "id": "diesel",
+          "label": "Diesel",
+          "unit": "kg",
+          "quantity": 14000,
+          "capacity": 40000,
+          "unitCost": 4
+        }
+      ],
+      "armament": [
+        {
+          "id": "aim-120c",
+          "label": "AIM-120C",
+          "unit": "ea",
+          "quantity": 18,
+          "capacity": 48,
+          "unitCost": 120
+        },
+        {
+          "id": "aim-9x",
+          "label": "AIM-9X",
+          "unit": "ea",
+          "quantity": 24,
+          "capacity": 64,
+          "unitCost": 55
+        },
+        {
+          "id": "agm-65d",
+          "label": "AGM-65D",
+          "unit": "ea",
+          "quantity": 12,
+          "capacity": 36,
+          "unitCost": 70
+        },
+        {
+          "id": "gbu-12",
+          "label": "GBU-12",
+          "unit": "ea",
+          "quantity": 20,
+          "capacity": 60,
+          "unitCost": 40
+        },
+        {
+          "id": "hydra-70",
+          "label": "Hydra 70",
+          "unit": "ea",
+          "quantity": 96,
+          "capacity": 240,
+          "unitCost": 8
+        },
+        {
+          "id": "30mm",
+          "label": "30mm API",
+          "unit": "rds",
+          "quantity": 2400,
+          "capacity": 8000,
+          "unitCost": 1
+        },
+        {
+          "id": "20mm",
+          "label": "20mm M55",
+          "unit": "rds",
+          "quantity": 4000,
+          "capacity": 12000,
+          "unitCost": 1
+        }
+      ]
+    },
+    "kandahar": {
+      "baseId": "kandahar",
+      "credits": 18000,
+      "fuel": [
+        {
+          "id": "jet-a1",
+          "label": "Jet A-1",
+          "unit": "kg",
+          "quantity": 42000,
+          "capacity": 90000,
+          "unitCost": 8
+        },
+        {
+          "id": "jp8",
+          "label": "JP-8",
+          "unit": "kg",
+          "quantity": 26000,
+          "capacity": 60000,
+          "unitCost": 9
+        },
+        {
+          "id": "diesel",
+          "label": "Diesel",
+          "unit": "kg",
+          "quantity": 14000,
+          "capacity": 40000,
+          "unitCost": 4
+        }
+      ],
+      "armament": [
+        {
+          "id": "aim-120c",
+          "label": "AIM-120C",
+          "unit": "ea",
+          "quantity": 18,
+          "capacity": 48,
+          "unitCost": 120
+        },
+        {
+          "id": "aim-9x",
+          "label": "AIM-9X",
+          "unit": "ea",
+          "quantity": 24,
+          "capacity": 64,
+          "unitCost": 55
+        },
+        {
+          "id": "agm-65d",
+          "label": "AGM-65D",
+          "unit": "ea",
+          "quantity": 12,
+          "capacity": 36,
+          "unitCost": 70
+        },
+        {
+          "id": "gbu-12",
+          "label": "GBU-12",
+          "unit": "ea",
+          "quantity": 20,
+          "capacity": 60,
+          "unitCost": 40
+        },
+        {
+          "id": "hydra-70",
+          "label": "Hydra 70",
+          "unit": "ea",
+          "quantity": 96,
+          "capacity": 240,
+          "unitCost": 8
+        },
+        {
+          "id": "30mm",
+          "label": "30mm API",
+          "unit": "rds",
+          "quantity": 2400,
+          "capacity": 8000,
+          "unitCost": 1
+        },
+        {
+          "id": "20mm",
+          "label": "20mm M55",
+          "unit": "rds",
+          "quantity": 4000,
+          "capacity": 12000,
+          "unitCost": 1
+        }
+      ]
+    },
+    "camp-bastion": {
+      "baseId": "camp-bastion",
+      "credits": 18000,
+      "fuel": [
+        {
+          "id": "jet-a1",
+          "label": "Jet A-1",
+          "unit": "kg",
+          "quantity": 42000,
+          "capacity": 90000,
+          "unitCost": 8
+        },
+        {
+          "id": "jp8",
+          "label": "JP-8",
+          "unit": "kg",
+          "quantity": 26000,
+          "capacity": 60000,
+          "unitCost": 9
+        },
+        {
+          "id": "diesel",
+          "label": "Diesel",
+          "unit": "kg",
+          "quantity": 14000,
+          "capacity": 40000,
+          "unitCost": 4
+        }
+      ],
+      "armament": [
+        {
+          "id": "aim-120c",
+          "label": "AIM-120C",
+          "unit": "ea",
+          "quantity": 18,
+          "capacity": 48,
+          "unitCost": 120
+        },
+        {
+          "id": "aim-9x",
+          "label": "AIM-9X",
+          "unit": "ea",
+          "quantity": 24,
+          "capacity": 64,
+          "unitCost": 55
+        },
+        {
+          "id": "agm-65d",
+          "label": "AGM-65D",
+          "unit": "ea",
+          "quantity": 12,
+          "capacity": 36,
+          "unitCost": 70
+        },
+        {
+          "id": "gbu-12",
+          "label": "GBU-12",
+          "unit": "ea",
+          "quantity": 20,
+          "capacity": 60,
+          "unitCost": 40
+        },
+        {
+          "id": "hydra-70",
+          "label": "Hydra 70",
+          "unit": "ea",
+          "quantity": 96,
+          "capacity": 240,
+          "unitCost": 8
+        },
+        {
+          "id": "30mm",
+          "label": "30mm API",
+          "unit": "rds",
+          "quantity": 2400,
+          "capacity": 8000,
+          "unitCost": 1
+        },
+        {
+          "id": "20mm",
+          "label": "20mm M55",
+          "unit": "rds",
+          "quantity": 4000,
+          "capacity": 12000,
+          "unitCost": 1
+        }
+      ]
+    },
+    "kabul": {
+      "baseId": "kabul",
+      "credits": 18000,
+      "fuel": [
+        {
+          "id": "jet-a1",
+          "label": "Jet A-1",
+          "unit": "kg",
+          "quantity": 42000,
+          "capacity": 90000,
+          "unitCost": 8
+        },
+        {
+          "id": "jp8",
+          "label": "JP-8",
+          "unit": "kg",
+          "quantity": 26000,
+          "capacity": 60000,
+          "unitCost": 9
+        },
+        {
+          "id": "diesel",
+          "label": "Diesel",
+          "unit": "kg",
+          "quantity": 14000,
+          "capacity": 40000,
+          "unitCost": 4
+        }
+      ],
+      "armament": [
+        {
+          "id": "aim-120c",
+          "label": "AIM-120C",
+          "unit": "ea",
+          "quantity": 18,
+          "capacity": 48,
+          "unitCost": 120
+        },
+        {
+          "id": "aim-9x",
+          "label": "AIM-9X",
+          "unit": "ea",
+          "quantity": 24,
+          "capacity": 64,
+          "unitCost": 55
+        },
+        {
+          "id": "agm-65d",
+          "label": "AGM-65D",
+          "unit": "ea",
+          "quantity": 12,
+          "capacity": 36,
+          "unitCost": 70
+        },
+        {
+          "id": "gbu-12",
+          "label": "GBU-12",
+          "unit": "ea",
+          "quantity": 20,
+          "capacity": 60,
+          "unitCost": 40
+        },
+        {
+          "id": "hydra-70",
+          "label": "Hydra 70",
+          "unit": "ea",
+          "quantity": 96,
+          "capacity": 240,
+          "unitCost": 8
+        },
+        {
+          "id": "30mm",
+          "label": "30mm API",
+          "unit": "rds",
+          "quantity": 2400,
+          "capacity": 8000,
+          "unitCost": 1
+        },
+        {
+          "id": "20mm",
+          "label": "20mm M55",
+          "unit": "rds",
+          "quantity": 4000,
+          "capacity": 12000,
+          "unitCost": 1
+        }
+      ]
+    },
+    "bagram": {
+      "baseId": "bagram",
+      "credits": 18000,
+      "fuel": [
+        {
+          "id": "jet-a1",
+          "label": "Jet A-1",
+          "unit": "kg",
+          "quantity": 42000,
+          "capacity": 90000,
+          "unitCost": 8
+        },
+        {
+          "id": "jp8",
+          "label": "JP-8",
+          "unit": "kg",
+          "quantity": 26000,
+          "capacity": 60000,
+          "unitCost": 9
+        },
+        {
+          "id": "diesel",
+          "label": "Diesel",
+          "unit": "kg",
+          "quantity": 14000,
+          "capacity": 40000,
+          "unitCost": 4
+        }
+      ],
+      "armament": [
+        {
+          "id": "aim-120c",
+          "label": "AIM-120C",
+          "unit": "ea",
+          "quantity": 18,
+          "capacity": 48,
+          "unitCost": 120
+        },
+        {
+          "id": "aim-9x",
+          "label": "AIM-9X",
+          "unit": "ea",
+          "quantity": 24,
+          "capacity": 64,
+          "unitCost": 55
+        },
+        {
+          "id": "agm-65d",
+          "label": "AGM-65D",
+          "unit": "ea",
+          "quantity": 12,
+          "capacity": 36,
+          "unitCost": 70
+        },
+        {
+          "id": "gbu-12",
+          "label": "GBU-12",
+          "unit": "ea",
+          "quantity": 20,
+          "capacity": 60,
+          "unitCost": 40
+        },
+        {
+          "id": "hydra-70",
+          "label": "Hydra 70",
+          "unit": "ea",
+          "quantity": 96,
+          "capacity": 240,
+          "unitCost": 8
+        },
+        {
+          "id": "30mm",
+          "label": "30mm API",
+          "unit": "rds",
+          "quantity": 2400,
+          "capacity": 8000,
+          "unitCost": 1
+        },
+        {
+          "id": "20mm",
+          "label": "20mm M55",
+          "unit": "rds",
+          "quantity": 4000,
+          "capacity": 12000,
+          "unitCost": 1
+        }
+      ]
+    }
+  },
+  "updatedAt": 1787827754751
+}

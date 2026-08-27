@@ -25,6 +25,7 @@ import { normalizeSquadronLogo } from '../utils/normalizeSquadronLogo';
 import { getLidcUnitImageUrl } from '../utils/lidcUnitImages';
 import LidcTheaterMap from './LidcTheaterMap';
 import LidcAirportPresencePanel from './LidcAirportPresencePanel';
+import LidcAirportWizard from './LidcAirportWizard';
 import LidcDeckBuilder, {
   DECK_CATEGORY_META,
   buildDeckPayloadFromQuantities,
@@ -397,6 +398,7 @@ export default function LidcPage() {
   const [airportOccupancy, setAirportOccupancy] = useState(null);
   const [airportOccupancyLoading, setAirportOccupancyLoading] = useState(false);
   const [airportOccupancyError, setAirportOccupancyError] = useState('');
+  const [airportWizardTab, setAirportWizardTab] = useState('');
 
   const [submitError, setSubmitError] = useState('');
   const [wizardAdvanceAttempted, setWizardAdvanceAttempted] = useState(false);
@@ -525,7 +527,7 @@ export default function LidcPage() {
     && Boolean(user?.id)
     && !Boolean(userLidcState.hasSquadron)
     && panelMode === 'join';
-  const shouldBlurBehindOverlay = isWizardOpen || isEntryWizardVisible;
+  const shouldBlurBehindOverlay = isWizardOpen || isEntryWizardVisible || Boolean(airportWizardTab);
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
@@ -552,6 +554,10 @@ export default function LidcPage() {
 
     const handleKeyDown = (event) => {
       if (event.key !== 'Escape' || selectedAirframeDraft) return;
+      if (airportWizardTab) {
+        setAirportWizardTab('');
+        return;
+      }
       if (selectedMapAirportId) {
         setSelectedMapAirportId('');
         return;
@@ -570,7 +576,7 @@ export default function LidcPage() {
       document.body.classList.remove('lidc-deck-expanded-open');
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isDeckPanelFullscreen, isMapPanelFullscreen, selectedAirframeDraft, selectedMapAirportId]);
+  }, [isDeckPanelFullscreen, isMapPanelFullscreen, selectedAirframeDraft, selectedMapAirportId, airportWizardTab]);
 
   useEffect(() => {
     if (!mapBoardExpanded || typeof document === 'undefined') return undefined;
@@ -964,20 +970,46 @@ export default function LidcPage() {
 
   const handleSelectMapAirport = useCallback((airportId) => {
     const nextId = String(airportId || '');
-    setSelectedMapAirportId((prev) => (prev === nextId ? '' : nextId));
-  }, []);
+    setSelectedMapAirportId((prev) => {
+      if (prev === nextId && airportWizardTab) return prev;
+      return prev === nextId ? '' : nextId;
+    });
+  }, [airportWizardTab]);
 
   const handleClearMapAirport = useCallback(() => {
+    if (airportWizardTab) return;
     setSelectedMapAirportId('');
+  }, [airportWizardTab]);
+
+  const handleOpenAirportWizard = useCallback((tab) => {
+    setAirportWizardTab(tab === 'logistics' ? 'logistics' : 'overview');
+  }, []);
+
+  const handleCloseAirportWizard = useCallback(() => {
+    setAirportWizardTab('');
+  }, []);
+
+  const handleAirportLogisticsUpdated = useCallback((result) => {
+    setAirportOccupancy((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        logistics: result?.logistics || prev.logistics,
+        resources: result?.resources || prev.resources,
+      };
+    });
   }, []);
 
   useEffect(() => {
-    if (!selectedMapAirportId) {
-      setAirportOccupancy(null);
-      setAirportOccupancyError('');
-      setAirportOccupancyLoading(false);
-      return undefined;
-    }
+    if (selectedMapAirportId || airportWizardTab) return undefined;
+    setAirportOccupancy(null);
+    setAirportOccupancyError('');
+    setAirportOccupancyLoading(false);
+    return undefined;
+  }, [selectedMapAirportId, airportWizardTab]);
+
+  useEffect(() => {
+    if (!selectedMapAirportId) return undefined;
 
     let mounted = true;
 
@@ -1007,16 +1039,19 @@ export default function LidcPage() {
     if (!selectedMapAirportId || isMapPanelFullscreen) return undefined;
 
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        setSelectedMapAirportId('');
+      if (event.key !== 'Escape') return;
+      if (airportWizardTab) {
+        setAirportWizardTab('');
+        return;
       }
+      setSelectedMapAirportId('');
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedMapAirportId, isMapPanelFullscreen]);
+  }, [selectedMapAirportId, isMapPanelFullscreen, airportWizardTab]);
   const userHasSquadron = Boolean(userLidcState.hasSquadron);
   const isDeckFocusView = userHasSquadron;
   const isTableFocusView = isDeckPanelFullscreen || isDeckFocusView;
@@ -2769,6 +2804,7 @@ export default function LidcPage() {
               loading={airportOccupancyLoading}
               error={airportOccupancyError}
               onClose={handleClearMapAirport}
+              onOpenWizard={handleOpenAirportWizard}
             />
           )}
         </div>
@@ -3037,6 +3073,19 @@ export default function LidcPage() {
             </footer>
           </section>
         </div>,
+        wizardPortalTarget,
+      )}
+
+      {airportWizardTab && selectedMapAirport && wizardPortalTarget && createPortal(
+        <LidcAirportWizard
+          airport={selectedMapAirport}
+          occupancy={airportOccupancy}
+          activeTab={airportWizardTab}
+          isLogged={isLogged}
+          onChangeTab={setAirportWizardTab}
+          onClose={handleCloseAirportWizard}
+          onLogisticsUpdated={handleAirportLogisticsUpdated}
+        />,
         wizardPortalTarget,
       )}
 

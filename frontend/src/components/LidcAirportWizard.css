@@ -1,0 +1,278 @@
+.lidc-airport-wizard-card {
+  width: min(980px, 96vw);
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.lidc-airport-wizard-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.lidc-airport-wizard-head h2 {
+  margin: 4px 0 6px;
+  font-size: clamp(22px, 1.4vw, 32px);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.lidc-airport-wizard-head p {
+  margin: 0;
+  color: var(--lidc-mute);
+  font-size: 13px;
+}
+
+.lidc-airport-wizard-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.lidc-airport-wizard-tab {
+  min-height: 42px;
+  border: 1px solid var(--lidc-hairline);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lidc-mute);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.lidc-airport-wizard-tab.is-active {
+  color: #121212;
+  background: var(--lidc-accent-gold);
+  border-color: var(--lidc-accent-gold);
+}
+
+.lidc-airport-wizard-body {
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.lidc-airport-wizard-overview,
+.lidc-airport-wizard-logistics {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.lidc-airport-wizard-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.lidc-airport-wizard-facts article {
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.lidc-airport-wizard-facts span,
+.lidc-airport-wizard-block h3 {
+  display: block;
+  margin: 0 0 8px;
+  color: var(--lidc-mute);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.lidc-airport-wizard-facts strong {
+  font-size: 16px;
+}
+
+.lidc-airport-wizard-mgrs {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.lidc-airport-wizard-resource-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.lidc-airport-wizard-resource-grid div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+}
+
+.lidc-airport-wizard-resource-grid span {
+  flex: 1 1 auto;
+  color: var(--lidc-mute);
+  font-size: 12px;
+}
+
+.lidc-airport-wizard-squadron {
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.lidc-airport-wizard-squadron + .lidc-airport-wizard-squadron {
+  margin-top: 10px;
+}
+
+.lidc-airport-wizard-squadron header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.lidc-airport-wizard-squadron header img,
+.lidc-airport-wizard-squadron header span {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 10px;
+  background: #161616;
+}
+
+.lidc-airport-wizard-squadron header span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+}
+
+.lidc-airport-wizard-squadron h4 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.lidc-airport-wizard-squadron p {
+  margin: 4px 0 0;
+  color: var(--lidc-mute);
+  font-size: 12px;
+}
+
+.lidc-airport-wizard-airframes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+}
+
+.lidc-airport-wizard-airframe {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 58px;
+  padding: 16px 4px 6px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.lidc-airport-wizard-airframe span {
+  position: absolute;
+  top: 5px;
+  left: 6px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.lidc-airport-wizard-airframe img {
+  width: 100%;
+  max-height: 36px;
+  object-fit: contain;
+}
+
+.lidc-airport-wizard-airframe em {
+  font-size: 9px;
+  font-style: normal;
+  text-align: center;
+}
+
+.lidc-airport-wizard-credits {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--lidc-accent-gold);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lidc-airport-wizard-stock {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.lidc-airport-wizard-stock__copy strong {
+  display: block;
+  font-size: 14px;
+}
+
+.lidc-airport-wizard-stock__copy span {
+  display: block;
+  margin: 4px 0 8px;
+  color: var(--lidc-mute);
+  font-size: 12px;
+}
+
+.lidc-airport-wizard-meter {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.lidc-airport-wizard-meter i {
+  display: block;
+  height: 100%;
+  background: var(--lidc-accent-gold);
+}
+
+.lidc-airport-wizard-stock__buy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lidc-airport-wizard-stock__buy input {
+  width: 64px;
+  height: 34px;
+  border: 1px solid var(--lidc-hairline);
+  border-radius: 10px;
+  background: #121212;
+  color: #fff;
+  text-align: center;
+}
+
+.lidc-airport-wizard-stock__buy .lidc-btn {
+  min-width: 108px;
+  gap: 8px;
+}
+
+@media (max-width: 860px) {
+  .lidc-airport-wizard-facts,
+  .lidc-airport-wizard-resource-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .lidc-airport-wizard-stock {
+    grid-template-columns: 1fr;
+  }
+}

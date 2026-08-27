@@ -711,6 +711,17 @@ export async function getLidcAirportOccupancy(baseId) {
 }
 
 /**
+ * Purchase fuel or armament for a LIDC Afghanistan airbase
+ */
+export async function purchaseLidcAirportLogistics(baseId, payload) {
+  return fetchAPI(`/lidc/airports/${encodeURIComponent(baseId)}/logistics/purchase`, {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+    credentials: 'include',
+  });
+}
+
+/**
  * Create a new LIDC squadron
  */
 export async function createLidcSquadron(payload) {

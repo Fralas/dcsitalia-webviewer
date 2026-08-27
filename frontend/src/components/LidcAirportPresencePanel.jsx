@@ -1,29 +1,22 @@
-import { Loader2, X } from 'lucide-react';
+import { ChevronRight, Helicopter, Loader2, Plane, X } from 'lucide-react';
 import { formatLidcAirportLabel } from '../config/lidcAfghanistanAirports';
 import { t } from '../utils/locale';
-import { getLidcUnitImageUrl } from '../utils/lidcUnitImages';
 import InlineError from './InlineError';
 
-function OccupancyAirframe({ airframe }) {
-  const model = airframe.unitLabel || airframe.unitId || '-';
-  const imageUrl = getLidcUnitImageUrl(airframe.unitId);
+function SquadronKindCounts({ counts }) {
+  const aircrafts = Number(counts?.aircrafts || 0);
+  const helicopters = Number(counts?.helicopters || 0);
 
   return (
-    <div
-      className="lidc-occupancy-airframe"
-      title={`${model} · ${airframe.boardNumber || '-'}`}
-    >
-      <span className="lidc-occupancy-airframe-board">{airframe.boardNumber || '-'}</span>
-      {imageUrl ? (
-        <img
-          src={imageUrl}
-          alt={model}
-          className="lidc-occupancy-airframe-image"
-          draggable={false}
-        />
-      ) : (
-        <span className="lidc-occupancy-airframe-fallback">{model}</span>
-      )}
+    <div className="lidc-occupancy-counts">
+      <span className="lidc-occupancy-count">
+        <Plane size={13} aria-hidden="true" />
+        <strong>{aircrafts}</strong>
+      </span>
+      <span className="lidc-occupancy-count">
+        <Helicopter size={13} aria-hidden="true" />
+        <strong>{helicopters}</strong>
+      </span>
     </div>
   );
 }
@@ -34,11 +27,9 @@ export default function LidcAirportPresencePanel({
   loading = false,
   error = '',
   onClose,
+  onOpenWizard,
 }) {
   const squadrons = Array.isArray(occupancy?.squadrons) ? occupancy.squadrons : [];
-  const airframeCount = squadrons.reduce((total, squadron) => (
-    total + (Array.isArray(squadron.airframes) ? squadron.airframes.length : 0)
-  ), 0);
 
   return (
     <aside
@@ -62,10 +53,13 @@ export default function LidcAirportPresencePanel({
         </button>
       </header>
 
-      <div className="lidc-occupancy-panel__meta">
-        <span>{squadrons.length} {t('lidc.map.occupancy.squadrons')}</span>
-        <span aria-hidden="true">·</span>
-        <span>{airframeCount} {t('lidc.map.occupancy.aircraft')}</span>
+      <div className="lidc-occupancy-panel__menus" role="navigation" aria-label={t('lidc.map.airportWizard.menus')}>
+        <button type="button" className="lidc-occupancy-menu" onClick={() => onOpenWizard('overview')}>
+          {t('lidc.map.airportWizard.overview')}
+        </button>
+        <button type="button" className="lidc-occupancy-menu" onClick={() => onOpenWizard('logistics')}>
+          {t('lidc.map.airportWizard.logistics')}
+        </button>
       </div>
 
       <div className="lidc-occupancy-panel__body">
@@ -82,47 +76,36 @@ export default function LidcAirportPresencePanel({
           <p className="lidc-occupancy-panel__hint">{t('lidc.map.occupancy.empty')}</p>
         )}
         {!loading && !error && squadrons.map((squadron) => (
-          <section key={squadron.id} className="lidc-occupancy-squadron">
-            <div className="lidc-occupancy-squadron__head">
-              {squadron.logoDataUrl ? (
-                <img
-                  src={squadron.logoDataUrl}
-                  alt=""
-                  className="lidc-occupancy-squadron__logo"
-                />
-              ) : (
-                <span className="lidc-occupancy-squadron__logo is-empty" aria-hidden="true">
-                  {(squadron.name || '?').charAt(0)}
-                </span>
-              )}
-              <div className="lidc-occupancy-squadron__copy">
-                <div className="lidc-occupancy-squadron__title-row">
-                  <h4>{squadron.name}</h4>
-                  <span className={`lidc-occupancy-badge ${squadron.isHome ? 'is-home' : 'is-visiting'}`}>
-                    {squadron.isHome
-                      ? t('lidc.map.occupancy.home')
-                      : t('lidc.map.occupancy.visiting')}
-                  </span>
-                </div>
-                <p>
-                  {Array.isArray(squadron.airframes) ? squadron.airframes.length : 0}
-                  {' '}
-                  {t('lidc.map.occupancy.aircraft')}
-                </p>
-              </div>
-            </div>
-            {(!squadron.airframes || squadron.airframes.length === 0) ? (
-              <p className="lidc-occupancy-panel__hint is-compact">
-                {t('lidc.map.occupancy.emptyAirframes')}
-              </p>
+          <button
+            key={squadron.id}
+            type="button"
+            className="lidc-occupancy-squadron is-button"
+            onClick={() => onOpenWizard('overview')}
+          >
+            {squadron.logoDataUrl ? (
+              <img
+                src={squadron.logoDataUrl}
+                alt=""
+                className="lidc-occupancy-squadron__logo"
+              />
             ) : (
-              <div className="lidc-occupancy-airframes">
-                {squadron.airframes.map((airframe) => (
-                  <OccupancyAirframe key={airframe.id} airframe={airframe} />
-                ))}
-              </div>
+              <span className="lidc-occupancy-squadron__logo is-empty" aria-hidden="true">
+                {(squadron.name || '?').charAt(0)}
+              </span>
             )}
-          </section>
+            <div className="lidc-occupancy-squadron__copy">
+              <div className="lidc-occupancy-squadron__title-row">
+                <h4>{squadron.name}</h4>
+                <span className={`lidc-occupancy-badge ${squadron.isHome ? 'is-home' : 'is-visiting'}`}>
+                  {squadron.isHome
+                    ? t('lidc.map.occupancy.home')
+                    : t('lidc.map.occupancy.visiting')}
+                </span>
+              </div>
+              <SquadronKindCounts counts={squadron.counts} />
+            </div>
+            <ChevronRight size={16} className="lidc-occupancy-squadron__open" aria-hidden="true" />
+          </button>
         ))}
       </div>
     </aside>

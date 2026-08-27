@@ -14,7 +14,7 @@ import {
   resolveDcsAirbaseName,
   writeJsonAtomic,
 } from './lidcDcsBridge.js';
-import { getLidcAirportById } from '../config/lidcAfghanistanAirports.js';
+import { getLidcAirportById, LIDC_AFGHANISTAN_AIRPORTS } from '../config/lidcAfghanistanAirports.js';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data/lidc');
 // Filename kept from the pre-specialization schema so existing deployments keep their catalog.
@@ -23,6 +23,7 @@ const SQUADRONS_FILE = path.join(DATA_DIR, 'squadrons.json');
 const DISCORD_USERS_FILE = path.join(DATA_DIR, 'discord-users.json');
 const UCID_LINKS_FILE = path.join(DATA_DIR, 'ucid-links.json');
 const LINK_CODES_FILE = path.join(DATA_DIR, 'link-codes.json');
+const BASE_LOGISTICS_FILE = path.join(DATA_DIR, 'base-logistics.json');
 const LINK_CODE_TTL_MS = 10 * 60 * 1000;
 const LINK_CODE_PATTERN = /^LIDC-[A-Z0-9]{6}$/;
 const MAX_LOGO_DATA_URL_LENGTH = 12_000_000;
@@ -37,6 +38,23 @@ export const DECK_CATEGORIES = Object.freeze([
   'helicopters',
   'logistics',
   'groundAssets',
+]);
+
+const ROTARY_LOGISTICS_UNIT_IDS = new Set(['ch47f', 'mi8mt', 'uh1h']);
+const DEFAULT_BASE_CREDITS = 18000;
+const LOGISTICS_FUEL_CATALOG = Object.freeze([
+  { id: 'jet-a1', label: 'Jet A-1', unit: 'kg', defaultQuantity: 42000, capacity: 90000, unitCost: 8 },
+  { id: 'jp8', label: 'JP-8', unit: 'kg', defaultQuantity: 26000, capacity: 60000, unitCost: 9 },
+  { id: 'diesel', label: 'Diesel', unit: 'kg', defaultQuantity: 14000, capacity: 40000, unitCost: 4 },
+]);
+const LOGISTICS_ARMAMENT_CATALOG = Object.freeze([
+  { id: 'aim-120c', label: 'AIM-120C', unit: 'ea', defaultQuantity: 18, capacity: 48, unitCost: 120 },
+  { id: 'aim-9x', label: 'AIM-9X', unit: 'ea', defaultQuantity: 24, capacity: 64, unitCost: 55 },
+  { id: 'agm-65d', label: 'AGM-65D', unit: 'ea', defaultQuantity: 12, capacity: 36, unitCost: 70 },
+  { id: 'gbu-12', label: 'GBU-12', unit: 'ea', defaultQuantity: 20, capacity: 60, unitCost: 40 },
+  { id: 'hydra-70', label: 'Hydra 70', unit: 'ea', defaultQuantity: 96, capacity: 240, unitCost: 8 },
+  { id: '30mm', label: '30mm API', unit: 'rds', defaultQuantity: 2400, capacity: 8000, unitCost: 1 },
+  { id: '20mm', label: '20mm M55', unit: 'rds', defaultQuantity: 4000, capacity: 12000, unitCost: 1 },
 ]);
 
 export const LIDC_MEMBER_ROLES = Object.freeze([
@@ -177,6 +195,10 @@ function ensureStorage() {
 
   if (!fs.existsSync(LINK_CODES_FILE)) {
     writeJsonAtomic(LINK_CODES_FILE, {});
+  }
+
+  if (!fs.existsSync(BASE_LOGISTICS_FILE)) {
+    writeJsonAtomic(BASE_LOGISTICS_FILE, { bases: {}, updatedAt: Date.now() });
   }
 
   ensureSquadronInviteCodes();
@@ -1142,7 +1164,6 @@ function isAirframePresentOnRamp(airframe) {
 
 function toOccupancyAirframe(airframe) {
   const category = sanitizeText(airframe?.category, 40);
-  if (category === 'groundAssets') return null;
 
   return {
     id: sanitizeText(airframe?.id, 160),
@@ -1151,6 +1172,122 @@ function toOccupancyAirframe(airframe) {
     category,
     boardNumber: sanitizeText(airframe?.boardNumber, 16).toUpperCase(),
     dcsState: sanitizeText(airframe?.dcsState, 40) || 'in_hangar',
+  };
+}
+
+function countOccupancyKinds(airframes) {
+  const counts = { aircrafts: 0, helicopters: 0, groundAssets: 0 };
+  (Array.isArray(airframes) ? airframes : []).forEach((airframe) => {
+    const category = sanitizeText(airframe?.category, 40);
+    const unitId = sanitizeText(airframe?.unitId, 80);
+    if (category === 'groundAssets') {
+      counts.groundAssets += 1;
+      return;
+    }
+    if (category === 'helicopters' || (category === 'logistics' && ROTARY_LOGISTICS_UNIT_IDS.has(unitId))) {
+      counts.helicopters += 1;
+      return;
+    }
+    counts.aircrafts += 1;
+  });
+  return counts;
+}
+
+function cloneLogisticsStock(catalog) {
+  return catalog.map((entry) => ({
+    id: entry.id,
+    label: entry.label,
+    unit: entry.unit,
+    quantity: entry.defaultQuantity,
+    capacity: entry.capacity,
+    unitCost: entry.unitCost,
+  }));
+}
+
+function normalizeLogisticsStock(rawList, catalog) {
+  const byId = new Map(
+    (Array.isArray(rawList) ? rawList : []).map((entry) => [sanitizeText(entry?.id, 80), entry]),
+  );
+
+  return catalog.map((template) => {
+    const existing = byId.get(template.id);
+    const quantity = Number.isFinite(Number(existing?.quantity))
+      ? Math.max(0, Math.floor(Number(existing.quantity)))
+      : template.defaultQuantity;
+    return {
+      id: template.id,
+      label: template.label,
+      unit: template.unit,
+      quantity: Math.min(template.capacity, quantity),
+      capacity: template.capacity,
+      unitCost: template.unitCost,
+    };
+  });
+}
+
+function createDefaultBaseLogistics(baseId) {
+  return {
+    baseId,
+    credits: DEFAULT_BASE_CREDITS,
+    fuel: cloneLogisticsStock(LOGISTICS_FUEL_CATALOG),
+    armament: cloneLogisticsStock(LOGISTICS_ARMAMENT_CATALOG),
+  };
+}
+
+function readBaseLogisticsStore() {
+  const raw = readJson(BASE_LOGISTICS_FILE, { bases: {}, updatedAt: Date.now() });
+  return {
+    bases: raw?.bases && typeof raw.bases === 'object' ? raw.bases : {},
+    updatedAt: Number.isFinite(raw?.updatedAt) ? raw.updatedAt : Date.now(),
+  };
+}
+
+function writeBaseLogisticsStore(store) {
+  writeJsonAtomic(BASE_LOGISTICS_FILE, {
+    bases: store?.bases || {},
+    updatedAt: Date.now(),
+  });
+}
+
+function getOrCreateBaseLogistics(baseId) {
+  const airport = getLidcAirportById(baseId);
+  if (!airport) return null;
+
+  const store = readBaseLogisticsStore();
+  const existing = store.bases[airport.id];
+  const next = {
+    baseId: airport.id,
+    credits: Number.isFinite(Number(existing?.credits))
+      ? Math.max(0, Math.floor(Number(existing.credits)))
+      : DEFAULT_BASE_CREDITS,
+    fuel: normalizeLogisticsStock(existing?.fuel, LOGISTICS_FUEL_CATALOG),
+    armament: normalizeLogisticsStock(existing?.armament, LOGISTICS_ARMAMENT_CATALOG),
+  };
+
+  store.bases[airport.id] = next;
+  if (!existing) {
+    LIDC_AFGHANISTAN_AIRPORTS.forEach((entry) => {
+      if (store.bases[entry.id]) return;
+      store.bases[entry.id] = createDefaultBaseLogistics(entry.id);
+    });
+    writeBaseLogisticsStore(store);
+  }
+
+  return next;
+}
+
+function summarizeLogistics(logistics) {
+  const fuel = Array.isArray(logistics?.fuel) ? logistics.fuel : [];
+  const armament = Array.isArray(logistics?.armament) ? logistics.armament : [];
+  const fuelQuantity = fuel.reduce((sum, entry) => sum + Number(entry.quantity || 0), 0);
+  const fuelCapacity = fuel.reduce((sum, entry) => sum + Number(entry.capacity || 0), 0);
+  const armamentQuantity = armament.reduce((sum, entry) => sum + Number(entry.quantity || 0), 0);
+  return {
+    credits: Number(logistics?.credits || 0),
+    fuelQuantity,
+    fuelCapacity,
+    armamentQuantity,
+    armamentTypes: armament.length,
   };
 }
 
@@ -1163,6 +1300,7 @@ export function getAirportOccupancy(baseId) {
   const catalogState = readCatalogState();
   const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
   const squadrons = readSquadrons();
+  const logistics = getOrCreateBaseLogistics(airport.id);
 
   const occupancySquadrons = squadrons
     .map((rawSquadron) => {
@@ -1185,6 +1323,7 @@ export function getAirportOccupancy(baseId) {
         return String(a.boardNumber || '').localeCompare(String(b.boardNumber || ''), 'en', { numeric: true, sensitivity: 'base' });
       });
 
+      const counts = countOccupancyKinds(airframes);
       if (!isHome && airframes.length === 0) return null;
 
       return {
@@ -1194,6 +1333,7 @@ export function getAirportOccupancy(baseId) {
         specializationNames: readSquadronSpecializationNames(squadron),
         memberCount: Array.isArray(squadron?.members) ? squadron.members.length : 0,
         isHome,
+        counts,
         airframes,
       };
     })
@@ -1210,6 +1350,67 @@ export function getAirportOccupancy(baseId) {
       subtitle: airport.subtitle,
     },
     squadrons: occupancySquadrons,
+    logistics,
+    resources: summarizeLogistics(logistics),
+  };
+}
+
+export function purchaseAirportLogistics({ baseId, kind, itemId, quantity }) {
+  ensureStorage();
+
+  const airport = getLidcAirportById(baseId);
+  if (!airport) {
+    throw new Error('Airport not found');
+  }
+
+  const catalog = kind === 'fuel'
+    ? LOGISTICS_FUEL_CATALOG
+    : (kind === 'armament' ? LOGISTICS_ARMAMENT_CATALOG : null);
+  if (!catalog) {
+    throw new Error('Invalid logistics kind');
+  }
+
+  const itemKey = sanitizeText(itemId, 80);
+  const buyQuantity = Math.floor(Number(quantity));
+  if (!itemKey || !Number.isFinite(buyQuantity) || buyQuantity < 1) {
+    throw new Error('Invalid purchase quantity');
+  }
+
+  const current = getOrCreateBaseLogistics(airport.id);
+  const store = readBaseLogisticsStore();
+  const stockKey = kind === 'fuel' ? 'fuel' : 'armament';
+  const stock = current[stockKey];
+  const index = stock.findIndex((entry) => entry.id === itemKey);
+  if (index < 0) {
+    throw new Error('Item not found');
+  }
+
+  const item = stock[index];
+  const nextQuantity = item.quantity + buyQuantity;
+  if (nextQuantity > item.capacity) {
+    throw new Error('Purchase exceeds warehouse capacity');
+  }
+
+  const cost = item.unitCost * buyQuantity;
+  if (current.credits < cost) {
+    throw new Error('Insufficient base credits');
+  }
+
+  stock[index] = { ...item, quantity: nextQuantity };
+  current.credits -= cost;
+  store.bases[airport.id] = current;
+  writeBaseLogisticsStore(store);
+
+  return {
+    logistics: current,
+    resources: summarizeLogistics(current),
+    purchase: {
+      kind,
+      itemId: item.id,
+      label: item.label,
+      quantity: buyQuantity,
+      cost,
+    },
   };
 }
 
@@ -2114,6 +2315,7 @@ export default {
   updateSquadronDeck,
   listSquadrons,
   getAirportOccupancy,
+  purchaseAirportLogistics,
   getSquadronById,
   joinSquadronByInviteCode,
   updateAirframeAssignment,

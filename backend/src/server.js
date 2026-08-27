@@ -2154,6 +2154,30 @@ app.get('/api/lidc/airports/:baseId/occupancy', (req, res) => {
   res.json(occupancy);
 });
 
+/**
+ * POST /api/lidc/airports/:baseId/logistics/purchase
+ * Buy fuel or armament for an Afghanistan airbase warehouse.
+ */
+app.post('/api/lidc/airports/:baseId/logistics/purchase', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const result = lidcService.purchaseAirportLogistics({
+      baseId: req.params.baseId,
+      kind: req.body?.kind,
+      itemId: req.body?.itemId,
+      quantity: req.body?.quantity,
+    });
+    return res.json(result);
+  } catch (error) {
+    const message = String(error?.message || 'Failed to purchase logistics');
+    const status = message.toLowerCase().includes('not found') ? 404 : 400;
+    return res.status(status).json({ error: message });
+  }
+});
+
 app.use('/api/lidc', requireFeatureAccess(LIDC_DISCORD_IDS));
 app.use('/api/atc', requireFeatureAccess(ATC_DISCORD_IDS));
 

@@ -649,6 +649,31 @@ body.lidc-map-fullscreen-open {
   text-transform: uppercase;
 }
 
+.lidc-occupancy-panel__menus {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 0 12px 10px;
+}
+
+.lidc-occupancy-menu {
+  min-height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--lidc-ink);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.lidc-occupancy-menu:hover {
+  border-color: var(--lidc-accent-gold);
+  color: var(--lidc-accent-gold);
+}
+
 .lidc-occupancy-panel__body {
   min-height: 0;
   overflow-y: auto;
@@ -671,10 +696,50 @@ body.lidc-map-fullscreen-open {
 }
 
 .lidc-occupancy-squadron {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
   padding: 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  text-align: left;
+}
+
+.lidc-occupancy-squadron.is-button {
+  cursor: pointer;
+  font: inherit;
+}
+
+.lidc-occupancy-squadron.is-button:hover {
+  border-color: rgba(255, 187, 0, 0.45);
+}
+
+.lidc-occupancy-squadron__open {
+  flex-shrink: 0;
+  color: var(--lidc-mute);
+}
+
+.lidc-occupancy-counts {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.lidc-occupancy-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--lidc-mute);
+  font-size: 11px;
+}
+
+.lidc-occupancy-count strong {
+  color: var(--lidc-ink);
+  font-size: 12px;
 }
 
 .lidc-occupancy-squadron__head {
