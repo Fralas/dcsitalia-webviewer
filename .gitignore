@@ -1,11 +1,50 @@
+# Dependencies and build
 node_modules/
 dist/
 build/
+
+# Logs and dumps
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+frontend/scripts/dump-out.txt
+
+# Environment (keep *.example)
 .env
+.env.*
+!.env.example
+!**/.env.example
+
+# OS
 .DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.code-workspace
+*.swp
+*.swo
+*~
+
+# Caches / coverage
+.cache/
+.vite/
+coverage/
+.nyc_output/
+
+# Backups and atomic write temps
+*.tmp
+*.bak
+*.bak_*
+*.orig
+
 # Data files (JSON storage)
 data/historical/*.json
+backend/data/historical/*.json
 # No longer used (switched from SQLite to JSON)
 *.db
 *.sqlite
@@ -15,9 +54,12 @@ CHANGELOG.md
 /csvexample
 /data/changelogs/media
 data/changelogs/drafts.json
+backend/data/changelogs/drafts.json
 data/wiki/pages.json
 data/wiki/drafts.json
 data/wiki/media/
+backend/data/wiki/pages.json
+backend/data/wiki/drafts.json
 
 # LIDC runtime data (squadrons, links, warehouse ledger)
 data/lidc/discord-users.json
@@ -39,5 +81,8 @@ backend/data/achievements/users.json
 logistics-route-visibility.json
 backend/logistics-route-visibility.json
 
-# Atomic write temp files
-*.tmp
+# DCS DBRIDGE exports (runtime, also written via absolute Windows paths)
+Export_LIDC_*.json
+Export_WebCommands.json
+/C:*
+/F:*

@@ -1,7 +1,7 @@
 # Environment variables
 .env
-.env.local
-.env.production
+.env.*
+!.env.example
 
 # Dependencies
 node_modules/
@@ -13,10 +13,18 @@ build/
 # Logs
 *.log
 npm-debug.log*
+scripts/dump-out.txt
 
 # OS files
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Backups / temps
+*.tmp
+*.bak
+*.bak_*
+*.orig
 
 # Editor directories
 .vscode/

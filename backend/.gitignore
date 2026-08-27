@@ -1,7 +1,7 @@
 # Environment variables
 .env
-.env.local
-.env.production
+.env.*
+!.env.example
 
 # Dependencies
 node_modules/
@@ -13,3 +13,10 @@ npm-debug.log*
 # OS files
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Backups / temps
+*.tmp
+*.bak
+*.bak_*
+*.orig
