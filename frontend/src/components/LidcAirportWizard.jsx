@@ -46,6 +46,22 @@ function formatStock(value) {
   return Number(value || 0).toLocaleString();
 }
 
+function FuelStock({ item }) {
+  const fill = item.capacity > 0 ? Math.min(100, Math.round((item.quantity / item.capacity) * 100)) : 0;
+
+  return (
+    <div className="lidc-airport-wizard-stock">
+      <strong>{item.label}</strong>
+      <span>
+        {formatStock(item.quantity)} / {formatStock(item.capacity)} {item.unit}
+      </span>
+      <div className="lidc-airport-wizard-meter" aria-hidden="true">
+        <i style={{ width: `${fill}%` }} />
+      </div>
+    </div>
+  );
+}
+
 function OccupancyAirframe({ airframe }) {
   const model = airframe.unitLabel || airframe.unitId || '-';
   const imageUrl = getLidcUnitImageUrl(airframe.unitId);
@@ -106,6 +122,7 @@ export default function LidcAirportWizard({
   const catalogAirport = getLidcAirportById(airport?.id) || airport;
   const squadrons = Array.isArray(occupancy?.squadrons) ? occupancy.squadrons : [];
   const resources = occupancy?.resources || {};
+  const logistics = occupancy?.logistics || { fuel: [] };
   const shop = Array.isArray(occupancy?.shop) ? occupancy.shop : [];
   const shopper = occupancy?.shopper || null;
   const squadronCredits = Number(shopper?.credits || 0);
@@ -289,6 +306,15 @@ export default function LidcAirportWizard({
                 <p className="lidc-occupancy-panel__hint">{t('lidc.map.airportWizard.joinToBuy')}</p>
               )}
               {purchaseError && <InlineError message={purchaseError} />}
+
+              <section className="lidc-airport-wizard-block">
+                <h3>{t('lidc.map.airportWizard.fuel')}</h3>
+                <div className="lidc-airport-wizard-fuel-row">
+                  {(logistics.fuel || []).map((item) => (
+                    <FuelStock key={item.id} item={item} />
+                  ))}
+                </div>
+              </section>
 
               <section className="lidc-airport-wizard-block">
                 <div className="lidc-airport-wizard-shop">

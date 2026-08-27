@@ -343,13 +343,53 @@
   font-weight: 800;
 }
 
+.lidc-airport-wizard-fuel-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.lidc-airport-wizard-stock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.lidc-airport-wizard-stock strong {
+  font-size: 13px;
+}
+
+.lidc-airport-wizard-stock span {
+  color: var(--lidc-mute);
+  font-size: 12px;
+}
+
+.lidc-airport-wizard-meter {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.lidc-airport-wizard-meter i {
+  display: block;
+  height: 100%;
+  background: var(--lidc-accent-gold);
+}
+
 @media (max-width: 860px) {
   .lidc-airport-wizard-facts {
     grid-template-columns: 1fr 1fr;
   }
 
   .lidc-airport-wizard-resource-grid,
-  .lidc-airport-wizard-shop {
+  .lidc-airport-wizard-shop,
+  .lidc-airport-wizard-fuel-row {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
