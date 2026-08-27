@@ -346,6 +346,8 @@ export default {
         credits: 'Crediti',
         container: 'Container',
         crate: 'Cassa',
+        shopAircraft: 'Preset aerei',
+        shopHelicopters: 'Preset elicotteri',
         fuel: 'Carburante',
         armament: 'Armamento',
         resources: 'Risorse',

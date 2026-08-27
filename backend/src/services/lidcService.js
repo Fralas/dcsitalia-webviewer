@@ -57,19 +57,100 @@ const LOGISTICS_ARMAMENT_CATALOG = Object.freeze([
   { id: '30mm', label: '30mm API', unit: 'rds', defaultQuantity: 2400, capacity: 8000, unitCost: 1 },
   { id: '20mm', label: '20mm M55', unit: 'rds', defaultQuantity: 4000, capacity: 12000, unitCost: 1 },
 ]);
+
+function parseShopContents(raw) {
+  return String(raw || '')
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const match = part.match(/^(.*)\s+x(\d+)$/i);
+      if (!match) return { label: part, quantity: 0 };
+      return { label: match[1].trim(), quantity: Number(match[2]) };
+    });
+}
+
+function defineShopPreset({ category, id, name, destination, contents, total, types }) {
+  const kind = category === 'CONTAINER' ? 'container' : 'crate';
+  const totalQuantity = Math.max(0, Math.floor(Number(total) || 0));
+  return Object.freeze({
+    id,
+    kind,
+    name,
+    destination: destination === 'ELICOTTERI' ? 'helicopters' : 'aircraft',
+    contents: Object.freeze(parseShopContents(contents)),
+    total: totalQuantity,
+    types: Math.max(0, Math.floor(Number(types) || 0)),
+    cost: kind === 'container' ? totalQuantity * 30 : totalQuantity * 72,
+    transport: Object.freeze(kind === 'container' ? ['aircraft'] : ['aircraft', 'helicopter']),
+  });
+}
+
 const LOGISTICS_SHOP_CATALOG = Object.freeze([
-  {
-    id: 'ammo-container',
-    kind: 'container',
-    cost: 2400,
-    transport: Object.freeze(['aircraft']),
-  },
-  {
-    id: 'ammo-crate',
-    kind: 'crate',
-    cost: 720,
-    transport: Object.freeze(['aircraft', 'helicopter']),
-  },
+  defineShopPreset({
+    category: 'CONTAINER', id: 'CONT-AIR-01', name: 'GEN', destination: 'AEREI',
+    contents: 'Mk-82 x30; Mk-84 x10; AIM-120C x20; AIM-9X x20', total: 80, types: 4,
+  }),
+  defineShopPreset({
+    category: 'CONTAINER', id: 'CONT-AIR-02', name: 'STRIKE', destination: 'AEREI',
+    contents: 'Mk-82 x40; Mk-83 x20; AGM-65D x20', total: 80, types: 3,
+  }),
+  defineShopPreset({
+    category: 'CONTAINER', id: 'CONT-AIR-03', name: 'SEAD', destination: 'AEREI',
+    contents: 'AGM-88C x20; AGM-65G x20; AIM-120C x20; AIM-9M x20', total: 80, types: 4,
+  }),
+  defineShopPreset({
+    category: 'CONTAINER', id: 'CONT-AIR-04', name: 'CAS', destination: 'AEREI',
+    contents: 'Mk-82 x30; CBU-97 x20; AGM-65D x20; Hydra 70 x30', total: 100, types: 4,
+  }),
+  defineShopPreset({
+    category: 'CONTAINER', id: 'CONT-AIR-05', name: 'AAM', destination: 'AEREI',
+    contents: 'AIM-120C x30; AIM-9X x30; AIM-7M x20; AIM-9M x10', total: 90, types: 4,
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'BOX-AIR-01', name: 'BOMBS', destination: 'AEREI',
+    contents: 'Mk-82 x6; Mk-84 x4', total: 10, types: 2,
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'BOX-AIR-02', name: 'AAM', destination: 'AEREI',
+    contents: 'AIM-120C x5; AIM-9X x5', total: 10, types: 2,
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'BOX-AIR-03', name: 'SEAD', destination: 'AEREI',
+    contents: 'AGM-65D x6; AGM-88C x4', total: 10, types: 2,
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'BOX-AIR-04', name: 'CLUSTER', destination: 'AEREI',
+    contents: 'CBU-97 x5; Mk-82 x5', total: 10, types: 2,
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'BOX-AIR-05', name: 'AAM2', destination: 'AEREI',
+    contents: 'AIM-7M x5; AIM-9M x5', total: 10, types: 2,
+  }),
+  defineShopPreset({
+    category: 'CONTAINER', id: 'CONT-HEL-01', name: 'HELLFIRE', destination: 'ELICOTTERI',
+    contents: 'AGM-114K x40; AGM-114L x30', total: 70, types: 2,
+  }),
+  defineShopPreset({
+    category: 'CONTAINER', id: 'CONT-HEL-02', name: 'MIXED', destination: 'ELICOTTERI',
+    contents: 'AGM-114K x25; APKWS x25; Hydra 70 x25; AGM-114L x20', total: 95, types: 4,
+  }),
+  defineShopPreset({
+    category: 'CONTAINER', id: 'CONT-HEL-03', name: 'RUS', destination: 'ELICOTTERI',
+    contents: '9M127 Vikhr x30; 9M120 Ataka x30; S-8 x20; S-13 x10', total: 90, types: 4,
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'BOX-HEL-01', name: 'APKWS', destination: 'ELICOTTERI',
+    contents: 'APKWS x10', total: 10, types: 1,
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'BOX-HEL-02', name: 'HYDRA', destination: 'ELICOTTERI',
+    contents: 'Hydra 70 x10', total: 10, types: 1,
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'BOX-HEL-03', name: 'HELLFIRE', destination: 'ELICOTTERI',
+    contents: 'AGM-114K x6; AGM-114L x4', total: 10, types: 2,
+  }),
 ]);
 
 export const LIDC_MEMBER_ROLES = Object.freeze([
@@ -1312,6 +1393,11 @@ function listLogisticsShop() {
   return LOGISTICS_SHOP_CATALOG.map((item) => ({
     id: item.id,
     kind: item.kind,
+    name: item.name,
+    destination: item.destination,
+    contents: item.contents.map((entry) => ({ ...entry })),
+    total: item.total,
+    types: item.types,
     cost: item.cost,
     transport: [...item.transport],
   }));

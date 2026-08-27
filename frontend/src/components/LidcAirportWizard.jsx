@@ -10,7 +10,9 @@ import {
 } from 'lucide-react';
 import * as mgrs from 'mgrs';
 import ammoContainerImage from '../../img/crates/container_blue_mid.png';
+import ammoHeliContainerImage from '../../img/crates/container_green_small.png';
 import ammoCrateImage from '../../img/crates/prop_mil_crate_01.png';
+import ammoHeliCrateImage from '../../img/crates/prop_box_ammo03a_set2.png';
 import { formatLidcAirportLabel, getLidcAirportById } from '../config/lidcAfghanistanAirports';
 import * as api from '../services/api';
 import { t } from '../utils/locale';
@@ -20,10 +22,71 @@ import './LidcAirportWizard.css';
 
 const TABS = ['overview', 'logistics'];
 
-const SHOP_IMAGES = {
-  container: ammoContainerImage,
-  crate: ammoCrateImage,
-};
+function shopImageFor(item) {
+  if (item.kind === 'container') {
+    return item.destination === 'helicopters' ? ammoHeliContainerImage : ammoContainerImage;
+  }
+  return item.destination === 'helicopters' ? ammoHeliCrateImage : ammoCrateImage;
+}
+
+function contentsLabel(item) {
+  return (Array.isArray(item.contents) ? item.contents : [])
+    .map((entry) => `${entry.label} ×${entry.quantity}`)
+    .join(' · ');
+}
+
+function ShopCard({ item, credits, canPurchase, buyingKey, onPurchase }) {
+  const isBuying = buyingKey === item.id;
+  const canAfford = credits >= item.cost;
+  const enabled = canPurchase && canAfford && !isBuying;
+  const transport = Array.isArray(item.transport) ? item.transport : [];
+  const imageUrl = shopImageFor(item);
+  const contents = contentsLabel(item);
+
+  return (
+    <button
+      type="button"
+      className="lidc-airport-wizard-shop-card"
+      disabled={!enabled}
+      title={contents}
+      onClick={() => onPurchase(item.id)}
+    >
+      <span className="lidc-airport-wizard-shop-card__transport" aria-hidden="true">
+        <Plane size={14} />
+        {transport.includes('helicopter') && <Helicopter size={14} />}
+      </span>
+      {imageUrl ? (
+        <img src={imageUrl} alt="" draggable={false} />
+      ) : null}
+      <strong>{item.name}</strong>
+      <em>{t(`lidc.map.airportWizard.${item.kind}`)}</em>
+      <p>{contents}</p>
+      <span className="lidc-airport-wizard-shop-card__cost">
+        {isBuying ? <Loader2 size={14} className="spin" /> : <Coins size={14} />}
+        {formatStock(item.cost)}
+      </span>
+    </button>
+  );
+}
+
+function ShopGroup({ items, credits, canPurchase, buyingKey, onPurchase }) {
+  if (!items.length) return null;
+
+  return (
+    <div className="lidc-airport-wizard-shop">
+      {items.map((item) => (
+        <ShopCard
+          key={item.id}
+          item={item}
+          credits={credits}
+          canPurchase={canPurchase}
+          buyingKey={buyingKey}
+          onPurchase={onPurchase}
+        />
+      ))}
+    </div>
+  );
+}
 
 function formatMgrs(lat, lon) {
   const latitude = Number(lat);
@@ -78,36 +141,6 @@ function OccupancyAirframe({ airframe }) {
   );
 }
 
-function ShopCard({ item, credits, canPurchase, buyingKey, onPurchase }) {
-  const isBuying = buyingKey === item.id;
-  const canAfford = credits >= item.cost;
-  const enabled = canPurchase && canAfford && !isBuying;
-  const transport = Array.isArray(item.transport) ? item.transport : [];
-  const imageUrl = SHOP_IMAGES[item.kind] || '';
-
-  return (
-    <button
-      type="button"
-      className="lidc-airport-wizard-shop-card"
-      disabled={!enabled}
-      onClick={() => onPurchase(item.id)}
-    >
-      <span className="lidc-airport-wizard-shop-card__transport" aria-hidden="true">
-        <Plane size={16} />
-        {transport.includes('helicopter') && <Helicopter size={16} />}
-      </span>
-      {imageUrl ? (
-        <img src={imageUrl} alt="" draggable={false} />
-      ) : null}
-      <strong>{t(`lidc.map.airportWizard.${item.kind}`)}</strong>
-      <span className="lidc-airport-wizard-shop-card__cost">
-        {isBuying ? <Loader2 size={14} className="spin" /> : <Coins size={14} />}
-        {formatStock(item.cost)}
-      </span>
-    </button>
-  );
-}
-
 export default function LidcAirportWizard({
   airport,
   occupancy,
@@ -124,6 +157,14 @@ export default function LidcAirportWizard({
   const resources = occupancy?.resources || {};
   const logistics = occupancy?.logistics || { fuel: [] };
   const shop = Array.isArray(occupancy?.shop) ? occupancy.shop : [];
+  const aircraftShop = useMemo(
+    () => shop.filter((item) => item.destination !== 'helicopters'),
+    [shop],
+  );
+  const helicopterShop = useMemo(
+    () => shop.filter((item) => item.destination === 'helicopters'),
+    [shop],
+  );
   const shopper = occupancy?.shopper || null;
   const squadronCredits = Number(shopper?.credits || 0);
 
@@ -317,18 +358,25 @@ export default function LidcAirportWizard({
               </section>
 
               <section className="lidc-airport-wizard-block">
-                <div className="lidc-airport-wizard-shop">
-                  {shop.map((item) => (
-                    <ShopCard
-                      key={item.id}
-                      item={item}
-                      credits={squadronCredits}
-                      canPurchase={isLogged && Boolean(shopper)}
-                      buyingKey={buyingKey}
-                      onPurchase={handlePurchase}
-                    />
-                  ))}
-                </div>
+                <h3>{t('lidc.map.airportWizard.shopAircraft')}</h3>
+                <ShopGroup
+                  items={aircraftShop}
+                  credits={squadronCredits}
+                  canPurchase={isLogged && Boolean(shopper)}
+                  buyingKey={buyingKey}
+                  onPurchase={handlePurchase}
+                />
+              </section>
+
+              <section className="lidc-airport-wizard-block">
+                <h3>{t('lidc.map.airportWizard.shopHelicopters')}</h3>
+                <ShopGroup
+                  items={helicopterShop}
+                  credits={squadronCredits}
+                  canPurchase={isLogged && Boolean(shopper)}
+                  buyingKey={buyingKey}
+                  onPurchase={handlePurchase}
+                />
               </section>
               </div>
             </div>

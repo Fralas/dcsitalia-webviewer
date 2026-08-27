@@ -346,6 +346,8 @@ export default {
         credits: 'Credits',
         container: 'Container',
         crate: 'Crate',
+        shopAircraft: 'Aircraft presets',
+        shopHelicopters: 'Helicopter presets',
         fuel: 'Fuel',
         armament: 'Armament',
         resources: 'Resources',

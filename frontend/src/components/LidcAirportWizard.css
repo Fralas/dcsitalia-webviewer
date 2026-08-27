@@ -332,6 +332,28 @@
   text-transform: uppercase;
 }
 
+.lidc-airport-wizard-shop-card em {
+  margin-top: 2px;
+  color: var(--lidc-mute);
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lidc-airport-wizard-shop-card p {
+  display: -webkit-box;
+  margin: 6px 0 0;
+  min-height: 2.6em;
+  overflow: hidden;
+  color: var(--lidc-mute);
+  font-size: 9px;
+  line-height: 1.3;
+  text-align: center;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .lidc-airport-wizard-shop-card__cost {
   display: flex;
   align-items: center;
