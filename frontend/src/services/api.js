@@ -710,6 +710,12 @@ export async function getLidcAirportOccupancy(baseId) {
   });
 }
 
+export async function getLidcLogisticsAlerts() {
+  return fetchAPI('/lidc/logistics-alerts', {
+    credentials: 'include',
+  });
+}
+
 /**
  * Purchase ammunition containers or crates with squadron credits
  */

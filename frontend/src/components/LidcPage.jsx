@@ -399,6 +399,7 @@ export default function LidcPage() {
   const [airportOccupancyLoading, setAirportOccupancyLoading] = useState(false);
   const [airportOccupancyError, setAirportOccupancyError] = useState('');
   const [airportWizardTab, setAirportWizardTab] = useState('');
+  const [airportOrderAlerts, setAirportOrderAlerts] = useState({});
 
   const [submitError, setSubmitError] = useState('');
   const [wizardAdvanceAttempted, setWizardAdvanceAttempted] = useState(false);
@@ -999,7 +1000,18 @@ export default function LidcPage() {
         orders: result?.orders || prev.orders,
       };
     });
-  }, []);
+    if (!selectedMapAirportId) return;
+    const nextCount = Array.isArray(result?.orders) ? result.orders.length : 0;
+    setAirportOrderAlerts((prev) => {
+      const next = { ...prev };
+      if (nextCount > 0) {
+        next[selectedMapAirportId] = nextCount;
+      } else {
+        delete next[selectedMapAirportId];
+      }
+      return next;
+    });
+  }, [selectedMapAirportId]);
 
   useEffect(() => {
     if (selectedMapAirportId || airportWizardTab) return undefined;
@@ -1021,6 +1033,16 @@ export default function LidcPage() {
         const occupancy = await api.getLidcAirportOccupancy(selectedMapAirportId);
         if (!mounted) return;
         setAirportOccupancy(occupancy);
+        const nextCount = Array.isArray(occupancy?.orders) ? occupancy.orders.length : 0;
+        setAirportOrderAlerts((prev) => {
+          const next = { ...prev };
+          if (nextCount > 0) {
+            next[selectedMapAirportId] = nextCount;
+          } else {
+            delete next[selectedMapAirportId];
+          }
+          return next;
+        });
       } catch (error) {
         if (!mounted) return;
         setAirportOccupancy(null);
@@ -1035,6 +1057,28 @@ export default function LidcPage() {
       mounted = false;
     };
   }, [selectedMapAirportId]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadOrderAlerts() {
+      try {
+        const result = await api.getLidcLogisticsAlerts();
+        if (!mounted) return;
+        const alerts = result?.alerts && typeof result.alerts === 'object' ? result.alerts : {};
+        setAirportOrderAlerts(alerts);
+      } catch (error) {
+        if (!mounted) return;
+      }
+    }
+
+    loadOrderAlerts();
+    const interval = window.setInterval(loadOrderAlerts, 20000);
+    return () => {
+      mounted = false;
+      window.clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     if (!selectedMapAirportId || isMapPanelFullscreen) return undefined;
@@ -2775,6 +2819,7 @@ export default function LidcPage() {
             selectedAirportId={selectedMapAirportId}
             onSelectAirport={handleSelectMapAirport}
             onClearAirport={handleClearMapAirport}
+            orderAlerts={airportOrderAlerts}
           />
           <header className={`lidc-panel-map-overlay ${mapBoardExpanded ? 'is-fullscreen' : ''}`}>
             <h2 className="lidc-panel-title">{t('lidc.map.title')}</h2>
@@ -2804,6 +2849,7 @@ export default function LidcPage() {
               occupancy={airportOccupancy}
               loading={airportOccupancyLoading}
               error={airportOccupancyError}
+              orderAlertCount={airportOrderAlerts[selectedMapAirport.id] || 0}
               onClose={handleClearMapAirport}
               onOpenWizard={handleOpenAirportWizard}
             />

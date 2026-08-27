@@ -2142,6 +2142,14 @@ app.put('/api/profile', (req, res) => {
 });
 
 /**
+ * GET /api/lidc/logistics-alerts
+ * Open order counts per Afghanistan airbase, for theater-map attention markers.
+ */
+app.get('/api/lidc/logistics-alerts', (req, res) => {
+  res.json({ alerts: lidcService.listAirportOrderAlerts() });
+});
+
+/**
  * GET /api/lidc/airports/:baseId/occupancy
  * Public theater occupancy: squadrons and airframes present at an Afghanistan airbase.
  */

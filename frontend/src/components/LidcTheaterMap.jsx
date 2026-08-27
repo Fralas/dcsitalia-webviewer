@@ -66,6 +66,7 @@ export default function LidcTheaterMap({
   selectedAirportId = '',
   onSelectAirport = null,
   onClearAirport = null,
+  orderAlerts = {},
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
@@ -159,6 +160,7 @@ export default function LidcTheaterMap({
           map={mapInstance}
           selectedAirportId={selectedAirportId}
           onSelectAirport={onSelectAirport}
+          orderAlerts={orderAlerts}
         />
       )}
     </div>

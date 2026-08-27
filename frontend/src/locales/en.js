@@ -335,6 +335,7 @@ export default {
         visiting: 'Visiting',
         loadFailed: 'Could not load airbase occupancy.',
         openBase: 'Open airbase',
+        orderAlert: '{{count}} open orders',
       },
       airportWizard: {
         subtitle: 'Base occupancy, resources, and warehouse logistics.',

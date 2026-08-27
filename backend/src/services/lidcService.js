@@ -1502,6 +1502,24 @@ function listVisibleAirportOrders(rawOrders, actorId, squadrons) {
     .map((order) => toPublicAirportOrder(order, actorId, squadrons));
 }
 
+export function listAirportOrderAlerts() {
+  ensureStorage();
+  const store = readBaseLogisticsStore();
+  const alerts = {};
+
+  Object.entries(store.bases && typeof store.bases === 'object' ? store.bases : {}).forEach(([baseId, logistics]) => {
+    const id = sanitizeText(baseId, 120);
+    if (!id) return;
+    const count = normalizeBaseOrders(logistics?.orders)
+      .filter((order) => order.status !== 'completed').length;
+    if (count > 0) {
+      alerts[id] = count;
+    }
+  });
+
+  return alerts;
+}
+
 function buildShopPurchaseLines(rawItems) {
   const aggregated = new Map();
   (Array.isArray(rawItems) ? rawItems : []).forEach((line) => {
@@ -2777,6 +2795,7 @@ export default {
   updateSquadronDeck,
   listSquadrons,
   getAirportOccupancy,
+  listAirportOrderAlerts,
   purchaseAirportLogistics,
   updateAirportOrderStatus,
   updateAirportOrder,

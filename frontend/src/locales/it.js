@@ -335,6 +335,7 @@ export default {
         visiting: 'In transito',
         loadFailed: 'Impossibile caricare la presenza in aeroporto.',
         openBase: 'Apri aeroporto',
+        orderAlert: '{{count}} ordini aperti',
       },
       airportWizard: {
         subtitle: 'Presenza in base, risorse e logistica di magazzino.',

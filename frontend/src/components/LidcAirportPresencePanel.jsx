@@ -21,15 +21,27 @@ function SquadronKindCounts({ counts }) {
   );
 }
 
+function formatOrderBadge(count) {
+  const value = Math.max(0, Math.floor(Number(count) || 0));
+  if (value < 1) return '';
+  return value > 99 ? '99+' : String(value);
+}
+
 export default function LidcAirportPresencePanel({
   airport,
   occupancy,
   loading = false,
   error = '',
+  orderAlertCount = 0,
   onClose,
   onOpenWizard,
 }) {
   const squadrons = Array.isArray(occupancy?.squadrons) ? occupancy.squadrons : [];
+  const occupancyMatches = occupancy?.airport?.id === airport?.id;
+  const orderCount = occupancyMatches && Array.isArray(occupancy?.orders)
+    ? occupancy.orders.length
+    : Math.max(0, Math.floor(Number(orderAlertCount) || 0));
+  const orderBadge = formatOrderBadge(orderCount);
 
   return (
     <aside
@@ -59,6 +71,11 @@ export default function LidcAirportPresencePanel({
         </button>
         <button type="button" className="lidc-occupancy-menu" onClick={() => onOpenWizard('logistics')}>
           {t('lidc.map.airportWizard.logistics')}
+          {orderBadge ? (
+            <span className="lidc-occupancy-menu__badge" aria-label={t('lidc.map.occupancy.orderAlert', { count: orderCount })}>
+              {orderBadge}
+            </span>
+          ) : null}
         </button>
       </div>
 

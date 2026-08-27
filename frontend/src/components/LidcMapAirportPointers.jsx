@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { LIDC_AFGHANISTAN_AIRPORTS } from '../config/lidcAfghanistanAirports';
+import { t } from '../utils/locale';
 
 const BASE_OUTWARD_PX = 44;
 const BASE_LABEL_GAP_PX = 2;
@@ -101,6 +102,7 @@ export default function LidcMapAirportPointers({
   map,
   selectedAirportId = '',
   onSelectAirport = null,
+  orderAlerts = {},
 }) {
   const [frames, setFrames] = useState([]);
   const selectable = typeof onSelectAirport === 'function';
@@ -134,10 +136,12 @@ export default function LidcMapAirportPointers({
       <svg className="lidc-map-pointers__svg">
         {frames.map((frame) => {
           const isSelected = frame.airport.id === selectedAirportId;
+          const orderCount = Math.max(0, Math.floor(Number(orderAlerts[frame.airport.id]) || 0));
+          const hasOrders = orderCount > 0;
           return (
             <g
               key={frame.airport.id}
-              className={`lidc-map-pointers__group ${isSelected ? 'is-selected' : ''} ${selectable ? 'is-selectable' : ''}`}
+              className={`lidc-map-pointers__group ${isSelected ? 'is-selected' : ''} ${selectable ? 'is-selectable' : ''} ${hasOrders ? 'has-orders' : ''}`}
               style={{ '--pointer-accent': isSelected ? '#ffbb00' : frame.airport.highlightColor }}
             >
               <path
@@ -157,6 +161,14 @@ export default function LidcMapAirportPointers({
                   }}
                 />
               )}
+              {hasOrders && (
+                <circle
+                  className="lidc-map-pointers__pulse"
+                  cx={frame.anchor.x}
+                  cy={frame.anchor.y}
+                  r={frame.dotRadius}
+                />
+              )}
               <circle
                 className="lidc-map-pointers__dot"
                 cx={frame.anchor.x}
@@ -170,7 +182,9 @@ export default function LidcMapAirportPointers({
       </svg>
       {frames.map((frame) => {
         const isSelected = frame.airport.id === selectedAirportId;
+        const orderCount = Math.max(0, Math.floor(Number(orderAlerts[frame.airport.id]) || 0));
         const LabelTag = selectable ? 'button' : 'div';
+        const alertLabel = orderCount > 0 ? t('lidc.map.occupancy.orderAlert', { count: orderCount }) : '';
         return (
           <LabelTag
             key={`${frame.airport.id}-label`}
@@ -188,7 +202,9 @@ export default function LidcMapAirportPointers({
               onSelectAirport(frame.airport.id);
             } : undefined}
             aria-pressed={selectable ? isSelected : undefined}
-            aria-label={selectable ? `${frame.airport.name} ${frame.airport.subtitle}` : undefined}
+            aria-label={selectable
+              ? `${frame.airport.name} ${frame.airport.subtitle}${alertLabel ? `, ${alertLabel}` : ''}`
+              : undefined}
           >
             <span
               className="lidc-map-pointers__label-type"
