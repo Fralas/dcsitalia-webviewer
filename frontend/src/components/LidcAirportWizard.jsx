@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Check,
+  CheckCheck,
   Coins,
   Droplets,
   Helicopter,
   Loader2,
   Minus,
+  Pencil,
   Plane,
   Plus,
   Shield,
   Trash2,
+  Undo2,
   X,
 } from 'lucide-react';
 import * as mgrs from 'mgrs';
@@ -151,11 +155,15 @@ export default function LidcAirportWizard({
   const [cart, setCart] = useState({});
   const [confirming, setConfirming] = useState(false);
   const [purchaseError, setPurchaseError] = useState('');
+  const [editingOrderId, setEditingOrderId] = useState('');
+  const [orderBusyId, setOrderBusyId] = useState('');
   const catalogAirport = getLidcAirportById(airport?.id) || airport;
   const squadrons = Array.isArray(occupancy?.squadrons) ? occupancy.squadrons : [];
   const resources = occupancy?.resources || {};
   const logistics = occupancy?.logistics || { fuel: [] };
   const shop = Array.isArray(occupancy?.shop) ? occupancy.shop : [];
+  const orders = Array.isArray(occupancy?.orders) ? occupancy.orders : [];
+  const editingOrder = orders.find((order) => order.id === editingOrderId) || null;
   const aircraftShop = useMemo(
     () => shop.filter((item) => item.destination !== 'helicopters'),
     [shop],
@@ -190,8 +198,11 @@ export default function LidcAirportWizard({
     () => cartLines.reduce((sum, line) => sum + line.cost, 0),
     [cartLines],
   );
-  const remainingCredits = Math.max(0, squadronCredits - cartTotal);
-  const canPurchase = isLogged && Boolean(shopper);
+  const spendBudget = editingOrder
+    ? Number(editingOrder.squadronCredits || 0) + Number(editingOrder.cost || 0)
+    : squadronCredits;
+  const remainingCredits = Math.max(0, spendBudget - cartTotal);
+  const canPurchase = isLogged && (editingOrder ? Boolean(editingOrder.canEdit) : Boolean(shopper));
   const shouldShowCart = activeTab === 'logistics' && cartLines.length > 0;
   const [cartMounted, setCartMounted] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
@@ -224,6 +235,13 @@ export default function LidcAirportWizard({
     const timeout = window.setTimeout(() => setCartMounted(false), 520);
     return () => window.clearTimeout(timeout);
   }, [shouldShowCart, cartMounted]);
+
+  useEffect(() => {
+    if (!editingOrderId) return;
+    if (editingOrder?.canEdit) return;
+    setEditingOrderId('');
+    setCart({});
+  }, [editingOrderId, editingOrder]);
 
   const totals = useMemo(() => {
     return squadrons.reduce((acc, squadron) => {
@@ -261,20 +279,59 @@ export default function LidcAirportWizard({
 
   async function confirmOrder() {
     if (!canPurchase || !airport?.id || cartLines.length === 0 || remainingCredits < 0) return;
-    if (cartTotal > squadronCredits) return;
+    if (cartTotal > spendBudget) return;
     setConfirming(true);
     setPurchaseError('');
     try {
-      const result = await api.purchaseLidcAirportLogistics(airport.id, {
+      const payload = {
         items: cartLines.map((line) => ({ itemId: line.item.id, quantity: line.quantity })),
-      });
+      };
+      const result = editingOrder
+        ? await api.updateLidcAirportOrder(airport.id, editingOrder.id, payload)
+        : await api.purchaseLidcAirportLogistics(airport.id, payload);
       setCart({});
+      setEditingOrderId('');
       onLogisticsUpdated?.(result);
       onChangeTab?.('overview');
     } catch (error) {
-      setPurchaseError(error.message || t('lidc.map.airportWizard.purchaseFailed'));
+      setPurchaseError(error.message || t(editingOrder ? 'lidc.map.airportWizard.orderActionFailed' : 'lidc.map.airportWizard.purchaseFailed'));
     } finally {
       setConfirming(false);
+    }
+  }
+
+  function startEditOrder(order) {
+    if (!order?.canEdit) return;
+    const nextCart = {};
+    (order.items || []).forEach((item) => {
+      const qty = Math.max(0, Math.floor(Number(item.quantity) || 0));
+      if (!item.itemId || qty < 1) return;
+      nextCart[item.itemId] = (nextCart[item.itemId] || 0) + qty;
+    });
+    setPurchaseError('');
+    setEditingOrderId(order.id);
+    setCart(nextCart);
+    onChangeTab?.('logistics');
+  }
+
+  function cancelEditOrder() {
+    setEditingOrderId('');
+    setCart({});
+    setPurchaseError('');
+    onChangeTab?.('overview');
+  }
+
+  async function runOrderAction(order, action) {
+    if (!airport?.id || !order?.id) return;
+    setOrderBusyId(order.id);
+    setPurchaseError('');
+    try {
+      const result = await api.updateLidcAirportOrder(airport.id, order.id, { action });
+      onLogisticsUpdated?.(result);
+    } catch (error) {
+      setPurchaseError(error.message || t('lidc.map.airportWizard.orderActionFailed'));
+    } finally {
+      setOrderBusyId('');
     }
   }
 
@@ -371,26 +428,83 @@ export default function LidcAirportWizard({
 
               <section className="lidc-airport-wizard-block">
                 <h3>{t('lidc.map.airportWizard.orders')}</h3>
-                {(Array.isArray(occupancy?.orders) ? occupancy.orders : []).length === 0 && (
+                {orders.length === 0 && (
                   <p className="lidc-occupancy-panel__hint">{t('lidc.map.airportWizard.orderEmpty')}</p>
                 )}
-                {(Array.isArray(occupancy?.orders) ? occupancy.orders : []).map((order) => (
-                  <article key={order.id} className="lidc-airport-wizard-order">
-                    <header>
-                      <h4>{order.squadronName || '—'}</h4>
-                      <strong>{formatStock(order.cost)}</strong>
-                    </header>
-                    <div className="lidc-airport-wizard-order-items">
-                      {(order.items || []).map((item, index) => (
-                        <div key={`${order.id}-${item.itemId}-${index}`}>
-                          <img src={shopImageFor(item)} alt="" draggable={false} />
-                          <strong>{item.name}</strong>
-                          <em>×{item.quantity}</em>
+                {purchaseError && activeTab === 'overview' && <InlineError message={purchaseError} />}
+                {orders.map((order) => {
+                  const isAccepted = order.status === 'accepted';
+                  const busy = orderBusyId === order.id;
+                  return (
+                    <article
+                      key={order.id}
+                      className={`lidc-airport-wizard-order ${isAccepted ? 'is-accepted' : ''}`}
+                    >
+                      <header>
+                        <h4>{order.squadronName || '—'}</h4>
+                        <div className="lidc-airport-wizard-order-tools">
+                          {(order.canAccept || order.canComplete || order.canUnaccept || order.canEdit) && (
+                            <div className="lidc-airport-wizard-order-actions">
+                              {order.canEdit && (
+                                <button
+                                  type="button"
+                                  disabled={busy || Boolean(editingOrderId)}
+                                  onClick={() => startEditOrder(order)}
+                                >
+                                  <Pencil size={12} />
+                                  {t('lidc.map.airportWizard.editOrder')}
+                                </button>
+                              )}
+                              {order.canUnaccept && (
+                                <button
+                                  type="button"
+                                  className="is-undo"
+                                  disabled={busy}
+                                  onClick={() => runOrderAction(order, 'unaccept')}
+                                >
+                                  {busy ? <Loader2 size={12} className="spin" /> : <Undo2 size={12} />}
+                                  {t('lidc.map.airportWizard.unacceptOrder')}
+                                </button>
+                              )}
+                              {order.canAccept && (
+                                <button
+                                  type="button"
+                                  className="is-accept"
+                                  disabled={busy}
+                                  onClick={() => runOrderAction(order, 'accept')}
+                                >
+                                  {busy ? <Loader2 size={12} className="spin" /> : <Check size={12} />}
+                                  {t('lidc.map.airportWizard.acceptOrder')}
+                                </button>
+                              )}
+                              {order.canComplete && (
+                                <button
+                                  type="button"
+                                  className="is-complete"
+                                  disabled={busy}
+                                  onClick={() => runOrderAction(order, 'complete')}
+                                >
+                                  {busy ? <Loader2 size={12} className="spin" /> : <CheckCheck size={12} />}
+                                  {t('lidc.map.airportWizard.completeOrder')}
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          <strong>{formatStock(order.cost)}</strong>
                         </div>
-                      ))}
-                    </div>
-                  </article>
-                ))}
+                      </header>
+                      <div className="lidc-airport-wizard-order-items">
+                        {(order.items || []).map((item, index) => (
+                          <div key={`${order.id}-${item.itemId}-${index}`}>
+                            <img src={shopImageFor(item)} alt="" draggable={false} />
+                            <strong>{item.name}</strong>
+                            <em>×{item.quantity}</em>
+                          </div>
+                        ))}
+                      </div>
+                    </article>
+                  );
+                })}
               </section>
 
               <section className="lidc-airport-wizard-block">
@@ -501,7 +615,7 @@ export default function LidcAirportWizard({
           onMouseDown={(event) => event.stopPropagation()}
         >
           <header>
-            <h3>{t('lidc.map.airportWizard.cart')}</h3>
+            <h3>{editingOrder ? t('lidc.map.airportWizard.editOrder') : t('lidc.map.airportWizard.cart')}</h3>
             <strong>{visibleCartCount}</strong>
           </header>
           <div className="lidc-airport-wizard-cart__body">
@@ -543,12 +657,22 @@ export default function LidcAirportWizard({
             <button
               type="button"
               className="lidc-btn lidc-btn-primary lidc-btn-block"
-              disabled={!canPurchase || confirming || cartLines.length === 0 || cartTotal > squadronCredits}
+              disabled={!canPurchase || confirming || cartLines.length === 0 || cartTotal > spendBudget}
               onClick={confirmOrder}
             >
               {confirming ? <Loader2 size={14} className="spin" /> : null}
-              {t('lidc.map.airportWizard.confirmOrder')}
+              {t(editingOrder ? 'lidc.map.airportWizard.saveOrder' : 'lidc.map.airportWizard.confirmOrder')}
             </button>
+            {editingOrder && (
+              <button
+                type="button"
+                className="lidc-btn lidc-btn-outline lidc-btn-block"
+                disabled={confirming}
+                onClick={cancelEditOrder}
+              >
+                {t('lidc.map.airportWizard.cancelEdit')}
+              </button>
+            )}
           </footer>
         </aside>
       )}

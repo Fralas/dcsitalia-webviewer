@@ -1407,6 +1407,24 @@ function listLogisticsShop() {
 
 const MAX_BASE_ORDERS = 80;
 
+function persistBaseLogistics(airportId, logistics) {
+  const store = readBaseLogisticsStore();
+  store.bases[airportId] = logistics;
+  writeBaseLogisticsStore(store);
+}
+
+function findSquadronIndexById(squadrons, squadronId) {
+  const id = sanitizeText(squadronId, 120);
+  if (!id) return -1;
+  return squadrons.findIndex((entry) => sanitizeText(entry?.id, 120) === id);
+}
+
+function normalizeOrderStatus(rawStatus) {
+  const status = sanitizeText(rawStatus, 20).toLowerCase();
+  if (status === 'accepted' || status === 'completed') return status;
+  return 'pending';
+}
+
 function normalizeBaseOrders(rawOrders) {
   const catalogById = new Map(LOGISTICS_SHOP_CATALOG.map((entry) => [entry.id, entry]));
 
@@ -1434,8 +1452,14 @@ function normalizeBaseOrders(rawOrders) {
       return {
         id: sanitizeText(order?.id, 120) || `order_${Date.now()}`,
         createdAt: Number.isFinite(Number(order?.createdAt)) ? Number(order.createdAt) : Date.now(),
+        createdByUserId: sanitizeText(order?.createdByUserId, 80),
+        acceptedAt: Number.isFinite(Number(order?.acceptedAt)) ? Number(order.acceptedAt) : 0,
+        acceptedByUserId: sanitizeText(order?.acceptedByUserId, 80),
+        completedAt: Number.isFinite(Number(order?.completedAt)) ? Number(order.completedAt) : 0,
+        completedByUserId: sanitizeText(order?.completedByUserId, 80),
         squadronId: sanitizeText(order?.squadronId, 120),
         squadronName: sanitizeText(order?.squadronName, 120),
+        status: normalizeOrderStatus(order?.status),
         items,
         cost: items.reduce((sum, line) => sum + Number(line.cost || 0), 0),
       };
@@ -1443,6 +1467,91 @@ function normalizeBaseOrders(rawOrders) {
     .filter(Boolean)
     .sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0))
     .slice(0, MAX_BASE_ORDERS);
+}
+
+function canEditAirportOrder(order, actorId, squadrons) {
+  const userId = sanitizeText(actorId, 80);
+  if (!userId || !order) return false;
+  if (normalizeOrderStatus(order.status) !== 'pending') return false;
+  if (sanitizeText(order.createdByUserId, 80) === userId) return true;
+
+  const squadronIndex = findSquadronIndexById(squadrons, order.squadronId);
+  if (squadronIndex < 0) return false;
+  const role = getMemberRoleInSquadron(squadrons[squadronIndex], userId);
+  return role === 'owner' || role === 'admin';
+}
+
+function toPublicAirportOrder(order, actorId, squadrons) {
+  const status = normalizeOrderStatus(order?.status);
+  const squadronIndex = findSquadronIndexById(squadrons, order?.squadronId);
+  const squadron = squadronIndex >= 0 ? squadrons[squadronIndex] : null;
+  return {
+    ...order,
+    status,
+    squadronCredits: getSquadronCredits(squadron),
+    canEdit: canEditAirportOrder({ ...order, status }, actorId, squadrons),
+    canAccept: Boolean(actorId) && status === 'pending',
+    canUnaccept: Boolean(actorId) && status === 'accepted',
+    canComplete: Boolean(actorId) && status === 'accepted',
+  };
+}
+
+function listVisibleAirportOrders(rawOrders, actorId, squadrons) {
+  return normalizeBaseOrders(rawOrders)
+    .filter((order) => order.status !== 'completed')
+    .map((order) => toPublicAirportOrder(order, actorId, squadrons));
+}
+
+function buildShopPurchaseLines(rawItems) {
+  const aggregated = new Map();
+  (Array.isArray(rawItems) ? rawItems : []).forEach((line) => {
+    const key = sanitizeText(line?.itemId, 80);
+    const qty = Math.floor(Number(line?.quantity));
+    if (!key || !Number.isFinite(qty) || qty < 1) return;
+    aggregated.set(key, (aggregated.get(key) || 0) + qty);
+  });
+
+  if (aggregated.size < 1) {
+    throw new Error('Invalid purchase quantity');
+  }
+
+  const catalogById = new Map(LOGISTICS_SHOP_CATALOG.map((entry) => [entry.id, entry]));
+  const purchaseLines = [];
+  let totalCost = 0;
+
+  aggregated.forEach((qty, key) => {
+    const catalogItem = catalogById.get(key);
+    if (!catalogItem) {
+      throw new Error('Item not found');
+    }
+    const lineCost = catalogItem.cost * qty;
+    totalCost += lineCost;
+    purchaseLines.push({
+      itemId: catalogItem.id,
+      kind: catalogItem.kind,
+      name: catalogItem.name,
+      destination: catalogItem.destination,
+      quantity: qty,
+      cost: lineCost,
+    });
+  });
+
+  return { purchaseLines, totalCost };
+}
+
+function applyWarehouseDelta(cargo, previousItems, nextItems) {
+  const nextCargo = { ...cargo };
+  (Array.isArray(previousItems) ? previousItems : []).forEach((line) => {
+    const itemId = sanitizeText(line?.itemId, 80);
+    if (!itemId) return;
+    nextCargo[itemId] = Math.max(0, (nextCargo[itemId] || 0) - Math.max(0, Math.floor(Number(line?.quantity) || 0)));
+  });
+  (Array.isArray(nextItems) ? nextItems : []).forEach((line) => {
+    const itemId = sanitizeText(line?.itemId, 80);
+    if (!itemId) return;
+    nextCargo[itemId] = (nextCargo[itemId] || 0) + Math.max(0, Math.floor(Number(line?.quantity) || 0));
+  });
+  return nextCargo;
 }
 
 function getSquadronCredits(squadron) {
@@ -1543,7 +1652,7 @@ export function getAirportOccupancy(baseId, actorUserId = '') {
     resources: summarizeLogistics(logistics),
     shop: listLogisticsShop(),
     shopper: toShopper(shopperSquadron, airport.id),
-    orders: normalizeBaseOrders(logistics.orders),
+    orders: listVisibleAirportOrders(logistics.orders, actorId, squadrons),
   };
 }
 
@@ -1563,39 +1672,7 @@ export function purchaseAirportLogistics({ baseId, itemId, quantity, items, user
   const rawLines = Array.isArray(items) && items.length > 0
     ? items
     : [{ itemId, quantity: quantity || 1 }];
-
-  const aggregated = new Map();
-  rawLines.forEach((line) => {
-    const key = sanitizeText(line?.itemId, 80);
-    const qty = Math.floor(Number(line?.quantity));
-    if (!key || !Number.isFinite(qty) || qty < 1) return;
-    aggregated.set(key, (aggregated.get(key) || 0) + qty);
-  });
-
-  if (aggregated.size < 1) {
-    throw new Error('Invalid purchase quantity');
-  }
-
-  const catalogById = new Map(LOGISTICS_SHOP_CATALOG.map((entry) => [entry.id, entry]));
-  const purchaseLines = [];
-  let totalCost = 0;
-
-  aggregated.forEach((qty, key) => {
-    const catalogItem = catalogById.get(key);
-    if (!catalogItem) {
-      throw new Error('Item not found');
-    }
-    const lineCost = catalogItem.cost * qty;
-    totalCost += lineCost;
-    purchaseLines.push({
-      itemId: catalogItem.id,
-      kind: catalogItem.kind,
-      name: catalogItem.name,
-      destination: catalogItem.destination,
-      quantity: qty,
-      cost: lineCost,
-    });
-  });
+  const { purchaseLines, totalCost } = buildShopPurchaseLines(rawLines);
 
   const squadrons = readSquadrons();
   const shopperSquadron = getUserPrimarySquadron(actorId);
@@ -1632,25 +1709,170 @@ export function purchaseAirportLogistics({ baseId, itemId, quantity, items, user
   const order = {
     id: `order_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
     createdAt: Date.now(),
+    createdByUserId: actorId,
     squadronId: sanitizeText(squadron?.id, 120),
     squadronName: sanitizeText(squadron?.name, 120),
+    status: 'pending',
     items: purchaseLines,
     cost: totalCost,
   };
   logistics.orders = normalizeBaseOrders([order, ...(Array.isArray(logistics.orders) ? logistics.orders : [])]);
-  const store = readBaseLogisticsStore();
-  store.bases[airport.id] = logistics;
-  writeBaseLogisticsStore(store);
+  persistBaseLogistics(airport.id, logistics);
 
   return {
     shop: listLogisticsShop(),
     shopper: toShopper(nextSquadron, airport.id),
-    orders: logistics.orders,
+    orders: listVisibleAirportOrders(logistics.orders, actorId, squadrons),
     purchase: {
       items: purchaseLines,
       cost: totalCost,
       order,
     },
+  };
+}
+
+export function updateAirportOrderStatus({ baseId, orderId, action, userId }) {
+  ensureStorage();
+
+  const actorId = sanitizeText(userId, 80);
+  if (!actorId) {
+    throw new Error('Authentication required');
+  }
+
+  const actionKey = sanitizeText(action, 20).toLowerCase();
+  if (!['accept', 'unaccept', 'complete'].includes(actionKey)) {
+    throw new Error('Invalid order action');
+  }
+
+  const airport = getLidcAirportById(baseId);
+  if (!airport) {
+    throw new Error('Airport not found');
+  }
+
+  const logistics = getOrCreateBaseLogistics(airport.id);
+  const orders = normalizeBaseOrders(logistics.orders);
+  const targetId = sanitizeText(orderId, 120);
+  const orderIndex = orders.findIndex((entry) => entry.id === targetId);
+  if (orderIndex < 0) {
+    throw new Error('Order not found');
+  }
+
+  const order = orders[orderIndex];
+  const status = normalizeOrderStatus(order.status);
+
+  if (actionKey === 'accept') {
+    if (status !== 'pending') {
+      throw new Error('Order cannot be accepted');
+    }
+    orders[orderIndex] = {
+      ...order,
+      status: 'accepted',
+      acceptedAt: Date.now(),
+      acceptedByUserId: actorId,
+    };
+  } else if (actionKey === 'unaccept') {
+    if (status !== 'accepted') {
+      throw new Error('Order cannot be cancelled');
+    }
+    orders[orderIndex] = {
+      ...order,
+      status: 'pending',
+      acceptedAt: 0,
+      acceptedByUserId: '',
+    };
+  } else {
+    if (status !== 'accepted') {
+      throw new Error('Order cannot be completed');
+    }
+    orders[orderIndex] = {
+      ...order,
+      status: 'completed',
+      completedAt: Date.now(),
+      completedByUserId: actorId,
+    };
+  }
+
+  logistics.orders = orders;
+  persistBaseLogistics(airport.id, logistics);
+  const squadrons = readSquadrons();
+  const shopperSquadron = getUserPrimarySquadron(actorId);
+
+  return {
+    shop: listLogisticsShop(),
+    shopper: toShopper(shopperSquadron, airport.id),
+    orders: listVisibleAirportOrders(logistics.orders, actorId, squadrons),
+  };
+}
+
+export function updateAirportOrder({ baseId, orderId, items, userId }) {
+  ensureStorage();
+
+  const actorId = sanitizeText(userId, 80);
+  if (!actorId) {
+    throw new Error('Authentication required');
+  }
+
+  const airport = getLidcAirportById(baseId);
+  if (!airport) {
+    throw new Error('Airport not found');
+  }
+
+  const { purchaseLines, totalCost } = buildShopPurchaseLines(items);
+  const logistics = getOrCreateBaseLogistics(airport.id);
+  const orders = normalizeBaseOrders(logistics.orders);
+  const targetId = sanitizeText(orderId, 120);
+  const orderIndex = orders.findIndex((entry) => entry.id === targetId);
+  if (orderIndex < 0) {
+    throw new Error('Order not found');
+  }
+
+  const order = orders[orderIndex];
+  const squadrons = readSquadrons();
+  if (!canEditAirportOrder(order, actorId, squadrons)) {
+    throw new Error('Not allowed to edit this order');
+  }
+
+  const squadronIndex = findSquadronIndexById(squadrons, order.squadronId);
+  if (squadronIndex < 0) {
+    throw new Error('Squadron required');
+  }
+
+  const squadron = squadrons[squadronIndex];
+  const credits = getSquadronCredits(squadron);
+  const available = credits + Number(order.cost || 0);
+  if (available < totalCost) {
+    throw new Error('Insufficient squadron credits');
+  }
+
+  const cargo = applyWarehouseDelta(
+    getWarehouseStock(squadron, airport.id),
+    order.items,
+    purchaseLines,
+  );
+
+  const nextSquadron = {
+    ...squadron,
+    credits: available - totalCost,
+    warehouses: {
+      ...(squadron.warehouses && typeof squadron.warehouses === 'object' ? squadron.warehouses : {}),
+      [airport.id]: cargo,
+    },
+  };
+  squadrons[squadronIndex] = nextSquadron;
+  writeSquadrons(squadrons);
+
+  orders[orderIndex] = {
+    ...order,
+    items: purchaseLines,
+    cost: totalCost,
+  };
+  logistics.orders = orders;
+  persistBaseLogistics(airport.id, logistics);
+
+  return {
+    shop: listLogisticsShop(),
+    shopper: toShopper(getUserPrimarySquadron(actorId), airport.id),
+    orders: listVisibleAirportOrders(logistics.orders, actorId, squadrons),
   };
 }
 
@@ -2556,6 +2778,8 @@ export default {
   listSquadrons,
   getAirportOccupancy,
   purchaseAirportLogistics,
+  updateAirportOrderStatus,
+  updateAirportOrder,
   getSquadronById,
   joinSquadronByInviteCode,
   updateAirframeAssignment,

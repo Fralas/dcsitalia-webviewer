@@ -413,12 +413,74 @@
 
 .lidc-airport-wizard-order h4 {
   margin: 0;
+  min-width: 0;
   font-size: 13px;
 }
 
-.lidc-airport-wizard-order header strong {
+.lidc-airport-wizard-order-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.lidc-airport-wizard-order-tools strong {
   color: var(--lidc-accent-gold);
   font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lidc-airport-wizard-order.is-accepted {
+  border-color: rgba(62, 207, 142, 0.42);
+  background: rgba(62, 207, 142, 0.08);
+}
+
+.lidc-airport-wizard-order-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.lidc-airport-wizard-order-actions + strong {
+  padding-left: 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.lidc-airport-wizard-order-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--lidc-mute);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.lidc-airport-wizard-order-actions button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--lidc-ink);
+}
+
+.lidc-airport-wizard-order-actions button.is-accept:hover:not(:disabled),
+.lidc-airport-wizard-order-actions button.is-complete:hover:not(:disabled) {
+  background: rgba(62, 207, 142, 0.18);
+  color: var(--lidc-success);
+}
+
+.lidc-airport-wizard-order-actions button.is-undo:hover:not(:disabled) {
+  background: rgba(255, 127, 127, 0.14);
+  color: var(--lidc-danger);
+}
+
+.lidc-airport-wizard-order-actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .lidc-airport-wizard-order-items {

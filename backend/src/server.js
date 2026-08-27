@@ -2179,6 +2179,42 @@ app.post('/api/lidc/airports/:baseId/logistics/purchase', (req, res) => {
   }
 });
 
+/**
+ * PATCH /api/lidc/airports/:baseId/logistics/orders/:orderId
+ * Accept, unaccept, complete, or edit a logistics order.
+ */
+app.patch('/api/lidc/airports/:baseId/logistics/orders/:orderId', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const action = req.body?.action;
+    const result = action
+      ? lidcService.updateAirportOrderStatus({
+          baseId: req.params.baseId,
+          orderId: req.params.orderId,
+          action,
+          userId: req.session.user.id,
+        })
+      : lidcService.updateAirportOrder({
+          baseId: req.params.baseId,
+          orderId: req.params.orderId,
+          items: req.body?.items,
+          userId: req.session.user.id,
+        });
+    return res.json(result);
+  } catch (error) {
+    const message = String(error?.message || 'Failed to update order');
+    const status = message.toLowerCase().includes('not found')
+      ? 404
+      : message.toLowerCase().includes('not allowed')
+        ? 403
+        : 400;
+    return res.status(status).json({ error: message });
+  }
+});
+
 app.use('/api/lidc', requireFeatureAccess(LIDC_DISCORD_IDS));
 app.use('/api/atc', requireFeatureAccess(ATC_DISCORD_IDS));
 

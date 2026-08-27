@@ -91,8 +91,14 @@
         {
           "id": "order_1787838334290_3697f6",
           "createdAt": 1787838334290,
+          "createdByUserId": "",
+          "acceptedAt": 0,
+          "acceptedByUserId": "",
+          "completedAt": 0,
+          "completedByUserId": "",
           "squadronId": "lidc_1787779236246_16b1ac",
           "squadronName": "Dj GAY",
+          "status": "pending",
           "items": [
             {
               "itemId": "BOX-AIR-03",
@@ -302,25 +308,15 @@
         {
           "id": "order_1787838395032_84d753",
           "createdAt": 1787838395035,
+          "createdByUserId": "",
+          "acceptedAt": 0,
+          "acceptedByUserId": "",
+          "completedAt": 0,
+          "completedByUserId": "",
           "squadronId": "lidc_1787838377438_0fdd90",
           "squadronName": "djogogay",
+          "status": "pending",
           "items": [
-            {
-              "itemId": "CONT-AIR-03",
-              "kind": "container",
-              "name": "SEAD",
-              "destination": "aircraft",
-              "quantity": 1,
-              "cost": 2400
-            },
-            {
-              "itemId": "BOX-HEL-03",
-              "kind": "crate",
-              "name": "HELLFIRE",
-              "destination": "helicopters",
-              "quantity": 1,
-              "cost": 720
-            },
             {
               "itemId": "BOX-HEL-02",
               "kind": "crate",
@@ -362,7 +358,7 @@
               "cost": 2700
             }
           ],
-          "cost": 12210
+          "cost": 9090
         }
       ]
     },
@@ -543,5 +539,5 @@
       ]
     }
   },
-  "updatedAt": 1787838395036
+  "updatedAt": 1787839528873
 }

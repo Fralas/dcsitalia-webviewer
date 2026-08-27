@@ -721,6 +721,14 @@ export async function purchaseLidcAirportLogistics(baseId, payload) {
   });
 }
 
+export async function updateLidcAirportOrder(baseId, orderId, payload) {
+  return fetchAPI(`/lidc/airports/${encodeURIComponent(baseId)}/logistics/orders/${encodeURIComponent(orderId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload || {}),
+    credentials: 'include',
+  });
+}
+
 /**
  * Create a new LIDC squadron
  */
