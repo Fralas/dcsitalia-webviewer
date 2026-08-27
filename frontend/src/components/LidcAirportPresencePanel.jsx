@@ -21,10 +21,18 @@ function SquadronKindCounts({ counts }) {
   );
 }
 
-function formatOrderBadge(count) {
+function formatBadgeCount(count) {
   const value = Math.max(0, Math.floor(Number(count) || 0));
   if (value < 1) return '';
   return value > 99 ? '99+' : String(value);
+}
+
+function countLowFuelTanks(fuel) {
+  return (Array.isArray(fuel) ? fuel : []).filter((entry) => {
+    const capacity = Number(entry?.capacity) || 0;
+    if (capacity <= 0) return false;
+    return (Number(entry?.quantity) || 0) / capacity < 0.2;
+  }).length;
 }
 
 export default function LidcAirportPresencePanel({
@@ -33,6 +41,7 @@ export default function LidcAirportPresencePanel({
   loading = false,
   error = '',
   orderAlertCount = 0,
+  fuelAlertCount = 0,
   onClose,
   onOpenWizard,
 }) {
@@ -41,7 +50,11 @@ export default function LidcAirportPresencePanel({
   const orderCount = occupancyMatches && Array.isArray(occupancy?.orders)
     ? occupancy.orders.length
     : Math.max(0, Math.floor(Number(orderAlertCount) || 0));
-  const orderBadge = formatOrderBadge(orderCount);
+  const fuelCount = occupancyMatches
+    ? countLowFuelTanks(occupancy?.logistics?.fuel)
+    : Math.max(0, Math.floor(Number(fuelAlertCount) || 0));
+  const orderBadge = formatBadgeCount(orderCount);
+  const fuelBadge = formatBadgeCount(fuelCount);
 
   return (
     <aside
@@ -68,12 +81,17 @@ export default function LidcAirportPresencePanel({
       <div className="lidc-occupancy-panel__menus" role="navigation" aria-label={t('lidc.map.airportWizard.menus')}>
         <button type="button" className="lidc-occupancy-menu" onClick={() => onOpenWizard('overview')}>
           {t('lidc.map.airportWizard.overview')}
-        </button>
-        <button type="button" className="lidc-occupancy-menu" onClick={() => onOpenWizard('logistics')}>
-          {t('lidc.map.airportWizard.logistics')}
           {orderBadge ? (
             <span className="lidc-occupancy-menu__badge" aria-label={t('lidc.map.occupancy.orderAlert', { count: orderCount })}>
               {orderBadge}
+            </span>
+          ) : null}
+        </button>
+        <button type="button" className="lidc-occupancy-menu" onClick={() => onOpenWizard('logistics')}>
+          {t('lidc.map.airportWizard.logistics')}
+          {fuelBadge ? (
+            <span className="lidc-occupancy-menu__badge" aria-label={t('lidc.map.occupancy.fuelAlert', { count: fuelCount })}>
+              {fuelBadge}
             </span>
           ) : null}
         </button>

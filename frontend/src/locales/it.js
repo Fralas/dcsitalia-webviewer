@@ -336,6 +336,7 @@ export default {
         loadFailed: 'Impossibile caricare la presenza in aeroporto.',
         openBase: 'Apri aeroporto',
         orderAlert: '{{count}} ordini aperti',
+        fuelAlert: '{{count}} carburanti in riserva',
       },
       airportWizard: {
         subtitle: 'Presenza in base, risorse e logistica di magazzino.',

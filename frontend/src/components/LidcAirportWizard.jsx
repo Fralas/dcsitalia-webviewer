@@ -111,11 +111,20 @@ function formatStock(value) {
   return Number(value || 0).toLocaleString();
 }
 
+const FUEL_LOW_RATIO = 0.2;
+
+function isFuelLow(item) {
+  const capacity = Number(item?.capacity) || 0;
+  if (capacity <= 0) return false;
+  return (Number(item?.quantity) || 0) / capacity < FUEL_LOW_RATIO;
+}
+
 function FuelStock({ item }) {
   const fill = item.capacity > 0 ? Math.min(100, Math.round((item.quantity / item.capacity) * 100)) : 0;
+  const low = isFuelLow(item);
 
   return (
-    <div className="lidc-airport-wizard-stock">
+    <div className={`lidc-airport-wizard-stock ${low ? 'is-low' : ''}`}>
       <strong>{item.label}</strong>
       <span>
         {formatStock(item.quantity)} / {formatStock(item.capacity)} {item.unit}

@@ -1502,22 +1502,33 @@ function listVisibleAirportOrders(rawOrders, actorId, squadrons) {
     .map((order) => toPublicAirportOrder(order, actorId, squadrons));
 }
 
+const FUEL_LOW_RATIO = 0.2;
+
+function countLowFuelTanks(fuel) {
+  return (Array.isArray(fuel) ? fuel : []).filter((entry) => {
+    const capacity = Number(entry?.capacity) || 0;
+    if (capacity <= 0) return false;
+    return (Number(entry?.quantity) || 0) / capacity < FUEL_LOW_RATIO;
+  }).length;
+}
+
 export function listAirportOrderAlerts() {
   ensureStorage();
   const store = readBaseLogisticsStore();
-  const alerts = {};
+  const orders = {};
+  const fuelLow = {};
 
   Object.entries(store.bases && typeof store.bases === 'object' ? store.bases : {}).forEach(([baseId, logistics]) => {
     const id = sanitizeText(baseId, 120);
     if (!id) return;
-    const count = normalizeBaseOrders(logistics?.orders)
+    const orderCount = normalizeBaseOrders(logistics?.orders)
       .filter((order) => order.status !== 'completed').length;
-    if (count > 0) {
-      alerts[id] = count;
-    }
+    const fuelCount = countLowFuelTanks(logistics?.fuel);
+    if (orderCount > 0) orders[id] = orderCount;
+    if (fuelCount > 0) fuelLow[id] = fuelCount;
   });
 
-  return alerts;
+  return { orders, fuelLow };
 }
 
 function buildShopPurchaseLines(rawItems) {

@@ -400,6 +400,7 @@ export default function LidcPage() {
   const [airportOccupancyError, setAirportOccupancyError] = useState('');
   const [airportWizardTab, setAirportWizardTab] = useState('');
   const [airportOrderAlerts, setAirportOrderAlerts] = useState({});
+  const [airportFuelAlerts, setAirportFuelAlerts] = useState({});
 
   const [submitError, setSubmitError] = useState('');
   const [wizardAdvanceAttempted, setWizardAdvanceAttempted] = useState(false);
@@ -1043,6 +1044,19 @@ export default function LidcPage() {
           }
           return next;
         });
+        const fuelCount = (Array.isArray(occupancy?.logistics?.fuel) ? occupancy.logistics.fuel : []).filter((entry) => {
+          const capacity = Number(entry?.capacity) || 0;
+          return capacity > 0 && (Number(entry?.quantity) || 0) / capacity < 0.2;
+        }).length;
+        setAirportFuelAlerts((prev) => {
+          const next = { ...prev };
+          if (fuelCount > 0) {
+            next[selectedMapAirportId] = fuelCount;
+          } else {
+            delete next[selectedMapAirportId];
+          }
+          return next;
+        });
       } catch (error) {
         if (!mounted) return;
         setAirportOccupancy(null);
@@ -1065,8 +1079,8 @@ export default function LidcPage() {
       try {
         const result = await api.getLidcLogisticsAlerts();
         if (!mounted) return;
-        const alerts = result?.alerts && typeof result.alerts === 'object' ? result.alerts : {};
-        setAirportOrderAlerts(alerts);
+        setAirportOrderAlerts(result?.orders && typeof result.orders === 'object' ? result.orders : {});
+        setAirportFuelAlerts(result?.fuelLow && typeof result.fuelLow === 'object' ? result.fuelLow : {});
       } catch (error) {
         if (!mounted) return;
       }
@@ -2850,6 +2864,7 @@ export default function LidcPage() {
               loading={airportOccupancyLoading}
               error={airportOccupancyError}
               orderAlertCount={airportOrderAlerts[selectedMapAirport.id] || 0}
+              fuelAlertCount={airportFuelAlerts[selectedMapAirport.id] || 0}
               onClose={handleClearMapAirport}
               onOpenWizard={handleOpenAirportWizard}
             />

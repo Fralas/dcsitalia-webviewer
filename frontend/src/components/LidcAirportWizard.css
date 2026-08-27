@@ -721,10 +721,30 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
-.lidc-airport-wizard-meter i {
-  display: block;
-  height: 100%;
-  background: var(--lidc-accent-gold);
+.lidc-airport-wizard-stock.is-low {
+  border-color: rgba(255, 59, 48, 0.55);
+  background: rgba(255, 59, 48, 0.08);
+  animation: lidc-fuel-low-pulse 1.15s ease-in-out infinite;
+}
+
+.lidc-airport-wizard-stock.is-low span,
+.lidc-airport-wizard-stock.is-low strong {
+  color: #ff8a82;
+}
+
+.lidc-airport-wizard-stock.is-low .lidc-airport-wizard-meter i {
+  background: #ff3b30;
+}
+
+@keyframes lidc-fuel-low-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.42; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lidc-airport-wizard-stock.is-low {
+    animation: none;
+  }
 }
 
 @media (max-width: 860px) {

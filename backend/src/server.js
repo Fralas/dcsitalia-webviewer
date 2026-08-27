@@ -2146,7 +2146,7 @@ app.put('/api/profile', (req, res) => {
  * Open order counts per Afghanistan airbase, for theater-map attention markers.
  */
 app.get('/api/lidc/logistics-alerts', (req, res) => {
-  res.json({ alerts: lidcService.listAirportOrderAlerts() });
+  res.json(lidcService.listAirportOrderAlerts());
 });
 
 /**
