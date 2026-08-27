@@ -1,5 +1,7 @@
 .lidc-airport-wizard-card {
   width: min(980px, 96vw);
+  height: min(760px, calc(100dvh - 48px));
+  max-height: min(760px, calc(100dvh - 48px));
   grid-template-rows: auto auto minmax(0, 1fr);
 }
 
@@ -24,14 +26,33 @@
 }
 
 .lidc-airport-wizard-tabs {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
 
+.lidc-airport-wizard-tab-glider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: calc((100% - 8px) / 2);
+  border-radius: 999px;
+  background: var(--lidc-accent-gold);
+  pointer-events: none;
+  transition: transform 480ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lidc-airport-wizard-tab-glider.is-logistics {
+  transform: translateX(calc(100% + 8px));
+}
+
 .lidc-airport-wizard-tab {
+  position: relative;
+  z-index: 1;
   min-height: 42px;
-  border: 1px solid var(--lidc-hairline);
+  border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
   color: var(--lidc-mute);
@@ -40,18 +61,41 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   cursor: pointer;
+  transition: color 280ms ease;
 }
 
 .lidc-airport-wizard-tab.is-active {
   color: #121212;
-  background: var(--lidc-accent-gold);
-  border-color: var(--lidc-accent-gold);
 }
 
-.lidc-airport-wizard-body {
+.lidc-airport-wizard-stage {
+  position: relative;
   min-height: 0;
+  overflow: hidden;
+}
+
+.lidc-airport-wizard-panes {
+  display: grid;
+  grid-template-columns: 50% 50%;
+  width: 200%;
+  height: 100%;
+  transform: translateX(0);
+  transition: transform 480ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lidc-airport-wizard-stage.is-logistics .lidc-airport-wizard-panes {
+  transform: translateX(-50%);
+}
+
+.lidc-airport-wizard-pane {
+  height: 100%;
+  min-width: 0;
   overflow: auto;
-  padding-right: 4px;
+  padding-right: 6px;
+}
+
+.lidc-airport-wizard-pane[aria-hidden='true'] {
+  pointer-events: none;
 }
 
 .lidc-airport-wizard-overview,
@@ -59,6 +103,14 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
+  min-height: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lidc-airport-wizard-tab-glider,
+  .lidc-airport-wizard-panes {
+    transition: none;
+  }
 }
 
 .lidc-airport-wizard-facts {
@@ -96,14 +148,15 @@
 
 .lidc-airport-wizard-resource-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 
 .lidc-airport-wizard-resource-grid div {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
   min-height: 52px;
   padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -112,8 +165,17 @@
 
 .lidc-airport-wizard-resource-grid span {
   flex: 1 1 auto;
+  min-width: 0;
   color: var(--lidc-mute);
   font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lidc-airport-wizard-resource-grid strong {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .lidc-airport-wizard-squadron {
@@ -266,13 +328,37 @@
   gap: 8px;
 }
 
+.lidc-airport-wizard-fuel-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.lidc-airport-wizard-fuel-row .lidc-airport-wizard-stock {
+  grid-template-columns: 1fr;
+  align-items: stretch;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.lidc-airport-wizard-fuel-row .lidc-airport-wizard-stock__buy {
+  justify-content: space-between;
+}
+
 @media (max-width: 860px) {
-  .lidc-airport-wizard-facts,
-  .lidc-airport-wizard-resource-grid {
+  .lidc-airport-wizard-facts {
     grid-template-columns: 1fr 1fr;
   }
 
-  .lidc-airport-wizard-stock {
-    grid-template-columns: 1fr;
+  .lidc-airport-wizard-resource-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .lidc-airport-wizard-fuel-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
   Coins,
-  Crosshair,
   Droplets,
   Helicopter,
   Loader2,
@@ -172,6 +171,10 @@ export default function LidcAirportWizard({
         </header>
 
         <div className="lidc-airport-wizard-tabs" role="tablist">
+          <span
+            className={`lidc-airport-wizard-tab-glider is-${activeTab}`}
+            aria-hidden="true"
+          />
           {TABS.map((tab) => (
             <button
               key={tab}
@@ -186,9 +189,15 @@ export default function LidcAirportWizard({
           ))}
         </div>
 
-        <div className="lidc-wizard-body lidc-airport-wizard-body">
-          {activeTab === 'overview' && (
-            <div className="lidc-airport-wizard-overview">
+        <div className={`lidc-airport-wizard-stage is-${activeTab}`}>
+          <div className="lidc-airport-wizard-panes">
+            <div
+              className="lidc-airport-wizard-pane"
+              role="tabpanel"
+              aria-hidden={activeTab !== 'overview'}
+              inert={activeTab !== 'overview'}
+            >
+              <div className="lidc-airport-wizard-overview">
               <section className="lidc-airport-wizard-facts">
                 <article>
                   <span>{t('lidc.map.airportWizard.mgrs')}</span>
@@ -222,11 +231,6 @@ export default function LidcAirportWizard({
                     <Droplets size={16} />
                     <span>{t('lidc.map.airportWizard.fuel')}</span>
                     <strong>{formatStock(resources.fuelQuantity)} kg</strong>
-                  </div>
-                  <div>
-                    <Crosshair size={16} />
-                    <span>{t('lidc.map.airportWizard.armament')}</span>
-                    <strong>{formatStock(resources.armamentQuantity)}</strong>
                   </div>
                 </div>
               </section>
@@ -274,11 +278,16 @@ export default function LidcAirportWizard({
                   );
                 })}
               </section>
+              </div>
             </div>
-          )}
 
-          {activeTab === 'logistics' && (
-            <div className="lidc-airport-wizard-logistics">
+            <div
+              className="lidc-airport-wizard-pane"
+              role="tabpanel"
+              aria-hidden={activeTab !== 'logistics'}
+              inert={activeTab !== 'logistics'}
+            >
+              <div className="lidc-airport-wizard-logistics">
               <div className="lidc-airport-wizard-credits">
                 <Coins size={16} />
                 <span>{t('lidc.map.airportWizard.credits')}</span>
@@ -291,33 +300,22 @@ export default function LidcAirportWizard({
 
               <section className="lidc-airport-wizard-block">
                 <h3>{t('lidc.map.airportWizard.fuel')}</h3>
-                {(logistics.fuel || []).map((item) => (
-                  <LogisticsRow
-                    key={item.id}
-                    item={item}
-                    kind="fuel"
-                    canPurchase={isLogged}
-                    buyingKey={buyingKey}
-                    onPurchase={handlePurchase}
-                  />
-                ))}
+                <div className="lidc-airport-wizard-fuel-row">
+                  {(logistics.fuel || []).map((item) => (
+                    <LogisticsRow
+                      key={item.id}
+                      item={item}
+                      kind="fuel"
+                      canPurchase={isLogged}
+                      buyingKey={buyingKey}
+                      onPurchase={handlePurchase}
+                    />
+                  ))}
+                </div>
               </section>
-
-              <section className="lidc-airport-wizard-block">
-                <h3>{t('lidc.map.airportWizard.armament')}</h3>
-                {(logistics.armament || []).map((item) => (
-                  <LogisticsRow
-                    key={item.id}
-                    item={item}
-                    kind="armament"
-                    canPurchase={isLogged}
-                    buyingKey={buyingKey}
-                    onPurchase={handlePurchase}
-                  />
-                ))}
-              </section>
+              </div>
             </div>
-          )}
+          </div>
         </div>
       </section>
     </div>
