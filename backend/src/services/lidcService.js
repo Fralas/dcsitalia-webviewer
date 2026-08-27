@@ -42,6 +42,7 @@ export const DECK_CATEGORIES = Object.freeze([
 
 const ROTARY_LOGISTICS_UNIT_IDS = new Set(['ch47f', 'mi8mt', 'uh1h']);
 const DEFAULT_BASE_CREDITS = 18000;
+const DEFAULT_SQUADRON_CREDITS = 18000;
 const LOGISTICS_FUEL_CATALOG = Object.freeze([
   { id: 'jet-a1', label: 'Jet A-1', unit: 'kg', defaultQuantity: 42000, capacity: 90000, unitCost: 8 },
   { id: 'jp8', label: 'JP-8', unit: 'kg', defaultQuantity: 26000, capacity: 60000, unitCost: 9 },
@@ -55,6 +56,20 @@ const LOGISTICS_ARMAMENT_CATALOG = Object.freeze([
   { id: 'hydra-70', label: 'Hydra 70', unit: 'ea', defaultQuantity: 96, capacity: 240, unitCost: 8 },
   { id: '30mm', label: '30mm API', unit: 'rds', defaultQuantity: 2400, capacity: 8000, unitCost: 1 },
   { id: '20mm', label: '20mm M55', unit: 'rds', defaultQuantity: 4000, capacity: 12000, unitCost: 1 },
+]);
+const LOGISTICS_SHOP_CATALOG = Object.freeze([
+  {
+    id: 'ammo-container',
+    kind: 'container',
+    cost: 2400,
+    transport: Object.freeze(['aircraft']),
+  },
+  {
+    id: 'ammo-crate',
+    kind: 'crate',
+    cost: 720,
+    transport: Object.freeze(['aircraft', 'helicopter']),
+  },
 ]);
 
 export const LIDC_MEMBER_ROLES = Object.freeze([
@@ -1011,6 +1026,8 @@ export function createSquadron(payload, sessionUser) {
       },
     ],
     costSummary,
+    credits: DEFAULT_SQUADRON_CREDITS,
+    warehouses: {},
     createdAt,
     createdBy: {
       id: userId,
@@ -1291,7 +1308,48 @@ function summarizeLogistics(logistics) {
   };
 }
 
-export function getAirportOccupancy(baseId) {
+function listLogisticsShop() {
+  return LOGISTICS_SHOP_CATALOG.map((item) => ({
+    id: item.id,
+    kind: item.kind,
+    cost: item.cost,
+    transport: [...item.transport],
+  }));
+}
+
+function getSquadronCredits(squadron) {
+  if (Number.isFinite(Number(squadron?.credits))) {
+    return Math.max(0, Math.floor(Number(squadron.credits)));
+  }
+  return DEFAULT_SQUADRON_CREDITS;
+}
+
+function getWarehouseStock(squadron, baseId) {
+  const warehouses = squadron?.warehouses && typeof squadron.warehouses === 'object'
+    ? squadron.warehouses
+    : {};
+  const stock = warehouses[baseId] && typeof warehouses[baseId] === 'object'
+    ? warehouses[baseId]
+    : {};
+
+  const cargo = {};
+  LOGISTICS_SHOP_CATALOG.forEach((item) => {
+    cargo[item.id] = Math.max(0, Math.floor(Number(stock[item.id]) || 0));
+  });
+  return cargo;
+}
+
+function toShopper(squadron, baseId) {
+  if (!squadron) return null;
+  return {
+    squadronId: sanitizeText(squadron?.id, 120),
+    squadronName: sanitizeText(squadron?.name, 120),
+    credits: getSquadronCredits(squadron),
+    cargo: getWarehouseStock(squadron, baseId),
+  };
+}
+
+export function getAirportOccupancy(baseId, actorUserId = '') {
   ensureStorage();
 
   const airport = getLidcAirportById(baseId);
@@ -1343,6 +1401,9 @@ export function getAirportOccupancy(baseId) {
       return String(a.name || '').localeCompare(String(b.name || ''), 'en', { sensitivity: 'base' });
     });
 
+  const actorId = sanitizeText(actorUserId, 80);
+  const shopperSquadron = actorId ? getUserPrimarySquadron(actorId) : null;
+
   return {
     airport: {
       id: airport.id,
@@ -1352,62 +1413,71 @@ export function getAirportOccupancy(baseId) {
     squadrons: occupancySquadrons,
     logistics,
     resources: summarizeLogistics(logistics),
+    shop: listLogisticsShop(),
+    shopper: toShopper(shopperSquadron, airport.id),
   };
 }
 
-export function purchaseAirportLogistics({ baseId, kind, itemId, quantity }) {
+export function purchaseAirportLogistics({ baseId, itemId, quantity, userId }) {
   ensureStorage();
+
+  const actorId = sanitizeText(userId, 80);
+  if (!actorId) {
+    throw new Error('Authentication required');
+  }
 
   const airport = getLidcAirportById(baseId);
   if (!airport) {
     throw new Error('Airport not found');
   }
 
-  const catalog = kind === 'fuel'
-    ? LOGISTICS_FUEL_CATALOG
-    : (kind === 'armament' ? LOGISTICS_ARMAMENT_CATALOG : null);
-  if (!catalog) {
-    throw new Error('Invalid logistics kind');
-  }
-
   const itemKey = sanitizeText(itemId, 80);
-  const buyQuantity = Math.floor(Number(quantity));
-  if (!itemKey || !Number.isFinite(buyQuantity) || buyQuantity < 1) {
-    throw new Error('Invalid purchase quantity');
-  }
-
-  const current = getOrCreateBaseLogistics(airport.id);
-  const store = readBaseLogisticsStore();
-  const stockKey = kind === 'fuel' ? 'fuel' : 'armament';
-  const stock = current[stockKey];
-  const index = stock.findIndex((entry) => entry.id === itemKey);
-  if (index < 0) {
+  const catalogItem = LOGISTICS_SHOP_CATALOG.find((entry) => entry.id === itemKey);
+  if (!catalogItem) {
     throw new Error('Item not found');
   }
 
-  const item = stock[index];
-  const nextQuantity = item.quantity + buyQuantity;
-  if (nextQuantity > item.capacity) {
-    throw new Error('Purchase exceeds warehouse capacity');
+  const buyQuantity = Math.floor(Number(quantity));
+  if (!Number.isFinite(buyQuantity) || buyQuantity < 1) {
+    throw new Error('Invalid purchase quantity');
   }
 
-  const cost = item.unitCost * buyQuantity;
-  if (current.credits < cost) {
-    throw new Error('Insufficient base credits');
+  const squadrons = readSquadrons();
+  const shopperSquadron = getUserPrimarySquadron(actorId);
+  const squadronIndex = shopperSquadron
+    ? squadrons.findIndex((entry) => sanitizeText(entry?.id, 120) === sanitizeText(shopperSquadron.id, 120))
+    : -1;
+  if (squadronIndex < 0) {
+    throw new Error('Squadron required');
   }
 
-  stock[index] = { ...item, quantity: nextQuantity };
-  current.credits -= cost;
-  store.bases[airport.id] = current;
-  writeBaseLogisticsStore(store);
+  const squadron = squadrons[squadronIndex];
+  const cost = catalogItem.cost * buyQuantity;
+  const credits = getSquadronCredits(squadron);
+  if (credits < cost) {
+    throw new Error('Insufficient squadron credits');
+  }
+
+  const cargo = getWarehouseStock(squadron, airport.id);
+  cargo[catalogItem.id] = (cargo[catalogItem.id] || 0) + buyQuantity;
+
+  const nextSquadron = {
+    ...squadron,
+    credits: credits - cost,
+    warehouses: {
+      ...(squadron.warehouses && typeof squadron.warehouses === 'object' ? squadron.warehouses : {}),
+      [airport.id]: cargo,
+    },
+  };
+  squadrons[squadronIndex] = nextSquadron;
+  writeSquadrons(squadrons);
 
   return {
-    logistics: current,
-    resources: summarizeLogistics(current),
+    shop: listLogisticsShop(),
+    shopper: toShopper(nextSquadron, airport.id),
     purchase: {
-      kind,
-      itemId: item.id,
-      label: item.label,
+      itemId: catalogItem.id,
+      kind: catalogItem.kind,
       quantity: buyQuantity,
       cost,
     },

@@ -9,6 +9,8 @@ import {
   X,
 } from 'lucide-react';
 import * as mgrs from 'mgrs';
+import ammoContainerImage from '../../img/crates/container_blue_mid.png';
+import ammoCrateImage from '../../img/crates/prop_mil_crate_01.png';
 import { formatLidcAirportLabel, getLidcAirportById } from '../config/lidcAfghanistanAirports';
 import * as api from '../services/api';
 import { t } from '../utils/locale';
@@ -17,6 +19,11 @@ import InlineError from './InlineError';
 import './LidcAirportWizard.css';
 
 const TABS = ['overview', 'logistics'];
+
+const SHOP_IMAGES = {
+  container: ammoContainerImage,
+  crate: ammoCrateImage,
+};
 
 function formatMgrs(lat, lon) {
   const latitude = Number(lat);
@@ -55,52 +62,33 @@ function OccupancyAirframe({ airframe }) {
   );
 }
 
-function LogisticsRow({
-  item,
-  kind,
-  canPurchase,
-  buyingKey,
-  onPurchase,
-}) {
-  const [quantity, setQuantity] = useState(1);
-  const fill = item.capacity > 0 ? Math.min(100, Math.round((item.quantity / item.capacity) * 100)) : 0;
-  const cost = item.unitCost * quantity;
-  const rowKey = `${kind}:${item.id}`;
-  const isBuying = buyingKey === rowKey;
-  const remaining = Math.max(0, item.capacity - item.quantity);
+function ShopCard({ item, credits, canPurchase, buyingKey, onPurchase }) {
+  const isBuying = buyingKey === item.id;
+  const canAfford = credits >= item.cost;
+  const enabled = canPurchase && canAfford && !isBuying;
+  const transport = Array.isArray(item.transport) ? item.transport : [];
+  const imageUrl = SHOP_IMAGES[item.kind] || '';
 
   return (
-    <div className="lidc-airport-wizard-stock">
-      <div className="lidc-airport-wizard-stock__copy">
-        <strong>{item.label}</strong>
-        <span>
-          {formatStock(item.quantity)} / {formatStock(item.capacity)} {item.unit}
-        </span>
-        <div className="lidc-airport-wizard-meter" aria-hidden="true">
-          <i style={{ width: `${fill}%` }} />
-        </div>
-      </div>
-      <div className="lidc-airport-wizard-stock__buy">
-        <input
-          type="number"
-          min={1}
-          max={Math.max(1, remaining)}
-          value={quantity}
-          disabled={!canPurchase || remaining < 1}
-          onChange={(event) => setQuantity(Math.max(1, Math.floor(Number(event.target.value) || 1)))}
-          aria-label={t('lidc.map.airportWizard.quantity')}
-        />
-        <button
-          type="button"
-          className="lidc-btn lidc-btn-primary"
-          disabled={!canPurchase || remaining < 1 || isBuying}
-          onClick={() => onPurchase(kind, item.id, quantity)}
-        >
-          {isBuying ? <Loader2 size={13} className="spin" /> : t('lidc.map.airportWizard.buy')}
-          <span>{cost}</span>
-        </button>
-      </div>
-    </div>
+    <button
+      type="button"
+      className="lidc-airport-wizard-shop-card"
+      disabled={!enabled}
+      onClick={() => onPurchase(item.id)}
+    >
+      <span className="lidc-airport-wizard-shop-card__transport" aria-hidden="true">
+        <Plane size={16} />
+        {transport.includes('helicopter') && <Helicopter size={16} />}
+      </span>
+      {imageUrl ? (
+        <img src={imageUrl} alt="" draggable={false} />
+      ) : null}
+      <strong>{t(`lidc.map.airportWizard.${item.kind}`)}</strong>
+      <span className="lidc-airport-wizard-shop-card__cost">
+        {isBuying ? <Loader2 size={14} className="spin" /> : <Coins size={14} />}
+        {formatStock(item.cost)}
+      </span>
+    </button>
   );
 }
 
@@ -117,8 +105,10 @@ export default function LidcAirportWizard({
   const [purchaseError, setPurchaseError] = useState('');
   const catalogAirport = getLidcAirportById(airport?.id) || airport;
   const squadrons = Array.isArray(occupancy?.squadrons) ? occupancy.squadrons : [];
-  const logistics = occupancy?.logistics || { fuel: [], armament: [], credits: 0 };
   const resources = occupancy?.resources || {};
+  const shop = Array.isArray(occupancy?.shop) ? occupancy.shop : [];
+  const shopper = occupancy?.shopper || null;
+  const squadronCredits = Number(shopper?.credits || 0);
 
   const totals = useMemo(() => {
     return squadrons.reduce((acc, squadron) => {
@@ -130,13 +120,12 @@ export default function LidcAirportWizard({
     }, { aircrafts: 0, helicopters: 0, groundAssets: 0, members: 0 });
   }, [squadrons]);
 
-  async function handlePurchase(kind, itemId, quantity) {
-    if (!isLogged || !airport?.id) return;
-    const rowKey = `${kind}:${itemId}`;
-    setBuyingKey(rowKey);
+  async function handlePurchase(itemId) {
+    if (!isLogged || !shopper || !airport?.id) return;
+    setBuyingKey(itemId);
     setPurchaseError('');
     try {
-      const result = await api.purchaseLidcAirportLogistics(airport.id, { kind, itemId, quantity });
+      const result = await api.purchaseLidcAirportLogistics(airport.id, { itemId, quantity: 1 });
       onLogisticsUpdated?.(result);
     } catch (error) {
       setPurchaseError(error.message || t('lidc.map.airportWizard.purchaseFailed'));
@@ -291,22 +280,24 @@ export default function LidcAirportWizard({
               <div className="lidc-airport-wizard-credits">
                 <Coins size={16} />
                 <span>{t('lidc.map.airportWizard.credits')}</span>
-                <strong>{formatStock(logistics.credits)}</strong>
+                <strong>{shopper ? formatStock(squadronCredits) : '—'}</strong>
               </div>
               {!isLogged && (
                 <p className="lidc-occupancy-panel__hint">{t('lidc.map.airportWizard.loginToBuy')}</p>
               )}
+              {isLogged && !shopper && (
+                <p className="lidc-occupancy-panel__hint">{t('lidc.map.airportWizard.joinToBuy')}</p>
+              )}
               {purchaseError && <InlineError message={purchaseError} />}
 
               <section className="lidc-airport-wizard-block">
-                <h3>{t('lidc.map.airportWizard.fuel')}</h3>
-                <div className="lidc-airport-wizard-fuel-row">
-                  {(logistics.fuel || []).map((item) => (
-                    <LogisticsRow
+                <div className="lidc-airport-wizard-shop">
+                  {shop.map((item) => (
+                    <ShopCard
                       key={item.id}
                       item={item}
-                      kind="fuel"
-                      canPurchase={isLogged}
+                      credits={squadronCredits}
+                      canPurchase={isLogged && Boolean(shopper)}
                       buyingKey={buyingKey}
                       onPurchase={handlePurchase}
                     />

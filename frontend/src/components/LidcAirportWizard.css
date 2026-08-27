@@ -1,4 +1,4 @@
-.lidc-airport-wizard-card {
+.lidc-wizard-card.lidc-airport-wizard-card {
   width: min(980px, 96vw);
   height: min(760px, calc(100dvh - 48px));
   max-height: min(760px, calc(100dvh - 48px));
@@ -29,7 +29,9 @@
   position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr;
+  align-self: start;
   gap: 8px;
+  height: 42px;
 }
 
 .lidc-airport-wizard-tab-glider {
@@ -51,7 +53,9 @@
 .lidc-airport-wizard-tab {
   position: relative;
   z-index: 1;
+  height: 42px;
   min-height: 42px;
+  max-height: 42px;
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
@@ -273,80 +277,70 @@
   text-transform: uppercase;
 }
 
-.lidc-airport-wizard-stock {
+.lidc-airport-wizard-shop {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: end;
-  padding: 12px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
 
-.lidc-airport-wizard-stock__copy strong {
-  display: block;
-  font-size: 14px;
+.lidc-airport-wizard-shop-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 280px;
+  padding: 18px 16px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
 }
 
-.lidc-airport-wizard-stock__copy span {
-  display: block;
-  margin: 4px 0 8px;
-  color: var(--lidc-mute);
-  font-size: 12px;
+.lidc-airport-wizard-shop-card:disabled {
+  cursor: default;
+  opacity: 0.72;
 }
 
-.lidc-airport-wizard-meter {
-  height: 4px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+.lidc-airport-wizard-shop-card:not(:disabled):hover {
+  border-color: rgba(232, 197, 106, 0.45);
+  background: rgba(232, 197, 106, 0.06);
 }
 
-.lidc-airport-wizard-meter i {
-  display: block;
-  height: 100%;
-  background: var(--lidc-accent-gold);
-}
-
-.lidc-airport-wizard-stock__buy {
+.lidc-airport-wizard-shop-card__transport {
+  position: absolute;
+  top: 12px;
+  right: 12px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  color: var(--lidc-mute);
 }
 
-.lidc-airport-wizard-stock__buy input {
-  width: 64px;
-  height: 34px;
-  border: 1px solid var(--lidc-hairline);
-  border-radius: 10px;
-  background: #121212;
-  color: #fff;
-  text-align: center;
+.lidc-airport-wizard-shop-card img {
+  width: min(180px, 72%);
+  height: 140px;
+  object-fit: contain;
+  margin: 28px 0 8px;
 }
 
-.lidc-airport-wizard-stock__buy .lidc-btn {
-  min-width: 108px;
-  gap: 8px;
+.lidc-airport-wizard-shop-card strong {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.lidc-airport-wizard-fuel-row {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.lidc-airport-wizard-fuel-row .lidc-airport-wizard-stock {
-  grid-template-columns: 1fr;
-  align-items: stretch;
-  gap: 10px;
-  min-width: 0;
-  padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.lidc-airport-wizard-fuel-row .lidc-airport-wizard-stock__buy {
-  justify-content: space-between;
+.lidc-airport-wizard-shop-card__cost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+  color: var(--lidc-accent-gold);
+  font-size: 16px;
+  font-weight: 800;
 }
 
 @media (max-width: 860px) {
@@ -354,11 +348,8 @@
     grid-template-columns: 1fr 1fr;
   }
 
-  .lidc-airport-wizard-resource-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .lidc-airport-wizard-fuel-row {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .lidc-airport-wizard-resource-grid,
+  .lidc-airport-wizard-shop {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

@@ -2146,7 +2146,7 @@ app.put('/api/profile', (req, res) => {
  * Public theater occupancy: squadrons and airframes present at an Afghanistan airbase.
  */
 app.get('/api/lidc/airports/:baseId/occupancy', (req, res) => {
-  const occupancy = lidcService.getAirportOccupancy(req.params.baseId);
+  const occupancy = lidcService.getAirportOccupancy(req.params.baseId, req.session.user?.id);
   if (!occupancy) {
     return res.status(404).json({ error: 'Airport not found' });
   }
@@ -2156,7 +2156,7 @@ app.get('/api/lidc/airports/:baseId/occupancy', (req, res) => {
 
 /**
  * POST /api/lidc/airports/:baseId/logistics/purchase
- * Buy fuel or armament for an Afghanistan airbase warehouse.
+ * Buy ammunition containers or crates with squadron credits.
  */
 app.post('/api/lidc/airports/:baseId/logistics/purchase', (req, res) => {
   if (!req.session.user?.id) {
@@ -2166,9 +2166,9 @@ app.post('/api/lidc/airports/:baseId/logistics/purchase', (req, res) => {
   try {
     const result = lidcService.purchaseAirportLogistics({
       baseId: req.params.baseId,
-      kind: req.body?.kind,
       itemId: req.body?.itemId,
       quantity: req.body?.quantity,
+      userId: req.session.user.id,
     });
     return res.json(result);
   } catch (error) {

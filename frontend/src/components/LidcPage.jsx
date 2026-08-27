@@ -994,8 +994,8 @@ export default function LidcPage() {
       if (!prev) return prev;
       return {
         ...prev,
-        logistics: result?.logistics || prev.logistics,
-        resources: result?.resources || prev.resources,
+        shop: result?.shop || prev.shop,
+        shopper: result?.shopper || prev.shopper,
       };
     });
   }, []);
