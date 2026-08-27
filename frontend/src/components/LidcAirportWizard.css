@@ -391,8 +391,67 @@
   background: rgba(255, 255, 255, 0.03);
 }
 
-.lidc-airport-wizard-squadron + .lidc-airport-wizard-squadron {
+.lidc-airport-wizard-squadron + .lidc-airport-wizard-squadron,
+.lidc-airport-wizard-order + .lidc-airport-wizard-order {
   margin-top: 10px;
+}
+
+.lidc-airport-wizard-order {
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.lidc-airport-wizard-order header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.lidc-airport-wizard-order h4 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.lidc-airport-wizard-order header strong {
+  color: var(--lidc-accent-gold);
+  font-size: 13px;
+}
+
+.lidc-airport-wizard-order-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px;
+}
+
+.lidc-airport-wizard-order-items div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 4px;
+  text-align: center;
+}
+
+.lidc-airport-wizard-order-items img {
+  width: 36px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.lidc-airport-wizard-order-items strong {
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.lidc-airport-wizard-order-items em {
+  color: var(--lidc-mute);
+  font-size: 8px;
+  font-style: normal;
 }
 
 .lidc-airport-wizard-squadron header {
@@ -615,5 +674,9 @@
   .lidc-airport-wizard-shop,
   .lidc-airport-wizard-fuel-row {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .lidc-airport-wizard-order-items {
+    grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
   }
 }

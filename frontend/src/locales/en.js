@@ -348,6 +348,8 @@ export default {
         crate: 'Crate',
         shopAircraft: 'Aircraft presets',
         shopHelicopters: 'Helicopter presets',
+        orders: 'Confirmed orders',
+        orderEmpty: 'No confirmed orders at this airbase.',
         fuel: 'Fuel',
         armament: 'Armament',
         resources: 'Resources',

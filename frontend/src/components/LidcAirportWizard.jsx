@@ -270,6 +270,7 @@ export default function LidcAirportWizard({
       });
       setCart({});
       onLogisticsUpdated?.(result);
+      onChangeTab?.('overview');
     } catch (error) {
       setPurchaseError(error.message || t('lidc.map.airportWizard.purchaseFailed'));
     } finally {
@@ -366,6 +367,30 @@ export default function LidcAirportWizard({
                     <strong>{formatStock(resources.fuelQuantity)} kg</strong>
                   </div>
                 </div>
+              </section>
+
+              <section className="lidc-airport-wizard-block">
+                <h3>{t('lidc.map.airportWizard.orders')}</h3>
+                {(Array.isArray(occupancy?.orders) ? occupancy.orders : []).length === 0 && (
+                  <p className="lidc-occupancy-panel__hint">{t('lidc.map.airportWizard.orderEmpty')}</p>
+                )}
+                {(Array.isArray(occupancy?.orders) ? occupancy.orders : []).map((order) => (
+                  <article key={order.id} className="lidc-airport-wizard-order">
+                    <header>
+                      <h4>{order.squadronName || '—'}</h4>
+                      <strong>{formatStock(order.cost)}</strong>
+                    </header>
+                    <div className="lidc-airport-wizard-order-items">
+                      {(order.items || []).map((item, index) => (
+                        <div key={`${order.id}-${item.itemId}-${index}`}>
+                          <img src={shopImageFor(item)} alt="" draggable={false} />
+                          <strong>{item.name}</strong>
+                          <em>×{item.quantity}</em>
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+                ))}
               </section>
 
               <section className="lidc-airport-wizard-block">

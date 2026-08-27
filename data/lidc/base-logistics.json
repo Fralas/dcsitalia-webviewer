@@ -86,6 +86,41 @@
           "capacity": 12000,
           "unitCost": 1
         }
+      ],
+      "orders": [
+        {
+          "id": "order_1787838334290_3697f6",
+          "createdAt": 1787838334290,
+          "squadronId": "lidc_1787779236246_16b1ac",
+          "squadronName": "Dj GAY",
+          "items": [
+            {
+              "itemId": "BOX-AIR-03",
+              "kind": "crate",
+              "name": "SEAD",
+              "destination": "aircraft",
+              "quantity": 1,
+              "cost": 720
+            },
+            {
+              "itemId": "BOX-AIR-04",
+              "kind": "crate",
+              "name": "CLUSTER",
+              "destination": "aircraft",
+              "quantity": 1,
+              "cost": 720
+            },
+            {
+              "itemId": "BOX-AIR-01",
+              "kind": "crate",
+              "name": "BOMBS",
+              "destination": "aircraft",
+              "quantity": 1,
+              "cost": 720
+            }
+          ],
+          "cost": 2160
+        }
       ]
     },
     "kandahar": {
@@ -261,6 +296,73 @@
           "quantity": 4000,
           "capacity": 12000,
           "unitCost": 1
+        }
+      ],
+      "orders": [
+        {
+          "id": "order_1787838395032_84d753",
+          "createdAt": 1787838395035,
+          "squadronId": "lidc_1787838377438_0fdd90",
+          "squadronName": "djogogay",
+          "items": [
+            {
+              "itemId": "CONT-AIR-03",
+              "kind": "container",
+              "name": "SEAD",
+              "destination": "aircraft",
+              "quantity": 1,
+              "cost": 2400
+            },
+            {
+              "itemId": "BOX-HEL-03",
+              "kind": "crate",
+              "name": "HELLFIRE",
+              "destination": "helicopters",
+              "quantity": 1,
+              "cost": 720
+            },
+            {
+              "itemId": "BOX-HEL-02",
+              "kind": "crate",
+              "name": "HYDRA",
+              "destination": "helicopters",
+              "quantity": 1,
+              "cost": 720
+            },
+            {
+              "itemId": "BOX-HEL-01",
+              "kind": "crate",
+              "name": "APKWS",
+              "destination": "helicopters",
+              "quantity": 1,
+              "cost": 720
+            },
+            {
+              "itemId": "CONT-HEL-01",
+              "kind": "container",
+              "name": "HELLFIRE",
+              "destination": "helicopters",
+              "quantity": 1,
+              "cost": 2100
+            },
+            {
+              "itemId": "CONT-HEL-02",
+              "kind": "container",
+              "name": "MIXED",
+              "destination": "helicopters",
+              "quantity": 1,
+              "cost": 2850
+            },
+            {
+              "itemId": "CONT-HEL-03",
+              "kind": "container",
+              "name": "RUS",
+              "destination": "helicopters",
+              "quantity": 1,
+              "cost": 2700
+            }
+          ],
+          "cost": 12210
         }
       ]
     },
@@ -441,5 +543,5 @@
       ]
     }
   },
-  "updatedAt": 1787827754751
+  "updatedAt": 1787838395036
 }

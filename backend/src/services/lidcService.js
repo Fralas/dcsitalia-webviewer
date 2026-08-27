@@ -1329,6 +1329,7 @@ function createDefaultBaseLogistics(baseId) {
     credits: DEFAULT_BASE_CREDITS,
     fuel: cloneLogisticsStock(LOGISTICS_FUEL_CATALOG),
     armament: cloneLogisticsStock(LOGISTICS_ARMAMENT_CATALOG),
+    orders: [],
   };
 }
 
@@ -1360,6 +1361,7 @@ function getOrCreateBaseLogistics(baseId) {
       : DEFAULT_BASE_CREDITS,
     fuel: normalizeLogisticsStock(existing?.fuel, LOGISTICS_FUEL_CATALOG),
     armament: normalizeLogisticsStock(existing?.armament, LOGISTICS_ARMAMENT_CATALOG),
+    orders: normalizeBaseOrders(existing?.orders),
   };
 
   store.bases[airport.id] = next;
@@ -1401,6 +1403,46 @@ function listLogisticsShop() {
     cost: item.cost,
     transport: [...item.transport],
   }));
+}
+
+const MAX_BASE_ORDERS = 80;
+
+function normalizeBaseOrders(rawOrders) {
+  const catalogById = new Map(LOGISTICS_SHOP_CATALOG.map((entry) => [entry.id, entry]));
+
+  return (Array.isArray(rawOrders) ? rawOrders : [])
+    .map((order) => {
+      const items = (Array.isArray(order?.items) ? order.items : [])
+        .map((line) => {
+          const catalogItem = catalogById.get(sanitizeText(line?.itemId, 80));
+          const quantity = Math.max(0, Math.floor(Number(line?.quantity) || 0));
+          const cost = Math.max(0, Math.floor(Number(line?.cost) || 0));
+          if (!catalogItem || quantity < 1) return null;
+          return {
+            itemId: catalogItem.id,
+            kind: catalogItem.kind,
+            name: catalogItem.name,
+            destination: catalogItem.destination,
+            quantity,
+            cost: cost || catalogItem.cost * quantity,
+          };
+        })
+        .filter(Boolean);
+
+      if (items.length < 1) return null;
+
+      return {
+        id: sanitizeText(order?.id, 120) || `order_${Date.now()}`,
+        createdAt: Number.isFinite(Number(order?.createdAt)) ? Number(order.createdAt) : Date.now(),
+        squadronId: sanitizeText(order?.squadronId, 120),
+        squadronName: sanitizeText(order?.squadronName, 120),
+        items,
+        cost: items.reduce((sum, line) => sum + Number(line.cost || 0), 0),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0))
+    .slice(0, MAX_BASE_ORDERS);
 }
 
 function getSquadronCredits(squadron) {
@@ -1501,6 +1543,7 @@ export function getAirportOccupancy(baseId, actorUserId = '') {
     resources: summarizeLogistics(logistics),
     shop: listLogisticsShop(),
     shopper: toShopper(shopperSquadron, airport.id),
+    orders: normalizeBaseOrders(logistics.orders),
   };
 }
 
@@ -1548,6 +1591,7 @@ export function purchaseAirportLogistics({ baseId, itemId, quantity, items, user
       itemId: catalogItem.id,
       kind: catalogItem.kind,
       name: catalogItem.name,
+      destination: catalogItem.destination,
       quantity: qty,
       cost: lineCost,
     });
@@ -1584,12 +1628,28 @@ export function purchaseAirportLogistics({ baseId, itemId, quantity, items, user
   squadrons[squadronIndex] = nextSquadron;
   writeSquadrons(squadrons);
 
+  const logistics = getOrCreateBaseLogistics(airport.id);
+  const order = {
+    id: `order_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+    createdAt: Date.now(),
+    squadronId: sanitizeText(squadron?.id, 120),
+    squadronName: sanitizeText(squadron?.name, 120),
+    items: purchaseLines,
+    cost: totalCost,
+  };
+  logistics.orders = normalizeBaseOrders([order, ...(Array.isArray(logistics.orders) ? logistics.orders : [])]);
+  const store = readBaseLogisticsStore();
+  store.bases[airport.id] = logistics;
+  writeBaseLogisticsStore(store);
+
   return {
     shop: listLogisticsShop(),
     shopper: toShopper(nextSquadron, airport.id),
+    orders: logistics.orders,
     purchase: {
       items: purchaseLines,
       cost: totalCost,
+      order,
     },
   };
 }

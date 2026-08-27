@@ -996,6 +996,7 @@ export default function LidcPage() {
         ...prev,
         shop: result?.shop || prev.shop,
         shopper: result?.shopper || prev.shopper,
+        orders: result?.orders || prev.orders,
       };
     });
   }, []);

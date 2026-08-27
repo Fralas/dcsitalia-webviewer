@@ -348,6 +348,8 @@ export default {
         crate: 'Cassa',
         shopAircraft: 'Preset aerei',
         shopHelicopters: 'Preset elicotteri',
+        orders: 'Ordini confermati',
+        orderEmpty: 'Nessun ordine confermato in questa base.',
         fuel: 'Carburante',
         armament: 'Armamento',
         resources: 'Risorse',
