@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { LIDC_STORYLINE_WHITEBOARD_CONNECTIONS, LIDC_STORYLINE_WHITEBOARD_ITEMS } from '../config/lidcStorylineWhiteboardItems';
 import { t } from '../utils/locale';
 import LidcStorylineWhiteboardString from './LidcStorylineWhiteboardString';
+import { LidcStorylineHudNotice } from './LidcStorylineHud';
 import './LidcStorylineWhiteboard.css';
 
 const DEFAULT_VIEW_SCALE = 0.62;
@@ -390,10 +391,11 @@ export default function LidcStorylineWhiteboard({ onClose }) {
       )}
 
       {showExitHint && !activeItem && (
-        <p className="lidc-whiteboard-exit-hint">
-          {t('lidc.storyline.whiteboardExitHint')}
-          <span className="lidc-whiteboard-nav-hint">{t('lidc.storyline.whiteboardNavHint')}</span>
-        </p>
+        <LidcStorylineHudNotice
+          primaryLabel={t('lidc.storyline.backToRoom')}
+          secondary={t('lidc.storyline.whiteboardNavHint')}
+          fadeOut
+        />
       )}
     </div>
   );

@@ -385,12 +385,16 @@ export default {
       close: 'Chiudi storyline',
       closePanel: 'Chiudi pannello lavagna',
       enterHint: 'Clicca per entrare nella stanza',
-      controlsHint: 'WASD per muoverti · Mouse per guardare · Clic al centro per la lavagna · L debug · Esc per uscire',
+      controlsHint: [
+        { key: 'WASD', label: 'Muoviti' },
+        { key: 'Mouse', label: 'Guarda' },
+        { key: 'L', label: 'Debug layout' },
+        { key: 'Esc', label: 'Esci' },
+      ],
       whiteboardTitle: 'Lavagna operativa',
       whiteboardBody: 'Qui comparirà il contenuto del briefing missione. Esplora la stanza e interagisci con la lavagna per seguire la storyline della campagna.',
-      whiteboardPrompt: 'Premi E per accedere alla lavagna',
-      whiteboardExitHint: 'Esc per tornare in stanza',
-      whiteboardNavHint: 'Rotella: zoom · Trascina: muovi la lavagna',
+      whiteboardPromptAction: 'Accedi alla lavagna',
+      whiteboardNavHint: 'Rotella · zoom   Trascina · muovi la lavagna',
       whiteboardItems: {
         abdulRahman: {
           label: 'Al-Safah',

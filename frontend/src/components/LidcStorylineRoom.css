@@ -1,5 +1,11 @@
 .lidc-storyline-root {
   --lidc-storyline-font: "Inter", "Aptos", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  --lidc-storyline-hairline: #4e4e4e;
+  --lidc-storyline-body: #dadbdf;
+  --lidc-storyline-mute: #7d8187;
+  --lidc-storyline-soft: #1b1b1b;
+  --lidc-storyline-gold: #ffbb00;
+  --lidc-storyline-row-radius: 15px;
 
   position: fixed;
   inset: 0;
@@ -61,35 +67,6 @@
   transition: width 180ms ease;
 }
 
-.lidc-storyline-hint {
-  position: absolute;
-  left: 50%;
-  bottom: clamp(24px, 4vh, 48px);
-  transform: translateX(-50%);
-  z-index: 2;
-  min-width: min(420px, calc(100vw - 32px));
-  padding: 14px 18px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 16px;
-  background: rgba(14, 14, 14, 0.72);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  text-align: center;
-  pointer-events: none;
-}
-
-.lidc-storyline-hint p {
-  margin: 0;
-  font-size: 0.95rem;
-  color: #ffffff;
-}
-
-.lidc-storyline-hint-sub {
-  margin-top: 6px !important;
-  font-size: 0.82rem !important;
-  color: #a8adb5 !important;
-}
-
 .lidc-storyline-close {
   position: absolute;
   top: clamp(12px, 1.4vw, 20px);
@@ -128,29 +105,6 @@
   border-radius: 0;
   border: none;
   z-index: 6;
-}
-
-.lidc-storyline-interact-prompt {
-  position: absolute;
-  left: 50%;
-  bottom: clamp(20px, 4vh, 48px);
-  z-index: 3;
-  transform: translateX(-50%);
-  padding: 12px 18px;
-  border: 1px solid rgba(255, 187, 0, 0.45);
-  border-radius: 999px;
-  background: rgba(10, 10, 10, 0.82);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  pointer-events: none;
-}
-
-.lidc-storyline-interact-prompt p {
-  margin: 0;
-  font-size: 0.92rem;
-  font-weight: 600;
-  color: #ffdd88;
-  letter-spacing: 0.01em;
 }
 
 .lidc-storyline-whiteboard-panel {

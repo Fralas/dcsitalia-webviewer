@@ -385,12 +385,16 @@ export default {
       close: 'Close storyline',
       closePanel: 'Close whiteboard panel',
       enterHint: 'Click to enter the room',
-      controlsHint: 'WASD to move · Mouse to look · Center click for whiteboard · L debug · Esc to exit',
+      controlsHint: [
+        { key: 'WASD', label: 'Move' },
+        { key: 'Mouse', label: 'Look' },
+        { key: 'L', label: 'Layout debug' },
+        { key: 'Esc', label: 'Exit' },
+      ],
       whiteboardTitle: 'Operations whiteboard',
       whiteboardBody: 'Mission briefing content will appear here. Explore the room and interact with the whiteboard to follow the campaign storyline.',
-      whiteboardPrompt: 'Press E to access the whiteboard',
-      whiteboardExitHint: 'Esc to return to the room',
-      whiteboardNavHint: 'Scroll: zoom · Drag: pan the board',
+      whiteboardPromptAction: 'Access the whiteboard',
+      whiteboardNavHint: 'Scroll · zoom   Drag · pan the board',
       whiteboardItems: {
         abdulRahman: {
           label: 'Al-Safah',

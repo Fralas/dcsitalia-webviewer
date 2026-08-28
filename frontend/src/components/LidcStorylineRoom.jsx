@@ -7,6 +7,7 @@ import roomModelUrl from '../../3D/LIDC/room.glb';
 import whiteboardModelUrl from '../../3D/LIDC/whiteboard.glb';
 import LidcStorylineDebugPanel from './LidcStorylineDebugPanel';
 import LidcStorylineWhiteboard from './LidcStorylineWhiteboard';
+import { LidcStorylineControlsHint, LidcStorylineInteractPrompt } from './LidcStorylineHud';
 import { t } from '../utils/locale';
 import {
   applyLinkedScaleChange,
@@ -207,6 +208,9 @@ function createWhiteboardGroup(whiteboardScene, roomLocalBounds) {
   return group;
 }
 
+const CONTROLS_HINT_VISIBLE_MS = 10000;
+const CONTROLS_HINT_FADE_MS = 600;
+
 export default function LidcStorylineRoom({ onClose }) {
   const containerRef = useRef(null);
   const sceneApiRef = useRef(null);
@@ -227,6 +231,8 @@ export default function LidcStorylineRoom({ onClose }) {
   const [scaleLinked, setScaleLinked] = useState(true);
   const [whiteboardOpen, setWhiteboardOpen] = useState(false);
   const [whiteboardPromptActive, setWhiteboardPromptActive] = useState(false);
+  const [showControlsHint, setShowControlsHint] = useState(false);
+  const [controlsHintFading, setControlsHintFading] = useState(false);
   const [transform, setTransform] = useState(() => loadSavedTransform());
   const [transformMode, setTransformMode] = useState('translate');
   const [cameraPosition, setCameraPosition] = useState([0, 0, 0]);
@@ -244,6 +250,28 @@ export default function LidcStorylineRoom({ onClose }) {
   useEffect(() => {
     whiteboardPromptActiveRef.current = whiteboardPromptActive;
   }, [whiteboardPromptActive]);
+
+  useEffect(() => {
+    if (loading || loadError) {
+      setShowControlsHint(false);
+      setControlsHintFading(false);
+      return undefined;
+    }
+
+    setShowControlsHint(true);
+    setControlsHintFading(false);
+
+    const fadeTimer = window.setTimeout(() => setControlsHintFading(true), CONTROLS_HINT_VISIBLE_MS);
+    const hideTimer = window.setTimeout(() => {
+      setShowControlsHint(false);
+      setControlsHintFading(false);
+    }, CONTROLS_HINT_VISIBLE_MS + CONTROLS_HINT_FADE_MS);
+
+    return () => {
+      window.clearTimeout(fadeTimer);
+      window.clearTimeout(hideTimer);
+    };
+  }, [loading, loadError]);
 
   useEffect(() => {
     debugTargetRef.current = debugTarget;
@@ -1290,15 +1318,17 @@ export default function LidcStorylineRoom({ onClose }) {
       )}
 
       {!loading && !loadError && !debugOpen && !whiteboardOpen && whiteboardPromptActive && (
-        <div className="lidc-storyline-interact-prompt">
-          <p>{t('lidc.storyline.whiteboardPrompt')}</p>
-        </div>
+        <LidcStorylineInteractPrompt
+          keys="E"
+          label={t('lidc.storyline.whiteboardPromptAction')}
+        />
       )}
 
-      {!loading && !loadError && !debugOpen && !whiteboardOpen && !whiteboardPromptActive && (
-        <div className="lidc-storyline-hint">
-          <p>{t('lidc.storyline.controlsHint')}</p>
-        </div>
+      {!loading && !loadError && !debugOpen && !whiteboardOpen && !whiteboardPromptActive && showControlsHint && (
+        <LidcStorylineControlsHint
+          segments={t('lidc.storyline.controlsHint')}
+          fadeOut={controlsHintFading}
+        />
       )}
 
       {!loading && !loadError && !whiteboardOpen && (
