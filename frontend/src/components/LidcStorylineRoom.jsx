@@ -47,6 +47,7 @@ import {
   TERMINAL_ZONE_EVENT_ID,
   updateZoneTriggers,
   WHITEBOARD_ZONE_EVENT_ID,
+  PHONE_ZONE_EVENT_ID,
   ZONE_TYPES,
 } from '../utils/lidcStorylineZones';
 import { syncWhiteboard3DDecorations } from '../utils/lidcStorylineWhiteboard3D';
@@ -1163,7 +1164,7 @@ export default function LidcStorylineRoom({ onClose }) {
 
       exitPointerLock();
       initRatosTerminal();
-      renderTerminal3DScreens(zoneGroups, getRatosTerminalSnapshot());
+      renderTerminal3DScreens(zoneGroups, getRatosTerminalSnapshot(), performance.now());
       lastTerminalRenderVersion = getRatosTerminalSnapshot().version;
 
       const focus = resolveTerminalCameraFocus();
@@ -1744,7 +1745,7 @@ export default function LidcStorylineRoom({ onClose }) {
         || terminalSnapshot.version !== lastTerminalRenderVersion
       ) {
         lastTerminalRenderVersion = terminalSnapshot.version;
-        renderTerminal3DScreens(zoneGroups, terminalSnapshot);
+        renderTerminal3DScreens(zoneGroups, terminalSnapshot, now);
       }
       renderer.render(scene, camera);
     };
@@ -1935,6 +1936,13 @@ export default function LidcStorylineRoom({ onClose }) {
           keys="E"
           label={t('lidc.storyline.terminalPromptAction')}
           onActivate={() => sceneApiRef.current?.openTerminal?.()}
+        />
+      )}
+
+      {!loading && !loadError && !debugOpen && !whiteboardOpen && !terminalOpen && activeInteractEvent === PHONE_ZONE_EVENT_ID && (
+        <LidcStorylineInteractPrompt
+          keys="E"
+          label={t('lidc.storyline.phonePromptAction')}
         />
       )}
 

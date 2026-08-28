@@ -396,6 +396,7 @@ export default {
       whiteboardPromptAction: 'Accedi alla lavagna',
       whiteboardNavHint: 'Rotella · zoom   Trascina · muovi la lavagna',
       terminalPromptAction: 'Accedi al terminale',
+      phonePromptAction: 'Usa il telefono',
       terminal: {
         title: 'Terminale RatOS',
         secureShell: 'Shell sicura',
@@ -873,6 +874,7 @@ export default {
         zonesEmpty: 'Nessuna zona. Aggiungine una per trigger o collisioni.',
         addTriggerZone: 'Trigger',
         addTerminalTriggerZone: 'Terminale',
+        addPhoneTriggerZone: 'Telefono',
         zoneEventNone: 'Nessuno',
         addCollisionZone: 'Collisione',
         addWhiteboardSurfaceZone: 'Superficie lavagna',
@@ -880,7 +882,7 @@ export default {
         removeZone: 'Rimuovi zona',
         zoneTransform: 'Transform zona',
         zoneLabel: 'Etichetta',
-        zoneEventId: 'Event ID (es. whiteboard, terminal)',
+        zoneEventId: 'Event ID (es. whiteboard, terminal, phone)',
         lastTrigger: 'Ultimo trigger: {eventId} ({label})',
         zoneTypes: {
           trigger: 'Trigger',

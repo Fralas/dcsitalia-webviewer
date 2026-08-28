@@ -147,13 +147,11 @@ function positionMeshOnSurface(mesh, mapping) {
   orientMeshToSurface(mesh, mapping);
 }
 
-function drawScanlines(ctx, width, height) {
+function drawScanlinePattern(ctx, width, height) {
   ctx.save();
-  ctx.globalAlpha = 0.12;
-  for (let y = 0; y < height; y += 3) {
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, y, width, 1);
-  }
+  ctx.globalAlpha = 0.2;
+  ctx.fillStyle = getScanlinePattern();
+  ctx.fillRect(0, 0, width, height);
   ctx.restore();
 }
 
@@ -170,6 +168,121 @@ function drawVignette(ctx, width, height) {
   gradient.addColorStop(1, 'rgba(0, 0, 0, 0.55)');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
+}
+
+let scanlinePattern = null;
+
+function getScanlinePattern() {
+  if (scanlinePattern) return scanlinePattern;
+
+  const tile = document.createElement('canvas');
+  tile.width = 4;
+  tile.height = 4;
+  const tileCtx = tile.getContext('2d');
+  tileCtx.fillStyle = 'rgba(0, 0, 0, 0.38)';
+  tileCtx.fillRect(0, 2, 4, 1);
+  scanlinePattern = tileCtx.createPattern(tile, 'repeat');
+  return scanlinePattern;
+}
+
+function drawVcrOverlay(ctx, width, height, timeMs) {
+  const t = timeMs * 0.001;
+
+  drawScanlinePattern(ctx, width, height);
+
+  ctx.save();
+  ctx.globalAlpha = 0.1 + Math.sin(t * 2.1) * 0.035;
+  const chroma = ctx.createLinearGradient(0, 0, width, 0);
+  chroma.addColorStop(0, 'rgba(255, 70, 70, 0.14)');
+  chroma.addColorStop(0.16, 'rgba(0, 0, 0, 0)');
+  chroma.addColorStop(0.84, 'rgba(0, 0, 0, 0)');
+  chroma.addColorStop(1, 'rgba(70, 190, 255, 0.12)');
+  ctx.fillStyle = chroma;
+  ctx.fillRect(0, 0, width, height);
+  ctx.restore();
+
+  const trackY = ((timeMs * 0.00014) % 1.15 - 0.08) * height;
+  ctx.save();
+  ctx.globalAlpha = 0.42;
+  const trackGrad = ctx.createLinearGradient(0, trackY, 0, trackY + height * 0.02);
+  trackGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+  trackGrad.addColorStop(0.45, 'rgba(255, 255, 255, 0.09)');
+  trackGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = trackGrad;
+  ctx.fillRect(0, trackY, width, height * 0.02);
+  ctx.restore();
+
+  drawVignette(ctx, width, height);
+
+  ctx.save();
+  ctx.globalAlpha = 0.28;
+  const glow = ctx.createRadialGradient(
+    width / 2,
+    height * 0.05,
+    0,
+    width / 2,
+    height * 0.05,
+    height * 0.55,
+  );
+  glow.addColorStop(0, 'rgba(103, 255, 136, 0.14)');
+  glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, width, height);
+  ctx.restore();
+
+  if ((Math.floor(timeMs / 95) % 8) === 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.03;
+    ctx.fillStyle = '#67ff88';
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+  }
+}
+
+function buildTerminalContentKey(snapshot, timeMs) {
+  if (snapshot.bootPhase === 'terminal' && snapshot.bootComplete) {
+    return `${snapshot.version}:${Math.floor(timeMs / 530)}`;
+  }
+  return String(snapshot.version);
+}
+
+function ensureContentCanvas(root) {
+  if (root.userData.contentCanvas) return;
+
+  const contentCanvas = document.createElement('canvas');
+  contentCanvas.width = CANVAS_WIDTH;
+  contentCanvas.height = CANVAS_HEIGHT;
+  root.userData.contentCanvas = contentCanvas;
+  root.userData.contentCtx = contentCanvas.getContext('2d');
+  root.userData.contentKey = null;
+}
+
+function compositeTerminalFrame(root, snapshot, timeMs) {
+  ensureContentCanvas(root);
+  const { ctx, canvas, contentCtx, contentCanvas, texture } = root.userData;
+  const { width, height } = canvas;
+  const contentKey = buildTerminalContentKey(snapshot, timeMs);
+
+  if (root.userData.contentKey !== contentKey) {
+    drawTerminalContent(contentCtx, contentCanvas, snapshot, timeMs);
+    root.userData.contentKey = contentKey;
+  }
+
+  ctx.fillStyle = COLORS.bg;
+  ctx.fillRect(0, 0, width, height);
+
+  const t = timeMs * 0.001;
+  const jitterX = Math.sin(t * 1.1) * 0.55 + Math.sin(t * 2.7) * 0.25;
+  const jitterY = Math.sin(t * 0.85) * 0.22;
+  const skew = Math.sin(t * 0.65) * 0.0011;
+
+  ctx.save();
+  ctx.transform(1, 0, skew, 1, jitterX, jitterY);
+  ctx.drawImage(contentCanvas, 0, 0);
+  ctx.restore();
+
+  drawVcrOverlay(ctx, width, height, timeMs);
+  texture.needsUpdate = true;
 }
 
 function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight) {
@@ -207,7 +320,7 @@ function drawPreScaled(ctx, text, x, y, scale, color) {
   ctx.restore();
 }
 
-function drawTerminalContent(ctx, canvas, snapshot) {
+function drawTerminalContent(ctx, canvas, snapshot, timeMs = 0) {
   const { width, height } = canvas;
 
   if (snapshot.bootPhase === 'idle') {
@@ -222,6 +335,8 @@ function drawTerminalContent(ctx, canvas, snapshot) {
   if (snapshot.bootPhase === 'bios') {
     ctx.textBaseline = 'top';
     ctx.font = '8px "IBM Plex Mono", "Courier New", monospace';
+    ctx.shadowColor = 'rgba(103, 255, 136, 0.32)';
+    ctx.shadowBlur = 2.5;
     drawPreScaled(ctx, RATOS_BIOS_LOGO_ART, width * 0.08, height * 0.04, 0.42, COLORS.banner);
     drawPreScaled(ctx, RATOS_BIOS_TITLE_ART, width * 0.1, height * 0.52, 0.72, COLORS.banner);
     ctx.font = '11px "IBM Plex Mono", "Courier New", monospace';
@@ -229,8 +344,7 @@ function drawTerminalContent(ctx, canvas, snapshot) {
     ctx.fillText(t('lidc.storyline.terminal.biosLoading'), width * 0.1, height * 0.82);
     ctx.fillStyle = COLORS.text;
     ctx.fillText(buildBiosProgressBar(snapshot.biosProgress), width * 0.1, height * 0.86);
-    drawScanlines(ctx, width, height);
-    drawVignette(ctx, width, height);
+    ctx.shadowBlur = 0;
     return;
   }
 
@@ -242,6 +356,8 @@ function drawTerminalContent(ctx, canvas, snapshot) {
 
   ctx.textBaseline = 'top';
   ctx.font = '11px "IBM Plex Mono", "Courier New", monospace';
+  ctx.shadowColor = 'rgba(103, 255, 136, 0.38)';
+  ctx.shadowBlur = 3;
 
   ctx.fillStyle = COLORS.header;
   ctx.fillText(`${RATOS_OS_NAME} v3.11`, padX, cursorY);
@@ -317,11 +433,11 @@ function drawTerminalContent(ctx, canvas, snapshot) {
 
   ctx.fillStyle = COLORS.text;
   const prompt = `${cwdToPrompt(snapshot.cwd)} ${snapshot.input}`;
-  const cursor = snapshot.bootComplete ? '_' : '';
+  const showCursor = snapshot.bootComplete && (Math.floor(timeMs / 530) % 2 === 0);
+  const cursor = showCursor ? '_' : ' ';
   ctx.fillText(`${prompt}${cursor}`, padX, height - padY - lineHeight * 0.5);
 
-  drawScanlines(ctx, width, height);
-  drawVignette(ctx, width, height);
+  ctx.shadowBlur = 0;
 }
 
 function disposeScreenRoot(root) {
@@ -347,6 +463,10 @@ function createTerminalScreenRoot(zone) {
   canvas.width = CANVAS_WIDTH;
   canvas.height = CANVAS_HEIGHT;
 
+  const contentCanvas = document.createElement('canvas');
+  contentCanvas.width = CANVAS_WIDTH;
+  contentCanvas.height = CANVAS_HEIGHT;
+
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.minFilter = THREE.LinearFilter;
@@ -369,6 +489,9 @@ function createTerminalScreenRoot(zone) {
   root.name = 'terminal-3d-screen';
   root.userData.canvas = canvas;
   root.userData.ctx = canvas.getContext('2d');
+  root.userData.contentCanvas = contentCanvas;
+  root.userData.contentCtx = contentCanvas.getContext('2d');
+  root.userData.contentKey = null;
   root.userData.texture = texture;
   root.userData.mapping = mapping;
   root.userData.zoneScale = [...zone.scale];
@@ -565,7 +688,11 @@ export function syncTerminal3DDecorations(zones, zoneGroups) {
   }
 }
 
-export function renderTerminal3DScreens(zoneGroups, snapshot = getRatosTerminalSnapshot()) {
+export function renderTerminal3DScreens(
+  zoneGroups,
+  snapshot = getRatosTerminalSnapshot(),
+  timeMs = 0,
+) {
   zoneGroups.forEach((group) => {
     if (group.userData.zoneType !== ZONE_TYPES.TERMINAL_SURFACE) return;
     const root = group.getObjectByName('terminal-3d-screen');
@@ -577,15 +704,7 @@ export function renderTerminal3DScreens(zoneGroups, snapshot = getRatosTerminalS
     }
 
     restoreTerminalCanvasMap(root);
-
-    root.userData.renderGeneration = (root.userData.renderGeneration ?? 0) + 1;
-    const generation = root.userData.renderGeneration;
-
-    const { ctx, canvas, texture } = root.userData;
-    drawTerminalContent(ctx, canvas, snapshot);
-    if (root.userData.renderGeneration === generation) {
-      texture.needsUpdate = true;
-    }
+    compositeTerminalFrame(root, snapshot, timeMs);
   });
 }
 

@@ -396,6 +396,7 @@ export default {
       whiteboardPromptAction: 'Access the whiteboard',
       whiteboardNavHint: 'Scroll · zoom   Drag · pan the board',
       terminalPromptAction: 'Access the terminal',
+      phonePromptAction: 'Use the phone',
       terminal: {
         title: 'RatOS terminal',
         secureShell: 'Secure shell',
@@ -873,6 +874,7 @@ export default {
         zonesEmpty: 'No zones yet. Add one for triggers or collisions.',
         addTriggerZone: 'Trigger',
         addTerminalTriggerZone: 'Terminal',
+        addPhoneTriggerZone: 'Phone',
         zoneEventNone: 'None',
         addCollisionZone: 'Collision',
         addWhiteboardSurfaceZone: 'Board surface',
@@ -880,7 +882,7 @@ export default {
         removeZone: 'Remove zone',
         zoneTransform: 'Zone transform',
         zoneLabel: 'Label',
-        zoneEventId: 'Event ID (e.g. whiteboard, terminal)',
+        zoneEventId: 'Event ID (e.g. whiteboard, terminal, phone)',
         lastTrigger: 'Last trigger: {eventId} ({label})',
         zoneTypes: {
           trigger: 'Trigger',

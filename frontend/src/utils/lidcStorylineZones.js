@@ -21,6 +21,7 @@ export const ZONE_TYPES = Object.freeze({
 
 export const WHITEBOARD_ZONE_EVENT_ID = 'whiteboard';
 export const TERMINAL_ZONE_EVENT_ID = 'terminal';
+export const PHONE_ZONE_EVENT_ID = 'phone';
 
 const TRIGGER_EVENT_ALIASES = {
   whiteboard: WHITEBOARD_ZONE_EVENT_ID,
@@ -30,6 +31,14 @@ const TRIGGER_EVENT_ALIASES = {
   ratos: TERMINAL_ZONE_EVENT_ID,
   computer: TERMINAL_ZONE_EVENT_ID,
   pc: TERMINAL_ZONE_EVENT_ID,
+  phone: PHONE_ZONE_EVENT_ID,
+  telefono: PHONE_ZONE_EVENT_ID,
+};
+
+const TRIGGER_EVENT_LABELS = {
+  [WHITEBOARD_ZONE_EVENT_ID]: 'Whiteboard',
+  [TERMINAL_ZONE_EVENT_ID]: 'Terminal',
+  [PHONE_ZONE_EVENT_ID]: 'Phone',
 };
 
 export function normalizeZoneEventId(eventId) {
@@ -57,7 +66,7 @@ export function createDefaultZone(type, position = [0, 1, 0], options = {}) {
     type,
     label: options.label ?? (
       type === ZONE_TYPES.TRIGGER
-        ? (defaultTriggerEventId === TERMINAL_ZONE_EVENT_ID ? 'Terminal' : 'Trigger')
+        ? (TRIGGER_EVENT_LABELS[defaultTriggerEventId] ?? 'Trigger')
         : type === ZONE_TYPES.WHITEBOARD_SURFACE
           ? 'Whiteboard surface'
           : type === ZONE_TYPES.TERMINAL_SURFACE
@@ -393,6 +402,9 @@ export function getActiveInteractEventId(zones, activeTriggerIds) {
   }
   if (getActiveTriggerByEventId(zones, activeTriggerIds, WHITEBOARD_ZONE_EVENT_ID)) {
     return WHITEBOARD_ZONE_EVENT_ID;
+  }
+  if (getActiveTriggerByEventId(zones, activeTriggerIds, PHONE_ZONE_EVENT_ID)) {
+    return PHONE_ZONE_EVENT_ID;
   }
   return null;
 }

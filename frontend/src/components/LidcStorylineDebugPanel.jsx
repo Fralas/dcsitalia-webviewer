@@ -1,6 +1,6 @@
 import { Copy, Download, Link2, Plus, RotateCcw, Save, Trash2, Unlink, X } from 'lucide-react';
 import { DEBUG_TARGETS } from '../utils/lidcStorylineTransform';
-import { TERMINAL_ZONE_EVENT_ID, WHITEBOARD_ZONE_EVENT_ID, ZONE_TYPES } from '../utils/lidcStorylineZones';
+import { PHONE_ZONE_EVENT_ID, TERMINAL_ZONE_EVENT_ID, WHITEBOARD_ZONE_EVENT_ID, ZONE_TYPES } from '../utils/lidcStorylineZones';
 import { t } from '../utils/locale';
 
 function NumberField({ label, value, step = 0.01, onChange }) {
@@ -194,6 +194,7 @@ export default function LidcStorylineDebugPanel({
                   <option value="">{t('lidc.storyline.debug.zoneEventNone')}</option>
                   <option value={WHITEBOARD_ZONE_EVENT_ID}>{WHITEBOARD_ZONE_EVENT_ID}</option>
                   <option value={TERMINAL_ZONE_EVENT_ID}>{TERMINAL_ZONE_EVENT_ID}</option>
+                  <option value={PHONE_ZONE_EVENT_ID}>{PHONE_ZONE_EVENT_ID}</option>
                 </select>
               </label>
             )}
@@ -267,6 +268,15 @@ export default function LidcStorylineDebugPanel({
             >
               <Plus size={14} />
               {t('lidc.storyline.debug.addTerminalTriggerZone')}
+            </button>
+            <button
+              type="button"
+              className="lidc-storyline-debug-zone-add is-trigger"
+              onClick={() => onAddZone(ZONE_TYPES.TRIGGER, { eventId: PHONE_ZONE_EVENT_ID, label: 'Phone' })}
+              title={t('lidc.storyline.debug.addPhoneTriggerZone')}
+            >
+              <Plus size={14} />
+              {t('lidc.storyline.debug.addPhoneTriggerZone')}
             </button>
             <button
               type="button"
