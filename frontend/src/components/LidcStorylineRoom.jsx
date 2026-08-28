@@ -26,6 +26,9 @@ import './LidcStorylineRoom.css';
 const MOVE_SPEED = 3.2;
 const FLOOR_RAY_START_OFFSET = 2;
 const ROOM_WALL_MARGIN = 0.8;
+const PLAYER_COLLISION_RADIUS = 0.35;
+const PLAYER_BODY_RAY_HEIGHT = 1;
+const WALL_NORMAL_MAX_Y = 0.55;
 const LOOK_SENSITIVITY = 0.002;
 const MAX_PITCH = Math.PI / 2.2;
 const WHITEBOARD_TARGET_WIDTH = 1.75;
@@ -78,6 +81,50 @@ function getFloorYAt(x, z, roomBounds, floorMeshes, raycaster, floorRayOrigin, f
   }
 
   return bestY ?? roomBounds.min.y;
+}
+
+function getWorldNormal(hit, target) {
+  if (hit.normal) {
+    target.copy(hit.normal);
+    return target;
+  }
+
+  if (hit.face?.normal) {
+    target.copy(hit.face.normal);
+    hit.object.localToWorldDirection(target);
+    return target;
+  }
+
+  return null;
+}
+
+function resolveHorizontalCollision(from, to, collisionMeshes, raycaster, normalScratch) {
+  const movement = to.clone().sub(from);
+  movement.y = 0;
+  if (movement.lengthSq() < 1e-8 || collisionMeshes.length === 0) {
+    return to;
+  }
+
+  const direction = movement.clone().normalize();
+  const distance = movement.length();
+  const origin = from.clone();
+  origin.y -= PLAYER_BODY_RAY_HEIGHT;
+
+  raycaster.set(origin, direction);
+  raycaster.far = distance + PLAYER_COLLISION_RADIUS;
+  const hits = raycaster.intersectObjects(collisionMeshes, true);
+
+  for (const hit of hits) {
+    const normal = getWorldNormal(hit, normalScratch);
+    if (!normal || Math.abs(normal.y) > WALL_NORMAL_MAX_Y) continue;
+
+    if (hit.distance <= distance + PLAYER_COLLISION_RADIUS) {
+      const allowed = Math.max(0, hit.distance - PLAYER_COLLISION_RADIUS);
+      return from.clone().add(direction.multiplyScalar(allowed));
+    }
+  }
+
+  return to;
 }
 
 function recenterObject(object) {
@@ -360,12 +407,22 @@ export default function LidcStorylineRoom({ onClose }) {
     const floorRayOrigin = new THREE.Vector3();
     const floorNormal = new THREE.Vector3();
     const floorMeshes = [];
+    const collisionMeshes = [];
     const whiteboardMeshes = [];
     let roomBounds = null;
 
+    const syncCollisionMeshes = () => {
+      collisionMeshes.length = 0;
+      collisionMeshes.push(...floorMeshes, ...whiteboardMeshes);
+    };
+
     const refreshRoomBounds = () => {
       roomContentGroup.updateMatrixWorld(true);
+      whiteboardGroup?.updateMatrixWorld(true);
       roomBounds = new THREE.Box3().setFromObject(roomContentGroup);
+      if (whiteboardGroup) {
+        roomBounds.union(new THREE.Box3().setFromObject(whiteboardGroup));
+      }
       if (!roomBounds.isEmpty()) {
         const roomSize = roomBounds.getSize(new THREE.Vector3());
         scene.fog = new THREE.Fog(0x1a1a1a, roomSize.length() * 0.8, roomSize.length() * 3.5);
@@ -384,6 +441,14 @@ export default function LidcStorylineRoom({ onClose }) {
       refreshRoomBounds();
     };
 
+    const applyLoadedSceneTransform = (config) => {
+      applyObjectTransform(roomContentGroup, config.room);
+      if (whiteboardGroup) {
+        applyObjectTransform(whiteboardGroup, config.whiteboard);
+      }
+      refreshRoomBounds();
+    };
+
     const readSceneTransformFromGroups = () => readSceneTransform(
       roomContentGroup,
       whiteboardGroup,
@@ -393,11 +458,14 @@ export default function LidcStorylineRoom({ onClose }) {
     const resetWhiteboardPlacement = () => {
       if (!whiteboardGroup || !autoWhiteboardTransform) return;
       applyObjectTransform(whiteboardGroup, autoWhiteboardTransform);
+      refreshRoomBounds();
+      syncCollisionMeshes();
     };
 
     const applyPlayerTransform = (config) => {
       if (!roomBounds || roomBounds.isEmpty()) return;
 
+      roomContentGroup.updateMatrixWorld(true);
       const center = roomBounds.getCenter(new THREE.Vector3());
       const spawnX = THREE.MathUtils.clamp(
         center.x + config.player.spawnOffset[0],
@@ -435,6 +503,7 @@ export default function LidcStorylineRoom({ onClose }) {
       const config = transformRef.current;
       if (!config.player.snapToFloor || !roomBounds) return;
 
+      roomContentGroup.updateMatrixWorld(true);
       const floorY = getFloorYAt(
         camera.position.x,
         camera.position.z,
@@ -577,6 +646,7 @@ export default function LidcStorylineRoom({ onClose }) {
           }
         });
         roomRoot.add(whiteboardGroup);
+        syncCollisionMeshes();
 
         refreshRoomBounds();
         if (!roomBounds || roomBounds.isEmpty()) {
@@ -594,12 +664,13 @@ export default function LidcStorylineRoom({ onClose }) {
         }
 
         const initialTransform = loadSavedTransform();
-        applyObjectTransform(roomContentGroup, initialTransform.room);
 
         if (storedTransform?.whiteboard) {
-          applyObjectTransform(whiteboardGroup, initialTransform.whiteboard);
+          applyLoadedSceneTransform(initialTransform);
         } else {
+          applyObjectTransform(roomContentGroup, initialTransform.room);
           initialTransform.whiteboard = readObjectTransform(whiteboardGroup);
+          refreshRoomBounds();
         }
 
         transformRef.current = initialTransform;
@@ -732,6 +803,8 @@ export default function LidcStorylineRoom({ onClose }) {
 
     const clock = new THREE.Clock();
 
+    const wallNormalScratch = new THREE.Vector3();
+
     const animate = () => {
       frameId = requestAnimationFrame(animate);
       const delta = clock.getDelta();
@@ -751,7 +824,20 @@ export default function LidcStorylineRoom({ onClose }) {
 
         if (movement.lengthSq() > 0) {
           movement.normalize().multiplyScalar(MOVE_SPEED * delta);
-          camera.position.add(movement);
+          roomContentGroup.updateMatrixWorld(true);
+          whiteboardGroup?.updateMatrixWorld(true);
+
+          const from = camera.position.clone();
+          const desired = from.clone().add(movement);
+          const resolved = resolveHorizontalCollision(
+            from,
+            desired,
+            collisionMeshes,
+            raycaster,
+            wallNormalScratch,
+          );
+
+          camera.position.copy(resolved);
         }
 
         camera.position.x = THREE.MathUtils.clamp(
