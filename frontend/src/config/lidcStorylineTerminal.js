@@ -2,6 +2,13 @@ import { t } from '../utils/locale';
 
 export const RATOS_OS_NAME = 'RatOS';
 
+export {
+  BIOS_SPLASH_DURATION_MS,
+  buildBiosProgressBar,
+  RATOS_BIOS_LOGO_ART,
+  RATOS_BIOS_TITLE_ART,
+} from './lidcStorylineTerminalBiosArt';
+
 export const RATOS_ASCII_BANNER = [
   '    ____        __  ____  _____',
   '   / __ \\____ _/ /_/ __ \\/ ___/',

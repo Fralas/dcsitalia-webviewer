@@ -1,64 +1,439 @@
+.lidc-ratos-filters {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
 .lidc-ratos-stage {
+  --mac-cream: #ece9de;
+  --mac-cream-light: #f6f4ec;
+  --mac-cream-mid: #e3dfd3;
+  --mac-cream-dark: #cfc9bb;
+  --mac-cream-shadow: #b8b1a3;
+  --mac-inset: #8a8578;
+  --mac-label: #4a4842;
+  --ratos-screen: #010803;
+
   position: fixed;
   inset: 0;
   z-index: 7;
-  display: grid;
-  place-items: center;
-  padding: clamp(8px, 1.5vw, 16px);
-  background:
-    radial-gradient(circle at 50% 20%, rgba(22, 40, 24, 0.35), rgba(0, 0, 0, 0.94) 68%),
-    #030403;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  background: var(--mac-cream);
   animation: lidc-ratos-enter 360ms ease;
 }
 
 @keyframes lidc-ratos-enter {
   from {
     opacity: 0;
-    transform: scale(1.015);
   }
   to {
     opacity: 1;
-    transform: scale(1);
   }
 }
 
-.lidc-ratos-monitor {
-  position: relative;
-  width: min(1280px, calc(100vw - 20px));
-  height: min(900px, calc(100vh - 28px));
-  border-radius: 20px;
-  padding: 16px;
-  background: linear-gradient(180deg, #2f2f2f 0%, #121212 100%);
-  box-shadow:
-    0 32px 90px rgba(0, 0, 0, 0.72),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+.lidc-ratos-workstation {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
 }
 
-.lidc-ratos-monitor::before {
+.lidc-ratos-screen-frame {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background:
+    linear-gradient(180deg, var(--mac-cream-light) 0%, var(--mac-cream) 18%, var(--mac-cream-mid) 82%, var(--mac-cream-dark) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+}
+
+.lidc-ratos-screen-frame::before {
   content: '';
   position: absolute;
-  inset: 12px;
-  border-radius: 14px;
+  inset: 0;
   pointer-events: none;
-  box-shadow: inset 0 0 48px rgba(0, 0, 0, 0.62);
+  z-index: 1;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.04) 0,
+      rgba(255, 255, 255, 0.04) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+  opacity: 0.25;
+}
+
+.lidc-ratos-frame-grime {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  opacity: 0.92;
+  background:
+    radial-gradient(ellipse 110px 70px at 3% 8%, rgba(108, 96, 72, 0.34) 0%, transparent 72%),
+    radial-gradient(ellipse 85px 120px at 1.5% 42%, rgba(92, 82, 62, 0.28) 0%, transparent 74%),
+    radial-gradient(ellipse 95px 65px at 2% 78%, rgba(118, 104, 78, 0.32) 0%, transparent 70%),
+    radial-gradient(ellipse 88px 55px at 1% 94%, rgba(84, 76, 58, 0.36) 0%, transparent 68%),
+    radial-gradient(ellipse 100px 75px at 97% 6%, rgba(102, 92, 70, 0.3) 0%, transparent 71%),
+    radial-gradient(ellipse 75px 110px at 98.5% 38%, rgba(88, 80, 60, 0.26) 0%, transparent 73%),
+    radial-gradient(ellipse 90px 60px at 96% 72%, rgba(112, 98, 74, 0.31) 0%, transparent 69%),
+    radial-gradient(ellipse 80px 50px at 98% 92%, rgba(96, 86, 66, 0.33) 0%, transparent 67%),
+    radial-gradient(ellipse 140px 35px at 50% 0.5%, rgba(100, 90, 68, 0.18) 0%, transparent 75%),
+    radial-gradient(ellipse 160px 40px at 50% 99.5%, rgba(94, 84, 64, 0.22) 0%, transparent 76%),
+    radial-gradient(ellipse 45px 38px at 12% 18%, rgba(78, 70, 54, 0.2) 0%, transparent 70%),
+    radial-gradient(ellipse 52px 42px at 88% 22%, rgba(82, 74, 56, 0.19) 0%, transparent 68%),
+    radial-gradient(ellipse 38px 30px at 6% 58%, rgba(124, 110, 82, 0.16) 0%, transparent 72%),
+    radial-gradient(ellipse 42px 34px at 93% 61%, rgba(116, 102, 76, 0.17) 0%, transparent 70%);
+  mix-blend-mode: multiply;
+}
+
+.lidc-ratos-frame-grime::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(72, 64, 48, 0.14) 0%, transparent 5%, transparent 95%, rgba(72, 64, 48, 0.14) 100%),
+    linear-gradient(180deg, rgba(68, 60, 46, 0.1) 0%, transparent 4%, transparent 96%, rgba(68, 60, 46, 0.12) 100%);
+}
+
+.lidc-ratos-frame-grime::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.45;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='5' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.55'/%3E%3C/svg%3E");
+  background-size: 220px 220px;
+  mix-blend-mode: multiply;
+}
+
+.lidc-ratos-frame-top,
+.lidc-ratos-frame-bottom {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+}
+
+.lidc-ratos-frame-top::after,
+.lidc-ratos-frame-bottom::after,
+.lidc-ratos-frame-body::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+
+.lidc-ratos-frame-top::after {
+  background:
+    radial-gradient(ellipse 55px 28px at 8% 70%, rgba(98, 88, 66, 0.28) 0%, transparent 72%),
+    radial-gradient(ellipse 40px 22px at 22% 30%, rgba(88, 78, 58, 0.2) 0%, transparent 68%),
+    radial-gradient(ellipse 48px 26px at 92% 55%, rgba(94, 84, 62, 0.24) 0%, transparent 70%);
+}
+
+.lidc-ratos-frame-bottom::after {
+  background:
+    radial-gradient(ellipse 70px 32px at 18% 35%, rgba(104, 92, 68, 0.3) 0%, transparent 72%),
+    radial-gradient(ellipse 50px 24px at 8% 68%, rgba(86, 76, 56, 0.26) 0%, transparent 68%),
+    radial-gradient(ellipse 60px 28px at 78% 40%, rgba(96, 86, 64, 0.22) 0%, transparent 70%),
+    radial-gradient(ellipse 45px 20px at 94% 62%, rgba(90, 80, 60, 0.25) 0%, transparent 66%);
+}
+
+.lidc-ratos-frame-body::after {
+  background:
+    radial-gradient(ellipse 55px 140px at 0.5% 30%, rgba(100, 90, 68, 0.26) 0%, transparent 74%),
+    radial-gradient(ellipse 50px 130px at 99.5% 65%, rgba(96, 86, 64, 0.24) 0%, transparent 72%),
+    radial-gradient(ellipse 35px 25px at 4% 8%, rgba(82, 72, 54, 0.22) 0%, transparent 68%),
+    radial-gradient(ellipse 38px 28px at 96% 12%, rgba(80, 70, 52, 0.2) 0%, transparent 66%);
+}
+
+.lidc-ratos-frame-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: clamp(10px, 1.4vh, 16px) clamp(16px, 2vw, 28px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow:
+    inset 0 -1px 0 rgba(255, 255, 255, 0.45),
+    0 1px 0 rgba(0, 0, 0, 0.04);
+  font-family: 'IBM Plex Mono', 'Courier New', Courier, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.lidc-ratos-frame-bottom {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: clamp(16px, 3vw, 36px);
+  padding: clamp(12px, 1.8vh, 20px) clamp(16px, 2vw, 28px);
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 -1px 0 rgba(0, 0, 0, 0.05);
+}
+
+.lidc-ratos-brand {
+  font-size: clamp(0.68rem, 1.1vw, 0.78rem);
+  font-weight: 700;
+  color: var(--mac-label);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.lidc-ratos-indicators {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lidc-ratos-led {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.lidc-ratos-led.is-power {
+  background: #3fbf52;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.25),
+    0 0 5px rgba(63, 191, 82, 0.55);
+}
+
+.lidc-ratos-led.is-hdd {
+  background: #c4a035;
+  animation: lidc-ratos-hdd-blink 1.4s steps(2) infinite;
+}
+
+.lidc-ratos-frame-labels {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: clamp(12px, 2vw, 24px);
+  min-width: 0;
+  font-family: 'IBM Plex Mono', 'Courier New', Courier, monospace;
+  font-size: clamp(0.58rem, 0.95vw, 0.68rem);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(74, 72, 66, 0.72);
+}
+
+.lidc-ratos-model {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.lidc-ratos-serial {
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+.lidc-ratos-floppy-bay {
+  flex-shrink: 0;
+}
+
+.lidc-ratos-floppy-face {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 7px;
+  border-radius: 4px;
+  background:
+    linear-gradient(180deg, var(--mac-cream-dark) 0%, var(--mac-cream-shadow) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.12),
+    0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.lidc-ratos-floppy-face::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 40px 18px at 30% 80%, rgba(78, 68, 50, 0.32) 0%, transparent 72%),
+    radial-gradient(ellipse 28px 14px at 75% 25%, rgba(86, 76, 58, 0.24) 0%, transparent 68%);
+  mix-blend-mode: multiply;
+}
+
+.lidc-ratos-floppy-slot {
+  position: relative;
+  width: clamp(112px, 14vw, 168px);
+  height: clamp(14px, 1.8vh, 18px);
+  padding: 2px;
+  border-radius: 2px;
+  background:
+    linear-gradient(180deg, #6a665c 0%, #4a4740 100%);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.55),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.08),
+    0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.lidc-ratos-floppy-mouth {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 1px;
+  background:
+    linear-gradient(180deg, #1a1917 0%, #080807 55%, #151413 100%);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.85),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.lidc-ratos-floppy-mouth::before {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 50%;
+  height: 1px;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.lidc-ratos-floppy-slot::after {
+  content: '';
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  width: 3px;
+  height: 60%;
+  transform: translateY(-50%);
+  border-radius: 1px;
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.6);
+}
+
+.lidc-ratos-floppy-eject {
+  width: clamp(18px, 2.2vw, 24px);
+  height: clamp(18px, 2.2vw, 24px);
+  border-radius: 3px;
+  background:
+    linear-gradient(180deg, var(--mac-cream-light) 0%, var(--mac-cream-dark) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.15),
+    0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.lidc-ratos-floppy-eject::after {
+  content: '';
+  display: block;
+  width: 42%;
+  height: 42%;
+  margin: 29% auto 0;
+  border-top: 2px solid rgba(74, 72, 66, 0.65);
+  border-left: 2px solid rgba(74, 72, 66, 0.65);
+  transform: rotate(45deg) translateY(1px);
+}
+
+.lidc-ratos-frame-body {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(12px, 1.6vh, 18px) clamp(14px, 1.8vw, 22px);
+  background:
+    linear-gradient(180deg, var(--mac-cream-mid) 0%, var(--mac-cream) 40%, var(--mac-cream-dark) 100%);
+  box-shadow:
+    inset 0 3px 10px rgba(0, 0, 0, 0.08),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.lidc-ratos-screw {
+  position: absolute;
+  z-index: 4;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 35%, #c8c3b6 0%, #9a958a 45%, #6e6a62 100%);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.35),
+    0 1px 1px rgba(0, 0, 0, 0.2);
+}
+
+.lidc-ratos-screw::after {
+  content: '';
+  position: absolute;
+  inset: 4px 2px;
+  border-top: 1px solid rgba(0, 0, 0, 0.45);
+  transform: rotate(-28deg);
+}
+
+.lidc-ratos-screw.is-tl { top: 6px; left: 6px; }
+.lidc-ratos-screw.is-tr { top: 6px; right: 6px; }
+.lidc-ratos-screw.is-bl { bottom: 6px; left: 6px; }
+.lidc-ratos-screw.is-br { bottom: 6px; right: 6px; }
+
+.lidc-ratos-screen-aperture {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  padding: clamp(4px, 0.6vh, 6px);
+  border-radius: clamp(6px, 0.8vw, 10px);
+  background:
+    linear-gradient(180deg, var(--mac-inset) 0%, #5c5850 50%, var(--mac-inset) 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35),
+    inset 0 4px 12px rgba(0, 0, 0, 0.35),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.12),
+    0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 .lidc-ratos-screen {
   position: relative;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: clamp(4px, 0.6vw, 8px);
+  background: var(--ratos-screen);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.95),
+    inset 0 0 60px rgba(0, 0, 0, 0.6);
+}
+
+.lidc-ratos-screen-curve {
+  position: relative;
+  z-index: 1;
+  width: 100%;
   height: 100%;
   overflow: hidden;
-  border-radius: 12px;
-  background: #010803;
-  border: 1px solid rgba(86, 255, 126, 0.2);
-  box-shadow:
-    inset 0 0 100px rgba(36, 255, 96, 0.07),
-    0 0 30px rgba(52, 255, 112, 0.1);
+  border-radius: inherit;
+  transform: scale(0.975);
+  transform-origin: center center;
+  filter: url(#lidc-ratos-fisheye);
 }
 
 .lidc-ratos-screen-inner {
   position: relative;
-  z-index: 1;
+  box-sizing: border-box;
   height: 100%;
+  padding: 0 clamp(10px, 1.4vw, 18px);
   transform-origin: center center;
   animation: lidc-ratos-vcr-wobble 5.5s ease-in-out infinite;
   will-change: transform;
@@ -71,6 +446,27 @@
   z-index: 2;
   overflow: hidden;
   border-radius: inherit;
+}
+
+.lidc-ratos-tube-edge {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 36px rgba(0, 0, 0, 0.35),
+    inset 0 0 12px rgba(0, 0, 0, 0.2);
+  background:
+    radial-gradient(ellipse 96% 92% at 50% 50%, transparent 68%, rgba(0, 0, 0, 0.22) 88%, rgba(0, 0, 0, 0.5) 100%);
+}
+
+.lidc-ratos-glass {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 26%, transparent 74%, rgba(255, 255, 255, 0.02) 100%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, transparent 14%);
+  opacity: 0.55;
 }
 
 .lidc-ratos-scanlines {
@@ -126,8 +522,8 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at center, transparent 54%, rgba(0, 0, 0, 0.48) 100%),
-    radial-gradient(ellipse at 50% 0%, rgba(103, 255, 136, 0.08) 0%, transparent 42%);
+    radial-gradient(ellipse 94% 90% at 50% 50%, transparent 62%, rgba(0, 0, 0, 0.28) 86%, rgba(0, 0, 0, 0.48) 100%),
+    radial-gradient(ellipse at 50% 0%, rgba(103, 255, 136, 0.1) 0%, transparent 42%);
 }
 
 .lidc-ratos-flicker {
@@ -144,11 +540,95 @@
   height: 100%;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  padding: clamp(16px, 2vw, 24px) clamp(18px, 2.2vw, 28px) clamp(14px, 1.8vw, 20px);
+  padding:
+    clamp(18px, 2.2vh, 26px)
+    clamp(28px, 4vw, 48px)
+    clamp(16px, 2vh, 22px)
+    clamp(36px, 5vw, 56px);
   font-family: 'IBM Plex Mono', 'Courier New', Courier, monospace;
-  color: #67ff88;
-  text-shadow: 0 0 10px rgba(84, 255, 126, 0.38);
-  filter: contrast(1.08) brightness(1.04);
+  color: #a8ffbf;
+  text-shadow:
+    0 0 6px rgba(130, 255, 168, 0.85),
+    0 0 16px rgba(103, 255, 136, 0.55),
+    0 0 28px rgba(84, 255, 126, 0.28);
+  filter: contrast(1.1) brightness(1.18);
+}
+
+.lidc-ratos-body.is-image-open {
+  grid-template-rows: minmax(0, 1fr);
+  padding: 0;
+}
+
+.lidc-ratos-body.is-bios {
+  grid-template-rows: minmax(0, 1fr);
+  padding:
+    clamp(14px, 2vh, 22px)
+    clamp(20px, 3vw, 36px)
+    clamp(14px, 2vh, 22px)
+    clamp(28px, 4vw, 44px);
+  overflow: hidden;
+}
+
+.lidc-ratos-bios {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: none;
+  text-align: center;
+}
+
+.lidc-ratos-bios::-webkit-scrollbar {
+  display: none;
+}
+
+.lidc-ratos-bios-logo,
+.lidc-ratos-bios-title,
+.lidc-ratos-bios-progress {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-family: 'IBM Plex Mono', 'Courier New', Courier, monospace;
+  white-space: pre;
+  word-break: normal;
+  line-height: 1;
+  color: #d4ffdc;
+  text-shadow:
+    0 0 10px rgba(130, 255, 168, 0.85),
+    0 0 22px rgba(103, 255, 136, 0.55),
+    0 0 36px rgba(84, 255, 126, 0.3);
+}
+
+.lidc-ratos-bios-logo {
+  font-size: clamp(0.32rem, 0.58vw, 0.46rem);
+  margin-bottom: 0.65em;
+}
+
+.lidc-ratos-bios-title {
+  font-size: clamp(0.52rem, 0.95vw, 0.7rem);
+  margin-bottom: 1.4em;
+}
+
+.lidc-ratos-bios-label {
+  margin: 0 0 0.65em;
+  font-family: 'IBM Plex Mono', 'Courier New', Courier, monospace;
+  font-size: clamp(0.72rem, 1.1vw, 0.85rem);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(168, 255, 191, 0.88);
+  text-shadow:
+    0 0 8px rgba(130, 255, 168, 0.65),
+    0 0 16px rgba(103, 255, 136, 0.35);
+}
+
+.lidc-ratos-bios-progress {
+  font-size: clamp(0.72rem, 1.05vw, 0.86rem);
+  letter-spacing: 0.04em;
+  color: #a8ffbf;
 }
 
 .lidc-ratos-header {
@@ -158,11 +638,14 @@
   gap: 12px;
   margin-bottom: 14px;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(103, 255, 136, 0.2);
+  border-bottom: 1px solid rgba(130, 255, 168, 0.35);
   font-size: clamp(0.76rem, 1.1vw, 0.88rem);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(103, 255, 136, 0.72);
+  color: rgba(168, 255, 191, 0.92);
+  text-shadow:
+    0 0 8px rgba(130, 255, 168, 0.65),
+    0 0 18px rgba(103, 255, 136, 0.35);
 }
 
 .lidc-ratos-output {
@@ -181,7 +664,7 @@
   padding: 0;
   border: none;
   background: transparent;
-  color: #b6ffbe;
+  color: #d4ffdc;
   font-family: 'IBM Plex Mono', 'Courier New', Courier, monospace;
   font-size: clamp(0.68rem, 1.05vw, 0.82rem);
   line-height: 1;
@@ -190,8 +673,9 @@
   word-break: normal;
   overflow-x: auto;
   text-shadow:
-    0 0 12px rgba(103, 255, 136, 0.55),
-    0 0 24px rgba(103, 255, 136, 0.22);
+    0 0 10px rgba(130, 255, 168, 0.85),
+    0 0 22px rgba(103, 255, 136, 0.55),
+    0 0 36px rgba(84, 255, 126, 0.3);
 }
 
 .lidc-ratos-output::-webkit-scrollbar {
@@ -203,7 +687,10 @@
 }
 
 .lidc-ratos-line.is-dim {
-  color: rgba(103, 255, 136, 0.55);
+  color: rgba(168, 255, 191, 0.78);
+  text-shadow:
+    0 0 6px rgba(130, 255, 168, 0.5),
+    0 0 14px rgba(103, 255, 136, 0.28);
 }
 
 .lidc-ratos-line.is-error {
@@ -217,13 +704,16 @@
   gap: 10px;
   margin-top: 14px;
   padding-top: 12px;
-  border-top: 1px solid rgba(103, 255, 136, 0.2);
+  border-top: 1px solid rgba(130, 255, 168, 0.35);
   font-size: clamp(0.92rem, 1.35vw, 1.08rem);
 }
 
 .lidc-ratos-prompt {
-  color: #9dffaf;
+  color: #c8ffda;
   flex-shrink: 0;
+  text-shadow:
+    0 0 8px rgba(130, 255, 168, 0.75),
+    0 0 16px rgba(103, 255, 136, 0.4);
 }
 
 .lidc-ratos-input {
@@ -231,14 +721,40 @@
   border: none;
   outline: none;
   background: transparent;
-  color: #67ff88;
+  color: #a8ffbf;
   font: inherit;
-  caret-color: #67ff88;
-  text-shadow: 0 0 10px rgba(84, 255, 126, 0.38);
+  caret-color: #c8ffda;
+  text-shadow:
+    0 0 6px rgba(130, 255, 168, 0.85),
+    0 0 16px rgba(103, 255, 136, 0.55);
 }
 
 .lidc-ratos-input::selection {
-  background: rgba(103, 255, 136, 0.28);
+  background: rgba(130, 255, 168, 0.38);
+}
+
+.lidc-ratos-header.is-hidden {
+  display: none;
+}
+
+.lidc-ratos-image-view {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.lidc-ratos-image-view img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 
 @keyframes lidc-ratos-vcr-wobble {
@@ -290,12 +806,27 @@
   }
 }
 
+@keyframes lidc-ratos-hdd-blink {
+  0%, 100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 @media (max-width: 720px) {
-  .lidc-ratos-monitor {
-    width: 100%;
-    height: calc(100vh - 16px);
-    border-radius: 14px;
-    padding: 10px;
+  .lidc-ratos-frame-bottom {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .lidc-ratos-frame-labels {
+    justify-content: space-between;
+  }
+
+  .lidc-ratos-floppy-face {
+    width: fit-content;
   }
 }
 
@@ -304,7 +835,13 @@
   .lidc-ratos-noise,
   .lidc-ratos-chroma,
   .lidc-ratos-tracking,
-  .lidc-ratos-flicker {
+  .lidc-ratos-flicker,
+  .lidc-ratos-led.is-hdd {
     animation: none;
+  }
+
+  .lidc-ratos-screen-curve {
+    filter: none;
+    transform: none;
   }
 }

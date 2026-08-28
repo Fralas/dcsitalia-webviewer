@@ -1,4 +1,5 @@
 import { t } from '../utils/locale';
+import { getTerminalImageViewer, isTerminalImageFile } from './lidcStorylineTerminalImages';
 
 const ROOT = '/';
 
@@ -285,8 +286,37 @@ export function runRatosCommand(input, session = { cwd: ROOT }) {
         return { lines: [t('lidc.storyline.terminal.commands.catMissing', { file: (argText || '???').toUpperCase() })] };
       }
 
+      if (isTerminalImageFile(resolved.fileName)) {
+        return {
+          lines: t('lidc.storyline.terminal.commands.catImageHint', { file: resolved.fileName }),
+        };
+      }
+
       const content = readFileContent(resolved.fileName);
       return { lines: Array.isArray(content) ? content : [content] };
+    }
+
+    case 'view':
+    case 'display':
+    case 'show': {
+      const resolved = resolveFilePath(cwd, argText);
+      if (!resolved || !isTerminalImageFile(resolved.fileName)) {
+        return {
+          lines: [t('lidc.storyline.terminal.commands.viewMissing', { file: (argText || '???').toUpperCase() })],
+        };
+      }
+
+      const viewer = getTerminalImageViewer(resolved.fileName);
+      return {
+        lines: [],
+        imageViewer: {
+          src: viewer.src,
+        },
+      };
+    }
+
+    case 'close': {
+      return { closeImageViewer: true, lines: [] };
     }
 
     default:
