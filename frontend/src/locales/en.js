@@ -390,6 +390,7 @@ export default {
       whiteboardBody: 'Mission briefing content will appear here. Explore the room and interact with the whiteboard to follow the campaign storyline.',
       whiteboardPrompt: 'Press E to access the whiteboard',
       whiteboardExitHint: 'Esc to return to the room',
+      whiteboardNavHint: 'Scroll: zoom · Drag: pan the board',
       whiteboardItems: {
         abdulRahman: {
           label: 'Al-Safah',

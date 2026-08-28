@@ -390,6 +390,7 @@ export default {
       whiteboardBody: 'Qui comparirà il contenuto del briefing missione. Esplora la stanza e interagisci con la lavagna per seguire la storyline della campagna.',
       whiteboardPrompt: 'Premi E per accedere alla lavagna',
       whiteboardExitHint: 'Esc per tornare in stanza',
+      whiteboardNavHint: 'Rotella: zoom · Trascina: muovi la lavagna',
       whiteboardItems: {
         abdulRahman: {
           label: 'Al-Safah',

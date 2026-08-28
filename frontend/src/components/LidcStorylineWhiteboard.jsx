@@ -4,6 +4,15 @@ import { t } from '../utils/locale';
 import LidcStorylineWhiteboardString from './LidcStorylineWhiteboardString';
 import './LidcStorylineWhiteboard.css';
 
+const DEFAULT_VIEW_SCALE = 0.62;
+const MIN_VIEW_SCALE = 0.38;
+const MAX_VIEW_SCALE = 1.08;
+const ZOOM_SENSITIVITY = 0.0012;
+
+function clampViewScale(scale) {
+  return Math.min(MAX_VIEW_SCALE, Math.max(MIN_VIEW_SCALE, scale));
+}
+
 function renderParagraphs(text) {
   if (typeof text !== 'string' || !text.trim()) return null;
 
@@ -187,10 +196,84 @@ function CharacterDossier({ itemId }) {
 export default function LidcStorylineWhiteboard({ onClose }) {
   const [activeItemId, setActiveItemId] = useState(null);
   const [showExitHint, setShowExitHint] = useState(true);
+  const [viewScale, setViewScale] = useState(DEFAULT_VIEW_SCALE);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
   const contentRef = useRef(null);
+  const surfaceRef = useRef(null);
   const pinRefs = useRef({});
+  const panSessionRef = useRef(null);
+  const viewStateRef = useRef({ scale: DEFAULT_VIEW_SCALE, pan: { x: 0, y: 0 } });
 
   const activeItem = LIDC_STORYLINE_WHITEBOARD_ITEMS.find((item) => item.id === activeItemId) ?? null;
+
+  useEffect(() => {
+    viewStateRef.current = { scale: viewScale, pan };
+  }, [viewScale, pan]);
+
+  useEffect(() => {
+    const surface = surfaceRef.current;
+    if (!surface || activeItem) return undefined;
+
+    const onWheel = (event) => {
+      event.preventDefault();
+
+      const rect = surface.getBoundingClientRect();
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      const pointerX = event.clientX - rect.left - centerX;
+      const pointerY = event.clientY - rect.top - centerY;
+      const { scale, pan: currentPan } = viewStateRef.current;
+      const worldX = (pointerX - currentPan.x) / scale;
+      const worldY = (pointerY - currentPan.y) / scale;
+      const nextScale = clampViewScale(scale * Math.exp(-event.deltaY * ZOOM_SENSITIVITY));
+
+      setViewScale(nextScale);
+      setPan({
+        x: pointerX - worldX * nextScale,
+        y: pointerY - worldY * nextScale,
+      });
+    };
+
+    surface.addEventListener('wheel', onWheel, { passive: false });
+    return () => surface.removeEventListener('wheel', onWheel);
+  }, [activeItem]);
+
+  const onSurfacePointerDown = (event) => {
+    if (activeItem) return;
+    if (event.button !== 0 && event.button !== 1) return;
+    if (event.target.closest('.lidc-whiteboard-pin')) return;
+
+    event.preventDefault();
+    surfaceRef.current?.setPointerCapture(event.pointerId);
+    panSessionRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originPanX: pan.x,
+      originPanY: pan.y,
+    };
+    setIsPanning(true);
+  };
+
+  const onSurfacePointerMove = (event) => {
+    const session = panSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+
+    setPan({
+      x: session.originPanX + (event.clientX - session.startX),
+      y: session.originPanY + (event.clientY - session.startY),
+    });
+  };
+
+  const endPanSession = (event) => {
+    const session = panSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+
+    panSessionRef.current = null;
+    setIsPanning(false);
+    surfaceRef.current?.releasePointerCapture(event.pointerId);
+  };
 
   useEffect(() => {
     const hintTimer = window.setTimeout(() => setShowExitHint(false), 3200);
@@ -219,13 +302,29 @@ export default function LidcStorylineWhiteboard({ onClose }) {
   return (
     <div className="lidc-whiteboard-stage" role="dialog" aria-modal="true" aria-label={t('lidc.storyline.whiteboardTitle')}>
       <div className="lidc-whiteboard-frame">
-        <div className="lidc-whiteboard-surface">
+        <div
+          className={`lidc-whiteboard-surface ${isPanning ? 'is-panning' : ''}`}
+          ref={surfaceRef}
+          onPointerDown={onSurfacePointerDown}
+          onPointerMove={onSurfacePointerMove}
+          onPointerUp={endPanSession}
+          onPointerCancel={endPanSession}
+          onContextMenu={(event) => {
+            if (event.button === 1) event.preventDefault();
+          }}
+        >
           <div className="lidc-whiteboard-grime" aria-hidden="true" />
           <div className="lidc-whiteboard-scuffs" aria-hidden="true" />
           <div className="lidc-whiteboard-vignette" aria-hidden="true" />
           <div className="lidc-whiteboard-chalk-dust" aria-hidden="true" />
 
-          <div className="lidc-whiteboard-content" ref={contentRef}>
+          <div
+            className="lidc-whiteboard-content"
+            ref={contentRef}
+            style={{
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${viewScale})`,
+            }}
+          >
             {LIDC_STORYLINE_WHITEBOARD_ITEMS.map((item) => (
               <button
                 key={item.id}
@@ -291,7 +390,10 @@ export default function LidcStorylineWhiteboard({ onClose }) {
       )}
 
       {showExitHint && !activeItem && (
-        <p className="lidc-whiteboard-exit-hint">{t('lidc.storyline.whiteboardExitHint')}</p>
+        <p className="lidc-whiteboard-exit-hint">
+          {t('lidc.storyline.whiteboardExitHint')}
+          <span className="lidc-whiteboard-nav-hint">{t('lidc.storyline.whiteboardNavHint')}</span>
+        </p>
       )}
     </div>
   );
