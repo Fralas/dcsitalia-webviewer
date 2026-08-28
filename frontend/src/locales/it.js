@@ -401,7 +401,7 @@ export default {
         secureShell: 'Shell sicura',
         inputLabel: 'Comando terminale',
         prompt: 'ratos>',
-        readyHint: 'Digita HELP per i comandi disponibili.',
+        readyHint: 'Digita HELP per i comandi disponibili. Prova FILES o TREE.',
         exitHint: 'Esc · torna alla stanza',
         bootLines: [
           'RatOS BIOS v3.11 (C) 1989 RatWorks Ltd.',
@@ -419,13 +419,17 @@ export default {
             '  WHOAMI    Operatore corrente',
             '  HOSTNAME  Identificativo nodo',
             '  DATE      Data di sistema',
-            '  LS        Elenco directory',
-            '  CAT       Leggi un file (prova README.TXT)',
+            '  LS        Elenco directory corrente',
+            '  DIR       Come LS',
+            '  CD        Cambia directory (CD DOCUMENTS)',
+            '  TREE      Albero directory',
+            '  FILES     Elenco di tutti i file',
+            '  CAT       Leggi un file (CAT MISSION.TXT)',
             '  UNAME     Informazioni sistema',
             '  EXIT      Chiudi terminale',
           ],
           whoami: ['operator@lidc-briefing'],
-          ls: ['README.TXT', 'LOGS/', 'COMMS/', 'ARCHIVE/'],
+          filesHeader: 'Volume in drive C: RATOS_STOR',
           readme: [
             'NODO BRIEFING LIDC — RISERVATO',
             'Questa workstation è collegata ai sistemi di intelligence sul campo.',
@@ -433,7 +437,72 @@ export default {
           ],
           uname: 'RatOS node 07 (i8086-compatible) — terminale briefing room',
           catMissing: 'cat: {file}: file non trovato',
+          cdMissing: 'cd: {path}: directory non trovata',
+          dirMissing: 'dir: {path}: directory non trovata',
           unknown: '{command}: comando non trovato',
+        },
+        files: {
+          readme: [
+            'NODO BRIEFING LIDC — RISERVATO',
+            'Questa workstation è collegata ai sistemi di intelligence sul campo.',
+            'Accessi non autorizzati sono monitorati.',
+          ],
+          mission: [
+            'OPERAZIONE LIDC — BRIEFING FASE 2',
+            'Verificare i collegamenti in lavagna prima del dispiegamento.',
+            'Todo il traffico in uscita è registrato.',
+          ],
+          personnel: [
+            '12:04  operator@lidc-briefing  LOGIN',
+            '12:17  operator@lidc-briefing  VIEW DOCUMENTS\\MISSION.TXT',
+            '12:19  operator@lidc-briefing  VIEW PHOTO\\OP0147.IMG',
+          ],
+          fieldNotes: [
+            'Movimenti soggetto aumentati vicino griglia 42N 69E.',
+            'Raccomandata ulteriore raccolta SIGINT.',
+          ],
+          photoOp0147: [
+            '[DATI IMMAGINE BINARI — OP0147.IMG]',
+            'Didascalia: Osservazione tetto — muro sud compound.',
+            'Classificazione: RISERVATO',
+          ],
+          photoIntercept032: [
+            '[DATI IMMAGINE BINARI — INTERCEPT_032.IMG]',
+            'Didascalia: Match parziale volto — cross-ref archivio pending.',
+          ],
+          photoContact01: [
+            '[FRAME RAW SENSORE — CONTACT_01.RAW]',
+            'Didascalia: Maschio non identificato, distretto mercato, 06:14 local.',
+          ],
+          photoRoofCam: [
+            '[FRAME RAW SENSORE — ROOF_CAM.RAW]',
+            'Didascalia: Test pattern cam statica — calibrazione OK.',
+          ],
+          accessLog: [
+            '08:01  SYSTEM       BOOT RatOS v3.11',
+            '08:02  OPERATOR     SESSION OPEN',
+          ],
+          systemLog: [
+            'WARN  ventola2 sotto soglia',
+            'INFO  listener secure shell attivo',
+          ],
+          freqList: [
+            '142.760 MHz — guardia',
+            '241.020 MHz — traffico burst',
+            '433.920 MHz — relay locale',
+          ],
+          lastTx: [
+            'ULTIMO OUTBOUND: 07:58Z',
+            'ROUTE: COMMS\\FREQ_LIST.TXT -> uplink A',
+          ],
+          caseArchive: [
+            '[ARCHIVIO CASE_1187.ZIP — CRIPTATO]',
+            'Usare terminale di estrazione autorizzato.',
+          ],
+          oldManifest: [
+            'Revisione manifest 1987-11-03',
+            'Elementi trasferiti in ARCHIVE\\.',
+          ],
         },
       },
       whiteboardItems: {

@@ -401,7 +401,7 @@ export default {
         secureShell: 'Secure shell',
         inputLabel: 'Terminal command',
         prompt: 'ratos>',
-        readyHint: 'Type HELP for available commands.',
+        readyHint: 'Type HELP for available commands. Try FILES or TREE.',
         exitHint: 'Esc · return to the room',
         bootLines: [
           'RatOS BIOS v3.11 (C) 1989 RatWorks Ltd.',
@@ -419,13 +419,17 @@ export default {
             '  WHOAMI    Current operator',
             '  HOSTNAME  Node identifier',
             '  DATE      System date',
-            '  LS        List directory',
-            '  CAT       Read a file (try README.TXT)',
+            '  LS        List current directory',
+            '  DIR       Same as LS',
+            '  CD        Change directory (CD DOCUMENTS)',
+            '  TREE      Directory tree',
+            '  FILES     List every file on disk',
+            '  CAT       Read a file (CAT MISSION.TXT)',
             '  UNAME     System information',
             '  EXIT      Close terminal',
           ],
           whoami: ['operator@lidc-briefing'],
-          ls: ['README.TXT', 'LOGS/', 'COMMS/', 'ARCHIVE/'],
+          filesHeader: 'Volume in drive C: is RATOS_STOR',
           readme: [
             'LIDC BRIEFING NODE — RESTRICTED',
             'This workstation is linked to field intelligence systems.',
@@ -433,7 +437,72 @@ export default {
           ],
           uname: 'RatOS node 07 (i8086-compatible) — briefing room terminal',
           catMissing: 'cat: {file}: No such file',
+          cdMissing: 'cd: {path}: No such directory',
+          dirMissing: 'dir: {path}: No such directory',
           unknown: '{command}: command not found',
+        },
+        files: {
+          readme: [
+            'LIDC BRIEFING NODE — RESTRICTED',
+            'This workstation is linked to field intelligence systems.',
+            'Unauthorized access is monitored.',
+          ],
+          mission: [
+            'OPERATION LIDC — PHASE 2 BRIEFING',
+            'Review whiteboard links before field deployment.',
+            'All outbound traffic is logged.',
+          ],
+          personnel: [
+            '12:04  operator@lidc-briefing  LOGIN',
+            '12:17  operator@lidc-briefing  VIEW DOCUMENTS\\MISSION.TXT',
+            '12:19  operator@lidc-briefing  VIEW PHOTO\\OP0147.IMG',
+          ],
+          fieldNotes: [
+            'Subject movement increased near grid 42N 69E.',
+            'Recommend additional SIGINT collection.',
+          ],
+          photoOp0147: [
+            '[BINARY IMAGE DATA — OP0147.IMG]',
+            'Caption: Roofline observation — compound south wall.',
+            'Classification: RESTRICTED',
+          ],
+          photoIntercept032: [
+            '[BINARY IMAGE DATA — INTERCEPT_032.IMG]',
+            'Caption: Partial face match — archive cross-ref pending.',
+          ],
+          photoContact01: [
+            '[RAW SENSOR FRAME — CONTACT_01.RAW]',
+            'Caption: Unknown male, market district, 06:14 local.',
+          ],
+          photoRoofCam: [
+            '[RAW SENSOR FRAME — ROOF_CAM.RAW]',
+            'Caption: Static cam test pattern — lens calibration OK.',
+          ],
+          accessLog: [
+            '08:01  SYSTEM       BOOT RatOS v3.11',
+            '08:02  OPERATOR     SESSION OPEN',
+          ],
+          systemLog: [
+            'WARN  fan2 speed below threshold',
+            'INFO  secure shell listener active',
+          ],
+          freqList: [
+            '142.760 MHz — guard',
+            '241.020 MHz — burst traffic',
+            '433.920 MHz — local relay',
+          ],
+          lastTx: [
+            'LAST OUTBOUND: 07:58Z',
+            'ROUTE: COMMS\\FREQ_LIST.TXT -> uplink A',
+          ],
+          caseArchive: [
+            '[ARCHIVE CASE_1187.ZIP — ENCRYPTED]',
+            'Use authorized extraction terminal.',
+          ],
+          oldManifest: [
+            'Manifest revision 1987-11-03',
+            'Items transferred to ARCHIVE\\.',
+          ],
         },
       },
       whiteboardItems: {
