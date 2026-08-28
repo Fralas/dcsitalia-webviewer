@@ -1,0 +1,180 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+.lidc-phone-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(18px, 3.2vh, 32px);
+  overflow: hidden;
+  background: transparent;
+  user-select: none;
+  touch-action: none;
+  animation: lidc-phone-enter 280ms ease;
+}
+
+@keyframes lidc-phone-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.lidc-phone-dial {
+  position: relative;
+  z-index: 2;
+  width: min(88vw, 74vh);
+  aspect-ratio: 1;
+  flex-shrink: 0;
+  filter: drop-shadow(0 22px 40px rgba(0, 0, 0, 0.5));
+}
+
+.lidc-phone-base {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 38% 32%, #3d8a52 0%, #1f5c35 42%, #0f3a22 72%, #072416 100%);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.5),
+    inset 0 3px 2px rgba(190, 230, 198, 0.22),
+    inset 0 -6px 10px rgba(0, 0, 0, 0.4);
+}
+
+.lidc-phone-bezel {
+  position: absolute;
+  inset: 2.8%;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 210deg,
+    #5aad6c,
+    #1c5a32,
+    #6fbf7e,
+    #0e3a22,
+    #2f7a48,
+    #5aad6c
+  );
+  box-shadow:
+    inset 0 2px 1px rgba(220, 245, 224, 0.38),
+    inset 0 -3px 4px rgba(0, 20, 8, 0.45),
+    0 1px 2px rgba(0, 0, 0, 0.28);
+}
+
+.lidc-phone-card {
+  position: absolute;
+  inset: 8.2%;
+  z-index: 1;
+  overflow: hidden;
+  border-radius: 50%;
+  background: radial-gradient(circle at 42% 38%, #f3f4f2, #dfe3de 68%, #c5ccc4);
+  box-shadow:
+    inset 0 5px 14px rgba(0, 0, 0, 0.32),
+    inset 0 -2px 6px rgba(255, 255, 255, 0.18);
+}
+
+.lidc-phone-card-svg,
+.lidc-phone-wheel-svg,
+.lidc-phone-stop-wrap svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.lidc-phone-wheel {
+  position: absolute;
+  inset: 8.2%;
+  z-index: 2;
+  border-radius: 50%;
+  cursor: grab;
+  touch-action: none;
+  will-change: transform;
+}
+
+.lidc-phone-wheel.is-grabbed {
+  cursor: grabbing;
+}
+
+.lidc-phone-stop-wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.lidc-phone-stop-wrap g {
+  transform-origin: 50px 50px;
+  transform-box: view-box;
+  transition: transform 0.15s ease-out;
+}
+
+.lidc-phone-cap {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 4;
+  width: 20%;
+  height: 20%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle at 42% 36%, #f7f8f6, #dce1dc 52%, #b8c0b8 82%, #9aa49a);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.42),
+    inset 0 2px 1px rgba(255, 255, 255, 0.58),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.16);
+  cursor: pointer;
+}
+
+.lidc-phone-cap:active {
+  box-shadow:
+    inset 0 3px 6px rgba(0, 0, 0, 0.24),
+    0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.lidc-phone-cap span {
+  font-family: 'IBM Plex Sans', 'Helvetica Neue', sans-serif;
+  font-size: clamp(9px, 2.1vmin, 12px);
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #152018;
+  pointer-events: none;
+}
+
+.lidc-phone-readout {
+  position: relative;
+  z-index: 2;
+  min-height: 1.4em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: clamp(14px, 2.8vw, 18px);
+  font-weight: 400;
+  letter-spacing: 0.28em;
+  color: rgba(226, 232, 228, 0.7);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.75);
+}
+
+.lidc-phone-readout .has-number {
+  color: #e6ede8;
+}
+
+.lidc-phone-cursor {
+  display: inline-block;
+  width: 0.07em;
+  height: 0.95em;
+  margin-left: 5px;
+  vertical-align: text-bottom;
+  background: #c4d0c6;
+  animation: lidc-phone-blink 1.1s step-end infinite;
+}
+
+@keyframes lidc-phone-blink {
+  50% { opacity: 0; }
+}

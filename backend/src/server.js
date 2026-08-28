@@ -5400,6 +5400,13 @@ const watcher = chokidar.watch('*.csv', {
   cwd: CSV_DIR,
   persistent: true,
   ignoreInitial: true,
+  depth: 0,
+  ignored: [
+    '**/node_modules/**',
+    '**/.git/**',
+    '**/frontend/**',
+    '**/dist/**',
+  ],
   awaitWriteFinish: {
     stabilityThreshold: 1000,
     pollInterval: 100

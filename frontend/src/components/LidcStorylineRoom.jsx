@@ -9,6 +9,7 @@ import whiteboardModelUrl from '../../3D/LIDC/whiteboard.glb';
 import LidcStorylineDebugPanel from './LidcStorylineDebugPanel';
 import LidcStorylineWhiteboard from './LidcStorylineWhiteboard';
 import LidcStorylineTerminal from './LidcStorylineTerminal';
+import LidcStorylinePhone from './LidcStorylinePhone';
 import { LidcStorylineControlsHint, LidcStorylineInteractPrompt } from './LidcStorylineHud';
 import { t } from '../utils/locale';
 import {
@@ -256,6 +257,7 @@ export default function LidcStorylineRoom({ onClose }) {
   const debugOpenRef = useRef(false);
   const whiteboardOpenRef = useRef(false);
   const terminalOpenRef = useRef(false);
+  const phoneOpenRef = useRef(false);
   const cameraTransitionRef = useRef(null);
   const activeInteractEventRef = useRef(null);
   const debugTargetRef = useRef(DEBUG_TARGETS.WHITEBOARD);
@@ -273,6 +275,7 @@ export default function LidcStorylineRoom({ onClose }) {
   const [scaleLinked, setScaleLinked] = useState(true);
   const [whiteboardOpen, setWhiteboardOpen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
+  const [phoneOpen, setPhoneOpen] = useState(false);
   const [activeInteractEvent, setActiveInteractEvent] = useState(null);
   const [showControlsHint, setShowControlsHint] = useState(false);
   const [controlsHintFading, setControlsHintFading] = useState(false);
@@ -290,6 +293,10 @@ export default function LidcStorylineRoom({ onClose }) {
   useEffect(() => {
     whiteboardOpenRef.current = whiteboardOpen;
   }, [whiteboardOpen]);
+
+  useEffect(() => {
+    phoneOpenRef.current = phoneOpen;
+  }, [phoneOpen]);
 
   useEffect(() => {
     if (terminalOpen) {
@@ -738,7 +745,7 @@ export default function LidcStorylineRoom({ onClose }) {
     const isPointerLocked = () => document.pointerLockElement === lockElement;
 
     const requestPointerLock = () => {
-      if (disposed || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current || isTransformDragging || isCameraTransitioning()) return;
+      if (disposed || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current || phoneOpenRef.current || isTransformDragging || isCameraTransitioning()) return;
       if (isPointerLocked()) return;
       lockElement.requestPointerLock?.({ unadjustedMovement: true });
     };
@@ -1474,6 +1481,7 @@ export default function LidcStorylineRoom({ onClose }) {
         && !debugOpenRef.current
         && !whiteboardOpenRef.current
         && !terminalOpenRef.current
+        && !phoneOpenRef.current
         && !isCameraTransitioning()
       ) {
         const interactEvent = getActiveInteractEventId(
@@ -1491,6 +1499,14 @@ export default function LidcStorylineRoom({ onClose }) {
         if (activeInteractEventRef.current === TERMINAL_ZONE_EVENT_ID || canInteractWithTerminal()) {
           event.preventDefault();
           openTerminal();
+          return;
+        }
+
+        if (interactEvent === PHONE_ZONE_EVENT_ID || activeInteractEventRef.current === PHONE_ZONE_EVENT_ID) {
+          event.preventDefault();
+          setPhoneOpen(true);
+          setDebugOpen(false);
+          setActiveInteractEvent(null);
           return;
         }
       }
@@ -1580,7 +1596,7 @@ export default function LidcStorylineRoom({ onClose }) {
     };
 
     const onPointerDown = (event) => {
-      if (event.button !== 0 || isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current || isCameraTransitioning()) {
+      if (event.button !== 0 || isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current || phoneOpenRef.current || isCameraTransitioning()) {
         return;
       }
 
@@ -1592,7 +1608,7 @@ export default function LidcStorylineRoom({ onClose }) {
     };
 
     const onPointerUp = (event) => {
-      if (event.button !== 0 || isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current || isCameraTransitioning()) {
+      if (event.button !== 0 || isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current || phoneOpenRef.current || isCameraTransitioning()) {
         return;
       }
 
@@ -1606,7 +1622,7 @@ export default function LidcStorylineRoom({ onClose }) {
     };
 
     const onPointerMove = (event) => {
-      if (isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current || isCameraTransitioning()) return;
+      if (isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current || phoneOpenRef.current || isCameraTransitioning()) return;
       if (!isPointerLocked()) return;
 
       queueLookDelta(event.movementX, event.movementY);
@@ -1614,7 +1630,7 @@ export default function LidcStorylineRoom({ onClose }) {
     };
 
     const onPointerRawUpdate = (event) => {
-      if (isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current || isCameraTransitioning()) return;
+      if (isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current || phoneOpenRef.current || isCameraTransitioning()) return;
       if (!isPointerLocked()) return;
 
       if (typeof event.getCoalescedEvents === 'function') {
@@ -1651,6 +1667,7 @@ export default function LidcStorylineRoom({ onClose }) {
         && !isTransformDragging
         && !whiteboardOpenRef.current
         && !terminalOpenRef.current
+        && !phoneOpenRef.current
         && !transitioning
       ) {
         direction.set(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -1812,11 +1829,20 @@ export default function LidcStorylineRoom({ onClose }) {
 
     const onKeyDown = (event) => {
       const terminalActive = terminalOpen || terminalOpenRef.current;
+      const phoneActive = phoneOpen || phoneOpenRef.current;
 
       if (terminalActive) {
         if (event.key === 'Escape') {
           event.preventDefault();
           sceneApiRef.current?.closeTerminal?.();
+        }
+        return;
+      }
+
+      if (phoneActive) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          setPhoneOpen(false);
         }
         return;
       }
@@ -1849,6 +1875,10 @@ export default function LidcStorylineRoom({ onClose }) {
           setWhiteboardOpen(false);
           return;
         }
+        if (phoneOpen) {
+          setPhoneOpen(false);
+          return;
+        }
         if (debugOpen) {
           setDebugOpen(false);
           return;
@@ -1859,13 +1889,13 @@ export default function LidcStorylineRoom({ onClose }) {
 
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [debugOpen, whiteboardOpen, terminalOpen, onClose]);
+  }, [debugOpen, whiteboardOpen, terminalOpen, phoneOpen, onClose]);
 
   useEffect(() => {
     const api = sceneApiRef.current;
     if (!api) return undefined;
 
-    if (debugOpen || whiteboardOpen || terminalOpen || loading || loadError) {
+    if (debugOpen || whiteboardOpen || terminalOpen || phoneOpen || loading || loadError) {
       api.exitPointerLock?.();
       return undefined;
     }
@@ -1877,7 +1907,7 @@ export default function LidcStorylineRoom({ onClose }) {
 
     const frameId = window.requestAnimationFrame(() => api.requestPointerLock?.());
     return () => window.cancelAnimationFrame(frameId);
-  }, [debugOpen, whiteboardOpen, terminalOpen, loading, loadError]);
+  }, [debugOpen, whiteboardOpen, terminalOpen, phoneOpen, loading, loadError]);
 
   useEffect(() => {
     document.body.classList.add('lidc-storyline-open');
@@ -1898,7 +1928,7 @@ export default function LidcStorylineRoom({ onClose }) {
   }, []);
 
   return (
-    <div className={`lidc-storyline-root ${debugOpen ? 'is-debug-open' : ''} ${whiteboardOpen ? 'is-whiteboard-open' : ''} ${terminalOpen ? 'is-terminal-open' : ''}`} role="dialog" aria-modal="true" aria-label={t('lidc.storyline.title')}>
+    <div className={`lidc-storyline-root ${debugOpen ? 'is-debug-open' : ''} ${whiteboardOpen ? 'is-whiteboard-open' : ''} ${terminalOpen ? 'is-terminal-open' : ''} ${phoneOpen ? 'is-phone-open' : ''}`} role="dialog" aria-modal="true" aria-label={t('lidc.storyline.title')}>
       <div ref={containerRef} className="lidc-storyline-canvas" />
 
       {loading && (
@@ -1920,7 +1950,7 @@ export default function LidcStorylineRoom({ onClose }) {
         </div>
       )}
 
-      {!loading && !loadError && !debugOpen && !whiteboardOpen && !terminalOpen && activeInteractEvent === WHITEBOARD_ZONE_EVENT_ID && (
+      {!loading && !loadError && !debugOpen && !whiteboardOpen && !terminalOpen && !phoneOpen && activeInteractEvent === WHITEBOARD_ZONE_EVENT_ID && (
         <LidcStorylineInteractPrompt
           keys="E"
           label={t('lidc.storyline.whiteboardPromptAction')}
@@ -1931,7 +1961,7 @@ export default function LidcStorylineRoom({ onClose }) {
         />
       )}
 
-      {!loading && !loadError && !debugOpen && !whiteboardOpen && !terminalOpen && activeInteractEvent === TERMINAL_ZONE_EVENT_ID && (
+      {!loading && !loadError && !debugOpen && !whiteboardOpen && !terminalOpen && !phoneOpen && activeInteractEvent === TERMINAL_ZONE_EVENT_ID && (
         <LidcStorylineInteractPrompt
           keys="E"
           label={t('lidc.storyline.terminalPromptAction')}
@@ -1939,21 +1969,26 @@ export default function LidcStorylineRoom({ onClose }) {
         />
       )}
 
-      {!loading && !loadError && !debugOpen && !whiteboardOpen && !terminalOpen && activeInteractEvent === PHONE_ZONE_EVENT_ID && (
+      {!loading && !loadError && !debugOpen && !whiteboardOpen && !terminalOpen && !phoneOpen && activeInteractEvent === PHONE_ZONE_EVENT_ID && (
         <LidcStorylineInteractPrompt
           keys="E"
           label={t('lidc.storyline.phonePromptAction')}
+          onActivate={() => {
+            setPhoneOpen(true);
+            setDebugOpen(false);
+            setActiveInteractEvent(null);
+          }}
         />
       )}
 
-      {!loading && !loadError && !debugOpen && !whiteboardOpen && !terminalOpen && !activeInteractEvent && showControlsHint && (
+      {!loading && !loadError && !debugOpen && !whiteboardOpen && !terminalOpen && !phoneOpen && !activeInteractEvent && showControlsHint && (
         <LidcStorylineControlsHint
           segments={t('lidc.storyline.controlsHint')}
           fadeOut={controlsHintFading}
         />
       )}
 
-      {!loading && !loadError && !whiteboardOpen && !terminalOpen && (
+      {!loading && !loadError && !whiteboardOpen && !terminalOpen && !phoneOpen && (
         <button
           type="button"
           className={`lidc-storyline-debug-toggle ${debugOpen ? 'is-active' : ''}`}
@@ -1967,7 +2002,7 @@ export default function LidcStorylineRoom({ onClose }) {
         </button>
       )}
 
-      {!loading && !loadError && debugOpen && !terminalOpen && (
+      {!loading && !loadError && debugOpen && !terminalOpen && !phoneOpen && (
         <LidcStorylineDebugPanel
           transform={transform}
           transformMode={transformMode}
@@ -2011,7 +2046,11 @@ export default function LidcStorylineRoom({ onClose }) {
         <LidcStorylineTerminal onClose={() => sceneApiRef.current?.closeTerminal?.()} />
       )}
 
-      {!whiteboardOpen && !terminalOpen && (
+      {phoneOpen && (
+        <LidcStorylinePhone onClose={() => setPhoneOpen(false)} />
+      )}
+
+      {!whiteboardOpen && !terminalOpen && !phoneOpen && (
         <button
           type="button"
           className="lidc-storyline-close"

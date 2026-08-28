@@ -397,6 +397,15 @@ export default {
       whiteboardNavHint: 'Scroll · zoom   Drag · pan the board',
       terminalPromptAction: 'Access the terminal',
       phonePromptAction: 'Use the phone',
+      phone: {
+        title: 'Rotary telephone',
+        empty: '––––',
+        composed: 'Number dialed: {{number}}',
+        digit: 'Dial {{digit}}',
+        dial: 'Rotary dial',
+        clear: 'Clear',
+        hint: 'Drag the dial clockwise to enter a number',
+      },
       terminal: {
         title: 'RatOS terminal',
         secureShell: 'Secure shell',

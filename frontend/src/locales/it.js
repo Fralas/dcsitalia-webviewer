@@ -397,6 +397,15 @@ export default {
       whiteboardNavHint: 'Rotella · zoom   Trascina · muovi la lavagna',
       terminalPromptAction: 'Accedi al terminale',
       phonePromptAction: 'Usa il telefono',
+      phone: {
+        title: 'Telefono a disco',
+        empty: '––––',
+        composed: 'Numero composto: {{number}}',
+        digit: 'Componi {{digit}}',
+        dial: 'Disco combinatore',
+        clear: 'Cancella',
+        hint: 'Trascina il disco in senso orario per comporre',
+      },
       terminal: {
         title: 'Terminale RatOS',
         secureShell: 'Shell sicura',
