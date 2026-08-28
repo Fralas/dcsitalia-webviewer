@@ -1163,6 +1163,8 @@ export default function LidcStorylineRoom({ onClose }) {
 
       exitPointerLock();
       initRatosTerminal();
+      renderTerminal3DScreens(zoneGroups, getRatosTerminalSnapshot());
+      lastTerminalRenderVersion = getRatosTerminalSnapshot().version;
 
       const focus = resolveTerminalCameraFocus();
       if (focus) {
@@ -1307,6 +1309,7 @@ export default function LidcStorylineRoom({ onClose }) {
     };
 
     let lastCameraReadoutAt = 0;
+    let lastTerminalRenderVersion = -1;
 
     let scaleAtDragStart = null;
 
@@ -1734,7 +1737,15 @@ export default function LidcStorylineRoom({ onClose }) {
         setCameraRotation(sceneApiRef.current?.readCameraPose?.().rotation ?? [0, 0, 0]);
       }
 
-      void renderTerminal3DScreens(zoneGroups, getRatosTerminalSnapshot());
+      const terminalSnapshot = getRatosTerminalSnapshot();
+      if (
+        terminalOpenRef.current
+        || terminalSnapshot.bootPhase === 'bios'
+        || terminalSnapshot.version !== lastTerminalRenderVersion
+      ) {
+        lastTerminalRenderVersion = terminalSnapshot.version;
+        renderTerminal3DScreens(zoneGroups, terminalSnapshot);
+      }
       renderer.render(scene, camera);
     };
 

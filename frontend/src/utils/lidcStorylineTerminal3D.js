@@ -32,28 +32,92 @@ const COLORS = {
   banner: '#d4ffdc',
 };
 
-const imageCache = new Map();
+const textureLoader = new THREE.TextureLoader();
 
-function loadCanvasImage(src) {
-  if (!src) return Promise.resolve(null);
-  if (imageCache.has(src)) {
-    const cached = imageCache.get(src);
-    return cached.complete ? Promise.resolve(cached) : new Promise((resolve) => {
-      cached.onload = () => resolve(cached);
-      cached.onerror = () => resolve(null);
-    });
+function resolveImageSrc(src) {
+  if (!src) return '';
+  if (typeof src === 'string') return src;
+  if (typeof src === 'object') {
+    if (typeof src.default === 'string') return src.default;
+    if (typeof src.src === 'string') return src.src;
+  }
+  return '';
+}
+
+function getScreenMesh(root) {
+  return root.getObjectByName('terminal-screen-mesh');
+}
+
+function restoreTerminalCanvasMap(root) {
+  const mesh = getScreenMesh(root);
+  if (!mesh || !root.userData.texture) return;
+
+  if (root.userData.imageTexture) {
+    root.userData.imageTexture.dispose();
+    root.userData.imageTexture = null;
   }
 
-  return new Promise((resolve) => {
-    const image = new Image();
-    image.crossOrigin = 'anonymous';
-    image.onload = () => {
-      imageCache.set(src, image);
-      resolve(image);
-    };
-    image.onerror = () => resolve(null);
-    image.src = src;
-  });
+  if (mesh.material.map !== root.userData.texture) {
+    mesh.material.map = root.userData.texture;
+    mesh.material.needsUpdate = true;
+  }
+
+  root.userData.activeImageSrc = null;
+}
+
+function applyTerminalImageMap(root, src) {
+  const resolvedSrc = resolveImageSrc(src);
+  if (!resolvedSrc) {
+    restoreTerminalCanvasMap(root);
+    return;
+  }
+
+  if (root.userData.activeImageSrc === resolvedSrc) {
+    if (root.userData.imageTexture) {
+      const mesh = getScreenMesh(root);
+      if (mesh && mesh.material.map !== root.userData.imageTexture) {
+        mesh.material.map = root.userData.imageTexture;
+        mesh.material.needsUpdate = true;
+      }
+    }
+    return;
+  }
+
+  root.userData.activeImageSrc = resolvedSrc;
+  root.userData.imageRequestId = (root.userData.imageRequestId ?? 0) + 1;
+  const requestId = root.userData.imageRequestId;
+
+  textureLoader.load(
+    resolvedSrc,
+    (texture) => {
+      if (root.userData.imageRequestId !== requestId) {
+        texture.dispose();
+        return;
+      }
+
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+
+      if (root.userData.imageTexture && root.userData.imageTexture !== root.userData.texture) {
+        root.userData.imageTexture.dispose();
+      }
+
+      root.userData.imageTexture = texture;
+
+      const mesh = getScreenMesh(root);
+      if (mesh) {
+        mesh.material.map = texture;
+        mesh.material.needsUpdate = true;
+      }
+    },
+    undefined,
+    () => {
+      if (root.userData.imageRequestId !== requestId) return;
+      root.userData.activeImageSrc = null;
+      restoreTerminalCanvasMap(root);
+    },
+  );
 }
 
 function orientMeshToSurface(mesh, mapping) {
@@ -143,7 +207,7 @@ function drawPreScaled(ctx, text, x, y, scale, color) {
   ctx.restore();
 }
 
-async function drawTerminalContent(ctx, canvas, snapshot) {
+function drawTerminalContent(ctx, canvas, snapshot) {
   const { width, height } = canvas;
 
   if (snapshot.bootPhase === 'idle') {
@@ -165,28 +229,6 @@ async function drawTerminalContent(ctx, canvas, snapshot) {
     ctx.fillText(t('lidc.storyline.terminal.biosLoading'), width * 0.1, height * 0.82);
     ctx.fillStyle = COLORS.text;
     ctx.fillText(buildBiosProgressBar(snapshot.biosProgress), width * 0.1, height * 0.86);
-    drawScanlines(ctx, width, height);
-    drawVignette(ctx, width, height);
-    return;
-  }
-
-  if (snapshot.imageViewer?.src) {
-    const image = await loadCanvasImage(snapshot.imageViewer.src);
-    if (image) {
-      const margin = width * 0.04;
-      const maxW = width - margin * 2;
-      const maxH = height - margin * 2;
-      const scale = Math.min(maxW / image.width, maxH / image.height);
-      const drawW = image.width * scale;
-      const drawH = image.height * scale;
-      ctx.drawImage(
-        image,
-        (width - drawW) / 2,
-        (height - drawH) / 2,
-        drawW,
-        drawH,
-      );
-    }
     drawScanlines(ctx, width, height);
     drawVignette(ctx, width, height);
     return;
@@ -283,6 +325,11 @@ async function drawTerminalContent(ctx, canvas, snapshot) {
 }
 
 function disposeScreenRoot(root) {
+  if (root.userData.imageTexture && root.userData.imageTexture !== root.userData.texture) {
+    root.userData.imageTexture.dispose();
+    root.userData.imageTexture = null;
+  }
+
   root.traverse((child) => {
     if (child.isMesh) {
       child.geometry?.dispose();
@@ -326,6 +373,9 @@ function createTerminalScreenRoot(zone) {
   root.userData.mapping = mapping;
   root.userData.zoneScale = [...zone.scale];
   root.userData.planeUsesUnitSpace = true;
+  root.userData.activeImageSrc = null;
+  root.userData.imageTexture = null;
+  root.userData.imageRequestId = 0;
   root.add(mesh);
   positionMeshOnSurface(mesh, mapping);
 
@@ -515,23 +565,28 @@ export function syncTerminal3DDecorations(zones, zoneGroups) {
   }
 }
 
-export async function renderTerminal3DScreens(zoneGroups, snapshot = getRatosTerminalSnapshot()) {
-  const tasks = [];
-
+export function renderTerminal3DScreens(zoneGroups, snapshot = getRatosTerminalSnapshot()) {
   zoneGroups.forEach((group) => {
     if (group.userData.zoneType !== ZONE_TYPES.TERMINAL_SURFACE) return;
     const root = group.getObjectByName('terminal-3d-screen');
     if (!root?.userData?.ctx) return;
 
-    const { ctx, canvas, texture } = root.userData;
-    tasks.push(
-      drawTerminalContent(ctx, canvas, snapshot).then(() => {
-        texture.needsUpdate = true;
-      }),
-    );
-  });
+    if (snapshot.imageViewer?.src) {
+      applyTerminalImageMap(root, snapshot.imageViewer.src);
+      return;
+    }
 
-  await Promise.all(tasks);
+    restoreTerminalCanvasMap(root);
+
+    root.userData.renderGeneration = (root.userData.renderGeneration ?? 0) + 1;
+    const generation = root.userData.renderGeneration;
+
+    const { ctx, canvas, texture } = root.userData;
+    drawTerminalContent(ctx, canvas, snapshot);
+    if (root.userData.renderGeneration === generation) {
+      texture.needsUpdate = true;
+    }
+  });
 }
 
 export function disposeTerminal3DDecorations(root) {
