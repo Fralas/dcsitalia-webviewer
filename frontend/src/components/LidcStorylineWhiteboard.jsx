@@ -42,6 +42,7 @@ export default function LidcStorylineWhiteboard({ onClose }) {
           <div className="lidc-whiteboard-vignette" aria-hidden="true" />
           <div className="lidc-whiteboard-chalk-dust" aria-hidden="true" />
 
+          <div className="lidc-whiteboard-content">
           {LIDC_STORYLINE_WHITEBOARD_ITEMS.map((item) => (
             <button
               key={item.id}
@@ -65,6 +66,7 @@ export default function LidcStorylineWhiteboard({ onClose }) {
               <span className="lidc-whiteboard-caption">{t(item.labelKey)}</span>
             </button>
           ))}
+          </div>
         </div>
       </div>
 

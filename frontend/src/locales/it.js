@@ -389,6 +389,29 @@ export default {
       whiteboardTitle: 'Lavagna operativa',
       whiteboardBody: 'Qui comparirà il contenuto del briefing missione. Esplora la stanza e interagisci con la lavagna per seguire la storyline della campagna.',
       whiteboardPrompt: 'Premi E per accedere alla lavagna',
+      whiteboardExitHint: 'Esc per tornare in stanza',
+      whiteboardItems: {
+        patrol: {
+          label: 'Percorso pattuglia',
+          title: 'Settore Alpha',
+          body: 'Blocco stradale da verificare prima del decollo delle rotazioni CAS.',
+        },
+        cas: {
+          label: 'Supporto aereo',
+          title: 'Stack CAS',
+          body: 'Finestra di impegno 14:20–14:45. Coordinare con JTAC sul canale dedicato.',
+        },
+        scout: {
+          label: 'Ricognizione',
+          title: 'Drone Scout',
+          body: 'Riprese aggiornate del perimetro nord. Controllare punti caldi segnati a pennarello.',
+        },
+        naval: {
+          label: 'Minaccia navale',
+          title: 'Contatto surface',
+          body: 'Possibile unità ostile in avvicinamento alla costa. Valutare dirottamento asset.',
+        },
+      },
       backToRoom: 'Torna alla stanza',
       debug: {
         toggle: 'Apri/chiudi debug layout (L)',

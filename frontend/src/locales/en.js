@@ -389,6 +389,29 @@ export default {
       whiteboardTitle: 'Operations whiteboard',
       whiteboardBody: 'Mission briefing content will appear here. Explore the room and interact with the whiteboard to follow the campaign storyline.',
       whiteboardPrompt: 'Press E to access the whiteboard',
+      whiteboardExitHint: 'Esc to return to the room',
+      whiteboardItems: {
+        patrol: {
+          label: 'Patrol route',
+          title: 'Sector Alpha',
+          body: 'Road block to inspect before CAS rotations launch.',
+        },
+        cas: {
+          label: 'Air support',
+          title: 'CAS stack',
+          body: 'Engagement window 14:20–14:45. Coordinate with JTAC on the dedicated channel.',
+        },
+        scout: {
+          label: 'Reconnaissance',
+          title: 'Scout drone',
+          body: 'Updated footage of the northern perimeter. Check marked hotspots.',
+        },
+        naval: {
+          label: 'Naval threat',
+          title: 'Surface contact',
+          body: 'Possible hostile unit approaching the coast. Consider asset diversion.',
+        },
+      },
       backToRoom: 'Back to room',
       debug: {
         toggle: 'Toggle layout debug (L)',
