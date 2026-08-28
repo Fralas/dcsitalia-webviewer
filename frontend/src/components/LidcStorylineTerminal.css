@@ -14,49 +14,65 @@
   --mac-inset: #8a8578;
   --mac-label: #4a4842;
   --ratos-screen: #010803;
+  /* Macintosh SE front face: 246 x 345 mm (9.69" x 13.6") */
+  --mac-se-w: 246;
+  --mac-se-h: 345;
+  --mac-bezel-top: 11%;
+  --mac-screen-band: 35%;
+  --mac-bezel-bottom: 54%;
+  --mac-bezel-side: 13.3%;
+  --mac-unit-width: min(520px, calc(100vw - 48px), calc((100dvh - 48px) * var(--mac-se-w) / var(--mac-se-h)));
 
   position: fixed;
   inset: 0;
   z-index: 7;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
-  padding: 0;
-  margin: 0;
+  display: grid;
+  place-items: center;
+  padding: clamp(16px, 3vw, 28px);
   overflow: hidden;
-  background: var(--mac-cream);
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 42%, rgba(36, 34, 30, 0.55), rgba(8, 8, 7, 0.98) 72%),
+    #121110;
   animation: lidc-ratos-enter 360ms ease;
 }
 
 @keyframes lidc-ratos-enter {
   from {
     opacity: 0;
+    transform: scale(0.985);
   }
   to {
     opacity: 1;
+    transform: scale(1);
   }
 }
 
 .lidc-ratos-workstation {
   display: flex;
   flex-direction: column;
-  width: 100%;
-  height: 100%;
+  align-items: center;
+  width: var(--mac-unit-width);
+  aspect-ratio: 246 / 345;
+  max-height: calc(100dvh - 48px);
   min-height: 0;
+  filter: drop-shadow(0 28px 56px rgba(0, 0, 0, 0.62));
 }
 
 .lidc-ratos-screen-frame {
   position: relative;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: var(--mac-bezel-top) var(--mac-screen-band) var(--mac-bezel-bottom);
   width: 100%;
   height: 100%;
   min-height: 0;
+  border-radius: 14px;
+  overflow: hidden;
   background:
     linear-gradient(180deg, var(--mac-cream-light) 0%, var(--mac-cream) 18%, var(--mac-cream-mid) 82%, var(--mac-cream-dark) 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.65),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+    inset 0 -2px 0 rgba(0, 0, 0, 0.1),
+    0 2px 0 rgba(255, 255, 255, 0.08);
 }
 
 .lidc-ratos-screen-frame::before {
@@ -123,7 +139,22 @@
 .lidc-ratos-frame-bottom {
   position: relative;
   z-index: 2;
-  flex-shrink: 0;
+  min-height: 0;
+}
+
+.lidc-ratos-frame-body {
+  position: relative;
+  z-index: 2;
+  grid-row: 2;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--mac-bezel-side);
+  background:
+    linear-gradient(180deg, var(--mac-cream-mid) 0%, var(--mac-cream) 40%, var(--mac-cream-dark) 100%);
+  box-shadow:
+    inset 0 3px 10px rgba(0, 0, 0, 0.08),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.05);
 }
 
 .lidc-ratos-frame-top::after,
@@ -163,8 +194,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: clamp(10px, 1.4vh, 16px) clamp(16px, 2vw, 28px);
+  gap: 12px;
+  padding: 0 14px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   box-shadow:
     inset 0 -1px 0 rgba(255, 255, 255, 0.45),
@@ -175,23 +206,83 @@
 }
 
 .lidc-ratos-frame-bottom {
-  display: grid;
-  grid-template-columns: auto 1fr;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: clamp(16px, 3vw, 36px);
-  padding: clamp(12px, 1.8vh, 20px) clamp(16px, 2vw, 28px);
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 16px 14px;
   border-top: 1px solid rgba(0, 0, 0, 0.12);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.5),
     0 -1px 0 rgba(0, 0, 0, 0.05);
 }
 
-.lidc-ratos-brand {
-  font-size: clamp(0.68rem, 1.1vw, 0.78rem);
-  font-weight: 700;
-  color: var(--mac-label);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+.lidc-ratos-frame-labels {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(10px, 2vw, 18px);
+  min-width: 0;
+  width: 100%;
+  font-family: 'IBM Plex Mono', 'Courier New', Courier, monospace;
+  font-size: clamp(0.52rem, 1.6vw, 0.62rem);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(74, 72, 66, 0.72);
+  text-align: center;
 }
+
+.lidc-ratos-brand-mark {
+  position: relative;
+  flex-shrink: 0;
+  isolation: isolate;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--mac-cream);
+  box-shadow:
+    inset 2px 3px 6px rgba(72, 64, 48, 0.28),
+    inset -1px -1px 2px rgba(255, 255, 255, 0.58),
+    0 1px 0 rgba(255, 255, 255, 0.42);
+}
+
+.lidc-ratos-brand-mark::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(180deg, var(--mac-cream-light) 0%, var(--mac-cream) 42%, var(--mac-cream-mid) 100%);
+}
+
+.lidc-ratos-brand-mark::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 28% 20%, rgba(255, 255, 255, 0.22) 0%, transparent 42%),
+    radial-gradient(circle at 72% 78%, rgba(72, 64, 48, 0.1) 0%, transparent 38%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+.lidc-ratos-brand-mark img {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.62;
+  filter: grayscale(1) sepia(0.28) saturate(0.4) brightness(2.15) contrast(2.35);
+  mix-blend-mode: multiply;
+}
+
 
 .lidc-ratos-indicators {
   display: flex;
@@ -217,19 +308,6 @@
 .lidc-ratos-led.is-hdd {
   background: #c4a035;
   animation: lidc-ratos-hdd-blink 1.4s steps(2) infinite;
-}
-
-.lidc-ratos-frame-labels {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: clamp(12px, 2vw, 24px);
-  min-width: 0;
-  font-family: 'IBM Plex Mono', 'Courier New', Courier, monospace;
-  font-size: clamp(0.58rem, 0.95vw, 0.68rem);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(74, 72, 66, 0.72);
 }
 
 .lidc-ratos-model {
@@ -346,21 +424,6 @@
   transform: rotate(45deg) translateY(1px);
 }
 
-.lidc-ratos-frame-body {
-  position: relative;
-  z-index: 2;
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  padding: clamp(12px, 1.6vh, 18px) clamp(14px, 1.8vw, 22px);
-  background:
-    linear-gradient(180deg, var(--mac-cream-mid) 0%, var(--mac-cream) 40%, var(--mac-cream-dark) 100%);
-  box-shadow:
-    inset 0 3px 10px rgba(0, 0, 0, 0.08),
-    inset 0 -2px 6px rgba(0, 0, 0, 0.05);
-}
-
 .lidc-ratos-screw {
   position: absolute;
   z-index: 4;
@@ -393,8 +456,8 @@
   flex: 1;
   min-height: 0;
   display: flex;
-  padding: clamp(4px, 0.6vh, 6px);
-  border-radius: clamp(6px, 0.8vw, 10px);
+  padding: 3px;
+  border-radius: 6px;
   background:
     linear-gradient(180deg, var(--mac-inset) 0%, #5c5850 50%, var(--mac-inset) 100%);
   box-shadow:
@@ -410,7 +473,7 @@
   width: 100%;
   min-height: 0;
   overflow: hidden;
-  border-radius: clamp(4px, 0.6vw, 8px);
+  border-radius: 6px;
   background: var(--ratos-screen);
   box-shadow:
     inset 0 0 0 1px rgba(0, 0, 0, 0.95),
@@ -816,13 +879,18 @@
 }
 
 @media (max-width: 720px) {
-  .lidc-ratos-frame-bottom {
-    grid-template-columns: 1fr;
-    gap: 10px;
+  .lidc-ratos-stage {
+    --mac-unit-width: min(calc(100vw - 24px), calc((100dvh - 24px) * var(--mac-se-w) / var(--mac-se-h)));
+    padding: 12px;
   }
 
-  .lidc-ratos-frame-labels {
-    justify-content: space-between;
+  .lidc-ratos-frame-top {
+    padding: 0 10px;
+  }
+
+  .lidc-ratos-frame-bottom {
+    padding: 10px 12px 12px;
+    gap: 8px;
   }
 
   .lidc-ratos-floppy-face {
@@ -844,4 +912,24 @@
     filter: none;
     transform: none;
   }
+}
+
+.lidc-ratos-input-capture {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.lidc-ratos-input-capture-form {
+  pointer-events: auto;
+}
+
+.lidc-ratos-input-capture-field {
+  position: fixed;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: auto;
 }

@@ -1,10 +1,22 @@
 import * as THREE from 'three';
 import { applyObjectTransform, readObjectTransform } from './lidcStorylineTransform';
 
+const SURFACE_PLACEMENT_RAY = new THREE.Vector2(0, 0);
+const SURFACE_NORMAL = new THREE.Vector3();
+const SURFACE_POSITION = new THREE.Vector3();
+const LOCAL_FORWARD = new THREE.Vector3(0, 0, 1);
+const SURFACE_QUATERNION = new THREE.Quaternion();
+const SURFACE_SCALE = new THREE.Vector3();
+const SURFACE_WORLD_MATRIX = new THREE.Matrix4();
+const SURFACE_LOCAL_MATRIX = new THREE.Matrix4();
+const SURFACE_PARENT_INVERSE = new THREE.Matrix4();
+const SURFACE_EULER = new THREE.Euler();
+
 export const ZONE_TYPES = Object.freeze({
   TRIGGER: 'trigger',
   COLLISION: 'collision',
   WHITEBOARD_SURFACE: 'whiteboardSurface',
+  TERMINAL_SURFACE: 'terminalSurface',
 });
 
 export const WHITEBOARD_ZONE_EVENT_ID = 'whiteboard';
@@ -30,6 +42,7 @@ const ZONE_COLORS = {
   [ZONE_TYPES.TRIGGER]: 0x3ecf8e,
   [ZONE_TYPES.COLLISION]: 0xff6b4a,
   [ZONE_TYPES.WHITEBOARD_SURFACE]: 0x6ea8ff,
+  [ZONE_TYPES.TERMINAL_SURFACE]: 0xffb347,
 };
 
 export function createDefaultZone(type, position = [0, 1, 0], options = {}) {
@@ -47,19 +60,124 @@ export function createDefaultZone(type, position = [0, 1, 0], options = {}) {
         ? (defaultTriggerEventId === TERMINAL_ZONE_EVENT_ID ? 'Terminal' : 'Trigger')
         : type === ZONE_TYPES.WHITEBOARD_SURFACE
           ? 'Whiteboard surface'
-          : 'Collision'
+          : type === ZONE_TYPES.TERMINAL_SURFACE
+            ? 'Terminal screen'
+            : 'Collision'
     ),
     eventId: type === ZONE_TYPES.TRIGGER ? defaultTriggerEventId : '',
     position: position.map((value) => +Number(value).toFixed(4)),
     rotation: [0, 0, 0],
     scale: type === ZONE_TYPES.WHITEBOARD_SURFACE
       ? [1.6, 1.05, 0.02]
-      : [2, 2, 2],
+      : type === ZONE_TYPES.TERMINAL_SURFACE
+        ? [0.36, 0.28, 0.015]
+        : [2, 2, 2],
   };
 }
 
 export function cloneZone(zone) {
   return JSON.parse(JSON.stringify(zone));
+}
+
+function getZoneDepthHalfExtent(scale = [1, 1, 1]) {
+  return Math.min(...scale.map((value) => Math.abs(value))) * 0.5;
+}
+
+function rotationFromSurfaceNormal(normal) {
+  SURFACE_NORMAL.copy(normal).normalize();
+  if (SURFACE_NORMAL.lengthSq() < 0.0001) {
+    SURFACE_QUATERNION.identity();
+    return;
+  }
+
+  SURFACE_QUATERNION.setFromUnitVectors(LOCAL_FORWARD, SURFACE_NORMAL);
+}
+
+function worldZoneTransformToRoomLocal(position, quaternion, scale, roomContentGroup) {
+  roomContentGroup.updateMatrixWorld(true);
+  SURFACE_POSITION.copy(position);
+  SURFACE_QUATERNION.copy(quaternion);
+  SURFACE_SCALE.copy(scale);
+  SURFACE_WORLD_MATRIX.compose(SURFACE_POSITION, SURFACE_QUATERNION, SURFACE_SCALE);
+  SURFACE_PARENT_INVERSE.copy(roomContentGroup.matrixWorld).invert();
+  SURFACE_LOCAL_MATRIX.multiplyMatrices(SURFACE_PARENT_INVERSE, SURFACE_WORLD_MATRIX);
+  SURFACE_LOCAL_MATRIX.decompose(SURFACE_POSITION, SURFACE_QUATERNION, SURFACE_SCALE);
+  SURFACE_EULER.setFromQuaternion(SURFACE_QUATERNION, 'XYZ');
+
+  return {
+    position: SURFACE_POSITION.toArray().map((value) => +value.toFixed(4)),
+    rotation: [
+      +THREE.MathUtils.radToDeg(SURFACE_EULER.x).toFixed(2),
+      +THREE.MathUtils.radToDeg(SURFACE_EULER.y).toFixed(2),
+      +THREE.MathUtils.radToDeg(SURFACE_EULER.z).toFixed(2),
+    ],
+    scale: SURFACE_SCALE.toArray().map((value) => +value.toFixed(4)),
+  };
+}
+
+function resolveHitNormal(hit) {
+  if (hit.normal) {
+    SURFACE_NORMAL.copy(hit.normal);
+    return SURFACE_NORMAL;
+  }
+
+  if (hit.face?.normal) {
+    SURFACE_NORMAL.copy(hit.face.normal);
+    hit.object.localToWorldDirection(SURFACE_NORMAL);
+    return SURFACE_NORMAL;
+  }
+
+  return null;
+}
+
+export function createZoneAtView({
+  type,
+  camera,
+  raycaster,
+  placementMeshes = [],
+  roomContentGroup,
+  options = {},
+}) {
+  const defaultZone = createDefaultZone(type, [0, 1, 0], options);
+  const isSurfaceZone = type === ZONE_TYPES.TERMINAL_SURFACE || type === ZONE_TYPES.WHITEBOARD_SURFACE;
+
+  if (isSurfaceZone && camera && raycaster && placementMeshes.length > 0) {
+    raycaster.setFromCamera(SURFACE_PLACEMENT_RAY, camera);
+    const hits = raycaster.intersectObjects(placementMeshes, true);
+    if (hits.length > 0) {
+      const hit = hits[0];
+      const normal = resolveHitNormal(hit);
+      if (normal) {
+        const depthHalf = getZoneDepthHalfExtent(defaultZone.scale);
+        SURFACE_POSITION.copy(hit.point).addScaledVector(normal, depthHalf);
+        rotationFromSurfaceNormal(normal);
+        SURFACE_SCALE.fromArray(defaultZone.scale);
+
+        const localTransform = worldZoneTransformToRoomLocal(
+          SURFACE_POSITION,
+          SURFACE_QUATERNION,
+          SURFACE_SCALE,
+          roomContentGroup,
+        );
+
+        return {
+          ...defaultZone,
+          position: localTransform.position,
+          rotation: localTransform.rotation,
+          scale: localTransform.scale,
+        };
+      }
+    }
+  }
+
+  if (camera && roomContentGroup) {
+    SURFACE_POSITION.copy(camera.position);
+    roomContentGroup.updateMatrixWorld(true);
+    roomContentGroup.worldToLocal(SURFACE_POSITION);
+    return createDefaultZone(type, SURFACE_POSITION.toArray(), options);
+  }
+
+  return defaultZone;
 }
 
 export function createZoneGroup(zone) {

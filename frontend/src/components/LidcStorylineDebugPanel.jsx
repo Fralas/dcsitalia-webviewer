@@ -277,6 +277,15 @@ export default function LidcStorylineDebugPanel({
               <Plus size={14} />
               {t('lidc.storyline.debug.addWhiteboardSurfaceZone')}
             </button>
+            <button
+              type="button"
+              className="lidc-storyline-debug-zone-add is-terminal-surface"
+              onClick={() => onAddZone(ZONE_TYPES.TERMINAL_SURFACE)}
+              title={t('lidc.storyline.debug.addTerminalSurfaceZone')}
+            >
+              <Plus size={14} />
+              {t('lidc.storyline.debug.addTerminalSurfaceZone')}
+            </button>
           </div>
         </div>
 

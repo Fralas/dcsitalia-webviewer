@@ -93,8 +93,7 @@
   border-color: rgba(255, 255, 255, 0.32);
 }
 
-.lidc-storyline-root.is-whiteboard-open .lidc-storyline-canvas,
-.lidc-storyline-root.is-terminal-open .lidc-storyline-canvas {
+.lidc-storyline-root.is-whiteboard-open .lidc-storyline-canvas {
   visibility: hidden;
 }
 
@@ -530,6 +529,11 @@ body.lidc-storyline-open {
   color: #9ec5ff;
 }
 
+.lidc-storyline-debug-zone-add.is-terminal-surface {
+  border-color: rgba(255, 179, 71, 0.45);
+  color: #ffc98a;
+}
+
 .lidc-storyline-debug-empty {
   margin: 0 0 8px;
   font-size: 0.74rem;
@@ -579,6 +583,10 @@ body.lidc-storyline-open {
 
 .lidc-storyline-debug-zone-item.is-whiteboardSurface {
   box-shadow: inset 3px 0 0 rgba(110, 168, 255, 0.85);
+}
+
+.lidc-storyline-debug-zone-item.is-terminalSurface {
+  box-shadow: inset 3px 0 0 rgba(255, 179, 71, 0.85);
 }
 
 .lidc-storyline-debug-zone-type {

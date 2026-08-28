@@ -20,6 +20,7 @@ import {
   getDefaultTransform,
   LIDC_STORYLINE_TRANSFORM_STORAGE_KEY,
   loadSavedTransform,
+  migrateTransformZonesToRoomLocal,
   readObjectTransform,
   readSceneTransform,
   saveTransformToStorage,
@@ -32,6 +33,7 @@ import {
 import {
   applyZoneTransform,
   createDefaultZone,
+  createZoneAtView,
   createZoneGroup,
   disposeZoneGroup,
   findSpawnOutsideCollisionZones,
@@ -44,7 +46,22 @@ import {
   ZONE_TYPES,
 } from '../utils/lidcStorylineZones';
 import { syncWhiteboard3DDecorations } from '../utils/lidcStorylineWhiteboard3D';
+import {
+  renderTerminal3DScreens,
+  syncTerminal3DDecorations,
+} from '../utils/lidcStorylineTerminal3D';
+import {
+  disposeRatosTerminal,
+  getRatosTerminalSnapshot,
+  initRatosTerminal,
+} from '../utils/ratosTerminalStore';
 import './LidcStorylineRoom.css';
+
+const SURFACE_ZONE_DECOR_NAMES = new Set(['whiteboard-3d-decor', 'terminal-3d-screen']);
+
+function isPersistentSurfaceZone(type) {
+  return type === ZONE_TYPES.WHITEBOARD_SURFACE || type === ZONE_TYPES.TERMINAL_SURFACE;
+}
 
 const MOVE_SPEED = 1.8;
 const FLOOR_RAY_START_OFFSET = 2;
@@ -398,8 +415,8 @@ export default function LidcStorylineRoom({ onClose }) {
   }, []);
 
   const handleAddZone = useCallback((type, options = {}) => {
-    const cameraPos = sceneApiRef.current?.readCameraPosition?.() ?? [0, 1, 0];
-    const zone = createDefaultZone(type, cameraPos, options);
+    const zone = sceneApiRef.current?.createZoneAtView?.(type, options)
+      ?? createDefaultZone(type, [0, 1, 0], options);
 
     setTransform((current) => {
       const next = cloneTransform(current);
@@ -489,13 +506,19 @@ export default function LidcStorylineRoom({ onClose }) {
       applyObjectTransform(api.roomContentGroup, defaults.room);
     }
     api?.resetWhiteboardPlacement?.();
-    api?.syncZones?.(defaults.zones ?? []);
-    api?.syncEasterEggs?.(defaults.easterEggs ?? []);
 
-    const next = api?.readSceneTransform?.() ?? defaults;
+    const migratedDefaults = api?.roomContentGroup
+      ? migrateTransformZonesToRoomLocal(defaults, api.roomContentGroup)
+      : defaults;
+
+    api?.syncZones?.(migratedDefaults.zones ?? []);
+    api?.syncEasterEggs?.(migratedDefaults.easterEggs ?? []);
+
+    const next = api?.readSceneTransform?.() ?? migratedDefaults;
     next.player = { ...defaults.player };
-    next.zones = [...(defaults.zones ?? [])];
+    next.zones = [...(migratedDefaults.zones ?? [])];
     next.easterEggs = [...(defaults.easterEggs ?? [])];
+    next.zonesCoordinateSpace = migratedDefaults.zonesCoordinateSpace;
     transformRef.current = next;
     setTransform(next);
     setSelectedZoneId(null);
@@ -611,7 +634,8 @@ export default function LidcStorylineRoom({ onClose }) {
     let selectedEasterEggIdActive = selectedEasterEggIdRef.current;
 
     const zonesRoot = new THREE.Group();
-    scene.add(zonesRoot);
+    zonesRoot.name = 'zones-root';
+    roomContentGroup.add(zonesRoot);
     const zoneGroups = new Map();
 
     const easterEggsRoot = new THREE.Group();
@@ -654,10 +678,10 @@ export default function LidcStorylineRoom({ onClose }) {
         } else {
           applyZoneTransform(group, zone);
         }
-        if (group.userData.zoneType === ZONE_TYPES.WHITEBOARD_SURFACE) {
+        if (isPersistentSurfaceZone(group.userData.zoneType)) {
           group.visible = true;
           group.children.forEach((child) => {
-            child.visible = child.name === 'whiteboard-3d-decor' ? true : debugOpenRef.current;
+            child.visible = SURFACE_ZONE_DECOR_NAMES.has(child.name) ? true : debugOpenRef.current;
           });
         } else {
           group.visible = debugOpenRef.current;
@@ -665,14 +689,15 @@ export default function LidcStorylineRoom({ onClose }) {
       });
 
       syncWhiteboard3DDecorations(zones, zoneGroups);
+      syncTerminal3DDecorations(zones, zoneGroups);
     };
 
     const setZonesVisible = (visible) => {
       zoneGroups.forEach((group) => {
-        if (group.userData.zoneType === ZONE_TYPES.WHITEBOARD_SURFACE) {
+        if (isPersistentSurfaceZone(group.userData.zoneType)) {
           group.visible = true;
           group.children.forEach((child) => {
-            child.visible = child.name === 'whiteboard-3d-decor' ? true : visible;
+            child.visible = SURFACE_ZONE_DECOR_NAMES.has(child.name) ? true : visible;
           });
           return;
         }
@@ -710,11 +735,14 @@ export default function LidcStorylineRoom({ onClose }) {
     const floorMeshes = [];
     const collisionMeshes = [];
     const whiteboardMeshes = [];
+    const zonePlacementMeshes = [];
     let roomBounds = null;
 
     const syncCollisionMeshes = () => {
       collisionMeshes.length = 0;
       collisionMeshes.push(...floorMeshes, ...whiteboardMeshes);
+      zonePlacementMeshes.length = 0;
+      zonePlacementMeshes.push(...floorMeshes, ...whiteboardMeshes);
     };
 
     const refreshRoomBounds = () => {
@@ -937,6 +965,14 @@ export default function LidcStorylineRoom({ onClose }) {
         +camera.position.y.toFixed(3),
         +camera.position.z.toFixed(3),
       ],
+      createZoneAtView: (type, options = {}) => createZoneAtView({
+        type,
+        camera,
+        raycaster,
+        placementMeshes: zonePlacementMeshes,
+        roomContentGroup,
+        options,
+      }),
       requestPointerLock,
       exitPointerLock,
     };
@@ -1061,19 +1097,26 @@ export default function LidcStorylineRoom({ onClose }) {
           }));
         }
 
+        applyObjectTransform(roomContentGroup, initialTransform.room);
+        if (whiteboardGroup && initialTransform.whiteboard) {
+          applyObjectTransform(whiteboardGroup, initialTransform.whiteboard);
+        }
+
+        const migratedTransform = migrateTransformZonesToRoomLocal(initialTransform, roomContentGroup);
+
         if (storedTransform?.whiteboard) {
-          applyLoadedSceneTransform(initialTransform);
+          applyLoadedSceneTransform(migratedTransform);
         } else {
-          applyObjectTransform(roomContentGroup, initialTransform.room);
-          initialTransform.whiteboard = readObjectTransform(whiteboardGroup);
-          syncZones(initialTransform.zones ?? []);
-          syncEasterEggs(initialTransform.easterEggs ?? []);
+          migratedTransform.whiteboard = readObjectTransform(whiteboardGroup);
+          syncZones(migratedTransform.zones ?? []);
+          syncEasterEggs(migratedTransform.easterEggs ?? []);
           refreshRoomBounds();
         }
 
-        transformRef.current = initialTransform;
-        applyPlayerTransform(initialTransform);
-        setTransform(initialTransform);
+        transformRef.current = migratedTransform;
+        applyPlayerTransform(migratedTransform);
+        setTransform(migratedTransform);
+        initRatosTerminal();
 
         if (debugOpenRef.current) {
           const target = getActiveTransformTarget();
@@ -1332,6 +1375,7 @@ export default function LidcStorylineRoom({ onClose }) {
         setCameraPosition(sceneApiRef.current?.readCameraPosition?.() ?? [0, 0, 0]);
       }
 
+      void renderTerminal3DScreens(zoneGroups, getRatosTerminalSnapshot());
       renderer.render(scene, camera);
     };
 
@@ -1350,6 +1394,7 @@ export default function LidcStorylineRoom({ onClose }) {
 
     return () => {
       disposed = true;
+      disposeRatosTerminal();
       exitPointerLock();
       container.classList.remove('is-pointer-locked');
       document.removeEventListener('pointerlockchange', onPointerLockChange);

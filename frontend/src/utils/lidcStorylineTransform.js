@@ -3,6 +3,15 @@ import { mergeEasterEggTransforms } from '../config/lidcStorylineEasterEggs';
 import fileDefaults from '../config/lidcStorylineRoomTransform.json';
 
 export const LIDC_STORYLINE_TRANSFORM_STORAGE_KEY = 'lidc-storyline-room-transform';
+export const ZONES_COORDINATE_SPACE = 'room-local';
+
+const scratchPosition = new THREE.Vector3();
+const scratchRotation = new THREE.Euler();
+const scratchScale = new THREE.Vector3();
+const scratchQuaternion = new THREE.Quaternion();
+const scratchWorldMatrix = new THREE.Matrix4();
+const scratchLocalMatrix = new THREE.Matrix4();
+const scratchParentInverse = new THREE.Matrix4();
 
 export const DEBUG_TARGETS = Object.freeze({
   ROOM: 'room',
@@ -21,6 +30,53 @@ export function getDefaultTransform() {
   return defaults;
 }
 
+export function convertZoneTransformWorldToLocal(zone, parentGroup) {
+  if (!parentGroup || !zone) return zone;
+
+  parentGroup.updateMatrixWorld(true);
+
+  scratchPosition.fromArray(zone.position);
+  scratchRotation.set(
+    THREE.MathUtils.degToRad(zone.rotation[0]),
+    THREE.MathUtils.degToRad(zone.rotation[1]),
+    THREE.MathUtils.degToRad(zone.rotation[2]),
+  );
+  scratchScale.fromArray(zone.scale);
+  scratchQuaternion.setFromEuler(scratchRotation);
+  scratchWorldMatrix.compose(scratchPosition, scratchQuaternion, scratchScale);
+
+  scratchParentInverse.copy(parentGroup.matrixWorld).invert();
+  scratchLocalMatrix.multiplyMatrices(scratchParentInverse, scratchWorldMatrix);
+  scratchLocalMatrix.decompose(scratchPosition, scratchQuaternion, scratchScale);
+  scratchRotation.setFromQuaternion(scratchQuaternion, 'XYZ');
+
+  return {
+    ...zone,
+    position: scratchPosition.toArray().map((value) => +value.toFixed(4)),
+    rotation: [
+      +THREE.MathUtils.radToDeg(scratchRotation.x).toFixed(2),
+      +THREE.MathUtils.radToDeg(scratchRotation.y).toFixed(2),
+      +THREE.MathUtils.radToDeg(scratchRotation.z).toFixed(2),
+    ],
+    scale: scratchScale.toArray().map((value) => +value.toFixed(4)),
+  };
+}
+
+export function convertZonesWorldToRoomLocal(zones = [], roomContentGroup) {
+  return zones.map((zone) => convertZoneTransformWorldToLocal(zone, roomContentGroup));
+}
+
+export function migrateTransformZonesToRoomLocal(transform, roomContentGroup) {
+  const next = cloneTransform(transform);
+  if (next.zonesCoordinateSpace === ZONES_COORDINATE_SPACE) {
+    return next;
+  }
+
+  next.zones = convertZonesWorldToRoomLocal(next.zones ?? [], roomContentGroup);
+  next.zonesCoordinateSpace = ZONES_COORDINATE_SPACE;
+  return next;
+}
+
 export function loadSavedTransform() {
   const defaults = getDefaultTransform();
 
@@ -35,6 +91,7 @@ export function loadSavedTransform() {
       player: { ...defaults.player, ...parsed.player },
       zones: Array.isArray(parsed.zones) ? parsed.zones : defaults.zones,
       easterEggs: mergeEasterEggTransforms(parsed.easterEggs),
+      zonesCoordinateSpace: parsed.zonesCoordinateSpace,
     };
   } catch {
     return defaults;
@@ -139,6 +196,7 @@ export function readSceneTransform(
     player: { ...playerSettings },
     zones: zones.map((zone) => ({ ...zone })),
     easterEggs: easterEggs.map((egg) => ({ ...egg })),
+    zonesCoordinateSpace: ZONES_COORDINATE_SPACE,
   };
 }
 
