@@ -27,3 +27,13 @@ export const LIDC_STORYLINE_WHITEBOARD_ITEMS = [
     rotation: 1.4,
   },
 ];
+
+export const LIDC_STORYLINE_WHITEBOARD_CONNECTIONS = [
+  {
+    id: 'abdul-viktor',
+    from: 'abdulRahman',
+    to: 'viktorSokolov',
+    fromAnchor: { x: 0.5, y: 0.05 },
+    toAnchor: { x: 0.5, y: 0.05 },
+  },
+];

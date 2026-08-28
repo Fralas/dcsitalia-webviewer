@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
-import { LIDC_STORYLINE_WHITEBOARD_ITEMS } from '../config/lidcStorylineWhiteboardItems';
+import { useEffect, useRef, useState } from 'react';
+import { LIDC_STORYLINE_WHITEBOARD_CONNECTIONS, LIDC_STORYLINE_WHITEBOARD_ITEMS } from '../config/lidcStorylineWhiteboardItems';
 import { t } from '../utils/locale';
+import LidcStorylineWhiteboardString from './LidcStorylineWhiteboardString';
 import './LidcStorylineWhiteboard.css';
 
 function renderParagraphs(text) {
@@ -155,6 +156,8 @@ function CharacterDossier({ itemId }) {
 export default function LidcStorylineWhiteboard({ onClose }) {
   const [activeItemId, setActiveItemId] = useState(null);
   const [showExitHint, setShowExitHint] = useState(true);
+  const contentRef = useRef(null);
+  const pinRefs = useRef({});
 
   const activeItem = LIDC_STORYLINE_WHITEBOARD_ITEMS.find((item) => item.id === activeItemId) ?? null;
 
@@ -191,11 +194,14 @@ export default function LidcStorylineWhiteboard({ onClose }) {
           <div className="lidc-whiteboard-vignette" aria-hidden="true" />
           <div className="lidc-whiteboard-chalk-dust" aria-hidden="true" />
 
-          <div className="lidc-whiteboard-content">
+          <div className="lidc-whiteboard-content" ref={contentRef}>
             {LIDC_STORYLINE_WHITEBOARD_ITEMS.map((item) => (
               <button
                 key={item.id}
                 type="button"
+                ref={(element) => {
+                  pinRefs.current[item.id] = element;
+                }}
                 className={`lidc-whiteboard-pin ${activeItemId === item.id ? 'is-active' : ''}`}
                 style={{
                   left: `${item.x}%`,
@@ -214,6 +220,16 @@ export default function LidcStorylineWhiteboard({ onClose }) {
                 </span>
                 <span className="lidc-whiteboard-caption">{t(item.labelKey)}</span>
               </button>
+            ))}
+
+            {LIDC_STORYLINE_WHITEBOARD_CONNECTIONS.map((connection) => (
+              <LidcStorylineWhiteboardString
+                key={connection.id}
+                connection={connection}
+                pinRefs={pinRefs}
+                containerRef={contentRef}
+                interactive={!activeItem}
+              />
             ))}
           </div>
         </div>

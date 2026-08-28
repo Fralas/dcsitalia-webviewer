@@ -61,6 +61,65 @@
   transform-origin: center center;
 }
 
+.lidc-whiteboard-string {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.lidc-whiteboard-string-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 40;
+  pointer-events: stroke;
+}
+
+.lidc-whiteboard-string-path {
+  fill: none;
+  stroke: #a52f2f;
+  stroke-width: 4.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+}
+
+.lidc-whiteboard-string-pin {
+  pointer-events: none;
+}
+
+.lidc-whiteboard-string-pin-needle {
+  stroke: #8a8a8a;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.lidc-whiteboard-string-pin-head {
+  fill: #c62828;
+  stroke: #7f1d1d;
+  stroke-width: 1.1;
+}
+
+.lidc-whiteboard-string-pin-highlight {
+  fill: rgba(255, 255, 255, 0.45);
+  pointer-events: none;
+}
+
+.lidc-whiteboard-pin {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transform-origin: top center;
+  transition: transform 180ms ease, filter 180ms ease;
+  z-index: 1;
+}
+
 .lidc-whiteboard-grime {
   position: absolute;
   inset: 0;
@@ -103,22 +162,11 @@
   pointer-events: none;
 }
 
-.lidc-whiteboard-pin {
-  position: absolute;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  transform-origin: top center;
-  transition: transform 180ms ease, filter 180ms ease;
-}
-
 .lidc-whiteboard-pin:hover,
 .lidc-whiteboard-pin.is-active {
   transform: rotate(var(--pin-rotation, 0deg)) scale(1.04);
   filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.28));
-  z-index: 2;
+  z-index: 3;
 }
 
 .lidc-whiteboard-photo {
