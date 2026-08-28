@@ -317,6 +317,10 @@
   font-weight: 600;
 }
 
+.lidc-whiteboard-dossier-relationships li + li {
+  margin-top: 8px;
+}
+
 .lidc-whiteboard-focus-card {
   position: absolute;
   left: 50%;

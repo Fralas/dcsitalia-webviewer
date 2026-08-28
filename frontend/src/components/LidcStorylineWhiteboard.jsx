@@ -19,6 +19,7 @@ function DossierSection({ base, sectionId }) {
     case 'profile':
     case 'personality':
     case 'secret':
+    case 'weakness':
       return (
         <section>
           <h3>{title}</h3>
@@ -97,6 +98,36 @@ function DossierSection({ base, sectionId }) {
             ))}
           </ul>
           {renderParagraphs(t(`${base}.suppliedMaterialNote`))}
+        </section>
+      );
+    }
+
+    case 'transmissions': {
+      const transmissionItems = t(`${base}.transmissionItems`);
+      return (
+        <section>
+          <h3>{title}</h3>
+          <p>{t(`${base}.transmissionsIntro`)}</p>
+          <ul>
+            {Array.isArray(transmissionItems) && transmissionItems.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          {renderParagraphs(t(`${base}.transmissionsNote`))}
+        </section>
+      );
+    }
+
+    case 'relationships': {
+      const relationshipItems = t(`${base}.relationshipItems`);
+      return (
+        <section>
+          <h3>{title}</h3>
+          <ul className="lidc-whiteboard-dossier-relationships">
+            {Array.isArray(relationshipItems) && relationshipItems.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
         </section>
       );
     }
