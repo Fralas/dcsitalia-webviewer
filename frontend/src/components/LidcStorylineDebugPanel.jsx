@@ -1,5 +1,6 @@
-import { Copy, Download, Link2, RotateCcw, Save, Unlink, X } from 'lucide-react';
+import { Copy, Download, Link2, Plus, RotateCcw, Save, Trash2, Unlink, X } from 'lucide-react';
 import { DEBUG_TARGETS } from '../utils/lidcStorylineTransform';
+import { ZONE_TYPES } from '../utils/lidcStorylineZones';
 import { t } from '../utils/locale';
 
 function NumberField({ label, value, step = 0.01, onChange }) {
@@ -41,6 +42,7 @@ function ScaleFields({ values, scaleLinked, onScaleLinkedChange, onChange }) {
     </div>
   );
 }
+
 function VectorFields({ labels, values, step = 0.01, onChange }) {
   return (
     <div className="lidc-storyline-debug-vector">
@@ -59,14 +61,33 @@ function VectorFields({ labels, values, step = 0.01, onChange }) {
   );
 }
 
+function TextField({ label, value, onChange }) {
+  return (
+    <label className="lidc-storyline-debug-field">
+      <span>{label}</span>
+      <input
+        type="text"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
+  );
+}
+
 export default function LidcStorylineDebugPanel({
   transform,
   transformMode,
   debugTarget,
+  selectedZoneId,
   scaleLinked,
   cameraPosition,
   saveStatus,
+  lastTriggerEvent,
   onDebugTargetChange,
+  onSelectZone,
+  onAddZone,
+  onRemoveZone,
+  onZoneMetaChange,
   onScaleLinkedChange,
   onTransformModeChange,
   onTargetPositionChange,
@@ -80,11 +101,19 @@ export default function LidcStorylineDebugPanel({
   onSnapPlayerToRoom,
   onClose,
 }) {
-  const { room, whiteboard, player } = transform;
-  const activeTransform = debugTarget === DEBUG_TARGETS.WHITEBOARD ? whiteboard : room;
-  const targetLabel = debugTarget === DEBUG_TARGETS.WHITEBOARD
-    ? t('lidc.storyline.debug.whiteboardTransform')
-    : t('lidc.storyline.debug.roomTransform');
+  const { room, whiteboard, player, zones = [] } = transform;
+  const selectedZone = zones.find((zone) => zone.id === selectedZoneId) ?? null;
+  const activeTransform = debugTarget === DEBUG_TARGETS.ZONE && selectedZone
+    ? selectedZone
+    : debugTarget === DEBUG_TARGETS.WHITEBOARD
+      ? whiteboard
+      : room;
+
+  const targetLabel = debugTarget === DEBUG_TARGETS.ZONE && selectedZone
+    ? t('lidc.storyline.debug.zoneTransform')
+    : debugTarget === DEBUG_TARGETS.WHITEBOARD
+      ? t('lidc.storyline.debug.whiteboardTransform')
+      : t('lidc.storyline.debug.roomTransform');
 
   return (
     <aside className="lidc-storyline-debug-panel">
@@ -132,6 +161,22 @@ export default function LidcStorylineDebugPanel({
 
       <section className="lidc-storyline-debug-section">
         <h3>{targetLabel}</h3>
+        {debugTarget === DEBUG_TARGETS.ZONE && selectedZone && (
+          <>
+            <TextField
+              label={t('lidc.storyline.debug.zoneLabel')}
+              value={selectedZone.label}
+              onChange={(label) => onZoneMetaChange(selectedZone.id, { label })}
+            />
+            {selectedZone.type === ZONE_TYPES.TRIGGER && (
+              <TextField
+                label={t('lidc.storyline.debug.zoneEventId')}
+                value={selectedZone.eventId}
+                onChange={(eventId) => onZoneMetaChange(selectedZone.id, { eventId })}
+              />
+            )}
+          </>
+        )}
         <VectorFields
           labels={['X', 'Y', 'Z']}
           values={activeTransform.position}
@@ -158,6 +203,71 @@ export default function LidcStorylineDebugPanel({
           onScaleLinkedChange={onScaleLinkedChange}
           onChange={(scale, axisIndex, nextValue) => onTargetScaleAxisChange(axisIndex, nextValue)}
         />
+      </section>
+
+      <section className="lidc-storyline-debug-section">
+        <div className="lidc-storyline-debug-section-head">
+          <h3>{t('lidc.storyline.debug.zonesTitle')}</h3>
+          <div className="lidc-storyline-debug-zone-actions">
+            <button
+              type="button"
+              className="lidc-storyline-debug-zone-add is-trigger"
+              onClick={() => onAddZone(ZONE_TYPES.TRIGGER)}
+              title={t('lidc.storyline.debug.addTriggerZone')}
+            >
+              <Plus size={14} />
+              {t('lidc.storyline.debug.addTriggerZone')}
+            </button>
+            <button
+              type="button"
+              className="lidc-storyline-debug-zone-add is-collision"
+              onClick={() => onAddZone(ZONE_TYPES.COLLISION)}
+              title={t('lidc.storyline.debug.addCollisionZone')}
+            >
+              <Plus size={14} />
+              {t('lidc.storyline.debug.addCollisionZone')}
+            </button>
+          </div>
+        </div>
+
+        {zones.length === 0 && (
+          <p className="lidc-storyline-debug-empty">{t('lidc.storyline.debug.zonesEmpty')}</p>
+        )}
+
+        <ul className="lidc-storyline-debug-zone-list">
+          {zones.map((zone) => (
+            <li key={zone.id}>
+              <button
+                type="button"
+                className={`lidc-storyline-debug-zone-item ${selectedZoneId === zone.id ? 'is-active' : ''} is-${zone.type}`}
+                onClick={() => onSelectZone(zone.id)}
+              >
+                <span className="lidc-storyline-debug-zone-type">
+                  {t(`lidc.storyline.debug.zoneTypes.${zone.type}`)}
+                </span>
+                <span className="lidc-storyline-debug-zone-name">{zone.label || zone.id}</span>
+              </button>
+              <button
+                type="button"
+                className="lidc-storyline-debug-zone-delete"
+                onClick={() => onRemoveZone(zone.id)}
+                aria-label={t('lidc.storyline.debug.removeZone')}
+                title={t('lidc.storyline.debug.removeZone')}
+              >
+                <Trash2 size={14} />
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        {lastTriggerEvent && (
+          <p className="lidc-storyline-debug-trigger-log">
+            {t('lidc.storyline.debug.lastTrigger', {
+              eventId: lastTriggerEvent.eventId,
+              label: lastTriggerEvent.label,
+            })}
+          </p>
+        )}
       </section>
 
       <section className="lidc-storyline-debug-section">

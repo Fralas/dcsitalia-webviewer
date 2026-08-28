@@ -6,6 +6,7 @@ import { Loader2, Settings2, X } from 'lucide-react';
 import roomModelUrl from '../../3D/LIDC/room.glb';
 import whiteboardModelUrl from '../../3D/LIDC/whiteboard.glb';
 import LidcStorylineDebugPanel from './LidcStorylineDebugPanel';
+import LidcStorylineWhiteboard from './LidcStorylineWhiteboard';
 import { t } from '../utils/locale';
 import {
   applyLinkedScaleChange,
@@ -21,6 +22,17 @@ import {
   readSceneTransform,
   saveTransformToStorage,
 } from '../utils/lidcStorylineTransform';
+import {
+  applyZoneTransform,
+  createDefaultZone,
+  createZoneGroup,
+  disposeZoneGroup,
+  findSpawnOutsideCollisionZones,
+  getActiveWhiteboardTrigger,
+  readZoneFromGroup,
+  resolveCollisionZones,
+  updateZoneTriggers,
+} from '../utils/lidcStorylineZones';
 import './LidcStorylineRoom.css';
 
 const MOVE_SPEED = 1.8;
@@ -201,7 +213,9 @@ export default function LidcStorylineRoom({ onClose }) {
   const transformRef = useRef(loadSavedTransform());
   const debugOpenRef = useRef(false);
   const whiteboardOpenRef = useRef(false);
+  const whiteboardPromptActiveRef = useRef(false);
   const debugTargetRef = useRef(DEBUG_TARGETS.WHITEBOARD);
+  const selectedZoneIdRef = useRef(null);
   const scaleLinkedRef = useRef(true);
 
   const [loading, setLoading] = useState(true);
@@ -209,12 +223,15 @@ export default function LidcStorylineRoom({ onClose }) {
   const [loadProgress, setLoadProgress] = useState(0);
   const [debugOpen, setDebugOpen] = useState(false);
   const [debugTarget, setDebugTarget] = useState(DEBUG_TARGETS.WHITEBOARD);
+  const [selectedZoneId, setSelectedZoneId] = useState(null);
   const [scaleLinked, setScaleLinked] = useState(true);
   const [whiteboardOpen, setWhiteboardOpen] = useState(false);
+  const [whiteboardPromptActive, setWhiteboardPromptActive] = useState(false);
   const [transform, setTransform] = useState(() => loadSavedTransform());
   const [transformMode, setTransformMode] = useState('translate');
   const [cameraPosition, setCameraPosition] = useState([0, 0, 0]);
   const [saveStatus, setSaveStatus] = useState('');
+  const [lastTriggerEvent, setLastTriggerEvent] = useState(null);
 
   useEffect(() => {
     debugOpenRef.current = debugOpen;
@@ -225,8 +242,16 @@ export default function LidcStorylineRoom({ onClose }) {
   }, [whiteboardOpen]);
 
   useEffect(() => {
+    whiteboardPromptActiveRef.current = whiteboardPromptActive;
+  }, [whiteboardPromptActive]);
+
+  useEffect(() => {
     debugTargetRef.current = debugTarget;
   }, [debugTarget]);
+
+  useEffect(() => {
+    selectedZoneIdRef.current = selectedZoneId;
+  }, [selectedZoneId]);
 
   useEffect(() => {
     scaleLinkedRef.current = scaleLinked;
@@ -248,33 +273,106 @@ export default function LidcStorylineRoom({ onClose }) {
     sceneApiRef.current?.setDebugTarget(debugTarget);
   }, [debugTarget]);
 
-  const applyTargetTransformUpdate = useCallback((targetKey, patch) => {
+  useEffect(() => {
+    sceneApiRef.current?.setSelectedZoneId(selectedZoneId);
+  }, [selectedZoneId]);
+
+  useEffect(() => {
+    sceneApiRef.current?.setZonesVisible?.(debugOpen);
+  }, [debugOpen]);
+
+  const applyActiveTransformPatch = useCallback((patch) => {
     setTransform((current) => {
       const next = cloneTransform(current);
-      next[targetKey] = { ...next[targetKey], ...patch };
+
+      if (debugTargetRef.current === DEBUG_TARGETS.ZONE && selectedZoneIdRef.current) {
+        next.zones = next.zones.map((zone) => (
+          zone.id === selectedZoneIdRef.current ? { ...zone, ...patch } : zone
+        ));
+        sceneApiRef.current?.syncZones(next.zones);
+      } else {
+        const targetKey = debugTargetRef.current === DEBUG_TARGETS.WHITEBOARD ? 'whiteboard' : 'room';
+        next[targetKey] = { ...next[targetKey], ...patch };
+        sceneApiRef.current?.applySceneTransform(next);
+      }
+
       transformRef.current = next;
-      sceneApiRef.current?.applySceneTransform(next);
       return next;
     });
   }, []);
 
-  const applyTargetVectorUpdate = useCallback((targetKey, field, values) => {
-    applyTargetTransformUpdate(targetKey, { [field]: values });
-  }, [applyTargetTransformUpdate]);
-
   const applyTargetScaleAxisUpdate = useCallback((axisIndex, nextValue) => {
-    const targetKey = debugTargetRef.current === DEBUG_TARGETS.WHITEBOARD ? 'whiteboard' : 'room';
+    setTransform((current) => {
+      const next = cloneTransform(current);
+
+      if (debugTargetRef.current === DEBUG_TARGETS.ZONE && selectedZoneIdRef.current) {
+        next.zones = next.zones.map((zone) => {
+          if (zone.id !== selectedZoneIdRef.current) return zone;
+          const newScale = scaleLinkedRef.current
+            ? applyLinkedScaleChange(zone.scale, axisIndex, nextValue)
+            : zone.scale.map((value, index) => (index === axisIndex ? nextValue : value));
+          return { ...zone, scale: newScale };
+        });
+        sceneApiRef.current?.syncZones(next.zones);
+      } else {
+        const targetKey = debugTargetRef.current === DEBUG_TARGETS.WHITEBOARD ? 'whiteboard' : 'room';
+        const currentScale = next[targetKey].scale;
+        const newScale = scaleLinkedRef.current
+          ? applyLinkedScaleChange(currentScale, axisIndex, nextValue)
+          : currentScale.map((value, index) => (index === axisIndex ? nextValue : value));
+        next[targetKey] = { ...next[targetKey], scale: newScale };
+        sceneApiRef.current?.applySceneTransform(next);
+      }
+
+      transformRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const handleAddZone = useCallback((type) => {
+    const cameraPos = sceneApiRef.current?.readCameraPosition?.() ?? [0, 1, 0];
+    const zone = createDefaultZone(type, cameraPos);
 
     setTransform((current) => {
       const next = cloneTransform(current);
-      const currentScale = next[targetKey].scale;
-      const newScale = scaleLinkedRef.current
-        ? applyLinkedScaleChange(currentScale, axisIndex, nextValue)
-        : currentScale.map((value, index) => (index === axisIndex ? nextValue : value));
-
-      next[targetKey] = { ...next[targetKey], scale: newScale };
+      next.zones = [...(next.zones ?? []), zone];
       transformRef.current = next;
-      sceneApiRef.current?.applySceneTransform(next);
+      sceneApiRef.current?.syncZones(next.zones);
+      return next;
+    });
+    setSelectedZoneId(zone.id);
+    setDebugTarget(DEBUG_TARGETS.ZONE);
+  }, []);
+
+  const handleRemoveZone = useCallback((zoneId) => {
+    setTransform((current) => {
+      const next = cloneTransform(current);
+      next.zones = (next.zones ?? []).filter((zone) => zone.id !== zoneId);
+      transformRef.current = next;
+      sceneApiRef.current?.syncZones(next.zones);
+      return next;
+    });
+
+    setSelectedZoneId((current) => {
+      if (current !== zoneId) return current;
+      return null;
+    });
+    setDebugTarget((current) => (current === DEBUG_TARGETS.ZONE ? DEBUG_TARGETS.ROOM : current));
+  }, []);
+
+  const handleSelectZone = useCallback((zoneId) => {
+    setSelectedZoneId(zoneId);
+    setDebugTarget(DEBUG_TARGETS.ZONE);
+  }, []);
+
+  const handleZoneMetaChange = useCallback((zoneId, patch) => {
+    setTransform((current) => {
+      const next = cloneTransform(current);
+      next.zones = (next.zones ?? []).map((zone) => (
+        zone.id === zoneId ? { ...zone, ...patch } : zone
+      ));
+      transformRef.current = next;
+      sceneApiRef.current?.syncZones(next.zones);
       return next;
     });
   }, []);
@@ -316,11 +414,15 @@ export default function LidcStorylineRoom({ onClose }) {
       applyObjectTransform(api.roomContentGroup, defaults.room);
     }
     api?.resetWhiteboardPlacement?.();
+    api?.syncZones?.(defaults.zones ?? []);
 
     const next = api?.readSceneTransform?.() ?? defaults;
     next.player = { ...defaults.player };
+    next.zones = [...(defaults.zones ?? [])];
     transformRef.current = next;
     setTransform(next);
+    setSelectedZoneId(null);
+    setDebugTarget(DEBUG_TARGETS.ROOM);
     api?.applyPlayerTransform?.(next);
 
     setSaveStatus(t('lidc.storyline.debug.resetDone'));
@@ -405,6 +507,57 @@ export default function LidcStorylineRoom({ onClose }) {
     let whiteboardGroup = null;
     let autoWhiteboardTransform = null;
     let debugTargetActive = debugTargetRef.current;
+    let selectedZoneIdActive = selectedZoneIdRef.current;
+
+    const zonesRoot = new THREE.Group();
+    scene.add(zonesRoot);
+    const zoneGroups = new Map();
+    const activeTriggerIds = new Set();
+    const playerPoint = new THREE.Vector3();
+    let whiteboardPromptVisible = false;
+
+    const syncWhiteboardPrompt = () => {
+      const promptActive = Boolean(getActiveWhiteboardTrigger(
+        transformRef.current.zones ?? [],
+        activeTriggerIds,
+      ));
+
+      if (promptActive === whiteboardPromptVisible) return;
+      whiteboardPromptVisible = promptActive;
+      if (!disposed) {
+        setWhiteboardPromptActive(promptActive);
+      }
+    };
+
+    const syncZones = (zones = []) => {
+      const nextIds = new Set(zones.map((zone) => zone.id));
+
+      zoneGroups.forEach((group, zoneId) => {
+        if (nextIds.has(zoneId)) return;
+        zonesRoot.remove(group);
+        disposeZoneGroup(group);
+        zoneGroups.delete(zoneId);
+        activeTriggerIds.delete(zoneId);
+      });
+
+      zones.forEach((zone) => {
+        let group = zoneGroups.get(zone.id);
+        if (!group) {
+          group = createZoneGroup(zone);
+          zonesRoot.add(group);
+          zoneGroups.set(zone.id, group);
+        } else {
+          applyZoneTransform(group, zone);
+        }
+        group.visible = debugOpenRef.current;
+      });
+    };
+
+    const setZonesVisible = (visible) => {
+      zoneGroups.forEach((group) => {
+        group.visible = visible;
+      });
+    };
 
     const transformControls = new TransformControls(camera, renderer.domElement);
     transformControls.setMode('translate');
@@ -448,14 +601,39 @@ export default function LidcStorylineRoom({ onClose }) {
       return roomBounds;
     };
 
-    const getActiveTransformTarget = () => (
-      debugTargetActive === DEBUG_TARGETS.WHITEBOARD ? whiteboardGroup : roomContentGroup
-    );
+    const getActiveTransformTarget = () => {
+      if (debugTargetActive === DEBUG_TARGETS.ZONE && selectedZoneIdActive) {
+        return zoneGroups.get(selectedZoneIdActive) ?? null;
+      }
+      if (debugTargetActive === DEBUG_TARGETS.WHITEBOARD) return whiteboardGroup;
+      return roomContentGroup;
+    };
+
+    const readSceneTransformFromGroups = () => {
+      const zones = (transformRef.current.zones ?? []).map((zone) => {
+        const group = zoneGroups.get(zone.id);
+        if (!group) return zone;
+        return readZoneFromGroup(group, {
+          id: zone.id,
+          type: zone.type,
+          label: zone.label,
+          eventId: zone.eventId,
+        });
+      });
+
+      return readSceneTransform(
+        roomContentGroup,
+        whiteboardGroup,
+        transformRef.current.player,
+        zones,
+      );
+    };
 
     const applySceneTransform = (config) => {
       if (!roomContentGroup.children.length || !whiteboardGroup) return;
       applyObjectTransform(roomContentGroup, config.room);
       applyObjectTransform(whiteboardGroup, config.whiteboard);
+      syncZones(config.zones ?? transformRef.current.zones ?? []);
       refreshRoomBounds();
     };
 
@@ -464,14 +642,9 @@ export default function LidcStorylineRoom({ onClose }) {
       if (whiteboardGroup) {
         applyObjectTransform(whiteboardGroup, config.whiteboard);
       }
+      syncZones(config.zones ?? []);
       refreshRoomBounds();
     };
-
-    const readSceneTransformFromGroups = () => readSceneTransform(
-      roomContentGroup,
-      whiteboardGroup,
-      transformRef.current.player,
-    );
 
     const resetWhiteboardPlacement = () => {
       if (!whiteboardGroup || !autoWhiteboardTransform) return;
@@ -513,7 +686,19 @@ export default function LidcStorylineRoom({ onClose }) {
       }
 
       camera.position.set(spawnX, spawnY, spawnZ);
-      camera.lookAt(spawnX, spawnY, center.z);
+
+      zonesRoot.updateMatrixWorld(true);
+      const safeSpawn = findSpawnOutsideCollisionZones(
+        camera.position,
+        config.zones ?? transformRef.current.zones ?? [],
+        zoneGroups,
+        roomBounds,
+        ROOM_WALL_MARGIN,
+        PLAYER_COLLISION_RADIUS,
+      );
+      camera.position.copy(safeSpawn);
+
+      camera.lookAt(safeSpawn.x, safeSpawn.y, center.z);
       camera.rotation.order = 'YXZ';
     };
 
@@ -561,10 +746,14 @@ export default function LidcStorylineRoom({ onClose }) {
       applySceneTransform,
       applyPlayerTransform,
       resetWhiteboardPlacement,
+      syncZones,
+      setZonesVisible,
       setDebugEnabled: (enabled) => {
+        setZonesVisible(enabled);
         if (enabled) {
           const target = getActiveTransformTarget();
           if (target) transformControls.attach(target);
+          else transformControls.detach();
         } else {
           transformControls.detach();
         }
@@ -574,6 +763,15 @@ export default function LidcStorylineRoom({ onClose }) {
         if (debugOpenRef.current) {
           const activeTarget = getActiveTransformTarget();
           if (activeTarget) transformControls.attach(activeTarget);
+          else transformControls.detach();
+        }
+      },
+      setSelectedZoneId: (zoneId) => {
+        selectedZoneIdActive = zoneId;
+        if (debugOpenRef.current && debugTargetActive === DEBUG_TARGETS.ZONE) {
+          const activeTarget = getActiveTransformTarget();
+          if (activeTarget) transformControls.attach(activeTarget);
+          else transformControls.detach();
         }
       },
       setTransformMode: (mode) => {
@@ -691,6 +889,7 @@ export default function LidcStorylineRoom({ onClose }) {
         } else {
           applyObjectTransform(roomContentGroup, initialTransform.room);
           initialTransform.whiteboard = readObjectTransform(whiteboardGroup);
+          syncZones(initialTransform.zones ?? []);
           refreshRoomBounds();
         }
 
@@ -716,6 +915,18 @@ export default function LidcStorylineRoom({ onClose }) {
 
     const onKeyDown = (event) => {
       if (event.target?.tagName === 'INPUT') return;
+
+      if (
+        event.code === 'KeyE'
+        && !debugOpenRef.current
+        && whiteboardPromptActiveRef.current
+        && !whiteboardOpenRef.current
+      ) {
+        event.preventDefault();
+        setWhiteboardOpen(true);
+        setWhiteboardPromptActive(false);
+        return;
+      }
 
       if (debugOpenRef.current) {
         if (event.code === 'KeyG') {
@@ -887,6 +1098,36 @@ export default function LidcStorylineRoom({ onClose }) {
           camera.position.copy(resolved);
         }
 
+        zonesRoot.updateMatrixWorld(true);
+        camera.position.copy(resolveCollisionZones(
+          camera.position,
+          transformRef.current.zones ?? [],
+          zoneGroups,
+          PLAYER_COLLISION_RADIUS,
+        ));
+
+        playerPoint.copy(camera.position);
+        updateZoneTriggers(
+          playerPoint,
+          transformRef.current.zones ?? [],
+          zoneGroups,
+          activeTriggerIds,
+          {
+            onEnter: (zone) => {
+              window.dispatchEvent(new CustomEvent('lidc-storyline-zone-enter', { detail: zone }));
+              if (!disposed) {
+                setLastTriggerEvent({ eventId: zone.eventId, label: zone.label });
+              }
+              syncWhiteboardPrompt();
+            },
+            onExit: () => {
+              syncWhiteboardPrompt();
+            },
+          },
+        );
+
+        syncWhiteboardPrompt();
+
         camera.position.x = THREE.MathUtils.clamp(
           camera.position.x,
           roomBounds.min.x + ROOM_WALL_MARGIN,
@@ -931,6 +1172,8 @@ export default function LidcStorylineRoom({ onClose }) {
       resizeObserver.disconnect();
       transformControls.detach();
       transformControls.dispose();
+      zoneGroups.forEach((group) => disposeZoneGroup(group));
+      zoneGroups.clear();
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       renderer.domElement.removeEventListener('mousedown', onMouseDown);
@@ -1016,10 +1259,15 @@ export default function LidcStorylineRoom({ onClose }) {
     };
   }, []);
 
-  const activeTargetKey = debugTarget === DEBUG_TARGETS.WHITEBOARD ? 'whiteboard' : 'room';
+  const handleDebugTargetChange = useCallback((target) => {
+    setDebugTarget(target);
+    if (target !== DEBUG_TARGETS.ZONE) {
+      setSelectedZoneId(null);
+    }
+  }, []);
 
   return (
-    <div className={`lidc-storyline-root ${debugOpen ? 'is-debug-open' : ''}`} role="dialog" aria-modal="true" aria-label={t('lidc.storyline.title')}>
+    <div className={`lidc-storyline-root ${debugOpen ? 'is-debug-open' : ''} ${whiteboardOpen ? 'is-whiteboard-open' : ''}`} role="dialog" aria-modal="true" aria-label={t('lidc.storyline.title')}>
       <div ref={containerRef} className="lidc-storyline-canvas" />
 
       {loading && (
@@ -1041,13 +1289,19 @@ export default function LidcStorylineRoom({ onClose }) {
         </div>
       )}
 
-      {!loading && !loadError && !debugOpen && !whiteboardOpen && (
+      {!loading && !loadError && !debugOpen && !whiteboardOpen && whiteboardPromptActive && (
+        <div className="lidc-storyline-interact-prompt">
+          <p>{t('lidc.storyline.whiteboardPrompt')}</p>
+        </div>
+      )}
+
+      {!loading && !loadError && !debugOpen && !whiteboardOpen && !whiteboardPromptActive && (
         <div className="lidc-storyline-hint">
           <p>{t('lidc.storyline.controlsHint')}</p>
         </div>
       )}
 
-      {!loading && !loadError && (
+      {!loading && !loadError && !whiteboardOpen && (
         <button
           type="button"
           className={`lidc-storyline-debug-toggle ${debugOpen ? 'is-active' : ''}`}
@@ -1066,14 +1320,20 @@ export default function LidcStorylineRoom({ onClose }) {
           transform={transform}
           transformMode={transformMode}
           debugTarget={debugTarget}
+          selectedZoneId={selectedZoneId}
           scaleLinked={scaleLinked}
           cameraPosition={cameraPosition}
           saveStatus={saveStatus}
-          onDebugTargetChange={setDebugTarget}
+          lastTriggerEvent={lastTriggerEvent}
+          onDebugTargetChange={handleDebugTargetChange}
+          onSelectZone={handleSelectZone}
+          onAddZone={handleAddZone}
+          onRemoveZone={handleRemoveZone}
+          onZoneMetaChange={handleZoneMetaChange}
           onScaleLinkedChange={setScaleLinked}
           onTransformModeChange={setTransformMode}
-          onTargetPositionChange={(position) => applyTargetVectorUpdate(activeTargetKey, 'position', position)}
-          onTargetRotationChange={(rotation) => applyTargetVectorUpdate(activeTargetKey, 'rotation', rotation)}
+          onTargetPositionChange={(position) => applyActiveTransformPatch({ position })}
+          onTargetRotationChange={(rotation) => applyActiveTransformPatch({ rotation })}
           onTargetScaleAxisChange={applyTargetScaleAxisUpdate}
           onPlayerChange={applyPlayerUpdate}
           onSave={handleSave}
@@ -1086,38 +1346,20 @@ export default function LidcStorylineRoom({ onClose }) {
       )}
 
       {whiteboardOpen && (
-        <div className="lidc-storyline-whiteboard-panel">
-          <header className="lidc-storyline-whiteboard-head">
-            <h2>{t('lidc.storyline.whiteboardTitle')}</h2>
-            <button
-              type="button"
-              className="lidc-storyline-whiteboard-close"
-              onClick={() => setWhiteboardOpen(false)}
-              aria-label={t('lidc.storyline.closePanel')}
-            >
-              <X size={16} />
-            </button>
-          </header>
-          <div className="lidc-storyline-whiteboard-body">
-            <p>{t('lidc.storyline.whiteboardBody')}</p>
-          </div>
-          <footer className="lidc-storyline-whiteboard-foot">
-            <button type="button" className="lidc-storyline-btn" onClick={() => setWhiteboardOpen(false)}>
-              {t('lidc.storyline.backToRoom')}
-            </button>
-          </footer>
-        </div>
+        <LidcStorylineWhiteboard onClose={() => setWhiteboardOpen(false)} />
       )}
 
-      <button
-        type="button"
-        className="lidc-storyline-close"
-        onClick={onClose}
-        aria-label={t('lidc.storyline.close')}
-        title={t('lidc.storyline.close')}
-      >
-        <X size={18} />
-      </button>
+      {!whiteboardOpen && (
+        <button
+          type="button"
+          className="lidc-storyline-close"
+          onClick={onClose}
+          aria-label={t('lidc.storyline.close')}
+          title={t('lidc.storyline.close')}
+        >
+          <X size={18} />
+        </button>
+      )}
     </div>
   );
 }

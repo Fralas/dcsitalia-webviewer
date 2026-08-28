@@ -6,6 +6,7 @@ export const LIDC_STORYLINE_TRANSFORM_STORAGE_KEY = 'lidc-storyline-room-transfo
 export const DEBUG_TARGETS = Object.freeze({
   ROOM: 'room',
   WHITEBOARD: 'whiteboard',
+  ZONE: 'zone',
 });
 
 export function cloneTransform(value) {
@@ -28,6 +29,7 @@ export function loadSavedTransform() {
       room: { ...defaults.room, ...parsed.room },
       whiteboard: { ...defaults.whiteboard, ...parsed.whiteboard },
       player: { ...defaults.player, ...parsed.player },
+      zones: Array.isArray(parsed.zones) ? parsed.zones : defaults.zones,
     };
   } catch {
     return defaults;
@@ -119,11 +121,12 @@ export function readObjectTransform(group) {
   };
 }
 
-export function readSceneTransform(roomContentGroup, whiteboardGroup, playerSettings) {
+export function readSceneTransform(roomContentGroup, whiteboardGroup, playerSettings, zones = []) {
   return {
     room: readObjectTransform(roomContentGroup),
     whiteboard: readObjectTransform(whiteboardGroup),
     player: { ...playerSettings },
+    zones: zones.map((zone) => ({ ...zone })),
   };
 }
 
