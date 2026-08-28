@@ -179,6 +179,96 @@
   -webkit-backdrop-filter: blur(1px);
 }
 
+.lidc-whiteboard-focus-card.is-character {
+  width: min(920px, calc(100vw - 32px));
+  max-height: min(88vh, 900px);
+  overflow: auto;
+  padding: 20px 22px 24px;
+}
+
+.lidc-whiteboard-dossier-head {
+  display: grid;
+  grid-template-columns: minmax(140px, 200px) minmax(0, 1fr);
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.lidc-whiteboard-dossier-head .lidc-whiteboard-focus-photo {
+  margin-bottom: 0;
+}
+
+.lidc-whiteboard-dossier-head h2 {
+  margin: 0 0 12px;
+  font-family: 'Segoe Print', 'Bradley Hand', 'Comic Sans MS', cursive;
+  font-size: clamp(1.1rem, 2.2vw, 1.45rem);
+  line-height: 1.25;
+}
+
+.lidc-whiteboard-dossier-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+  margin: 0;
+}
+
+.lidc-whiteboard-dossier-meta div {
+  display: grid;
+  gap: 2px;
+}
+
+.lidc-whiteboard-dossier-meta dt {
+  margin: 0;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6f7680;
+}
+
+.lidc-whiteboard-dossier-meta dd {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--wb-ink);
+}
+
+.lidc-whiteboard-dossier section + section {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed rgba(47, 58, 68, 0.18);
+}
+
+.lidc-whiteboard-dossier h3 {
+  margin: 0 0 8px;
+  font-size: 0.88rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #556070;
+}
+
+.lidc-whiteboard-dossier p {
+  margin: 0 0 10px;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--wb-ink);
+}
+
+.lidc-whiteboard-dossier ul,
+.lidc-whiteboard-dossier ol {
+  margin: 0;
+  padding-left: 1.15rem;
+  color: var(--wb-ink);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.lidc-whiteboard-dossier-flow li + li {
+  margin-top: 4px;
+}
+
+.lidc-whiteboard-dossier-flow--chain li {
+  font-weight: 600;
+}
+
 .lidc-whiteboard-focus-card {
   position: absolute;
   left: 50%;
@@ -268,5 +358,13 @@
 
   .lidc-whiteboard-frame {
     transform: rotateX(3deg) translateZ(-80px);
+  }
+
+  .lidc-whiteboard-dossier-head {
+    grid-template-columns: 1fr;
+  }
+
+  .lidc-whiteboard-dossier-meta {
+    grid-template-columns: 1fr;
   }
 }

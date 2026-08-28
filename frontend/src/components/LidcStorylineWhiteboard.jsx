@@ -3,6 +3,155 @@ import { LIDC_STORYLINE_WHITEBOARD_ITEMS } from '../config/lidcStorylineWhiteboa
 import { t } from '../utils/locale';
 import './LidcStorylineWhiteboard.css';
 
+function renderParagraphs(text) {
+  if (typeof text !== 'string' || !text.trim()) return null;
+
+  return text.split('\n\n').map((paragraph) => (
+    <p key={paragraph.slice(0, 32)}>{paragraph}</p>
+  ));
+}
+
+function DossierSection({ base, sectionId }) {
+  const title = t(`${base}.sections.${sectionId}`);
+
+  switch (sectionId) {
+    case 'profile':
+    case 'personality':
+    case 'secret':
+      return (
+        <section>
+          <h3>{title}</h3>
+          {renderParagraphs(t(`${base}.${sectionId}`))}
+        </section>
+      );
+
+    case 'appearance': {
+      const appearanceItems = t(`${base}.appearanceItems`);
+      return (
+        <section>
+          <h3>{title}</h3>
+          <ul>
+            {Array.isArray(appearanceItems) && appearanceItems.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </section>
+      );
+    }
+
+    case 'network': {
+      const networkSteps = t(`${base}.networkSteps`);
+      return (
+        <section>
+          <h3>{title}</h3>
+          <ol className="lidc-whiteboard-dossier-flow">
+            {Array.isArray(networkSteps) && networkSteps.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ol>
+          {renderParagraphs(t(`${base}.networkNote`))}
+        </section>
+      );
+    }
+
+    case 'resources': {
+      const resourceItems = t(`${base}.resourceItems`);
+      return (
+        <section>
+          <h3>{title}</h3>
+          <p>{t(`${base}.resourcesIntro`)}</p>
+          <ul>
+            {Array.isArray(resourceItems) && resourceItems.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </section>
+      );
+    }
+
+    case 'relationship': {
+      const relationshipSteps = t(`${base}.relationshipSteps`);
+      return (
+        <section>
+          <h3>{title}</h3>
+          <ol className="lidc-whiteboard-dossier-flow">
+            {Array.isArray(relationshipSteps) && relationshipSteps.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ol>
+          {renderParagraphs(t(`${base}.relationshipNote`))}
+        </section>
+      );
+    }
+
+    case 'suppliedMaterial': {
+      const suppliedMaterialItems = t(`${base}.suppliedMaterialItems`);
+      return (
+        <section>
+          <h3>{title}</h3>
+          <p>{t(`${base}.suppliedMaterialIntro`)}</p>
+          <ul>
+            {Array.isArray(suppliedMaterialItems) && suppliedMaterialItems.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          {renderParagraphs(t(`${base}.suppliedMaterialNote`))}
+        </section>
+      );
+    }
+
+    case 'treeLink': {
+      const treeLinkSteps = t(`${base}.treeLinkSteps`);
+      return (
+        <section>
+          <h3>{title}</h3>
+          <ol className="lidc-whiteboard-dossier-flow lidc-whiteboard-dossier-flow--chain">
+            {Array.isArray(treeLinkSteps) && treeLinkSteps.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ol>
+          {renderParagraphs(t(`${base}.treeLinkNote`))}
+        </section>
+      );
+    }
+
+    default:
+      return null;
+  }
+}
+
+function CharacterDossier({ itemId }) {
+  const base = `lidc.storyline.whiteboardItems.${itemId}`;
+  const metaFields = ['name', 'nickname', 'age', 'nationality', 'origin', 'faction', 'role', 'category', 'association'];
+  const item = LIDC_STORYLINE_WHITEBOARD_ITEMS.find((entry) => entry.id === itemId);
+  const sections = item?.dossierSections ?? ['profile', 'personality', 'appearance'];
+
+  return (
+    <div className="lidc-whiteboard-dossier">
+      <header className="lidc-whiteboard-dossier-head">
+        <div className="lidc-whiteboard-focus-photo">
+          <img src={item?.image} alt="" draggable={false} />
+        </div>
+        <div>
+          <h2>{t(`${base}.title`)}</h2>
+          <dl className="lidc-whiteboard-dossier-meta">
+            {metaFields.map((field) => (
+              <div key={field}>
+                <dt>{t(`${base}.meta.${field}.label`)}</dt>
+                <dd>{t(`${base}.meta.${field}.value`)}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </header>
+
+      {sections.map((sectionId) => (
+        <DossierSection key={sectionId} base={base} sectionId={sectionId} />
+      ))}
+    </div>
+  );
+}
+
 export default function LidcStorylineWhiteboard({ onClose }) {
   const [activeItemId, setActiveItemId] = useState(null);
   const [showExitHint, setShowExitHint] = useState(true);
@@ -43,29 +192,29 @@ export default function LidcStorylineWhiteboard({ onClose }) {
           <div className="lidc-whiteboard-chalk-dust" aria-hidden="true" />
 
           <div className="lidc-whiteboard-content">
-          {LIDC_STORYLINE_WHITEBOARD_ITEMS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={`lidc-whiteboard-pin ${activeItemId === item.id ? 'is-active' : ''}`}
-              style={{
-                left: `${item.x}%`,
-                top: `${item.y}%`,
-                width: `${item.width}%`,
-                '--pin-rotation': `${item.rotation}deg`,
-                transform: `rotate(${item.rotation}deg)`,
-              }}
-              onClick={() => setActiveItemId((current) => (current === item.id ? null : item.id))}
-              aria-label={t(item.labelKey)}
-            >
-              <span className="lidc-whiteboard-tape lidc-whiteboard-tape--left" aria-hidden="true" />
-              <span className="lidc-whiteboard-tape lidc-whiteboard-tape--right" aria-hidden="true" />
-              <span className="lidc-whiteboard-photo">
-                <img src={item.image} alt="" draggable={false} />
-              </span>
-              <span className="lidc-whiteboard-caption">{t(item.labelKey)}</span>
-            </button>
-          ))}
+            {LIDC_STORYLINE_WHITEBOARD_ITEMS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`lidc-whiteboard-pin ${activeItemId === item.id ? 'is-active' : ''}`}
+                style={{
+                  left: `${item.x}%`,
+                  top: `${item.y}%`,
+                  width: `${item.width}%`,
+                  '--pin-rotation': `${item.rotation}deg`,
+                  transform: `rotate(${item.rotation}deg)`,
+                }}
+                onClick={() => setActiveItemId((current) => (current === item.id ? null : item.id))}
+                aria-label={t(item.labelKey)}
+              >
+                <span className="lidc-whiteboard-tape lidc-whiteboard-tape--left" aria-hidden="true" />
+                <span className="lidc-whiteboard-tape lidc-whiteboard-tape--right" aria-hidden="true" />
+                <span className="lidc-whiteboard-photo">
+                  <img src={item.image} alt="" draggable={false} />
+                </span>
+                <span className="lidc-whiteboard-caption">{t(item.labelKey)}</span>
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -79,12 +228,18 @@ export default function LidcStorylineWhiteboard({ onClose }) {
       )}
 
       {activeItem && (
-        <article className="lidc-whiteboard-focus-card" aria-live="polite">
-          <div className="lidc-whiteboard-focus-photo">
-            <img src={activeItem.image} alt="" draggable={false} />
-          </div>
-          <h2>{t(activeItem.detailTitleKey)}</h2>
-          <p>{t(activeItem.detailBodyKey)}</p>
+        <article className={`lidc-whiteboard-focus-card ${activeItem.type === 'character' ? 'is-character' : ''}`} aria-live="polite">
+          {activeItem.type === 'character' ? (
+            <CharacterDossier itemId={activeItem.id} />
+          ) : (
+            <>
+              <div className="lidc-whiteboard-focus-photo">
+                <img src={activeItem.image} alt="" draggable={false} />
+              </div>
+              <h2>{t(activeItem.detailTitleKey)}</h2>
+              <p>{t(`${activeItem.detailTitleKey.replace('.title', '.body')}`)}</p>
+            </>
+          )}
         </article>
       )}
 
