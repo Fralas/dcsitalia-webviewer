@@ -1,6 +1,6 @@
 import { Copy, Download, Link2, Plus, RotateCcw, Save, Trash2, Unlink, X } from 'lucide-react';
 import { DEBUG_TARGETS } from '../utils/lidcStorylineTransform';
-import { ZONE_TYPES } from '../utils/lidcStorylineZones';
+import { TERMINAL_ZONE_EVENT_ID, WHITEBOARD_ZONE_EVENT_ID, ZONE_TYPES } from '../utils/lidcStorylineZones';
 import { t } from '../utils/locale';
 
 function NumberField({ label, value, step = 0.01, onChange }) {
@@ -176,11 +176,17 @@ export default function LidcStorylineDebugPanel({
               onChange={(label) => onZoneMetaChange(selectedZone.id, { label })}
             />
             {selectedZone.type === ZONE_TYPES.TRIGGER && (
-              <TextField
-                label={t('lidc.storyline.debug.zoneEventId')}
-                value={selectedZone.eventId}
-                onChange={(eventId) => onZoneMetaChange(selectedZone.id, { eventId })}
-              />
+              <label className="lidc-storyline-debug-field">
+                <span>{t('lidc.storyline.debug.zoneEventId')}</span>
+                <select
+                  value={selectedZone.eventId}
+                  onChange={(event) => onZoneMetaChange(selectedZone.id, { eventId: event.target.value })}
+                >
+                  <option value="">{t('lidc.storyline.debug.zoneEventNone')}</option>
+                  <option value={WHITEBOARD_ZONE_EVENT_ID}>{WHITEBOARD_ZONE_EVENT_ID}</option>
+                  <option value={TERMINAL_ZONE_EVENT_ID}>{TERMINAL_ZONE_EVENT_ID}</option>
+                </select>
+              </label>
             )}
           </>
         )}
@@ -238,11 +244,20 @@ export default function LidcStorylineDebugPanel({
             <button
               type="button"
               className="lidc-storyline-debug-zone-add is-trigger"
-              onClick={() => onAddZone(ZONE_TYPES.TRIGGER)}
+              onClick={() => onAddZone(ZONE_TYPES.TRIGGER, { eventId: WHITEBOARD_ZONE_EVENT_ID, label: 'Whiteboard' })}
               title={t('lidc.storyline.debug.addTriggerZone')}
             >
               <Plus size={14} />
               {t('lidc.storyline.debug.addTriggerZone')}
+            </button>
+            <button
+              type="button"
+              className="lidc-storyline-debug-zone-add is-trigger"
+              onClick={() => onAddZone(ZONE_TYPES.TRIGGER, { eventId: TERMINAL_ZONE_EVENT_ID, label: 'Terminal' })}
+              title={t('lidc.storyline.debug.addTerminalTriggerZone')}
+            >
+              <Plus size={14} />
+              {t('lidc.storyline.debug.addTerminalTriggerZone')}
             </button>
             <button
               type="button"

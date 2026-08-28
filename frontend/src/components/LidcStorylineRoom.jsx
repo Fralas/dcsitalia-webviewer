@@ -7,6 +7,7 @@ import roomModelUrl from '../../3D/LIDC/room.glb';
 import whiteboardModelUrl from '../../3D/LIDC/whiteboard.glb';
 import LidcStorylineDebugPanel from './LidcStorylineDebugPanel';
 import LidcStorylineWhiteboard from './LidcStorylineWhiteboard';
+import LidcStorylineTerminal from './LidcStorylineTerminal';
 import { LidcStorylineControlsHint, LidcStorylineInteractPrompt } from './LidcStorylineHud';
 import { t } from '../utils/locale';
 import {
@@ -34,10 +35,12 @@ import {
   createZoneGroup,
   disposeZoneGroup,
   findSpawnOutsideCollisionZones,
-  getActiveWhiteboardTrigger,
+  getActiveInteractEventId,
   readZoneFromGroup,
   resolveCollisionZones,
+  TERMINAL_ZONE_EVENT_ID,
   updateZoneTriggers,
+  WHITEBOARD_ZONE_EVENT_ID,
   ZONE_TYPES,
 } from '../utils/lidcStorylineZones';
 import { syncWhiteboard3DDecorations } from '../utils/lidcStorylineWhiteboard3D';
@@ -224,7 +227,8 @@ export default function LidcStorylineRoom({ onClose }) {
   const transformRef = useRef(loadSavedTransform());
   const debugOpenRef = useRef(false);
   const whiteboardOpenRef = useRef(false);
-  const whiteboardPromptActiveRef = useRef(false);
+  const terminalOpenRef = useRef(false);
+  const activeInteractEventRef = useRef(null);
   const debugTargetRef = useRef(DEBUG_TARGETS.WHITEBOARD);
   const selectedZoneIdRef = useRef(null);
   const selectedEasterEggIdRef = useRef(null);
@@ -239,7 +243,8 @@ export default function LidcStorylineRoom({ onClose }) {
   const [selectedEasterEggId, setSelectedEasterEggId] = useState(null);
   const [scaleLinked, setScaleLinked] = useState(true);
   const [whiteboardOpen, setWhiteboardOpen] = useState(false);
-  const [whiteboardPromptActive, setWhiteboardPromptActive] = useState(false);
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [activeInteractEvent, setActiveInteractEvent] = useState(null);
   const [showControlsHint, setShowControlsHint] = useState(false);
   const [controlsHintFading, setControlsHintFading] = useState(false);
   const [transform, setTransform] = useState(() => loadSavedTransform());
@@ -257,8 +262,12 @@ export default function LidcStorylineRoom({ onClose }) {
   }, [whiteboardOpen]);
 
   useEffect(() => {
-    whiteboardPromptActiveRef.current = whiteboardPromptActive;
-  }, [whiteboardPromptActive]);
+    terminalOpenRef.current = terminalOpen;
+  }, [terminalOpen]);
+
+  useEffect(() => {
+    activeInteractEventRef.current = activeInteractEvent;
+  }, [activeInteractEvent]);
 
   useEffect(() => {
     if (loading || loadError) {
@@ -388,9 +397,9 @@ export default function LidcStorylineRoom({ onClose }) {
     });
   }, []);
 
-  const handleAddZone = useCallback((type) => {
+  const handleAddZone = useCallback((type, options = {}) => {
     const cameraPos = sceneApiRef.current?.readCameraPosition?.() ?? [0, 1, 0];
-    const zone = createDefaultZone(type, cameraPos);
+    const zone = createDefaultZone(type, cameraPos, options);
 
     setTransform((current) => {
       const next = cloneTransform(current);
@@ -542,7 +551,7 @@ export default function LidcStorylineRoom({ onClose }) {
     const isPointerLocked = () => document.pointerLockElement === lockElement;
 
     const requestPointerLock = () => {
-      if (disposed || debugOpenRef.current || whiteboardOpenRef.current || isTransformDragging) return;
+      if (disposed || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current || isTransformDragging) return;
       if (isPointerLocked()) return;
       lockElement.requestPointerLock?.({ unadjustedMovement: true });
     };
@@ -610,18 +619,18 @@ export default function LidcStorylineRoom({ onClose }) {
     const easterEggGroups = new Map();
     const activeTriggerIds = new Set();
     const playerPoint = new THREE.Vector3();
-    let whiteboardPromptVisible = false;
+    let interactPromptVisible = null;
 
-    const syncWhiteboardPrompt = () => {
-      const promptActive = Boolean(getActiveWhiteboardTrigger(
+    const syncInteractPrompt = () => {
+      const eventId = getActiveInteractEventId(
         transformRef.current.zones ?? [],
         activeTriggerIds,
-      ));
+      );
 
-      if (promptActive === whiteboardPromptVisible) return;
-      whiteboardPromptVisible = promptActive;
+      if (eventId === interactPromptVisible) return;
+      interactPromptVisible = eventId;
       if (!disposed) {
-        setWhiteboardPromptActive(promptActive);
+        setActiveInteractEvent(eventId);
       }
     };
 
@@ -1088,13 +1097,22 @@ export default function LidcStorylineRoom({ onClose }) {
       if (
         event.code === 'KeyE'
         && !debugOpenRef.current
-        && whiteboardPromptActiveRef.current
         && !whiteboardOpenRef.current
+        && !terminalOpenRef.current
       ) {
-        event.preventDefault();
-        setWhiteboardOpen(true);
-        setWhiteboardPromptActive(false);
-        return;
+        if (activeInteractEventRef.current === WHITEBOARD_ZONE_EVENT_ID) {
+          event.preventDefault();
+          setWhiteboardOpen(true);
+          setActiveInteractEvent(null);
+          return;
+        }
+
+        if (activeInteractEventRef.current === TERMINAL_ZONE_EVENT_ID) {
+          event.preventDefault();
+          setTerminalOpen(true);
+          setActiveInteractEvent(null);
+          return;
+        }
       }
 
       if (debugOpenRef.current) {
@@ -1168,7 +1186,7 @@ export default function LidcStorylineRoom({ onClose }) {
     };
 
     const onPointerDown = (event) => {
-      if (event.button !== 0 || isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current) {
+      if (event.button !== 0 || isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current) {
         return;
       }
 
@@ -1180,7 +1198,7 @@ export default function LidcStorylineRoom({ onClose }) {
     };
 
     const onPointerUp = (event) => {
-      if (event.button !== 0 || isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current) {
+      if (event.button !== 0 || isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current) {
         return;
       }
 
@@ -1194,7 +1212,7 @@ export default function LidcStorylineRoom({ onClose }) {
     };
 
     const onPointerMove = (event) => {
-      if (isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current) return;
+      if (isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current) return;
       if (!isPointerLocked()) return;
 
       queueLookDelta(event.movementX, event.movementY);
@@ -1202,7 +1220,7 @@ export default function LidcStorylineRoom({ onClose }) {
     };
 
     const onPointerRawUpdate = (event) => {
-      if (isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current) return;
+      if (isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current) return;
       if (!isPointerLocked()) return;
 
       if (typeof event.getCoalescedEvents === 'function') {
@@ -1229,7 +1247,7 @@ export default function LidcStorylineRoom({ onClose }) {
 
       applyPendingLook();
 
-      if (roomBounds && !debugOpenRef.current && !isTransformDragging && !whiteboardOpenRef.current) {
+      if (roomBounds && !debugOpenRef.current && !isTransformDragging && !whiteboardOpenRef.current && !terminalOpenRef.current) {
         direction.set(0, 0, -1).applyQuaternion(camera.quaternion);
         direction.y = 0;
         if (direction.lengthSq() > 0) direction.normalize();
@@ -1261,34 +1279,38 @@ export default function LidcStorylineRoom({ onClose }) {
         }
 
         zonesRoot.updateMatrixWorld(true);
+
+        const runZoneTriggers = () => {
+          playerPoint.copy(camera.position);
+          updateZoneTriggers(
+            playerPoint,
+            transformRef.current.zones ?? [],
+            zoneGroups,
+            activeTriggerIds,
+            {
+              onEnter: (zone) => {
+                window.dispatchEvent(new CustomEvent('lidc-storyline-zone-enter', { detail: zone }));
+                if (!disposed) {
+                  setLastTriggerEvent({ eventId: zone.eventId, label: zone.label });
+                }
+                syncInteractPrompt();
+              },
+              onExit: () => {
+                syncInteractPrompt();
+              },
+            },
+          );
+          syncInteractPrompt();
+        };
+
+        runZoneTriggers();
         camera.position.copy(resolveCollisionZones(
           camera.position,
           transformRef.current.zones ?? [],
           zoneGroups,
           PLAYER_COLLISION_RADIUS,
         ));
-
-        playerPoint.copy(camera.position);
-        updateZoneTriggers(
-          playerPoint,
-          transformRef.current.zones ?? [],
-          zoneGroups,
-          activeTriggerIds,
-          {
-            onEnter: (zone) => {
-              window.dispatchEvent(new CustomEvent('lidc-storyline-zone-enter', { detail: zone }));
-              if (!disposed) {
-                setLastTriggerEvent({ eventId: zone.eventId, label: zone.label });
-              }
-              syncWhiteboardPrompt();
-            },
-            onExit: () => {
-              syncWhiteboardPrompt();
-            },
-          },
-        );
-
-        syncWhiteboardPrompt();
+        runZoneTriggers();
 
         camera.position.x = THREE.MathUtils.clamp(
           camera.position.x,
@@ -1392,6 +1414,10 @@ export default function LidcStorylineRoom({ onClose }) {
           setWhiteboardOpen(false);
           return;
         }
+        if (terminalOpen) {
+          setTerminalOpen(false);
+          return;
+        }
         if (debugOpen) {
           setDebugOpen(false);
           return;
@@ -1402,20 +1428,20 @@ export default function LidcStorylineRoom({ onClose }) {
 
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [debugOpen, whiteboardOpen, onClose]);
+  }, [debugOpen, whiteboardOpen, terminalOpen, onClose]);
 
   useEffect(() => {
     const api = sceneApiRef.current;
     if (!api) return undefined;
 
-    if (debugOpen || whiteboardOpen || loading || loadError) {
+    if (debugOpen || whiteboardOpen || terminalOpen || loading || loadError) {
       api.exitPointerLock?.();
       return undefined;
     }
 
     const frameId = window.requestAnimationFrame(() => api.requestPointerLock?.());
     return () => window.cancelAnimationFrame(frameId);
-  }, [debugOpen, whiteboardOpen, loading, loadError]);
+  }, [debugOpen, whiteboardOpen, terminalOpen, loading, loadError]);
 
   useEffect(() => {
     document.body.classList.add('lidc-storyline-open');
@@ -1436,7 +1462,7 @@ export default function LidcStorylineRoom({ onClose }) {
   }, []);
 
   return (
-    <div className={`lidc-storyline-root ${debugOpen ? 'is-debug-open' : ''} ${whiteboardOpen ? 'is-whiteboard-open' : ''}`} role="dialog" aria-modal="true" aria-label={t('lidc.storyline.title')}>
+    <div className={`lidc-storyline-root ${debugOpen ? 'is-debug-open' : ''} ${whiteboardOpen ? 'is-whiteboard-open' : ''} ${terminalOpen ? 'is-terminal-open' : ''}`} role="dialog" aria-modal="true" aria-label={t('lidc.storyline.title')}>
       <div ref={containerRef} className="lidc-storyline-canvas" />
 
       {loading && (
@@ -1458,21 +1484,28 @@ export default function LidcStorylineRoom({ onClose }) {
         </div>
       )}
 
-      {!loading && !loadError && !debugOpen && !whiteboardOpen && whiteboardPromptActive && (
+      {!loading && !loadError && !debugOpen && !whiteboardOpen && !terminalOpen && activeInteractEvent === WHITEBOARD_ZONE_EVENT_ID && (
         <LidcStorylineInteractPrompt
           keys="E"
           label={t('lidc.storyline.whiteboardPromptAction')}
         />
       )}
 
-      {!loading && !loadError && !debugOpen && !whiteboardOpen && !whiteboardPromptActive && showControlsHint && (
+      {!loading && !loadError && !debugOpen && !whiteboardOpen && !terminalOpen && activeInteractEvent === TERMINAL_ZONE_EVENT_ID && (
+        <LidcStorylineInteractPrompt
+          keys="E"
+          label={t('lidc.storyline.terminalPromptAction')}
+        />
+      )}
+
+      {!loading && !loadError && !debugOpen && !whiteboardOpen && !terminalOpen && !activeInteractEvent && showControlsHint && (
         <LidcStorylineControlsHint
           segments={t('lidc.storyline.controlsHint')}
           fadeOut={controlsHintFading}
         />
       )}
 
-      {!loading && !loadError && !whiteboardOpen && (
+      {!loading && !loadError && !whiteboardOpen && !terminalOpen && (
         <button
           type="button"
           className={`lidc-storyline-debug-toggle ${debugOpen ? 'is-active' : ''}`}
@@ -1522,7 +1555,11 @@ export default function LidcStorylineRoom({ onClose }) {
         <LidcStorylineWhiteboard onClose={() => setWhiteboardOpen(false)} />
       )}
 
-      {!whiteboardOpen && (
+      {terminalOpen && (
+        <LidcStorylineTerminal onClose={() => setTerminalOpen(false)} />
+      )}
+
+      {!whiteboardOpen && !terminalOpen && (
         <button
           type="button"
           className="lidc-storyline-close"

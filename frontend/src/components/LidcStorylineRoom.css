@@ -93,7 +93,8 @@
   border-color: rgba(255, 255, 255, 0.32);
 }
 
-.lidc-storyline-root.is-whiteboard-open .lidc-storyline-canvas {
+.lidc-storyline-root.is-whiteboard-open .lidc-storyline-canvas,
+.lidc-storyline-root.is-terminal-open .lidc-storyline-canvas {
   visibility: hidden;
 }
 
@@ -403,6 +404,17 @@ body.lidc-storyline-open {
 }
 
 .lidc-storyline-debug-field input {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #ffffff;
+  font: inherit;
+}
+
+.lidc-storyline-debug-field select {
   width: 100%;
   min-height: 32px;
   padding: 0 8px;

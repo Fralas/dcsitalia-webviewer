@@ -8,6 +8,23 @@ export const ZONE_TYPES = Object.freeze({
 });
 
 export const WHITEBOARD_ZONE_EVENT_ID = 'whiteboard';
+export const TERMINAL_ZONE_EVENT_ID = 'terminal';
+
+const TRIGGER_EVENT_ALIASES = {
+  whiteboard: WHITEBOARD_ZONE_EVENT_ID,
+  board: WHITEBOARD_ZONE_EVENT_ID,
+  lavagna: WHITEBOARD_ZONE_EVENT_ID,
+  terminal: TERMINAL_ZONE_EVENT_ID,
+  ratos: TERMINAL_ZONE_EVENT_ID,
+  computer: TERMINAL_ZONE_EVENT_ID,
+  pc: TERMINAL_ZONE_EVENT_ID,
+};
+
+export function normalizeZoneEventId(eventId) {
+  const normalized = String(eventId ?? '').trim().toLowerCase();
+  if (!normalized) return '';
+  return TRIGGER_EVENT_ALIASES[normalized] ?? normalized;
+}
 
 const ZONE_COLORS = {
   [ZONE_TYPES.TRIGGER]: 0x3ecf8e,
@@ -15,20 +32,24 @@ const ZONE_COLORS = {
   [ZONE_TYPES.WHITEBOARD_SURFACE]: 0x6ea8ff,
 };
 
-export function createDefaultZone(type, position = [0, 1, 0]) {
+export function createDefaultZone(type, position = [0, 1, 0], options = {}) {
   const id = typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
     : `zone-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
+  const defaultTriggerEventId = options.eventId ?? '';
+
   return {
     id,
     type,
-    label: type === ZONE_TYPES.TRIGGER
-      ? 'Trigger'
-      : type === ZONE_TYPES.WHITEBOARD_SURFACE
-        ? 'Whiteboard surface'
-        : 'Collision',
-    eventId: type === ZONE_TYPES.TRIGGER ? WHITEBOARD_ZONE_EVENT_ID : '',
+    label: options.label ?? (
+      type === ZONE_TYPES.TRIGGER
+        ? (defaultTriggerEventId === TERMINAL_ZONE_EVENT_ID ? 'Terminal' : 'Trigger')
+        : type === ZONE_TYPES.WHITEBOARD_SURFACE
+          ? 'Whiteboard surface'
+          : 'Collision'
+    ),
+    eventId: type === ZONE_TYPES.TRIGGER ? defaultTriggerEventId : '',
     position: position.map((value) => +Number(value).toFixed(4)),
     rotation: [0, 0, 0],
     scale: type === ZONE_TYPES.WHITEBOARD_SURFACE
@@ -94,6 +115,25 @@ export function isPointInZone(point, zoneGroup) {
     && Math.abs(localPoint.y) <= 0.5
     && Math.abs(localPoint.z) <= 0.5
   );
+}
+
+const TRIGGER_SAMPLE_OFFSETS = [
+  [0, 0, 0],
+  [0, -0.35, 0],
+  [0, -0.85, 0],
+  [0, 0.25, 0],
+];
+
+export function isPlayerInTriggerZone(point, zoneGroup) {
+  if (!zoneGroup || !point) return false;
+
+  return TRIGGER_SAMPLE_OFFSETS.some(([offsetX, offsetY, offsetZ]) => {
+    const sample = point.clone();
+    sample.x += offsetX;
+    sample.y += offsetY;
+    sample.z += offsetZ;
+    return isPointInZone(sample, zoneGroup);
+  });
 }
 
 export function pushPointOutOfZone(point, zoneGroup, radius = 0) {
@@ -207,7 +247,7 @@ export function updateZoneTriggers(point, zones, zoneGroups, activeTriggerIds, c
     const group = zoneGroups.get(zone.id);
     if (!group) return;
 
-    const inside = isPointInZone(point, group);
+    const inside = isPlayerInTriggerZone(point, group);
     const wasInside = activeTriggerIds.has(zone.id);
 
     if (inside && !wasInside) {
@@ -220,12 +260,27 @@ export function updateZoneTriggers(point, zones, zoneGroups, activeTriggerIds, c
   });
 }
 
-export function getActiveWhiteboardTrigger(zones, activeTriggerIds) {
+export function getActiveTriggerByEventId(zones, activeTriggerIds, eventId) {
+  const targetEventId = normalizeZoneEventId(eventId);
   return zones.find(
     (zone) => zone.type === ZONE_TYPES.TRIGGER
-      && zone.eventId === WHITEBOARD_ZONE_EVENT_ID
+      && normalizeZoneEventId(zone.eventId) === targetEventId
       && activeTriggerIds.has(zone.id),
   ) ?? null;
+}
+
+export function getActiveInteractEventId(zones, activeTriggerIds) {
+  if (getActiveTriggerByEventId(zones, activeTriggerIds, TERMINAL_ZONE_EVENT_ID)) {
+    return TERMINAL_ZONE_EVENT_ID;
+  }
+  if (getActiveTriggerByEventId(zones, activeTriggerIds, WHITEBOARD_ZONE_EVENT_ID)) {
+    return WHITEBOARD_ZONE_EVENT_ID;
+  }
+  return null;
+}
+
+export function getActiveWhiteboardTrigger(zones, activeTriggerIds) {
+  return getActiveTriggerByEventId(zones, activeTriggerIds, WHITEBOARD_ZONE_EVENT_ID);
 }
 
 export function disposeZoneGroup(group) {
