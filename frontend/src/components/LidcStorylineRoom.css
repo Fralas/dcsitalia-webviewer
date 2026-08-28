@@ -19,11 +19,11 @@
   display: block;
   width: 100%;
   height: 100%;
-  cursor: grab;
+  cursor: none;
 }
 
-.lidc-storyline-canvas canvas:active {
-  cursor: grabbing;
+.lidc-storyline-root.is-pointer-locked {
+  cursor: none;
 }
 
 .lidc-storyline-overlay-panel {

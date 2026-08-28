@@ -349,8 +349,7 @@ export default function LidcStorylineRoom({ onClose }) {
     let isTransformDragging = false;
     let lastMouseX = null;
     let lastMouseY = null;
-    let pointerDownX = 0;
-    let pointerDownY = 0;
+    let pointerDownMovement = 0;
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x1a1a1a);
@@ -364,6 +363,26 @@ export default function LidcStorylineRoom({ onClose }) {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
     container.appendChild(renderer.domElement);
+
+    const canvas = renderer.domElement;
+
+    const isPointerLocked = () => document.pointerLockElement === canvas;
+
+    const requestPointerLock = () => {
+      if (disposed || debugOpenRef.current || whiteboardOpenRef.current || isTransformDragging) return;
+      if (isPointerLocked()) return;
+      canvas.requestPointerLock?.();
+    };
+
+    const exitPointerLock = () => {
+      if (document.pointerLockElement === canvas) {
+        document.exitPointerLock?.();
+      }
+    };
+
+    const onPointerLockChange = () => {
+      container.classList.toggle('is-pointer-locked', isPointerLocked());
+    };
 
     const resize = () => {
       const width = Math.max(container.clientWidth, 1);
@@ -519,10 +538,12 @@ export default function LidcStorylineRoom({ onClose }) {
     const tryInteractWithWhiteboard = (clientX, clientY) => {
       if (debugOpenRef.current || whiteboardMeshes.length === 0) return false;
 
-      const rect = renderer.domElement.getBoundingClientRect();
+      const rect = canvas.getBoundingClientRect();
+      const sampleX = clientX ?? rect.left + rect.width / 2;
+      const sampleY = clientY ?? rect.top + rect.height / 2;
       const pointer = new THREE.Vector2(
-        ((clientX - rect.left) / rect.width) * 2 - 1,
-        -((clientY - rect.top) / rect.height) * 2 + 1,
+        ((sampleX - rect.left) / rect.width) * 2 - 1,
+        -((sampleY - rect.top) / rect.height) * 2 + 1,
       );
 
       raycaster.setFromCamera(pointer, camera);
@@ -567,6 +588,8 @@ export default function LidcStorylineRoom({ onClose }) {
         +camera.position.y.toFixed(3),
         +camera.position.z.toFixed(3),
       ],
+      requestPointerLock,
+      exitPointerLock,
     };
 
     let lastCameraReadoutAt = 0;
@@ -682,6 +705,7 @@ export default function LidcStorylineRoom({ onClose }) {
 
         resize();
         setLoading(false);
+        window.requestAnimationFrame(() => requestPointerLock());
       })
       .catch((error) => {
         if (disposed) return;
@@ -764,10 +788,11 @@ export default function LidcStorylineRoom({ onClose }) {
         return;
       }
 
-      pointerDownX = event.clientX;
-      pointerDownY = event.clientY;
-      lastMouseX = event.clientX;
-      lastMouseY = event.clientY;
+      if (!isPointerLocked()) {
+        requestPointerLock();
+      }
+
+      pointerDownMovement = 0;
     };
 
     const onMouseUp = (event) => {
@@ -775,25 +800,35 @@ export default function LidcStorylineRoom({ onClose }) {
         return;
       }
 
-      const dragDistance = Math.hypot(event.clientX - pointerDownX, event.clientY - pointerDownY);
-      if (dragDistance <= CLICK_DRAG_THRESHOLD_PX) {
-        tryInteractWithWhiteboard(event.clientX, event.clientY);
+      if (pointerDownMovement <= CLICK_DRAG_THRESHOLD_PX) {
+        if (isPointerLocked()) {
+          tryInteractWithWhiteboard(null, null);
+        } else {
+          tryInteractWithWhiteboard(event.clientX, event.clientY);
+        }
       }
     };
 
     const onMouseMove = (event) => {
       if (isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current) return;
 
-      if (lastMouseX === null || lastMouseY === null) {
+      let deltaX = 0;
+      let deltaY = 0;
+
+      if (isPointerLocked()) {
+        deltaX = event.movementX;
+        deltaY = event.movementY;
+        pointerDownMovement += Math.abs(event.movementX) + Math.abs(event.movementY);
+      } else if (lastMouseX !== null && lastMouseY !== null) {
+        deltaX = event.clientX - lastMouseX;
+        deltaY = event.clientY - lastMouseY;
+        lastMouseX = event.clientX;
+        lastMouseY = event.clientY;
+      } else {
         lastMouseX = event.clientX;
         lastMouseY = event.clientY;
         return;
       }
-
-      const deltaX = event.clientX - lastMouseX;
-      const deltaY = event.clientY - lastMouseY;
-      lastMouseX = event.clientX;
-      lastMouseY = event.clientY;
 
       if (deltaX === 0 && deltaY === 0) return;
 
@@ -803,8 +838,10 @@ export default function LidcStorylineRoom({ onClose }) {
     };
 
     const onMouseEnter = (event) => {
-      lastMouseX = event.clientX;
-      lastMouseY = event.clientY;
+      if (!isPointerLocked()) {
+        lastMouseX = event.clientX;
+        lastMouseY = event.clientY;
+      }
     };
 
     const onContextMenu = (event) => {
@@ -875,6 +912,7 @@ export default function LidcStorylineRoom({ onClose }) {
 
     animate();
 
+    document.addEventListener('pointerlockchange', onPointerLockChange);
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     renderer.domElement.addEventListener('mousedown', onMouseDown);
@@ -885,6 +923,9 @@ export default function LidcStorylineRoom({ onClose }) {
 
     return () => {
       disposed = true;
+      exitPointerLock();
+      container.classList.remove('is-pointer-locked');
+      document.removeEventListener('pointerlockchange', onPointerLockChange);
       sceneApiRef.current = null;
       cancelAnimationFrame(frameId);
       resizeObserver.disconnect();
@@ -955,8 +996,24 @@ export default function LidcStorylineRoom({ onClose }) {
   }, [debugOpen, whiteboardOpen, onClose]);
 
   useEffect(() => {
+    const api = sceneApiRef.current;
+    if (!api) return undefined;
+
+    if (debugOpen || whiteboardOpen || loading || loadError) {
+      api.exitPointerLock?.();
+      return undefined;
+    }
+
+    const frameId = window.requestAnimationFrame(() => api.requestPointerLock?.());
+    return () => window.cancelAnimationFrame(frameId);
+  }, [debugOpen, whiteboardOpen, loading, loadError]);
+
+  useEffect(() => {
     document.body.classList.add('lidc-storyline-open');
-    return () => document.body.classList.remove('lidc-storyline-open');
+    return () => {
+      document.body.classList.remove('lidc-storyline-open');
+      document.exitPointerLock?.();
+    };
   }, []);
 
   const activeTargetKey = debugTarget === DEBUG_TARGETS.WHITEBOARD ? 'whiteboard' : 'room';
