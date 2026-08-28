@@ -397,6 +397,14 @@ export function getActiveInteractEventId(zones, activeTriggerIds) {
   return null;
 }
 
+export function isPlayerInTerminalTrigger(point, zones, zoneGroups) {
+  return zones.some((zone) => {
+    if (zone.type !== ZONE_TYPES.TRIGGER) return false;
+    if (normalizeZoneEventId(zone.eventId) !== TERMINAL_ZONE_EVENT_ID) return false;
+    return isPlayerInTriggerZone(point, zoneGroups.get(zone.id));
+  });
+}
+
 export function getActiveWhiteboardTrigger(zones, activeTriggerIds) {
   return getActiveTriggerByEventId(zones, activeTriggerIds, WHITEBOARD_ZONE_EVENT_ID);
 }

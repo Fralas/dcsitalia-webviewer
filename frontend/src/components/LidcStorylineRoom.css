@@ -432,6 +432,20 @@ body.lidc-storyline-open {
   font-size: 0.82rem;
 }
 
+.lidc-storyline-debug-help {
+  margin: 0 0 10px;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: #9ea3aa;
+}
+
+.lidc-storyline-debug-inline-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
 .lidc-storyline-debug-readout {
   margin: 0;
   padding: 10px;

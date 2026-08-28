@@ -20,6 +20,36 @@ export const DEBUG_TARGETS = Object.freeze({
   EASTER_EGG: 'easterEgg',
 });
 
+export function getDefaultTerminalCamera() {
+  return {
+    enabled: false,
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+  };
+}
+
+export function normalizeTerminalCamera(value) {
+  const defaults = getDefaultTerminalCamera();
+  if (!value || typeof value !== 'object') return defaults;
+
+  return {
+    enabled: Boolean(value.enabled),
+    position: Array.isArray(value.position)
+      ? value.position.map((axis) => +Number(axis).toFixed(4))
+      : defaults.position,
+    rotation: Array.isArray(value.rotation)
+      ? value.rotation.map((axis) => +Number(axis).toFixed(2))
+      : defaults.rotation,
+  };
+}
+
+export function isTerminalCameraConfigured(terminalCamera) {
+  const normalized = normalizeTerminalCamera(terminalCamera);
+  if (!normalized.enabled) return false;
+  return normalized.position.some((value) => value !== 0)
+    || normalized.rotation.some((value) => value !== 0);
+}
+
 export function cloneTransform(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -27,6 +57,7 @@ export function cloneTransform(value) {
 export function getDefaultTransform() {
   const defaults = cloneTransform(fileDefaults);
   defaults.easterEggs = mergeEasterEggTransforms(defaults.easterEggs);
+  defaults.terminalCamera = normalizeTerminalCamera(defaults.terminalCamera);
   return defaults;
 }
 
@@ -77,6 +108,29 @@ export function migrateTransformZonesToRoomLocal(transform, roomContentGroup) {
   return next;
 }
 
+function mergeMissingDefaultZones(savedZones = [], defaultZones = []) {
+  const next = Array.isArray(savedZones) ? [...savedZones] : [];
+  const hasTerminalSurface = next.some((zone) => zone.type === 'terminalSurface');
+  const hasTerminalTrigger = next.some(
+    (zone) => zone.type === 'trigger' && String(zone.eventId ?? '').trim().toLowerCase() === 'terminal',
+  );
+
+  defaultZones.forEach((zone) => {
+    if (zone.type === 'terminalSurface' && !hasTerminalSurface) {
+      next.push({ ...zone });
+    }
+    if (
+      zone.type === 'trigger'
+      && String(zone.eventId ?? '').trim().toLowerCase() === 'terminal'
+      && !hasTerminalTrigger
+    ) {
+      next.push({ ...zone });
+    }
+  });
+
+  return next;
+}
+
 export function loadSavedTransform() {
   const defaults = getDefaultTransform();
 
@@ -89,7 +143,13 @@ export function loadSavedTransform() {
       room: { ...defaults.room, ...parsed.room },
       whiteboard: { ...defaults.whiteboard, ...parsed.whiteboard },
       player: { ...defaults.player, ...parsed.player },
-      zones: Array.isArray(parsed.zones) ? parsed.zones : defaults.zones,
+      terminalCamera: normalizeTerminalCamera(
+        parsed.terminalCamera ?? defaults.terminalCamera,
+      ),
+      zones: mergeMissingDefaultZones(
+        Array.isArray(parsed.zones) ? parsed.zones : defaults.zones,
+        defaults.zones,
+      ),
       easterEggs: mergeEasterEggTransforms(parsed.easterEggs),
       zonesCoordinateSpace: parsed.zonesCoordinateSpace,
     };

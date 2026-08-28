@@ -14,14 +14,20 @@
     "heightOffset": 0,
     "snapToFloor": false
   },
+  "terminalCamera": {
+    "enabled": true,
+    "position": [6.2857, -0.25, -0.9668],
+    "rotation": [-20.17, -191.18, 0]
+  },
+  "zonesCoordinateSpace": "room-local",
   "zones": [
     {
       "id": "ed7548df-1591-4683-adf9-40b089dff434",
       "type": "collision",
       "label": "Collision",
       "eventId": "",
-      "position": [2.8888, -0.5549, -3.0766],
-      "rotation": [0, 5.92, 0],
+      "position": [0.1362, -0.8049, 0.383],
+      "rotation": [-180, 89.95, -180],
       "scale": [1.9998, 2.0808, 2.7455]
     },
     {
@@ -29,8 +35,8 @@
       "type": "trigger",
       "label": "Trigger",
       "eventId": "whiteboard",
-      "position": [7.207, -1.962, -3.4304],
-      "rotation": [0, 16.33, 0],
+      "position": [0.2259, -2.212, -3.9487],
+      "rotation": [-180, 79.54, -180],
       "scale": [2.1565, 4.4254, 2]
     },
     {
@@ -38,8 +44,8 @@
       "type": "whiteboardSurface",
       "label": "Whiteboard surface",
       "eventId": "",
-      "position": [6.7709, -0.5776, -3.2977],
-      "rotation": [-11.69, -72.65, -11.64],
+      "position": [0.3133, -0.8276, -3.5013],
+      "rotation": [-3.53, 11.12, 0.21],
       "scale": [1.637, 1.05, 0.02]
     },
     {
@@ -47,8 +53,8 @@
       "type": "collision",
       "label": "Collision",
       "eventId": "",
-      "position": [-2.0239, -0.7493, -5.3965],
-      "rotation": [0, 6.12, 0],
+      "position": [-2.6739, -0.9993, 5.0327],
+      "rotation": [-180, 89.75, -180],
       "scale": [2, 2, 2]
     },
     {
@@ -56,8 +62,8 @@
       "type": "collision",
       "label": "Collision",
       "eventId": "",
-      "position": [0.3676, -1.6008, -7.5675],
-      "rotation": [0, 0, 0],
+      "position": [-4.589, -1.8508, 2.4317],
+      "rotation": [0, 84.13, 0],
       "scale": [2.3987, 2, 2]
     },
     {
@@ -65,8 +71,8 @@
       "type": "collision",
       "label": "Collision",
       "eventId": "",
-      "position": [6.2274, -0.9108, -7.861],
-      "rotation": [0, 0, 0],
+      "position": [-4.2816, -1.1608, -3.4274],
+      "rotation": [0, 84.13, 0],
       "scale": [2, 2, 2]
     },
     {
@@ -74,8 +80,8 @@
       "type": "collision",
       "label": "Collision",
       "eventId": "",
-      "position": [7.5325, -1.1131, -5.812],
-      "rotation": [0, 0, 0],
+      "position": [-2.1099, -1.3631, -4.5161],
+      "rotation": [0, 84.13, 0],
       "scale": [2, 2, 2]
     },
     {
@@ -83,9 +89,27 @@
       "type": "collision",
       "label": "Collision",
       "eventId": "",
-      "position": [6.9277, -1.231, 0.5332],
-      "rotation": [0, 0, 0],
+      "position": [4.1402, -1.481, -3.2655],
+      "rotation": [0, 84.13, 0],
       "scale": [2, 2, 2]
+    },
+    {
+      "id": "5bdf9334-97df-4848-8648-7e79ba6b7050",
+      "type": "trigger",
+      "label": "Terminal",
+      "eventId": "terminal",
+      "position": [3.1187, -1.3052, -3.0456],
+      "rotation": [-180, 85.35, -180],
+      "scale": [2, 2, 2]
+    },
+    {
+      "id": "86c46112-46e7-4516-84bd-c59586ce6ae3",
+      "type": "terminalSurface",
+      "label": "Terminal screen",
+      "eventId": "",
+      "position": [2.9994, -0.6328, -2.6635],
+      "rotation": [-151.01, -73.34, -151.89],
+      "scale": [0.4178, 0.3387, 0.0048]
     }
   ],
   "easterEggs": [

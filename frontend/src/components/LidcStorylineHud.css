@@ -14,6 +14,28 @@
   pointer-events: none;
 }
 
+.lidc-storyline-hud.is-interactive {
+  pointer-events: auto;
+}
+
+.lidc-storyline-hud-action {
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.lidc-storyline-hud-action:hover {
+  border-color: #6a6a6a;
+  transform: translateY(-1px);
+}
+
+.lidc-storyline-hud-action:focus-visible {
+  outline: 2px solid var(--lidc-storyline-gold);
+  outline-offset: 2px;
+}
+
 .lidc-whiteboard-stage .lidc-storyline-hud {
   z-index: 5;
 }

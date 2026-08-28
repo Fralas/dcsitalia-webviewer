@@ -19,11 +19,29 @@ function HudKeys({ keys = 'E' }) {
   );
 }
 
-function InteractPromptBar({ label, keys = 'E' }) {
-  return (
-    <div className="lidc-storyline-hud-bar is-interact">
+function InteractPromptBar({ label, keys = 'E', onActivate, className = '' }) {
+  const content = (
+    <>
       <HudKeys keys={keys} />
       <span className="lidc-storyline-hud-text">{label}</span>
+    </>
+  );
+
+  if (onActivate) {
+    return (
+      <button
+        type="button"
+        className={`lidc-storyline-hud-bar is-interact lidc-storyline-hud-action ${className}`.trim()}
+        onClick={onActivate}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div className={`lidc-storyline-hud-bar is-interact ${className}`.trim()}>
+      {content}
     </div>
   );
 }
@@ -38,10 +56,14 @@ function HudSegment({ segment, showSeparator = false }) {
   );
 }
 
-export function LidcStorylineInteractPrompt({ label, keys = 'E' }) {
+export function LidcStorylineInteractPrompt({ label, keys = 'E', onActivate }) {
   return (
-    <div className="lidc-storyline-hud" role="status" aria-live="polite">
-      <InteractPromptBar label={label} keys={keys} />
+    <div
+      className={`lidc-storyline-hud${onActivate ? ' is-interactive' : ''}`}
+      role={onActivate ? 'group' : 'status'}
+      aria-live="polite"
+    >
+      <InteractPromptBar label={label} keys={keys} onActivate={onActivate} />
     </div>
   );
 }

@@ -82,6 +82,7 @@ export default function LidcStorylineDebugPanel({
   selectedEasterEggId,
   scaleLinked,
   cameraPosition,
+  cameraRotation,
   saveStatus,
   lastTriggerEvent,
   onDebugTargetChange,
@@ -96,6 +97,9 @@ export default function LidcStorylineDebugPanel({
   onTargetRotationChange,
   onTargetScaleAxisChange,
   onPlayerChange,
+  onTerminalCameraChange,
+  onCaptureTerminalCamera,
+  onPreviewTerminalCamera,
   onSave,
   onDownload,
   onReset,
@@ -104,6 +108,11 @@ export default function LidcStorylineDebugPanel({
   onClose,
 }) {
   const { room, whiteboard, player, zones = [], easterEggs = [] } = transform;
+  const terminalCamera = transform.terminalCamera ?? {
+    enabled: false,
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+  };
   const selectedZone = zones.find((zone) => zone.id === selectedZoneId) ?? null;
   const selectedEasterEgg = easterEggs.find((egg) => egg.id === selectedEasterEggId) ?? null;
   const activeTransform = debugTarget === DEBUG_TARGETS.ZONE && selectedZone
@@ -361,9 +370,67 @@ export default function LidcStorylineDebugPanel({
       </section>
 
       <section className="lidc-storyline-debug-section">
+        <h3>{t('lidc.storyline.debug.terminalCamera')}</h3>
+        <p className="lidc-storyline-debug-help">{t('lidc.storyline.debug.terminalCameraHint')}</p>
+        <label className="lidc-storyline-debug-check">
+          <input
+            type="checkbox"
+            checked={terminalCamera.enabled}
+            onChange={(event) => onTerminalCameraChange({ enabled: event.target.checked })}
+          />
+          <span>{t('lidc.storyline.debug.terminalCameraEnabled')}</span>
+        </label>
+        <div className="lidc-storyline-debug-subsection">
+          <span>{t('lidc.storyline.debug.terminalCameraPosition')}</span>
+          <VectorFields
+            labels={['X', 'Y', 'Z']}
+            values={terminalCamera.position}
+            step={0.01}
+            onChange={(values, index, nextValue) => {
+              const next = [...values];
+              next[index] = nextValue;
+              onTerminalCameraChange({ position: next });
+            }}
+          />
+        </div>
+        <div className="lidc-storyline-debug-subsection">
+          <span>{t('lidc.storyline.debug.terminalCameraRotation')}</span>
+          <VectorFields
+            labels={['Rx', 'Ry', 'Rz']}
+            values={terminalCamera.rotation}
+            step={0.1}
+            onChange={(values, index, nextValue) => {
+              const next = [...values];
+              next[index] = nextValue;
+              onTerminalCameraChange({ rotation: next });
+            }}
+          />
+        </div>
+        <div className="lidc-storyline-debug-inline-actions">
+          <button
+            type="button"
+            className="lidc-storyline-debug-action"
+            onClick={onCaptureTerminalCamera}
+          >
+            {t('lidc.storyline.debug.terminalCameraCapture')}
+          </button>
+          <button
+            type="button"
+            className="lidc-storyline-debug-action"
+            onClick={onPreviewTerminalCamera}
+            disabled={!terminalCamera.enabled}
+          >
+            {t('lidc.storyline.debug.terminalCameraPreview')}
+          </button>
+        </div>
+      </section>
+
+      <section className="lidc-storyline-debug-section">
         <h3>{t('lidc.storyline.debug.camera')}</h3>
         <pre className="lidc-storyline-debug-readout">
-          {cameraPosition.map((value) => value.toFixed(3)).join(', ')}
+          {`${t('lidc.storyline.debug.cameraPositionShort')}: ${cameraPosition.map((value) => value.toFixed(3)).join(', ')}`}
+          {'\n'}
+          {`${t('lidc.storyline.debug.cameraRotationShort')}: ${cameraRotation.map((value) => value.toFixed(2)).join(', ')}`}
         </pre>
       </section>
 

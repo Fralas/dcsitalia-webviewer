@@ -9,12 +9,19 @@ import {
 import { t } from './locale';
 import { getRatosTerminalSnapshot } from './ratosTerminalStore';
 import { getWhiteboardSurfaceMapping } from './lidcStorylineWhiteboard3D';
-import { ZONE_TYPES } from './lidcStorylineZones';
+import { applyZoneTransform, ZONE_TYPES } from './lidcStorylineZones';
 
 const SURFACE_INSET = 0.004;
 const CANVAS_WIDTH = 512;
 const CANVAS_HEIGHT = 384;
 const SCREEN_FILL = 0.94;
+const TERMINAL_CAMERA_DISTANCE = 0.42;
+const TERMINAL_CAMERA_FRAME_PADDING = 1.08;
+
+const SCREEN_NORMAL = new THREE.Vector3();
+const SCREEN_CENTER = new THREE.Vector3();
+const TEMP_ZONE_GROUP = new THREE.Group();
+const ZONE_WORLD_MATRIX = new THREE.Matrix4();
 
 const COLORS = {
   bg: '#010803',
@@ -59,11 +66,11 @@ function orientMeshToSurface(mesh, mapping) {
   mesh.rotateX(-Math.PI / 2);
 }
 
-function getPlaneSize(zoneScale, mapping) {
-  const absScale = zoneScale.map((value) => Math.abs(value));
+function getPlaneSize() {
+  // Zone groups are unit cubes; parent scale carries the zone dimensions.
   return {
-    width: absScale[mapping.uAxis] * SCREEN_FILL,
-    height: absScale[mapping.vAxis] * SCREEN_FILL,
+    width: SCREEN_FILL,
+    height: SCREEN_FILL,
   };
 }
 
@@ -138,6 +145,13 @@ function drawPreScaled(ctx, text, x, y, scale, color) {
 
 async function drawTerminalContent(ctx, canvas, snapshot) {
   const { width, height } = canvas;
+
+  if (snapshot.bootPhase === 'idle') {
+    ctx.fillStyle = '#020402';
+    ctx.fillRect(0, 0, width, height);
+    return;
+  }
+
   ctx.fillStyle = COLORS.bg;
   ctx.fillRect(0, 0, width, height);
 
@@ -280,7 +294,7 @@ function disposeScreenRoot(root) {
 
 function createTerminalScreenRoot(zone) {
   const mapping = getWhiteboardSurfaceMapping(zone.scale);
-  const { width, height } = getPlaneSize(zone.scale, mapping);
+  const { width, height } = getPlaneSize();
 
   const canvas = document.createElement('canvas');
   canvas.width = CANVAS_WIDTH;
@@ -311,6 +325,7 @@ function createTerminalScreenRoot(zone) {
   root.userData.texture = texture;
   root.userData.mapping = mapping;
   root.userData.zoneScale = [...zone.scale];
+  root.userData.planeUsesUnitSpace = true;
   root.add(mesh);
   positionMeshOnSurface(mesh, mapping);
 
@@ -319,7 +334,16 @@ function createTerminalScreenRoot(zone) {
 
 function updateTerminalScreenGeometry(root, zone) {
   const mapping = getWhiteboardSurfaceMapping(zone.scale);
-  const { width, height } = getPlaneSize(zone.scale, mapping);
+  const prevMapping = root.userData.mapping;
+  const mappingChanged = !prevMapping
+    || prevMapping.uAxis !== mapping.uAxis
+    || prevMapping.vAxis !== mapping.vAxis
+    || prevMapping.depthAxis !== mapping.depthAxis
+    || prevMapping.depthSign !== mapping.depthSign;
+
+  if (!mappingChanged && root.userData.planeUsesUnitSpace) return;
+
+  const { width, height } = getPlaneSize();
   const mesh = root.getObjectByName('terminal-screen-mesh');
   if (!mesh) return;
 
@@ -328,10 +352,122 @@ function updateTerminalScreenGeometry(root, zone) {
   positionMeshOnSurface(mesh, mapping);
   root.userData.mapping = mapping;
   root.userData.zoneScale = [...zone.scale];
+  root.userData.planeUsesUnitSpace = true;
 }
 
 export function findTerminalSurfaceZone(zones = []) {
   return zones.find((zone) => zone.type === ZONE_TYPES.TERMINAL_SURFACE) ?? null;
+}
+
+function getZoneWorldMatrix(zone, roomContentGroup, zonesRoot) {
+  applyZoneTransform(TEMP_ZONE_GROUP, zone);
+  TEMP_ZONE_GROUP.updateMatrixWorld(false);
+
+  if (zonesRoot) {
+    zonesRoot.updateMatrixWorld(true);
+    return ZONE_WORLD_MATRIX.multiplyMatrices(zonesRoot.matrixWorld, TEMP_ZONE_GROUP.matrix);
+  }
+
+  if (roomContentGroup) {
+    roomContentGroup.updateMatrixWorld(true);
+    return ZONE_WORLD_MATRIX.multiplyMatrices(roomContentGroup.matrixWorld, TEMP_ZONE_GROUP.matrix);
+  }
+
+  return ZONE_WORLD_MATRIX.copy(TEMP_ZONE_GROUP.matrix);
+}
+
+export function getTerminalScreenCameraView(
+  zoneGroups,
+  zones = [],
+  roomContentGroup = null,
+  zonesRoot = null,
+  distance = TERMINAL_CAMERA_DISTANCE,
+  viewerPosition = null,
+  cameraFovDegrees = 70,
+) {
+  const zone = findTerminalSurfaceZone(zones);
+  if (!zone) return null;
+
+  roomContentGroup?.updateMatrixWorld(true);
+  zonesRoot?.updateMatrixWorld(true);
+
+  const finishView = (lookAt, normal, frameDistance = distance) => {
+    if (normal.lengthSq() < 1e-8) return null;
+    normal.normalize();
+
+    if (viewerPosition) {
+      const towardViewer = viewerPosition.clone().sub(lookAt);
+      if (towardViewer.lengthSq() > 1e-8 && normal.dot(towardViewer) < 0) {
+        normal.negate();
+      }
+    }
+
+    const resolvedDistance = Math.max(distance, frameDistance);
+
+    return {
+      lookAt: lookAt.clone(),
+      targetPosition: lookAt.clone().addScaledVector(normal, resolvedDistance),
+    };
+  };
+
+  const group = zoneGroups.get(zone.id)
+    ?? [...zoneGroups.values()].find((candidate) => (
+      candidate.userData.zoneType === ZONE_TYPES.TERMINAL_SURFACE
+    ))
+    ?? null;
+
+  if (group) {
+    group.updateMatrixWorld(true);
+
+    const lookAt = new THREE.Vector3();
+    const normal = new THREE.Vector3();
+    const mesh = group.getObjectByName('terminal-3d-screen')?.getObjectByName('terminal-screen-mesh');
+
+    if (mesh) {
+      mesh.updateMatrixWorld(true);
+      const bounds = new THREE.Box3().setFromObject(mesh);
+      bounds.getCenter(lookAt);
+      mesh.localToWorldDirection(normal.set(0, 0, 1));
+
+      const screenSize = new THREE.Vector3();
+      bounds.getSize(screenSize);
+      const screenSpan = Math.max(screenSize.x, screenSize.y);
+      const halfFov = THREE.MathUtils.degToRad(cameraFovDegrees) * 0.5;
+      const frameDistance = halfFov > 1e-5
+        ? (screenSpan * 0.5 * TERMINAL_CAMERA_FRAME_PADDING) / Math.tan(halfFov)
+        : distance;
+
+      return finishView(lookAt, normal, frameDistance);
+    }
+
+    const mapping = getWhiteboardSurfaceMapping(zone.scale);
+    lookAt.set(0, 0, 0);
+    lookAt.setComponent(mapping.uAxis, 0);
+    lookAt.setComponent(mapping.vAxis, 0);
+    lookAt.setComponent(mapping.depthAxis, mapping.depthSign * 0.5 + SURFACE_INSET);
+    lookAt.applyMatrix4(group.matrixWorld);
+
+    normal.set(0, 0, 0);
+    normal.setComponent(mapping.depthAxis, mapping.depthSign);
+    normal.transformDirection(group.matrixWorld);
+    return finishView(lookAt, normal);
+  }
+
+  const worldMatrix = getZoneWorldMatrix(zone, roomContentGroup, zonesRoot);
+  const mapping = getWhiteboardSurfaceMapping(zone.scale);
+  const lookAt = new THREE.Vector3();
+  const normal = new THREE.Vector3();
+
+  lookAt.set(0, 0, 0);
+  lookAt.setComponent(mapping.uAxis, 0);
+  lookAt.setComponent(mapping.vAxis, 0);
+  lookAt.setComponent(mapping.depthAxis, mapping.depthSign * 0.5 + SURFACE_INSET);
+  lookAt.applyMatrix4(worldMatrix);
+
+  normal.set(0, 0, 0);
+  normal.setComponent(mapping.depthAxis, mapping.depthSign);
+  normal.transformDirection(worldMatrix);
+  return finishView(lookAt, normal);
 }
 
 export function attachTerminal3DScreen(zoneGroup, zone) {

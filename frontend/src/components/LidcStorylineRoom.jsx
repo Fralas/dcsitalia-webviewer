@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
@@ -18,9 +19,11 @@ import {
   downloadTransformJson,
   enforceUniformScaleFromDrag,
   getDefaultTransform,
+  isTerminalCameraConfigured,
   LIDC_STORYLINE_TRANSFORM_STORAGE_KEY,
   loadSavedTransform,
   migrateTransformZonesToRoomLocal,
+  normalizeTerminalCamera,
   readObjectTransform,
   readSceneTransform,
   saveTransformToStorage,
@@ -38,6 +41,7 @@ import {
   disposeZoneGroup,
   findSpawnOutsideCollisionZones,
   getActiveInteractEventId,
+  isPlayerInTerminalTrigger,
   readZoneFromGroup,
   resolveCollisionZones,
   TERMINAL_ZONE_EVENT_ID,
@@ -47,6 +51,7 @@ import {
 } from '../utils/lidcStorylineZones';
 import { syncWhiteboard3DDecorations } from '../utils/lidcStorylineWhiteboard3D';
 import {
+  getTerminalScreenCameraView,
   renderTerminal3DScreens,
   syncTerminal3DDecorations,
 } from '../utils/lidcStorylineTerminal3D';
@@ -58,6 +63,10 @@ import {
 import './LidcStorylineRoom.css';
 
 const SURFACE_ZONE_DECOR_NAMES = new Set(['whiteboard-3d-decor', 'terminal-3d-screen']);
+const MOVEMENT_KEY_CODES = new Set([
+  'KeyW', 'KeyA', 'KeyS', 'KeyD',
+  'ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight',
+]);
 
 function isPersistentSurfaceZone(type) {
   return type === ZONE_TYPES.WHITEBOARD_SURFACE || type === ZONE_TYPES.TERMINAL_SURFACE;
@@ -76,6 +85,7 @@ const WHITEBOARD_TARGET_HEIGHT = 1.2;
 const WHITEBOARD_BOTTOM_HEIGHT = 0.95;
 const WHITEBOARD_WALL_INSET = 0.06;
 const CLICK_DRAG_THRESHOLD_PX = 4;
+const TERMINAL_CAMERA_TRANSITION_MS = 680;
 
 function loadGltf(loader, url, onProgress) {
   return new Promise((resolve, reject) => {
@@ -245,6 +255,7 @@ export default function LidcStorylineRoom({ onClose }) {
   const debugOpenRef = useRef(false);
   const whiteboardOpenRef = useRef(false);
   const terminalOpenRef = useRef(false);
+  const cameraTransitionRef = useRef(null);
   const activeInteractEventRef = useRef(null);
   const debugTargetRef = useRef(DEBUG_TARGETS.WHITEBOARD);
   const selectedZoneIdRef = useRef(null);
@@ -267,6 +278,7 @@ export default function LidcStorylineRoom({ onClose }) {
   const [transform, setTransform] = useState(() => loadSavedTransform());
   const [transformMode, setTransformMode] = useState('translate');
   const [cameraPosition, setCameraPosition] = useState([0, 0, 0]);
+  const [cameraRotation, setCameraRotation] = useState([0, 0, 0]);
   const [saveStatus, setSaveStatus] = useState('');
   const [lastTriggerEvent, setLastTriggerEvent] = useState(null);
 
@@ -279,7 +291,12 @@ export default function LidcStorylineRoom({ onClose }) {
   }, [whiteboardOpen]);
 
   useEffect(() => {
-    terminalOpenRef.current = terminalOpen;
+    if (terminalOpen) {
+      terminalOpenRef.current = true;
+      setDebugOpen(false);
+      sceneApiRef.current?.clearMovementKeys?.();
+      sceneApiRef.current?.exitPointerLock?.();
+    }
   }, [terminalOpen]);
 
   useEffect(() => {
@@ -479,6 +496,34 @@ export default function LidcStorylineRoom({ onClose }) {
     });
   }, []);
 
+  const applyTerminalCameraUpdate = useCallback((patch) => {
+    setTransform((current) => {
+      const next = cloneTransform(current);
+      next.terminalCamera = normalizeTerminalCamera({
+        ...next.terminalCamera,
+        ...patch,
+      });
+      transformRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const captureTerminalCameraFromView = useCallback(() => {
+    const pose = sceneApiRef.current?.readCameraPose?.();
+    if (!pose) return;
+    applyTerminalCameraUpdate({
+      enabled: true,
+      position: pose.position,
+      rotation: pose.rotation,
+    });
+  }, [applyTerminalCameraUpdate]);
+
+  const previewTerminalCamera = useCallback(() => {
+    sceneApiRef.current?.previewTerminalCamera?.(
+      normalizeTerminalCamera(transformRef.current.terminalCamera),
+    );
+  }, []);
+
   const handleSave = useCallback(() => {
     const api = sceneApiRef.current;
     const nextTransform = api?.readSceneTransform?.() ?? transformRef.current;
@@ -519,6 +564,7 @@ export default function LidcStorylineRoom({ onClose }) {
     next.zones = [...(migratedDefaults.zones ?? [])];
     next.easterEggs = [...(defaults.easterEggs ?? [])];
     next.zonesCoordinateSpace = migratedDefaults.zonesCoordinateSpace;
+    next.terminalCamera = normalizeTerminalCamera(defaults.terminalCamera);
     transformRef.current = next;
     setTransform(next);
     setSelectedZoneId(null);
@@ -553,6 +599,96 @@ export default function LidcStorylineRoom({ onClose }) {
     let pointerDownMovement = 0;
     let pendingLookX = 0;
     let pendingLookY = 0;
+    let savedTerminalCameraPose = null;
+    let cameraTransition = null;
+
+    const easeInOut = (progress) => progress * progress * (3 - 2 * progress);
+
+    const isCameraTransitioning = () => Boolean(cameraTransition);
+
+    const cancelTerminalCameraFocus = () => {
+      cameraTransition = null;
+      cameraTransitionRef.current = null;
+    };
+
+    const startCameraFocus = ({ toPosition, lookAt, toRotation, onComplete }) => {
+      cancelTerminalCameraFocus();
+      pendingLookX = 0;
+      pendingLookY = 0;
+
+      cameraTransition = {
+        fromPosition: camera.position.clone(),
+        fromRotation: camera.rotation.clone(),
+        toPosition: toPosition.clone(),
+        lookAt: lookAt ? lookAt.clone() : null,
+        toRotation: toRotation ? toRotation.clone() : null,
+        startTime: performance.now(),
+        onComplete,
+      };
+      cameraTransitionRef.current = { active: true };
+    };
+
+    const updateCameraTransition = () => {
+      if (!cameraTransition) return false;
+
+      const progress = Math.min(
+        1,
+        (performance.now() - cameraTransition.startTime) / TERMINAL_CAMERA_TRANSITION_MS,
+      );
+      const eased = easeInOut(progress);
+
+      camera.position.lerpVectors(
+        cameraTransition.fromPosition,
+        cameraTransition.toPosition,
+        eased,
+      );
+
+      if (cameraTransition.lookAt) {
+        camera.lookAt(cameraTransition.lookAt);
+      } else if (cameraTransition.toRotation) {
+        camera.rotation.order = 'YXZ';
+        camera.rotation.x = THREE.MathUtils.lerp(
+          cameraTransition.fromRotation.x,
+          cameraTransition.toRotation.x,
+          eased,
+        );
+        camera.rotation.y = THREE.MathUtils.lerp(
+          cameraTransition.fromRotation.y,
+          cameraTransition.toRotation.y,
+          eased,
+        );
+        camera.rotation.z = THREE.MathUtils.lerp(
+          cameraTransition.fromRotation.z,
+          cameraTransition.toRotation.z,
+          eased,
+        );
+      }
+
+      camera.rotation.order = 'YXZ';
+
+      if (progress >= 1) {
+        const onComplete = cameraTransition.onComplete;
+        cancelTerminalCameraFocus();
+        onComplete?.();
+      }
+
+      return true;
+    };
+
+    const canInteractWithTerminal = () => {
+      const zones = transformRef.current.zones ?? [];
+
+      if (getActiveInteractEventId(zones, activeTriggerIds) === TERMINAL_ZONE_EVENT_ID) {
+        return true;
+      }
+
+      if (activeInteractEventRef.current === TERMINAL_ZONE_EVENT_ID) {
+        return true;
+      }
+
+      playerPoint.copy(camera.position);
+      return isPlayerInTerminalTrigger(playerPoint, zones, zoneGroups);
+    };
 
     const lockElement = container;
 
@@ -574,7 +710,7 @@ export default function LidcStorylineRoom({ onClose }) {
     const isPointerLocked = () => document.pointerLockElement === lockElement;
 
     const requestPointerLock = () => {
-      if (disposed || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current || isTransformDragging) return;
+      if (disposed || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current || isTransformDragging || isCameraTransitioning()) return;
       if (isPointerLocked()) return;
       lockElement.requestPointerLock?.({ unadjustedMovement: true });
     };
@@ -646,10 +782,15 @@ export default function LidcStorylineRoom({ onClose }) {
     let interactPromptVisible = null;
 
     const syncInteractPrompt = () => {
-      const eventId = getActiveInteractEventId(
-        transformRef.current.zones ?? [],
-        activeTriggerIds,
-      );
+      const zones = transformRef.current.zones ?? [];
+      let eventId = getActiveInteractEventId(zones, activeTriggerIds);
+
+      if (!eventId) {
+        playerPoint.copy(camera.position);
+        if (isPlayerInTerminalTrigger(playerPoint, zones, zoneGroups)) {
+          eventId = TERMINAL_ZONE_EVENT_ID;
+        }
+      }
 
       if (eventId === interactPromptVisible) return;
       interactPromptVisible = eventId;
@@ -788,13 +929,16 @@ export default function LidcStorylineRoom({ onClose }) {
         return readEasterEggFromGroup(group, egg.id);
       });
 
-      return readSceneTransform(
-        roomContentGroup,
-        whiteboardGroup,
-        transformRef.current.player,
-        zones,
-        easterEggs,
-      );
+      return {
+        ...readSceneTransform(
+          roomContentGroup,
+          whiteboardGroup,
+          transformRef.current.player,
+          zones,
+          easterEggs,
+        ),
+        terminalCamera: normalizeTerminalCamera(transformRef.current.terminalCamera),
+      };
     };
 
     const applySceneTransform = (config) => {
@@ -909,6 +1053,123 @@ export default function LidcStorylineRoom({ onClose }) {
       return true;
     };
 
+    const getTerminalCameraView = () => {
+      roomContentGroup.updateMatrixWorld(true);
+      zonesRoot.updateMatrixWorld(true);
+      zoneGroups.forEach((group) => {
+        group.updateMatrixWorld(true);
+      });
+
+      return getTerminalScreenCameraView(
+        zoneGroups,
+        transformRef.current.zones ?? [],
+        roomContentGroup,
+        zonesRoot,
+        undefined,
+        camera.position,
+        camera.fov,
+      );
+    };
+
+    const applyCameraPose = ({ toPosition, lookAt, toRotation }) => {
+      cancelTerminalCameraFocus();
+      pendingLookX = 0;
+      pendingLookY = 0;
+      camera.position.copy(toPosition);
+
+      if (toRotation) {
+        camera.rotation.order = 'YXZ';
+        camera.rotation.set(toRotation.x, toRotation.y, toRotation.z);
+      } else if (lookAt) {
+        camera.lookAt(lookAt);
+        camera.rotation.order = 'YXZ';
+      }
+    };
+
+    const resolveTerminalCameraFocus = () => {
+      const manual = normalizeTerminalCamera(transformRef.current.terminalCamera);
+      if (isTerminalCameraConfigured(manual)) {
+        return {
+          toPosition: new THREE.Vector3(
+            manual.position[0],
+            manual.position[1],
+            manual.position[2],
+          ),
+          toRotation: {
+            x: THREE.MathUtils.degToRad(manual.rotation[0]),
+            y: THREE.MathUtils.degToRad(manual.rotation[1]),
+            z: THREE.MathUtils.degToRad(manual.rotation[2]),
+          },
+        };
+      }
+
+      const view = getTerminalCameraView();
+      if (!view) return null;
+
+      return {
+        toPosition: view.targetPosition,
+        lookAt: view.lookAt,
+      };
+    };
+
+    const openTerminal = () => {
+      if (terminalOpenRef.current || isCameraTransitioning()) return;
+
+      terminalOpenRef.current = true;
+      flushSync(() => {
+        setTerminalOpen(true);
+        setDebugOpen(false);
+        setActiveInteractEvent(null);
+      });
+
+      keys.forward = false;
+      keys.backward = false;
+      keys.left = false;
+      keys.right = false;
+      pendingLookX = 0;
+      pendingLookY = 0;
+
+      savedTerminalCameraPose = {
+        position: camera.position.clone(),
+        rotation: camera.rotation.clone(),
+      };
+
+      exitPointerLock();
+      initRatosTerminal();
+
+      const focus = resolveTerminalCameraFocus();
+      if (focus) {
+        applyCameraPose(focus);
+      }
+    };
+
+    const closeTerminal = () => {
+      cancelTerminalCameraFocus();
+
+      if (!terminalOpenRef.current) {
+        pendingLookX = 0;
+        pendingLookY = 0;
+        return;
+      }
+
+      terminalOpenRef.current = false;
+      setTerminalOpen(false);
+      keys.forward = false;
+      keys.backward = false;
+      keys.left = false;
+      keys.right = false;
+      pendingLookX = 0;
+      pendingLookY = 0;
+
+      if (!savedTerminalCameraPose) return;
+
+      applyCameraPose({
+        toPosition: savedTerminalCameraPose.position,
+        toRotation: savedTerminalCameraPose.rotation,
+      });
+      savedTerminalCameraPose = null;
+    };
+
     sceneApiRef.current = {
       roomContentGroup,
       whiteboardGroup: () => whiteboardGroup,
@@ -965,6 +1226,32 @@ export default function LidcStorylineRoom({ onClose }) {
         +camera.position.y.toFixed(3),
         +camera.position.z.toFixed(3),
       ],
+      readCameraPose: () => ({
+        position: camera.position.toArray().map((value) => +value.toFixed(4)),
+        rotation: [
+          +THREE.MathUtils.radToDeg(camera.rotation.x).toFixed(2),
+          +THREE.MathUtils.radToDeg(camera.rotation.y).toFixed(2),
+          +THREE.MathUtils.radToDeg(camera.rotation.z).toFixed(2),
+        ],
+      }),
+      previewTerminalCamera: (terminalCamera) => {
+        const manual = normalizeTerminalCamera(terminalCamera);
+        if (!manual.enabled) return;
+
+        pendingLookX = 0;
+        pendingLookY = 0;
+        camera.position.set(
+          manual.position[0],
+          manual.position[1],
+          manual.position[2],
+        );
+        camera.rotation.order = 'YXZ';
+        camera.rotation.set(
+          THREE.MathUtils.degToRad(manual.rotation[0]),
+          THREE.MathUtils.degToRad(manual.rotation[1]),
+          THREE.MathUtils.degToRad(manual.rotation[2]),
+        );
+      },
       createZoneAtView: (type, options = {}) => createZoneAtView({
         type,
         camera,
@@ -973,6 +1260,15 @@ export default function LidcStorylineRoom({ onClose }) {
         roomContentGroup,
         options,
       }),
+      clearMovementKeys: () => {
+        keys.forward = false;
+        keys.backward = false;
+        keys.left = false;
+        keys.right = false;
+      },
+      openTerminal,
+      closeTerminal,
+      isCameraTransitioning: () => Boolean(cameraTransitionRef.current),
       requestPointerLock,
       exitPointerLock,
     };
@@ -1116,7 +1412,6 @@ export default function LidcStorylineRoom({ onClose }) {
         transformRef.current = migratedTransform;
         applyPlayerTransform(migratedTransform);
         setTransform(migratedTransform);
-        initRatosTerminal();
 
         if (debugOpenRef.current) {
           const target = getActiveTransformTarget();
@@ -1142,20 +1437,32 @@ export default function LidcStorylineRoom({ onClose }) {
         && !debugOpenRef.current
         && !whiteboardOpenRef.current
         && !terminalOpenRef.current
+        && !isCameraTransitioning()
       ) {
-        if (activeInteractEventRef.current === WHITEBOARD_ZONE_EVENT_ID) {
+        const interactEvent = getActiveInteractEventId(
+          transformRef.current.zones ?? [],
+          activeTriggerIds,
+        );
+
+        if (interactEvent === WHITEBOARD_ZONE_EVENT_ID || activeInteractEventRef.current === WHITEBOARD_ZONE_EVENT_ID) {
           event.preventDefault();
           setWhiteboardOpen(true);
           setActiveInteractEvent(null);
           return;
         }
 
-        if (activeInteractEventRef.current === TERMINAL_ZONE_EVENT_ID) {
+        if (activeInteractEventRef.current === TERMINAL_ZONE_EVENT_ID || canInteractWithTerminal()) {
           event.preventDefault();
-          setTerminalOpen(true);
-          setActiveInteractEvent(null);
+          openTerminal();
           return;
         }
+      }
+
+      if (terminalOpenRef.current || isCameraTransitioning()) {
+        if (MOVEMENT_KEY_CODES.has(event.code)) {
+          event.preventDefault();
+        }
+        return;
       }
 
       if (debugOpenRef.current) {
@@ -1206,6 +1513,13 @@ export default function LidcStorylineRoom({ onClose }) {
     };
 
     const onKeyUp = (event) => {
+      if (terminalOpenRef.current || isCameraTransitioning()) {
+        if (MOVEMENT_KEY_CODES.has(event.code)) {
+          event.preventDefault();
+        }
+        return;
+      }
+
       switch (event.code) {
         case 'KeyW':
         case 'ArrowUp':
@@ -1229,7 +1543,7 @@ export default function LidcStorylineRoom({ onClose }) {
     };
 
     const onPointerDown = (event) => {
-      if (event.button !== 0 || isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current) {
+      if (event.button !== 0 || isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current || isCameraTransitioning()) {
         return;
       }
 
@@ -1241,7 +1555,7 @@ export default function LidcStorylineRoom({ onClose }) {
     };
 
     const onPointerUp = (event) => {
-      if (event.button !== 0 || isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current) {
+      if (event.button !== 0 || isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current || isCameraTransitioning()) {
         return;
       }
 
@@ -1255,7 +1569,7 @@ export default function LidcStorylineRoom({ onClose }) {
     };
 
     const onPointerMove = (event) => {
-      if (isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current) return;
+      if (isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current || isCameraTransitioning()) return;
       if (!isPointerLocked()) return;
 
       queueLookDelta(event.movementX, event.movementY);
@@ -1263,7 +1577,7 @@ export default function LidcStorylineRoom({ onClose }) {
     };
 
     const onPointerRawUpdate = (event) => {
-      if (isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current) return;
+      if (isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current || isCameraTransitioning()) return;
       if (!isPointerLocked()) return;
 
       if (typeof event.getCoalescedEvents === 'function') {
@@ -1288,9 +1602,20 @@ export default function LidcStorylineRoom({ onClose }) {
       frameId = requestAnimationFrame(animate);
       const delta = clock.getDelta();
 
-      applyPendingLook();
+      const transitioning = updateCameraTransition();
 
-      if (roomBounds && !debugOpenRef.current && !isTransformDragging && !whiteboardOpenRef.current && !terminalOpenRef.current) {
+      if (!transitioning) {
+        applyPendingLook();
+      }
+
+      if (
+        roomBounds
+        && !debugOpenRef.current
+        && !isTransformDragging
+        && !whiteboardOpenRef.current
+        && !terminalOpenRef.current
+        && !transitioning
+      ) {
         direction.set(0, 0, -1).applyQuaternion(camera.quaternion);
         direction.y = 0;
         if (direction.lengthSq() > 0) direction.normalize();
@@ -1373,6 +1698,7 @@ export default function LidcStorylineRoom({ onClose }) {
       if (now - lastCameraReadoutAt > 120) {
         lastCameraReadoutAt = now;
         setCameraPosition(sceneApiRef.current?.readCameraPosition?.() ?? [0, 0, 0]);
+        setCameraRotation(sceneApiRef.current?.readCameraPose?.().rotation ?? [0, 0, 0]);
       }
 
       void renderTerminal3DScreens(zoneGroups, getRatosTerminalSnapshot());
@@ -1394,6 +1720,7 @@ export default function LidcStorylineRoom({ onClose }) {
 
     return () => {
       disposed = true;
+      cancelTerminalCameraFocus();
       disposeRatosTerminal();
       exitPointerLock();
       container.classList.remove('is-pointer-locked');
@@ -1439,6 +1766,24 @@ export default function LidcStorylineRoom({ onClose }) {
     };
 
     const onKeyDown = (event) => {
+      const terminalActive = terminalOpen || terminalOpenRef.current;
+
+      if (terminalActive) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          sceneApiRef.current?.closeTerminal?.();
+        }
+        return;
+      }
+
+      if (sceneApiRef.current?.isCameraTransitioning?.()) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          sceneApiRef.current?.closeTerminal?.();
+        }
+        return;
+      }
+
       if (event.target?.tagName === 'INPUT' || event.target?.tagName === 'TEXTAREA') return;
 
       if (event.code === 'KeyL' && !event.metaKey && !event.ctrlKey && !event.altKey) {
@@ -1459,10 +1804,6 @@ export default function LidcStorylineRoom({ onClose }) {
           setWhiteboardOpen(false);
           return;
         }
-        if (terminalOpen) {
-          setTerminalOpen(false);
-          return;
-        }
         if (debugOpen) {
           setDebugOpen(false);
           return;
@@ -1480,6 +1821,11 @@ export default function LidcStorylineRoom({ onClose }) {
     if (!api) return undefined;
 
     if (debugOpen || whiteboardOpen || terminalOpen || loading || loadError) {
+      api.exitPointerLock?.();
+      return undefined;
+    }
+
+    if (api.isCameraTransitioning?.()) {
       api.exitPointerLock?.();
       return undefined;
     }
@@ -1533,6 +1879,10 @@ export default function LidcStorylineRoom({ onClose }) {
         <LidcStorylineInteractPrompt
           keys="E"
           label={t('lidc.storyline.whiteboardPromptAction')}
+          onActivate={() => {
+            setWhiteboardOpen(true);
+            setActiveInteractEvent(null);
+          }}
         />
       )}
 
@@ -1540,6 +1890,7 @@ export default function LidcStorylineRoom({ onClose }) {
         <LidcStorylineInteractPrompt
           keys="E"
           label={t('lidc.storyline.terminalPromptAction')}
+          onActivate={() => sceneApiRef.current?.openTerminal?.()}
         />
       )}
 
@@ -1564,7 +1915,7 @@ export default function LidcStorylineRoom({ onClose }) {
         </button>
       )}
 
-      {!loading && !loadError && debugOpen && (
+      {!loading && !loadError && debugOpen && !terminalOpen && (
         <LidcStorylineDebugPanel
           transform={transform}
           transformMode={transformMode}
@@ -1573,6 +1924,7 @@ export default function LidcStorylineRoom({ onClose }) {
           selectedEasterEggId={selectedEasterEggId}
           scaleLinked={scaleLinked}
           cameraPosition={cameraPosition}
+          cameraRotation={cameraRotation}
           saveStatus={saveStatus}
           lastTriggerEvent={lastTriggerEvent}
           onDebugTargetChange={handleDebugTargetChange}
@@ -1587,6 +1939,9 @@ export default function LidcStorylineRoom({ onClose }) {
           onTargetRotationChange={(rotation) => applyActiveTransformPatch({ rotation })}
           onTargetScaleAxisChange={applyTargetScaleAxisUpdate}
           onPlayerChange={applyPlayerUpdate}
+          onTerminalCameraChange={applyTerminalCameraUpdate}
+          onCaptureTerminalCamera={captureTerminalCameraFromView}
+          onPreviewTerminalCamera={previewTerminalCamera}
           onSave={handleSave}
           onDownload={handleDownload}
           onReset={handleReset}
@@ -1601,7 +1956,7 @@ export default function LidcStorylineRoom({ onClose }) {
       )}
 
       {terminalOpen && (
-        <LidcStorylineTerminal onClose={() => setTerminalOpen(false)} />
+        <LidcStorylineTerminal onClose={() => sceneApiRef.current?.closeTerminal?.()} />
       )}
 
       {!whiteboardOpen && !terminalOpen && (
