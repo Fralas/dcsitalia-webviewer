@@ -14,5 +14,122 @@
     "heightOffset": 0,
     "snapToFloor": false
   },
-  "zones": []
+  "zones": [
+    {
+      "id": "ed7548df-1591-4683-adf9-40b089dff434",
+      "type": "collision",
+      "label": "Collision",
+      "eventId": "",
+      "position": [2.8888, -0.5549, -3.0766],
+      "rotation": [0, 5.92, 0],
+      "scale": [1.9998, 2.0808, 2.7455]
+    },
+    {
+      "id": "84471dc6-f48f-4bb5-b0d6-455bf298d0ff",
+      "type": "trigger",
+      "label": "Trigger",
+      "eventId": "whiteboard",
+      "position": [7.207, -1.962, -3.4304],
+      "rotation": [0, 16.33, 0],
+      "scale": [2.1565, 4.4254, 2]
+    },
+    {
+      "id": "cefcd8d6-2e6e-4fd0-a7a4-c625ed7a5530",
+      "type": "whiteboardSurface",
+      "label": "Whiteboard surface",
+      "eventId": "",
+      "position": [6.7709, -0.5776, -3.2977],
+      "rotation": [-11.69, -72.65, -11.64],
+      "scale": [1.637, 1.05, 0.02]
+    },
+    {
+      "id": "279187b2-f3c0-4960-bf57-9bf34d17b8a7",
+      "type": "collision",
+      "label": "Collision",
+      "eventId": "",
+      "position": [-2.0239, -0.7493, -5.3965],
+      "rotation": [0, 6.12, 0],
+      "scale": [2, 2, 2]
+    },
+    {
+      "id": "99d6624a-382f-4218-9af8-fd603225bb09",
+      "type": "collision",
+      "label": "Collision",
+      "eventId": "",
+      "position": [0.3676, -1.6008, -7.5675],
+      "rotation": [0, 0, 0],
+      "scale": [2.3987, 2, 2]
+    },
+    {
+      "id": "ce6491b7-b882-4ed8-a0df-ef64bad14ab8",
+      "type": "collision",
+      "label": "Collision",
+      "eventId": "",
+      "position": [6.2274, -0.9108, -7.861],
+      "rotation": [0, 0, 0],
+      "scale": [2, 2, 2]
+    },
+    {
+      "id": "882e3d05-3ea4-429a-bb6f-143b96a166f1",
+      "type": "collision",
+      "label": "Collision",
+      "eventId": "",
+      "position": [7.5325, -1.1131, -5.812],
+      "rotation": [0, 0, 0],
+      "scale": [2, 2, 2]
+    },
+    {
+      "id": "5e975116-82a0-40da-9f5e-c08594257da5",
+      "type": "collision",
+      "label": "Collision",
+      "eventId": "",
+      "position": [6.9277, -1.231, 0.5332],
+      "rotation": [0, 0, 0],
+      "scale": [2, 2, 2]
+    }
+  ],
+  "easterEggs": [
+    {
+      "id": "adlerkopf",
+      "position": [1.9208, -2.0001, -6.504],
+      "rotation": [-180, 84.49, -180],
+      "scale": [0.5117, 0.5972, 0.5425]
+    },
+    {
+      "id": "battleFox",
+      "position": [4.9922, 0.5714, -6.7045],
+      "rotation": [0, -69.68, 0],
+      "scale": [0.3265, 0.3265, 0.3265]
+    },
+    {
+      "id": "fancyPictureFrame",
+      "position": [7.6254, 0.164, -2.2093],
+      "rotation": [0, 4.27, 0],
+      "scale": [0.4345, 0.4345, 0.4345]
+    },
+    {
+      "id": "djogoImmagine",
+      "position": [7.6161, 0.1617, -2.2081],
+      "rotation": [-180, 84.99, -180],
+      "scale": [0.7374, 0.9606, 0.9876]
+    },
+    {
+      "id": "pioneerDjConsole",
+      "position": [6.7849, -1.8016, -6.0342],
+      "rotation": [0, -8.74, 0],
+      "scale": [0.0105, 0.0105, 0.0105]
+    },
+    {
+      "id": "rat",
+      "position": [6.1093, -0.1942, -0.4275],
+      "rotation": [-172.35, 39.89, 177.83],
+      "scale": [1.7255, 1.7255, 1.7255]
+    },
+    {
+      "id": "snowyOwl",
+      "position": [-0.3003, 0.845, -6.378],
+      "rotation": [0, 34.3, 0],
+      "scale": [1, 1, 1]
+    }
+  ]
 }

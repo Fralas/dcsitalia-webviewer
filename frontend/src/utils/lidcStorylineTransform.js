@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeEasterEggTransforms } from '../config/lidcStorylineEasterEggs';
 import fileDefaults from '../config/lidcStorylineRoomTransform.json';
 
 export const LIDC_STORYLINE_TRANSFORM_STORAGE_KEY = 'lidc-storyline-room-transform';
@@ -7,6 +8,7 @@ export const DEBUG_TARGETS = Object.freeze({
   ROOM: 'room',
   WHITEBOARD: 'whiteboard',
   ZONE: 'zone',
+  EASTER_EGG: 'easterEgg',
 });
 
 export function cloneTransform(value) {
@@ -14,7 +16,9 @@ export function cloneTransform(value) {
 }
 
 export function getDefaultTransform() {
-  return cloneTransform(fileDefaults);
+  const defaults = cloneTransform(fileDefaults);
+  defaults.easterEggs = mergeEasterEggTransforms(defaults.easterEggs);
+  return defaults;
 }
 
 export function loadSavedTransform() {
@@ -30,6 +34,7 @@ export function loadSavedTransform() {
       whiteboard: { ...defaults.whiteboard, ...parsed.whiteboard },
       player: { ...defaults.player, ...parsed.player },
       zones: Array.isArray(parsed.zones) ? parsed.zones : defaults.zones,
+      easterEggs: mergeEasterEggTransforms(parsed.easterEggs),
     };
   } catch {
     return defaults;
@@ -121,12 +126,19 @@ export function readObjectTransform(group) {
   };
 }
 
-export function readSceneTransform(roomContentGroup, whiteboardGroup, playerSettings, zones = []) {
+export function readSceneTransform(
+  roomContentGroup,
+  whiteboardGroup,
+  playerSettings,
+  zones = [],
+  easterEggs = [],
+) {
   return {
     room: readObjectTransform(roomContentGroup),
     whiteboard: readObjectTransform(whiteboardGroup),
     player: { ...playerSettings },
     zones: zones.map((zone) => ({ ...zone })),
+    easterEggs: easterEggs.map((egg) => ({ ...egg })),
   };
 }
 

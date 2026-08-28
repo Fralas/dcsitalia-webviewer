@@ -79,12 +79,14 @@ export default function LidcStorylineDebugPanel({
   transformMode,
   debugTarget,
   selectedZoneId,
+  selectedEasterEggId,
   scaleLinked,
   cameraPosition,
   saveStatus,
   lastTriggerEvent,
   onDebugTargetChange,
   onSelectZone,
+  onSelectEasterEgg,
   onAddZone,
   onRemoveZone,
   onZoneMetaChange,
@@ -101,19 +103,24 @@ export default function LidcStorylineDebugPanel({
   onSnapPlayerToRoom,
   onClose,
 }) {
-  const { room, whiteboard, player, zones = [] } = transform;
+  const { room, whiteboard, player, zones = [], easterEggs = [] } = transform;
   const selectedZone = zones.find((zone) => zone.id === selectedZoneId) ?? null;
+  const selectedEasterEgg = easterEggs.find((egg) => egg.id === selectedEasterEggId) ?? null;
   const activeTransform = debugTarget === DEBUG_TARGETS.ZONE && selectedZone
     ? selectedZone
-    : debugTarget === DEBUG_TARGETS.WHITEBOARD
-      ? whiteboard
-      : room;
+    : debugTarget === DEBUG_TARGETS.EASTER_EGG && selectedEasterEgg
+      ? selectedEasterEgg
+      : debugTarget === DEBUG_TARGETS.WHITEBOARD
+        ? whiteboard
+        : room;
 
   const targetLabel = debugTarget === DEBUG_TARGETS.ZONE && selectedZone
     ? t('lidc.storyline.debug.zoneTransform')
-    : debugTarget === DEBUG_TARGETS.WHITEBOARD
-      ? t('lidc.storyline.debug.whiteboardTransform')
-      : t('lidc.storyline.debug.roomTransform');
+    : debugTarget === DEBUG_TARGETS.EASTER_EGG && selectedEasterEgg
+      ? t('lidc.storyline.debug.easterEggTransform')
+      : debugTarget === DEBUG_TARGETS.WHITEBOARD
+        ? t('lidc.storyline.debug.whiteboardTransform')
+        : t('lidc.storyline.debug.roomTransform');
 
   return (
     <aside className="lidc-storyline-debug-panel">
@@ -206,6 +213,25 @@ export default function LidcStorylineDebugPanel({
       </section>
 
       <section className="lidc-storyline-debug-section">
+        <h3>{t('lidc.storyline.debug.easterEggsTitle')}</h3>
+        <ul className="lidc-storyline-debug-zone-list">
+          {easterEggs.map((egg) => (
+            <li key={egg.id}>
+              <button
+                type="button"
+                className={`lidc-storyline-debug-zone-item ${selectedEasterEggId === egg.id ? 'is-active' : ''} is-easter-egg`}
+                onClick={() => onSelectEasterEgg(egg.id)}
+              >
+                <span className="lidc-storyline-debug-zone-name">
+                  {t(`lidc.storyline.debug.easterEggs.${egg.id}`)}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="lidc-storyline-debug-section">
         <div className="lidc-storyline-debug-section-head">
           <h3>{t('lidc.storyline.debug.zonesTitle')}</h3>
           <div className="lidc-storyline-debug-zone-actions">
@@ -226,6 +252,15 @@ export default function LidcStorylineDebugPanel({
             >
               <Plus size={14} />
               {t('lidc.storyline.debug.addCollisionZone')}
+            </button>
+            <button
+              type="button"
+              className="lidc-storyline-debug-zone-add is-whiteboard-surface"
+              onClick={() => onAddZone(ZONE_TYPES.WHITEBOARD_SURFACE)}
+              title={t('lidc.storyline.debug.addWhiteboardSurfaceZone')}
+            >
+              <Plus size={14} />
+              {t('lidc.storyline.debug.addWhiteboardSurfaceZone')}
             </button>
           </div>
         </div>

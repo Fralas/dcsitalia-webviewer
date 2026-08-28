@@ -513,6 +513,11 @@ body.lidc-storyline-open {
   color: #ffb39e;
 }
 
+.lidc-storyline-debug-zone-add.is-whiteboard-surface {
+  border-color: rgba(110, 168, 255, 0.45);
+  color: #9ec5ff;
+}
+
 .lidc-storyline-debug-empty {
   margin: 0 0 8px;
   font-size: 0.74rem;
@@ -558,6 +563,10 @@ body.lidc-storyline-open {
 
 .lidc-storyline-debug-zone-item.is-collision {
   box-shadow: inset 3px 0 0 rgba(255, 107, 74, 0.85);
+}
+
+.lidc-storyline-debug-zone-item.is-whiteboardSurface {
+  box-shadow: inset 3px 0 0 rgba(110, 168, 255, 0.85);
 }
 
 .lidc-storyline-debug-zone-type {

@@ -23,6 +23,11 @@ import {
   readSceneTransform,
   saveTransformToStorage,
 } from '../utils/lidcStorylineTransform';
+import { LIDC_STORYLINE_EASTER_EGGS } from '../config/lidcStorylineEasterEggs';
+import {
+  loadEasterEggAsset,
+  readEasterEggFromGroup,
+} from '../utils/lidcStorylineEasterEggAssets';
 import {
   applyZoneTransform,
   createDefaultZone,
@@ -33,7 +38,9 @@ import {
   readZoneFromGroup,
   resolveCollisionZones,
   updateZoneTriggers,
+  ZONE_TYPES,
 } from '../utils/lidcStorylineZones';
+import { syncWhiteboard3DDecorations } from '../utils/lidcStorylineWhiteboard3D';
 import './LidcStorylineRoom.css';
 
 const MOVE_SPEED = 1.8;
@@ -220,6 +227,7 @@ export default function LidcStorylineRoom({ onClose }) {
   const whiteboardPromptActiveRef = useRef(false);
   const debugTargetRef = useRef(DEBUG_TARGETS.WHITEBOARD);
   const selectedZoneIdRef = useRef(null);
+  const selectedEasterEggIdRef = useRef(null);
   const scaleLinkedRef = useRef(true);
 
   const [loading, setLoading] = useState(true);
@@ -228,6 +236,7 @@ export default function LidcStorylineRoom({ onClose }) {
   const [debugOpen, setDebugOpen] = useState(false);
   const [debugTarget, setDebugTarget] = useState(DEBUG_TARGETS.WHITEBOARD);
   const [selectedZoneId, setSelectedZoneId] = useState(null);
+  const [selectedEasterEggId, setSelectedEasterEggId] = useState(null);
   const [scaleLinked, setScaleLinked] = useState(true);
   const [whiteboardOpen, setWhiteboardOpen] = useState(false);
   const [whiteboardPromptActive, setWhiteboardPromptActive] = useState(false);
@@ -282,6 +291,10 @@ export default function LidcStorylineRoom({ onClose }) {
   }, [selectedZoneId]);
 
   useEffect(() => {
+    selectedEasterEggIdRef.current = selectedEasterEggId;
+  }, [selectedEasterEggId]);
+
+  useEffect(() => {
     scaleLinkedRef.current = scaleLinked;
   }, [scaleLinked]);
 
@@ -306,6 +319,10 @@ export default function LidcStorylineRoom({ onClose }) {
   }, [selectedZoneId]);
 
   useEffect(() => {
+    sceneApiRef.current?.setSelectedEasterEggId(selectedEasterEggId);
+  }, [selectedEasterEggId]);
+
+  useEffect(() => {
     sceneApiRef.current?.setZonesVisible?.(debugOpen);
   }, [debugOpen]);
 
@@ -318,6 +335,11 @@ export default function LidcStorylineRoom({ onClose }) {
           zone.id === selectedZoneIdRef.current ? { ...zone, ...patch } : zone
         ));
         sceneApiRef.current?.syncZones(next.zones);
+      } else if (debugTargetRef.current === DEBUG_TARGETS.EASTER_EGG && selectedEasterEggIdRef.current) {
+        next.easterEggs = next.easterEggs.map((egg) => (
+          egg.id === selectedEasterEggIdRef.current ? { ...egg, ...patch } : egg
+        ));
+        sceneApiRef.current?.syncEasterEggs(next.easterEggs);
       } else {
         const targetKey = debugTargetRef.current === DEBUG_TARGETS.WHITEBOARD ? 'whiteboard' : 'room';
         next[targetKey] = { ...next[targetKey], ...patch };
@@ -342,6 +364,15 @@ export default function LidcStorylineRoom({ onClose }) {
           return { ...zone, scale: newScale };
         });
         sceneApiRef.current?.syncZones(next.zones);
+      } else if (debugTargetRef.current === DEBUG_TARGETS.EASTER_EGG && selectedEasterEggIdRef.current) {
+        next.easterEggs = next.easterEggs.map((egg) => {
+          if (egg.id !== selectedEasterEggIdRef.current) return egg;
+          const newScale = scaleLinkedRef.current
+            ? applyLinkedScaleChange(egg.scale, axisIndex, nextValue)
+            : egg.scale.map((value, index) => (index === axisIndex ? nextValue : value));
+          return { ...egg, scale: newScale };
+        });
+        sceneApiRef.current?.syncEasterEggs(next.easterEggs);
       } else {
         const targetKey = debugTargetRef.current === DEBUG_TARGETS.WHITEBOARD ? 'whiteboard' : 'room';
         const currentScale = next[targetKey].scale;
@@ -390,7 +421,14 @@ export default function LidcStorylineRoom({ onClose }) {
 
   const handleSelectZone = useCallback((zoneId) => {
     setSelectedZoneId(zoneId);
+    setSelectedEasterEggId(null);
     setDebugTarget(DEBUG_TARGETS.ZONE);
+  }, []);
+
+  const handleSelectEasterEgg = useCallback((easterEggId) => {
+    setSelectedEasterEggId(easterEggId);
+    setSelectedZoneId(null);
+    setDebugTarget(DEBUG_TARGETS.EASTER_EGG);
   }, []);
 
   const handleZoneMetaChange = useCallback((zoneId, patch) => {
@@ -443,13 +481,16 @@ export default function LidcStorylineRoom({ onClose }) {
     }
     api?.resetWhiteboardPlacement?.();
     api?.syncZones?.(defaults.zones ?? []);
+    api?.syncEasterEggs?.(defaults.easterEggs ?? []);
 
     const next = api?.readSceneTransform?.() ?? defaults;
     next.player = { ...defaults.player };
     next.zones = [...(defaults.zones ?? [])];
+    next.easterEggs = [...(defaults.easterEggs ?? [])];
     transformRef.current = next;
     setTransform(next);
     setSelectedZoneId(null);
+    setSelectedEasterEggId(null);
     setDebugTarget(DEBUG_TARGETS.ROOM);
     api?.applyPlayerTransform?.(next);
 
@@ -558,10 +599,15 @@ export default function LidcStorylineRoom({ onClose }) {
     let autoWhiteboardTransform = null;
     let debugTargetActive = debugTargetRef.current;
     let selectedZoneIdActive = selectedZoneIdRef.current;
+    let selectedEasterEggIdActive = selectedEasterEggIdRef.current;
 
     const zonesRoot = new THREE.Group();
     scene.add(zonesRoot);
     const zoneGroups = new Map();
+
+    const easterEggsRoot = new THREE.Group();
+    roomRoot.add(easterEggsRoot);
+    const easterEggGroups = new Map();
     const activeTriggerIds = new Set();
     const playerPoint = new THREE.Vector3();
     let whiteboardPromptVisible = false;
@@ -599,13 +645,38 @@ export default function LidcStorylineRoom({ onClose }) {
         } else {
           applyZoneTransform(group, zone);
         }
-        group.visible = debugOpenRef.current;
+        if (group.userData.zoneType === ZONE_TYPES.WHITEBOARD_SURFACE) {
+          group.visible = true;
+          group.children.forEach((child) => {
+            child.visible = child.name === 'whiteboard-3d-decor' ? true : debugOpenRef.current;
+          });
+        } else {
+          group.visible = debugOpenRef.current;
+        }
       });
+
+      syncWhiteboard3DDecorations(zones, zoneGroups);
     };
 
     const setZonesVisible = (visible) => {
       zoneGroups.forEach((group) => {
+        if (group.userData.zoneType === ZONE_TYPES.WHITEBOARD_SURFACE) {
+          group.visible = true;
+          group.children.forEach((child) => {
+            child.visible = child.name === 'whiteboard-3d-decor' ? true : visible;
+          });
+          return;
+        }
+
         group.visible = visible;
+      });
+    };
+
+    const syncEasterEggs = (easterEggs = []) => {
+      easterEggs.forEach((egg) => {
+        const group = easterEggGroups.get(egg.id);
+        if (!group) return;
+        applyObjectTransform(group, egg);
       });
     };
 
@@ -655,6 +726,9 @@ export default function LidcStorylineRoom({ onClose }) {
       if (debugTargetActive === DEBUG_TARGETS.ZONE && selectedZoneIdActive) {
         return zoneGroups.get(selectedZoneIdActive) ?? null;
       }
+      if (debugTargetActive === DEBUG_TARGETS.EASTER_EGG && selectedEasterEggIdActive) {
+        return easterEggGroups.get(selectedEasterEggIdActive) ?? null;
+      }
       if (debugTargetActive === DEBUG_TARGETS.WHITEBOARD) return whiteboardGroup;
       return roomContentGroup;
     };
@@ -671,11 +745,18 @@ export default function LidcStorylineRoom({ onClose }) {
         });
       });
 
+      const easterEggs = (transformRef.current.easterEggs ?? []).map((egg) => {
+        const group = easterEggGroups.get(egg.id);
+        if (!group) return egg;
+        return readEasterEggFromGroup(group, egg.id);
+      });
+
       return readSceneTransform(
         roomContentGroup,
         whiteboardGroup,
         transformRef.current.player,
         zones,
+        easterEggs,
       );
     };
 
@@ -684,6 +765,7 @@ export default function LidcStorylineRoom({ onClose }) {
       applyObjectTransform(roomContentGroup, config.room);
       applyObjectTransform(whiteboardGroup, config.whiteboard);
       syncZones(config.zones ?? transformRef.current.zones ?? []);
+      syncEasterEggs(config.easterEggs ?? transformRef.current.easterEggs ?? []);
       refreshRoomBounds();
     };
 
@@ -693,6 +775,7 @@ export default function LidcStorylineRoom({ onClose }) {
         applyObjectTransform(whiteboardGroup, config.whiteboard);
       }
       syncZones(config.zones ?? []);
+      syncEasterEggs(config.easterEggs ?? []);
       refreshRoomBounds();
     };
 
@@ -797,6 +880,7 @@ export default function LidcStorylineRoom({ onClose }) {
       applyPlayerTransform,
       resetWhiteboardPlacement,
       syncZones,
+      syncEasterEggs,
       setZonesVisible,
       setDebugEnabled: (enabled) => {
         setZonesVisible(enabled);
@@ -819,6 +903,14 @@ export default function LidcStorylineRoom({ onClose }) {
       setSelectedZoneId: (zoneId) => {
         selectedZoneIdActive = zoneId;
         if (debugOpenRef.current && debugTargetActive === DEBUG_TARGETS.ZONE) {
+          const activeTarget = getActiveTransformTarget();
+          if (activeTarget) transformControls.attach(activeTarget);
+          else transformControls.detach();
+        }
+      },
+      setSelectedEasterEggId: (easterEggId) => {
+        selectedEasterEggIdActive = easterEggId;
+        if (debugOpenRef.current && debugTargetActive === DEBUG_TARGETS.EASTER_EGG) {
           const activeTarget = getActiveTransformTarget();
           if (activeTarget) transformControls.attach(activeTarget);
           else transformControls.detach();
@@ -879,8 +971,19 @@ export default function LidcStorylineRoom({ onClose }) {
     });
 
     const loader = new GLTFLoader();
-    const progress = { room: 0, whiteboard: 0 };
-    const syncProgress = () => setLoadProgress((progress.room + progress.whiteboard) / 2);
+    const progress = { room: 0, whiteboard: 0, easterEggs: 0 };
+    const syncProgress = () => {
+      const easterEggWeight = LIDC_STORYLINE_EASTER_EGGS.length;
+      const totalWeight = 2 + easterEggWeight;
+      setLoadProgress((progress.room + progress.whiteboard + progress.easterEggs * easterEggWeight) / totalWeight);
+    };
+
+    const easterEggLoadPromises = LIDC_STORYLINE_EASTER_EGGS.map((eggDefinition) => (
+      loadEasterEggAsset(loader, eggDefinition, (value) => {
+        progress.easterEggs = Math.max(progress.easterEggs, value);
+        syncProgress();
+      }).then((group) => ({ eggDefinition, group }))
+    ));
 
     Promise.all([
       loadGltf(loader, roomModelUrl, (value) => {
@@ -891,8 +994,9 @@ export default function LidcStorylineRoom({ onClose }) {
         progress.whiteboard = value;
         syncProgress();
       }),
+      ...easterEggLoadPromises,
     ])
-      .then(([roomGltf, whiteboardGltf]) => {
+      .then(([roomGltf, whiteboardGltf, ...loadedEasterEggs]) => {
         if (disposed) return;
 
         const room = roomGltf.scene;
@@ -917,6 +1021,11 @@ export default function LidcStorylineRoom({ onClose }) {
         roomRoot.add(whiteboardGroup);
         syncCollisionMeshes();
 
+        loadedEasterEggs.forEach(({ eggDefinition, group }) => {
+          easterEggGroups.set(eggDefinition.id, group);
+          easterEggsRoot.add(group);
+        });
+
         refreshRoomBounds();
         if (!roomBounds || roomBounds.isEmpty()) {
           throw new Error('Room model has empty bounds');
@@ -934,12 +1043,22 @@ export default function LidcStorylineRoom({ onClose }) {
 
         const initialTransform = loadSavedTransform();
 
+        if (!storedTransform?.easterEggs) {
+          const roomCenter = new THREE.Vector3(0, roomLocalBounds.min.y + 0.5, 0);
+          roomContentGroup.localToWorld(roomCenter);
+          initialTransform.easterEggs = (initialTransform.easterEggs ?? []).map((egg) => ({
+            ...egg,
+            position: roomCenter.toArray().map((value) => +value.toFixed(4)),
+          }));
+        }
+
         if (storedTransform?.whiteboard) {
           applyLoadedSceneTransform(initialTransform);
         } else {
           applyObjectTransform(roomContentGroup, initialTransform.room);
           initialTransform.whiteboard = readObjectTransform(whiteboardGroup);
           syncZones(initialTransform.zones ?? []);
+          syncEasterEggs(initialTransform.easterEggs ?? []);
           refreshRoomBounds();
         }
 
@@ -1311,6 +1430,9 @@ export default function LidcStorylineRoom({ onClose }) {
     if (target !== DEBUG_TARGETS.ZONE) {
       setSelectedZoneId(null);
     }
+    if (target !== DEBUG_TARGETS.EASTER_EGG) {
+      setSelectedEasterEggId(null);
+    }
   }, []);
 
   return (
@@ -1370,12 +1492,14 @@ export default function LidcStorylineRoom({ onClose }) {
           transformMode={transformMode}
           debugTarget={debugTarget}
           selectedZoneId={selectedZoneId}
+          selectedEasterEggId={selectedEasterEggId}
           scaleLinked={scaleLinked}
           cameraPosition={cameraPosition}
           saveStatus={saveStatus}
           lastTriggerEvent={lastTriggerEvent}
           onDebugTargetChange={handleDebugTargetChange}
           onSelectZone={handleSelectZone}
+          onSelectEasterEgg={handleSelectEasterEgg}
           onAddZone={handleAddZone}
           onRemoveZone={handleRemoveZone}
           onZoneMetaChange={handleZoneMetaChange}

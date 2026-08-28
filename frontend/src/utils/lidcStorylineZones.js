@@ -4,6 +4,7 @@ import { applyObjectTransform, readObjectTransform } from './lidcStorylineTransf
 export const ZONE_TYPES = Object.freeze({
   TRIGGER: 'trigger',
   COLLISION: 'collision',
+  WHITEBOARD_SURFACE: 'whiteboardSurface',
 });
 
 export const WHITEBOARD_ZONE_EVENT_ID = 'whiteboard';
@@ -11,6 +12,7 @@ export const WHITEBOARD_ZONE_EVENT_ID = 'whiteboard';
 const ZONE_COLORS = {
   [ZONE_TYPES.TRIGGER]: 0x3ecf8e,
   [ZONE_TYPES.COLLISION]: 0xff6b4a,
+  [ZONE_TYPES.WHITEBOARD_SURFACE]: 0x6ea8ff,
 };
 
 export function createDefaultZone(type, position = [0, 1, 0]) {
@@ -21,11 +23,17 @@ export function createDefaultZone(type, position = [0, 1, 0]) {
   return {
     id,
     type,
-    label: type === ZONE_TYPES.TRIGGER ? 'Trigger' : 'Collision',
+    label: type === ZONE_TYPES.TRIGGER
+      ? 'Trigger'
+      : type === ZONE_TYPES.WHITEBOARD_SURFACE
+        ? 'Whiteboard surface'
+        : 'Collision',
     eventId: type === ZONE_TYPES.TRIGGER ? WHITEBOARD_ZONE_EVENT_ID : '',
     position: position.map((value) => +Number(value).toFixed(4)),
     rotation: [0, 0, 0],
-    scale: [2, 2, 2],
+    scale: type === ZONE_TYPES.WHITEBOARD_SURFACE
+      ? [1.6, 1.05, 0.02]
+      : [2, 2, 2],
   };
 }
 
