@@ -385,7 +385,7 @@ export default {
       close: 'Close storyline',
       closePanel: 'Close whiteboard panel',
       enterHint: 'Click to enter the room',
-      controlsHint: 'WASD to move · Drag to look · Click whiteboard to interact · L layout debug · Esc to exit',
+      controlsHint: 'WASD to move · Move mouse to look · Click whiteboard to interact · L layout debug · Esc to exit',
       whiteboardTitle: 'Operations whiteboard',
       whiteboardBody: 'Mission briefing content will appear here. Explore the room and interact with the whiteboard to follow the campaign storyline.',
       backToRoom: 'Back to room',

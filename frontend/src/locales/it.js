@@ -385,7 +385,7 @@ export default {
       close: 'Chiudi storyline',
       closePanel: 'Chiudi pannello lavagna',
       enterHint: 'Clicca per entrare nella stanza',
-      controlsHint: 'WASD per muoverti · Trascina per guardare · Clicca la lavagna · L debug layout · Esc per uscire',
+      controlsHint: 'WASD per muoverti · Muovi il mouse per guardare · Clicca la lavagna · L debug layout · Esc per uscire',
       whiteboardTitle: 'Lavagna operativa',
       whiteboardBody: 'Qui comparirà il contenuto del briefing missione. Esplora la stanza e interagisci con la lavagna per seguire la storyline della campagna.',
       backToRoom: 'Torna alla stanza',

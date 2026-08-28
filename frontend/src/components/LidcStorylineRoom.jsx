@@ -23,7 +23,7 @@ import {
 } from '../utils/lidcStorylineTransform';
 import './LidcStorylineRoom.css';
 
-const MOVE_SPEED = 3.2;
+const MOVE_SPEED = 1.8;
 const FLOOR_RAY_START_OFFSET = 2;
 const ROOM_WALL_MARGIN = 0.8;
 const PLAYER_COLLISION_RADIUS = 0.35;
@@ -346,10 +346,9 @@ export default function LidcStorylineRoom({ onClose }) {
 
     let frameId = 0;
     let disposed = false;
-    let isLooking = false;
     let isTransformDragging = false;
-    let lastMouseX = 0;
-    let lastMouseY = 0;
+    let lastMouseX = null;
+    let lastMouseY = null;
     let pointerDownX = 0;
     let pointerDownY = 0;
 
@@ -576,7 +575,6 @@ export default function LidcStorylineRoom({ onClose }) {
 
     transformControls.addEventListener('dragging-changed', (event) => {
       isTransformDragging = Boolean(event.value);
-      isLooking = false;
 
       if (!event.value) {
         scaleAtDragStart = null;
@@ -762,17 +760,18 @@ export default function LidcStorylineRoom({ onClose }) {
     };
 
     const onMouseDown = (event) => {
-      if (event.button !== 0 || isTransformDragging || debugOpenRef.current) return;
+      if (event.button !== 0 || isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current) {
+        return;
+      }
+
       pointerDownX = event.clientX;
       pointerDownY = event.clientY;
-      isLooking = true;
       lastMouseX = event.clientX;
       lastMouseY = event.clientY;
     };
 
     const onMouseUp = (event) => {
-      if (event.button !== 0 || isTransformDragging || debugOpenRef.current) {
-        isLooking = false;
+      if (event.button !== 0 || isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current) {
         return;
       }
 
@@ -780,21 +779,32 @@ export default function LidcStorylineRoom({ onClose }) {
       if (dragDistance <= CLICK_DRAG_THRESHOLD_PX) {
         tryInteractWithWhiteboard(event.clientX, event.clientY);
       }
-
-      isLooking = false;
     };
 
     const onMouseMove = (event) => {
-      if (!isLooking || isTransformDragging) return;
+      if (isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current) return;
+
+      if (lastMouseX === null || lastMouseY === null) {
+        lastMouseX = event.clientX;
+        lastMouseY = event.clientY;
+        return;
+      }
 
       const deltaX = event.clientX - lastMouseX;
       const deltaY = event.clientY - lastMouseY;
       lastMouseX = event.clientX;
       lastMouseY = event.clientY;
 
+      if (deltaX === 0 && deltaY === 0) return;
+
       camera.rotation.y -= deltaX * LOOK_SENSITIVITY;
       camera.rotation.x -= deltaY * LOOK_SENSITIVITY;
       camera.rotation.x = THREE.MathUtils.clamp(camera.rotation.x, -MAX_PITCH, MAX_PITCH);
+    };
+
+    const onMouseEnter = (event) => {
+      lastMouseX = event.clientX;
+      lastMouseY = event.clientY;
     };
 
     const onContextMenu = (event) => {
@@ -870,7 +880,7 @@ export default function LidcStorylineRoom({ onClose }) {
     renderer.domElement.addEventListener('mousedown', onMouseDown);
     renderer.domElement.addEventListener('mouseup', onMouseUp);
     renderer.domElement.addEventListener('mousemove', onMouseMove);
-    renderer.domElement.addEventListener('mouseleave', () => { isLooking = false; });
+    renderer.domElement.addEventListener('mouseenter', onMouseEnter);
     renderer.domElement.addEventListener('contextmenu', onContextMenu);
 
     return () => {
@@ -885,6 +895,7 @@ export default function LidcStorylineRoom({ onClose }) {
       renderer.domElement.removeEventListener('mousedown', onMouseDown);
       renderer.domElement.removeEventListener('mouseup', onMouseUp);
       renderer.domElement.removeEventListener('mousemove', onMouseMove);
+      renderer.domElement.removeEventListener('mouseenter', onMouseEnter);
       renderer.domElement.removeEventListener('contextmenu', onContextMenu);
 
       scene.traverse((child) => {
