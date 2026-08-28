@@ -604,11 +604,29 @@ export default function LidcStorylineRoom({ onClose }) {
 
     const easeInOut = (progress) => progress * progress * (3 - 2 * progress);
 
+    const lerpAngle = (from, to, alpha) => {
+      let delta = to - from;
+      delta = THREE.MathUtils.euclideanModulo(delta + Math.PI, Math.PI * 2) - Math.PI;
+      return from + delta * alpha;
+    };
+
     const isCameraTransitioning = () => Boolean(cameraTransition);
 
     const cancelTerminalCameraFocus = () => {
       cameraTransition = null;
       cameraTransitionRef.current = null;
+    };
+
+    const copyRotationTarget = (rotation) => {
+      if (!rotation) return null;
+      if (typeof rotation.clone === 'function') {
+        return rotation.clone();
+      }
+      return {
+        x: rotation.x,
+        y: rotation.y,
+        z: rotation.z,
+      };
     };
 
     const startCameraFocus = ({ toPosition, lookAt, toRotation, onComplete }) => {
@@ -621,7 +639,7 @@ export default function LidcStorylineRoom({ onClose }) {
         fromRotation: camera.rotation.clone(),
         toPosition: toPosition.clone(),
         lookAt: lookAt ? lookAt.clone() : null,
-        toRotation: toRotation ? toRotation.clone() : null,
+        toRotation: copyRotationTarget(toRotation),
         startTime: performance.now(),
         onComplete,
       };
@@ -647,17 +665,17 @@ export default function LidcStorylineRoom({ onClose }) {
         camera.lookAt(cameraTransition.lookAt);
       } else if (cameraTransition.toRotation) {
         camera.rotation.order = 'YXZ';
-        camera.rotation.x = THREE.MathUtils.lerp(
+        camera.rotation.x = lerpAngle(
           cameraTransition.fromRotation.x,
           cameraTransition.toRotation.x,
           eased,
         );
-        camera.rotation.y = THREE.MathUtils.lerp(
+        camera.rotation.y = lerpAngle(
           cameraTransition.fromRotation.y,
           cameraTransition.toRotation.y,
           eased,
         );
-        camera.rotation.z = THREE.MathUtils.lerp(
+        camera.rotation.z = lerpAngle(
           cameraTransition.fromRotation.z,
           cameraTransition.toRotation.z,
           eased,
@@ -667,6 +685,15 @@ export default function LidcStorylineRoom({ onClose }) {
       camera.rotation.order = 'YXZ';
 
       if (progress >= 1) {
+        if (cameraTransition.toRotation) {
+          camera.rotation.set(
+            cameraTransition.toRotation.x,
+            cameraTransition.toRotation.y,
+            cameraTransition.toRotation.z,
+          );
+        } else if (cameraTransition.lookAt) {
+          camera.lookAt(cameraTransition.lookAt);
+        }
         const onComplete = cameraTransition.onComplete;
         cancelTerminalCameraFocus();
         onComplete?.();
@@ -1139,7 +1166,11 @@ export default function LidcStorylineRoom({ onClose }) {
 
       const focus = resolveTerminalCameraFocus();
       if (focus) {
-        applyCameraPose(focus);
+        startCameraFocus({
+          toPosition: focus.toPosition,
+          lookAt: focus.lookAt,
+          toRotation: focus.toRotation,
+        });
       }
     };
 
@@ -1163,11 +1194,13 @@ export default function LidcStorylineRoom({ onClose }) {
 
       if (!savedTerminalCameraPose) return;
 
-      applyCameraPose({
-        toPosition: savedTerminalCameraPose.position,
-        toRotation: savedTerminalCameraPose.rotation,
+      startCameraFocus({
+        toPosition: savedTerminalCameraPose.position.clone(),
+        toRotation: savedTerminalCameraPose.rotation.clone(),
+        onComplete: () => {
+          savedTerminalCameraPose = null;
+        },
       });
-      savedTerminalCameraPose = null;
     };
 
     sceneApiRef.current = {
