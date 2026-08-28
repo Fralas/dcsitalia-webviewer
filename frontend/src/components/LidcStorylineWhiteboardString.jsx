@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react';
 
 const SEGMENT_COUNT = 26;
-const GRAVITY = 0.24;
-const FRICTION = 0.985;
-const CONSTRAINT_ITERATIONS = 10;
-const MOUSE_RADIUS = 78;
-const MOUSE_STRENGTH = 5.2;
+const GRAVITY = 0.21;
+const FRICTION = 0.955;
+const CONSTRAINT_ITERATIONS = 8;
+const MOUSE_RADIUS = 48;
+const MOUSE_STRENGTH = 2.2;
+const CONSTRAINT_STIFFNESS = 0.88;
 
 function createPoints(anchorA, anchorB, count) {
   const points = [];
@@ -157,9 +158,12 @@ export default function LidcStorylineWhiteboardString({
           const dy = point.y - mouse.y;
           const dist = Math.hypot(dx, dy);
           if (dist > 0.001 && dist < MOUSE_RADIUS) {
-            const push = (1 - dist / MOUSE_RADIUS) * MOUSE_STRENGTH;
-            point.x += (dx / dist) * push * 9;
-            point.y += (dy / dist) * push * 9;
+            const influence = 1 - dist / MOUSE_RADIUS;
+            const push = influence * MOUSE_STRENGTH * 3.2;
+            point.x += (dx / dist) * push;
+            point.y += (dy / dist) * push;
+            point.prevX = point.x - velocityX * 0.4;
+            point.prevY = point.y - velocityY * 0.4;
           }
         }
       }
@@ -172,8 +176,8 @@ export default function LidcStorylineWhiteboardString({
           const dy = p2.y - p1.y;
           const dist = Math.hypot(dx, dy) || 0.0001;
           const diff = (segmentLength - dist) / dist;
-          const offsetX = dx * diff * 0.5;
-          const offsetY = dy * diff * 0.5;
+          const offsetX = dx * diff * 0.5 * CONSTRAINT_STIFFNESS;
+          const offsetY = dy * diff * 0.5 * CONSTRAINT_STIFFNESS;
 
           if (!p1.pinned) {
             p1.x -= offsetX;
