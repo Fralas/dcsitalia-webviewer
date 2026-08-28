@@ -477,9 +477,11 @@ export default function LidcStorylineRoom({ onClose }) {
     let frameId = 0;
     let disposed = false;
     let isTransformDragging = false;
-    let lastMouseX = null;
-    let lastMouseY = null;
     let pointerDownMovement = 0;
+    let pendingLookX = 0;
+    let pendingLookY = 0;
+
+    const lockElement = container;
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x1a1a1a);
@@ -496,22 +498,42 @@ export default function LidcStorylineRoom({ onClose }) {
 
     const canvas = renderer.domElement;
 
-    const isPointerLocked = () => document.pointerLockElement === canvas;
+    const isPointerLocked = () => document.pointerLockElement === lockElement;
 
     const requestPointerLock = () => {
       if (disposed || debugOpenRef.current || whiteboardOpenRef.current || isTransformDragging) return;
       if (isPointerLocked()) return;
-      canvas.requestPointerLock?.();
+      lockElement.requestPointerLock?.({ unadjustedMovement: true });
     };
 
     const exitPointerLock = () => {
-      if (document.pointerLockElement === canvas) {
+      if (document.pointerLockElement === lockElement) {
         document.exitPointerLock?.();
       }
     };
 
+    const queueLookDelta = (deltaX, deltaY) => {
+      if (deltaX === 0 && deltaY === 0) return;
+      pendingLookX += deltaX;
+      pendingLookY += deltaY;
+    };
+
+    const applyPendingLook = () => {
+      if (pendingLookX === 0 && pendingLookY === 0) return;
+      camera.rotation.y -= pendingLookX * LOOK_SENSITIVITY;
+      camera.rotation.x -= pendingLookY * LOOK_SENSITIVITY;
+      camera.rotation.x = THREE.MathUtils.clamp(camera.rotation.x, -MAX_PITCH, MAX_PITCH);
+      pendingLookX = 0;
+      pendingLookY = 0;
+    };
+
     const onPointerLockChange = () => {
-      container.classList.toggle('is-pointer-locked', isPointerLocked());
+      const locked = isPointerLocked();
+      container.classList.toggle('is-pointer-locked', locked);
+      if (!locked) {
+        pendingLookX = 0;
+        pendingLookY = 0;
+      }
     };
 
     const resize = () => {
@@ -981,18 +1003,22 @@ export default function LidcStorylineRoom({ onClose }) {
         case 'KeyW':
         case 'ArrowUp':
           keys.forward = true;
+          requestPointerLock();
           break;
         case 'KeyS':
         case 'ArrowDown':
           keys.backward = true;
+          requestPointerLock();
           break;
         case 'KeyA':
         case 'ArrowLeft':
           keys.left = true;
+          requestPointerLock();
           break;
         case 'KeyD':
         case 'ArrowRight':
           keys.right = true;
+          requestPointerLock();
           break;
         default:
           break;
@@ -1022,7 +1048,7 @@ export default function LidcStorylineRoom({ onClose }) {
       }
     };
 
-    const onMouseDown = (event) => {
+    const onPointerDown = (event) => {
       if (event.button !== 0 || isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current) {
         return;
       }
@@ -1034,7 +1060,7 @@ export default function LidcStorylineRoom({ onClose }) {
       pointerDownMovement = 0;
     };
 
-    const onMouseUp = (event) => {
+    const onPointerUp = (event) => {
       if (event.button !== 0 || isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current) {
         return;
       }
@@ -1048,39 +1074,26 @@ export default function LidcStorylineRoom({ onClose }) {
       }
     };
 
-    const onMouseMove = (event) => {
+    const onPointerMove = (event) => {
       if (isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current) return;
+      if (!isPointerLocked()) return;
 
-      let deltaX = 0;
-      let deltaY = 0;
+      queueLookDelta(event.movementX, event.movementY);
+      pointerDownMovement += Math.abs(event.movementX) + Math.abs(event.movementY);
+    };
 
-      if (isPointerLocked()) {
-        deltaX = event.movementX;
-        deltaY = event.movementY;
-        pointerDownMovement += Math.abs(event.movementX) + Math.abs(event.movementY);
-      } else if (lastMouseX !== null && lastMouseY !== null) {
-        deltaX = event.clientX - lastMouseX;
-        deltaY = event.clientY - lastMouseY;
-        lastMouseX = event.clientX;
-        lastMouseY = event.clientY;
-      } else {
-        lastMouseX = event.clientX;
-        lastMouseY = event.clientY;
+    const onPointerRawUpdate = (event) => {
+      if (isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current) return;
+      if (!isPointerLocked()) return;
+
+      if (typeof event.getCoalescedEvents === 'function') {
+        for (const coalesced of event.getCoalescedEvents()) {
+          queueLookDelta(coalesced.movementX, coalesced.movementY);
+        }
         return;
       }
 
-      if (deltaX === 0 && deltaY === 0) return;
-
-      camera.rotation.y -= deltaX * LOOK_SENSITIVITY;
-      camera.rotation.x -= deltaY * LOOK_SENSITIVITY;
-      camera.rotation.x = THREE.MathUtils.clamp(camera.rotation.x, -MAX_PITCH, MAX_PITCH);
-    };
-
-    const onMouseEnter = (event) => {
-      if (!isPointerLocked()) {
-        lastMouseX = event.clientX;
-        lastMouseY = event.clientY;
-      }
+      queueLookDelta(event.movementX, event.movementY);
     };
 
     const onContextMenu = (event) => {
@@ -1094,6 +1107,8 @@ export default function LidcStorylineRoom({ onClose }) {
     const animate = () => {
       frameId = requestAnimationFrame(animate);
       const delta = clock.getDelta();
+
+      applyPendingLook();
 
       if (roomBounds && !debugOpenRef.current && !isTransformDragging && !whiteboardOpenRef.current) {
         direction.set(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -1184,10 +1199,12 @@ export default function LidcStorylineRoom({ onClose }) {
     document.addEventListener('pointerlockchange', onPointerLockChange);
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
-    renderer.domElement.addEventListener('mousedown', onMouseDown);
-    renderer.domElement.addEventListener('mouseup', onMouseUp);
-    renderer.domElement.addEventListener('mousemove', onMouseMove);
-    renderer.domElement.addEventListener('mouseenter', onMouseEnter);
+    document.addEventListener('mousemove', onPointerMove);
+    if ('onpointerrawupdate' in window) {
+      document.addEventListener('pointerrawupdate', onPointerRawUpdate);
+    }
+    lockElement.addEventListener('pointerdown', onPointerDown);
+    lockElement.addEventListener('pointerup', onPointerUp);
     renderer.domElement.addEventListener('contextmenu', onContextMenu);
 
     return () => {
@@ -1204,10 +1221,12 @@ export default function LidcStorylineRoom({ onClose }) {
       zoneGroups.clear();
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
-      renderer.domElement.removeEventListener('mousedown', onMouseDown);
-      renderer.domElement.removeEventListener('mouseup', onMouseUp);
-      renderer.domElement.removeEventListener('mousemove', onMouseMove);
-      renderer.domElement.removeEventListener('mouseenter', onMouseEnter);
+      document.removeEventListener('mousemove', onPointerMove);
+      if ('onpointerrawupdate' in window) {
+        document.removeEventListener('pointerrawupdate', onPointerRawUpdate);
+      }
+      lockElement.removeEventListener('pointerdown', onPointerDown);
+      lockElement.removeEventListener('pointerup', onPointerUp);
       renderer.domElement.removeEventListener('contextmenu', onContextMenu);
 
       scene.traverse((child) => {
