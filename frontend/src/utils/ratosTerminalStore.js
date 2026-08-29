@@ -3,9 +3,12 @@ import {
   cwdToPrompt,
   getRatosAsciiBanner,
   getRatosBootLines,
+  isRatosPackageInstalled,
   runRatosCommand,
 } from '../config/lidcStorylineTerminal';
 import { t } from './locale';
+
+const INSTALLED_PACKAGES_STORAGE_KEY = 'lidc-storyline-ratos-packages';
 
 function normalizeCommandResult(result) {
   if (!result) {
@@ -25,7 +28,26 @@ function normalizeCommandResult(result) {
     cwd: result.cwd,
     imageViewer: result.imageViewer ?? null,
     closeImageViewer: Boolean(result.closeImageViewer),
+    installedPackages: result.installedPackages,
   };
+}
+
+function loadInstalledPackages() {
+  if (typeof window === 'undefined' || !window.localStorage) return [];
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(INSTALLED_PACKAGES_STORAGE_KEY) ?? '[]');
+    return Array.isArray(parsed)
+      ? parsed.map((id) => String(id).trim()).filter(Boolean)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistInstalledPackages(packageIds) {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  window.localStorage.setItem(INSTALLED_PACKAGES_STORAGE_KEY, JSON.stringify(packageIds));
 }
 
 const listeners = new Set();
@@ -36,6 +58,8 @@ let biosTimer = null;
 let bootTimer = null;
 let initialized = false;
 let exitHandler = null;
+let operatorName = 'operator';
+let installedPackages = loadInstalledPackages();
 
 let state = {
   lines: [],
@@ -135,6 +159,19 @@ export function initRatosTerminal() {
   startBiosPhase();
 }
 
+export function setRatosTerminalOperator(name) {
+  const next = String(name ?? '').trim();
+  operatorName = next || 'operator';
+}
+
+export function getRatosInstalledPackages() {
+  return [...installedPackages];
+}
+
+export function hasRatosPackage(packageId) {
+  return isRatosPackageInstalled(installedPackages, packageId);
+}
+
 export function disposeRatosTerminal() {
   clearTimers();
   initialized = false;
@@ -208,10 +245,19 @@ export function submitRatosCommand(rawValue) {
   appendLines([`${cwdToPrompt(state.cwd)} ${value}`]);
   patch({ input: '' });
 
-  const result = normalizeCommandResult(runRatosCommand(value, { cwd: state.cwd }));
+  const result = normalizeCommandResult(runRatosCommand(value, {
+    cwd: state.cwd,
+    operator: operatorName,
+    installedPackages,
+  }));
   let nextCwd = state.cwd;
   if (result.cwd !== undefined) {
     nextCwd = result.cwd;
+  }
+
+  if (Array.isArray(result.installedPackages)) {
+    installedPackages = result.installedPackages;
+    persistInstalledPackages(installedPackages);
   }
 
   if (result.clear) {

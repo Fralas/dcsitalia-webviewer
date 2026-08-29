@@ -33,3 +33,8 @@ export function getRatosAsciiBanner() {
 }
 
 export { cwdToPrompt, runRatosCommand } from './lidcStorylineTerminalFs';
+export {
+  findRatosPackage,
+  isRatosPackageInstalled,
+  RATOS_PACKAGES,
+} from './lidcStorylineTerminalPackages';

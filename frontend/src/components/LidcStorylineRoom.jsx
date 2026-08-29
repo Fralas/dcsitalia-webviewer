@@ -11,6 +11,7 @@ import LidcStorylineWhiteboard from './LidcStorylineWhiteboard';
 import LidcStorylineTerminal from './LidcStorylineTerminal';
 import LidcStorylinePhone from './LidcStorylinePhone';
 import { LidcStorylineControlsHint, LidcStorylineInteractPrompt } from './LidcStorylineHud';
+import { useUser } from '../contexts/UserContext';
 import { t } from '../utils/locale';
 import {
   applyLinkedScaleChange,
@@ -61,6 +62,7 @@ import {
   disposeRatosTerminal,
   getRatosTerminalSnapshot,
   initRatosTerminal,
+  setRatosTerminalOperator,
 } from '../utils/ratosTerminalStore';
 import './LidcStorylineRoom.css';
 
@@ -251,6 +253,7 @@ const CONTROLS_HINT_VISIBLE_MS = 10000;
 const CONTROLS_HINT_FADE_MS = 600;
 
 export default function LidcStorylineRoom({ onClose }) {
+  const { user } = useUser();
   const containerRef = useRef(null);
   const sceneApiRef = useRef(null);
   const transformRef = useRef(loadSavedTransform());
@@ -285,6 +288,11 @@ export default function LidcStorylineRoom({ onClose }) {
   const [cameraRotation, setCameraRotation] = useState([0, 0, 0]);
   const [saveStatus, setSaveStatus] = useState('');
   const [lastTriggerEvent, setLastTriggerEvent] = useState(null);
+
+  useEffect(() => {
+    setRatosTerminalOperator(user?.username);
+    return () => setRatosTerminalOperator('');
+  }, [user?.username]);
 
   useEffect(() => {
     debugOpenRef.current = debugOpen;

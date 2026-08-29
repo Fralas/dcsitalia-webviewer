@@ -1,5 +1,6 @@
 import { t } from '../utils/locale';
 import { getTerminalImageViewer, isTerminalImageFile } from './lidcStorylineTerminalImages';
+import { runRatosAptCommand } from './lidcStorylineTerminalPackages';
 
 const ROOT = '/';
 
@@ -224,8 +225,14 @@ export function runRatosCommand(input, session = { cwd: ROOT }) {
     case 'clear':
       return { clear: true, lines: [] };
 
-    case 'whoami':
-      return { lines: t('lidc.storyline.terminal.commands.whoami') };
+    case 'whoami': {
+      const operator = String(session.operator ?? '').trim() || 'operator';
+      const template = t('lidc.storyline.terminal.commands.whoami');
+      const lines = Array.isArray(template) ? template : [template];
+      return {
+        lines: lines.map((line) => String(line).replaceAll('{{user}}', operator)),
+      };
+    }
 
     case 'hostname':
       return { lines: ['ratos-node-07'] };
@@ -235,6 +242,10 @@ export function runRatosCommand(input, session = { cwd: ROOT }) {
 
     case 'uname':
       return { lines: [t('lidc.storyline.terminal.commands.uname')] };
+
+    case 'apt':
+    case 'apt-get':
+      return runRatosAptCommand(args, session);
 
     case 'exit':
     case 'quit':
