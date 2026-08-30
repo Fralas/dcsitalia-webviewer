@@ -156,12 +156,25 @@ Serve the built `dist/` folder with a web server (Nginx, Apache, etc.)
 
 ### 8. Database Backups
 
-The application stores mutable state in `data/app.sqlite` (WAL mode). Set up regular backups of that file (and `-wal`/`-shm` if the process is running). DCS export JSON files are a separate input/output path.
+The application stores mutable state in `data/app.sqlite` (WAL mode). Run an online-consistent snapshot with:
 
 ```bash
-# Add to crontab for daily backups
-0 2 * * * tar -czf /backups/dcs-data-$(date +\%Y\%m\%d).tar.gz /path/to/dcsitalia-webviewer/data/app.sqlite /path/to/dcsitalia-webviewer/data
+npm run data:backup
+# optional destination file or directory
+npm run data:backup -- /backups/dcs-app.sqlite
 ```
+
+Restore only while the server is stopped:
+
+```bash
+npm run data:restore -- /path/to/app-backup.sqlite
+```
+
+Imported legacy JSON is moved to `data/legacy-json/` and is not live data. DCS export files (`Export_*.json`, CSV, `frontlineZones.json`) stay in place.
+
+`node:sqlite` is experimental in current Node: pin a Node 22.13+ LTS before upgrading the runtime.
+
+Run a single Node process against a given `SQLITE_PATH`. In-memory caches (map snapshot, ATC board) are not synchronized across multiple processes.
 
 ### 9. Monitoring & Logging
 

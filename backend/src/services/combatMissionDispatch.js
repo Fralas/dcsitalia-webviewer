@@ -1,14 +1,13 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Path to frontline zones
 const ZONES_PATH = path.join(__dirname, '../../../frontend/src/config/frontlineZones.json');
 
-// In-memory storage for combat missions
 let combatMissions = [];
 let missionIdCounter = 1;
 let lastZonesSignature = null;
@@ -125,6 +124,27 @@ function buildZonesSignature(zones) {
   return JSON.stringify(normalized);
 }
 
+function persistCombatState() {
+  saveJson(DOC.COMBAT_MISSIONS, {
+    missions: combatMissions,
+    missionIdCounter,
+    lastZonesSignature,
+  });
+}
+
+function loadCombatState() {
+  const raw = loadJson(DOC.COMBAT_MISSIONS, {
+    missions: [],
+    missionIdCounter: 1,
+    lastZonesSignature: null,
+  });
+  combatMissions = Array.isArray(raw?.missions) ? raw.missions : [];
+  missionIdCounter = Number.isFinite(raw?.missionIdCounter) && raw.missionIdCounter > 0
+    ? Math.floor(raw.missionIdCounter)
+    : 1;
+  lastZonesSignature = raw?.lastZonesSignature || null;
+}
+
 /**
  * Generate combat missions from active zones
  * Creates ONE mission per zone (not per task)
@@ -208,6 +228,7 @@ export function generateCombatMissions() {
   // Store in memory
   combatMissions = missions;
 
+  persistCombatState();
   console.log(`🎯 Generated ${missions.length} combat missions from frontline zones`);
   return missions;
 }
@@ -264,6 +285,7 @@ export function assignCombatMission(missionId, pilotName, aircraft) {
   console.log(`✈️  Mission ${missionId} assigned to ${pilotName} (${aircraft})`);
   console.log(`   Zone: ${mission.zone_name} | Tasks: ${mission.tasks.join(', ')} | Priority: ${mission.priority_label}`);
 
+  persistCombatState();
   return mission;
 }
 
@@ -299,6 +321,7 @@ export function addUserToMission(missionId, pilotName, aircraft) {
   console.log(`✈️  Added ${pilotName} (${aircraft}) to mission ${missionId}`);
   console.log(`   Zone: ${mission.zone_name} | Total pilots: ${mission.assigned_users.length}`);
 
+  persistCombatState();
   return mission;
 }
 
@@ -325,6 +348,7 @@ export function completeCombatMission(missionId) {
 
   console.log(`✅ Mission ${missionId} completed by ${mission.assigned_to}`);
 
+  persistCombatState();
   return mission;
 }
 
@@ -345,6 +369,7 @@ export function abortCombatMission(missionId) {
 
   console.log(`❌ Mission ${missionId} aborted`);
 
+  persistCombatState();
   return mission;
 }
 
@@ -478,6 +503,7 @@ export function refreshCombatMissions() {
   console.log(`   - New available: ${newAvailableMissions.length}`);
   console.log(`   - Total: ${combatMissions.length} missions`);
 
+  persistCombatState();
   return combatMissions;
 }
 
@@ -490,9 +516,12 @@ export function clearAllCombatMissions() {
   combatMissions = [];
   missionIdCounter = 1;
   lastZonesSignature = null;
+  persistCombatState();
   console.log(`🗑️  Cleared ${count} combat missions`);
   return count;
 }
 
-// Initialize missions on module load
-generateCombatMissions();
+loadCombatState();
+if (loadFrontlineZones().length > 0) {
+  refreshCombatMissions();
+}

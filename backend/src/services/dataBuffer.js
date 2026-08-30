@@ -1,6 +1,6 @@
-import fs from 'fs';
 import path from 'path';
 import * as csvParser from './csvParser.js';
+import { DOC, archiveSeedFile, loadJsonIfPresent, saveJson } from '../db/jsonStore.js';
 
 const DEFAULT_BUFFER_FILE = path.resolve(process.cwd(), 'data-buffer.json');
 
@@ -9,36 +9,18 @@ function getBufferFilePath(customPath) {
 }
 
 export function readBuffer(bufferFilePath) {
-  const targetPath = getBufferFilePath(bufferFilePath);
-
-  if (!fs.existsSync(targetPath)) {
-    return null;
-  }
-
-  try {
-    const content = fs.readFileSync(targetPath, 'utf-8');
-    const parsed = JSON.parse(content);
-    return parsed.data || parsed;
-  } catch (error) {
-    console.error('Error reading buffer file:', error.message);
-    return null;
-  }
+  const seedPath = getBufferFilePath(bufferFilePath);
+  const parsed = loadJsonIfPresent(DOC.CSV_BUFFER, seedPath);
+  if (parsed == null) return null;
+  return parsed.data || parsed;
 }
 
 export async function writeBuffer(data, bufferFilePath) {
-  const targetPath = getBufferFilePath(bufferFilePath);
-  const tempPath = `${targetPath}.tmp`;
-  const payload = {
+  saveJson(DOC.CSV_BUFFER, {
     data,
     updatedAt: Date.now(),
-  };
-
-  try {
-    await fs.promises.writeFile(tempPath, JSON.stringify(payload, null, 2), 'utf-8');
-    await fs.promises.rename(tempPath, targetPath);
-  } catch (error) {
-    console.error('Error writing buffer file:', error.message);
-  }
+  });
+  archiveSeedFile(getBufferFilePath(bufferFilePath));
 }
 
 export async function syncFromCsv(airports, csvDir, bufferFilePath) {

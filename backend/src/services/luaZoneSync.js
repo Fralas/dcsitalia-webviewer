@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { DOC, archiveSeedFile, loadJsonIfPresent, saveJson } from '../db/jsonStore.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -266,24 +267,15 @@ function generateZoneName(zoneId) {
 }
 
 function readZoneBuffer(bufferFilePath) {
-  const targetPath = getBufferFilePath(bufferFilePath);
-  if (!fs.existsSync(targetPath)) {
-    return null;
-  }
-
-  try {
-    const raw = fs.readFileSync(targetPath, 'utf8');
-    return JSON.parse(raw);
-  } catch (error) {
-    console.error('[lua] Error reading zone buffer:', error.message);
-    return null;
-  }
+  const seedPath = getBufferFilePath(bufferFilePath);
+  const parsed = loadJsonIfPresent(DOC.LUA_ZONE_BUFFER, seedPath);
+  return parsed && typeof parsed === 'object' ? parsed : null;
 }
 
 function writeZoneBuffer(payload, bufferFilePath) {
-  const targetPath = getBufferFilePath(bufferFilePath);
-  fs.writeFileSync(targetPath, JSON.stringify(payload, null, 2), 'utf8');
-  return targetPath;
+  saveJson(DOC.LUA_ZONE_BUFFER, payload);
+  archiveSeedFile(getBufferFilePath(bufferFilePath));
+  return 'sqlite:lua.zones-buffer';
 }
 
 function writeFrontlineZones(zones) {

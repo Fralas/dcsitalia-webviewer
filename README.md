@@ -28,7 +28,7 @@ A real-time, web-based logistics dashboard for DCS World servers. Monitor wareho
 - **Backend:** Node.js + Express + Socket.io with JSON file storage
 - **Frontend:** React (Vite) + Tailwind CSS
 - **Real-time:** WebSocket events for instant updates across connected clients
-- **Storage:** SQLite (`data/app.sqlite`) for mutable app state and Discord sessions. JSON files from DCS remain read/write bridges only. Existing `data/**/*.json` files are imported once on first start.
+- **Storage:** SQLite (`data/app.sqlite`) for mutable app state, sessions, CSV/lua caches, and combat missions. DCS export JSON files remain the simulator bridge. On first load, leftover app JSON is imported then moved to `data/legacy-json/`. Backup with `npm run data:backup`. Requires Node 22.13+ (`node:sqlite` is still experimental).
 
 ## Repository Layout
 ```

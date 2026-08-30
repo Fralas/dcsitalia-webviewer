@@ -11,7 +11,9 @@
     "dev:backend": "node --watch-path=backend/src --watch backend/src/server.js",
     "dev:frontend": "cd frontend && npm run dev",
     "build": "cd frontend && npm run build",
-    "start": "node backend/src/server.js"
+    "start": "node backend/src/server.js",
+    "data:backup": "node backend/src/db/backup.js",
+    "data:restore": "node backend/src/db/restore.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

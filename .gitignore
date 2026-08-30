@@ -47,6 +47,8 @@ data/historical/*.json
 backend/data/historical/*.json
 data/app.sqlite
 data/app.sqlite-*
+data/legacy-json/
+data/backups/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm

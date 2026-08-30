@@ -1873,15 +1873,15 @@ async function loadFromBuffer() {
   if (bufferedData) {
     const bufferedEntries = Object.keys(bufferedData || {}).length;
     if (bufferedEntries > 0) {
-      console.log(`📂 Loaded data from buffer file (${bufferedEntries} airports).`);
+    console.log(`📂 Loaded airport data from SQLite CSV buffer (${bufferedEntries} airports).`);
       return processData(bufferedData);
     }
 
-    console.warn('⚠️  Buffer file is empty. Loading directly from CSV.');
+    console.warn('⚠️  CSV buffer is empty. Loading directly from CSV.');
     return refreshDataFromCsv('buffer-empty');
   }
 
-  console.warn('⚠️  Buffer file missing or unreadable. Loading directly from CSV.');
+  console.warn('⚠️  CSV buffer missing. Loading directly from CSV.');
   return refreshDataFromCsv('buffer-missing');
 }
 
