@@ -1840,10 +1840,6 @@ export default function LidcStorylineRoom({ onClose }) {
       const phoneActive = phoneOpen || phoneOpenRef.current;
 
       if (terminalActive) {
-        if (event.key === 'Escape') {
-          event.preventDefault();
-          sceneApiRef.current?.closeTerminal?.();
-        }
         return;
       }
 

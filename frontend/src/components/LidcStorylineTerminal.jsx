@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  appendRatosTerminalLines,
   closeRatosImageViewer,
+  closeRatosPhoenixGame,
   getRatosTerminalSnapshot,
   navigateRatosHistory,
   setRatosTerminalExitHandler,
@@ -10,11 +12,13 @@ import {
 } from '../utils/ratosTerminalStore';
 import { t } from '../utils/locale';
 import { LidcStorylineHudNotice } from './LidcStorylineHud';
+import LidcPhoenixDecryptor from './LidcPhoenixDecryptor';
 import './LidcStorylineTerminal.css';
 
 export default function LidcStorylineTerminal({ onClose }) {
   const [bootComplete, setBootComplete] = useState(false);
   const [imageViewer, setImageViewer] = useState(null);
+  const [phoenixGame, setPhoenixGame] = useState(false);
   const [input, setInput] = useState('');
   const [showExitHint, setShowExitHint] = useState(true);
   const inputRef = useRef(null);
@@ -28,6 +32,7 @@ export default function LidcStorylineTerminal({ onClose }) {
     const unsubscribe = subscribeRatosTerminal((snapshot) => {
       setBootComplete(snapshot.bootComplete);
       setImageViewer(snapshot.imageViewer);
+      setPhoenixGame(Boolean(snapshot.phoenixGame));
       setInput(snapshot.input);
     });
     return unsubscribe;
@@ -45,10 +50,10 @@ export default function LidcStorylineTerminal({ onClose }) {
   }, []);
 
   useEffect(() => {
-    if (imageViewer || !bootComplete) return undefined;
+    if (imageViewer || phoenixGame || !bootComplete) return undefined;
     inputRef.current?.focus({ preventScroll: true });
     return undefined;
-  }, [bootComplete, imageViewer]);
+  }, [bootComplete, imageViewer, phoenixGame]);
 
   useEffect(() => {
     const hintTimer = window.setTimeout(() => setShowExitHint(false), 3200);
@@ -57,6 +62,10 @@ export default function LidcStorylineTerminal({ onClose }) {
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
+        if (phoenixGame) {
+          closeRatosPhoenixGame();
+          return;
+        }
         if (imageViewer) {
           closeRatosImageViewer();
           return;
@@ -70,11 +79,11 @@ export default function LidcStorylineTerminal({ onClose }) {
       window.clearTimeout(hintTimer);
       document.removeEventListener('keydown', onKeyDown, true);
     };
-  }, [imageViewer, onClose]);
+  }, [imageViewer, phoenixGame, onClose]);
 
   useEffect(() => {
     const onKeyDown = (event) => {
-      if (!bootComplete || imageViewer) return;
+      if (!bootComplete || imageViewer || phoenixGame) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.key === 'Escape') return;
 
@@ -105,11 +114,11 @@ export default function LidcStorylineTerminal({ onClose }) {
 
     document.addEventListener('keydown', onKeyDown, true);
     return () => document.removeEventListener('keydown', onKeyDown, true);
-  }, [bootComplete, imageViewer]);
+  }, [bootComplete, imageViewer, phoenixGame]);
 
   useEffect(() => {
     const onKeyPress = (event) => {
-      if (!bootComplete || imageViewer) return;
+      if (!bootComplete || imageViewer || phoenixGame) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.key.length !== 1) return;
 
@@ -121,7 +130,7 @@ export default function LidcStorylineTerminal({ onClose }) {
 
     document.addEventListener('keypress', onKeyPress, true);
     return () => document.removeEventListener('keypress', onKeyPress, true);
-  }, [bootComplete, imageViewer]);
+  }, [bootComplete, imageViewer, phoenixGame]);
 
   const onSubmit = (event) => {
     event.preventDefault();
@@ -136,7 +145,7 @@ export default function LidcStorylineTerminal({ onClose }) {
   };
 
   return (
-    <div className="lidc-ratos-input-capture" role="presentation">
+    <div className={`lidc-ratos-input-capture${phoenixGame ? ' is-phoenix' : ''}`} role="presentation">
       <form className="lidc-ratos-input-capture-form" onSubmit={onSubmit}>
         <input
           ref={inputRef}
@@ -153,7 +162,14 @@ export default function LidcStorylineTerminal({ onClose }) {
         />
       </form>
 
-      {showExitHint && (
+      {phoenixGame && (
+        <LidcPhoenixDecryptor
+          onClose={closeRatosPhoenixGame}
+          onSessionLog={(lines) => appendRatosTerminalLines(lines, 'dim')}
+        />
+      )}
+
+      {showExitHint && !phoenixGame && (
         <LidcStorylineHudNotice
           primaryLabel={t('lidc.storyline.backToRoom')}
           secondary={bootComplete

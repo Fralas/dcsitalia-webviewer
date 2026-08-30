@@ -1,0 +1,217 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Share+Tech+Mono&display=swap');
+
+.lidc-phoenix-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  padding: clamp(16px, 3vw, 36px);
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 40%, rgba(18, 42, 24, 0.55), rgba(4, 8, 6, 0.92) 70%);
+  pointer-events: auto;
+}
+
+.lidc-phoenix-console {
+  position: relative;
+  width: min(920px, 100%);
+  border: 1px solid #2f4a33;
+  border-radius: 4px;
+  padding: 14px 16px 16px;
+  background:
+    linear-gradient(180deg, #1a261c 0%, #101810 48%, #0c120e 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(180, 220, 170, 0.12),
+    0 22px 50px rgba(0, 0, 0, 0.45);
+  color: #b7ffc6;
+  font-family: 'IBM Plex Mono', 'Share Tech Mono', ui-monospace, monospace;
+}
+
+.lidc-phoenix-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.lidc-phoenix-brand {
+  font-family: 'Share Tech Mono', 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  color: #d8ffcf;
+}
+
+.lidc-phoenix-live {
+  font-size: 11px;
+  color: #ffb347;
+  animation: lidc-phoenix-live 1.2s steps(2) infinite;
+}
+
+.lidc-phoenix-meters {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: #7fba8c;
+}
+
+.lidc-phoenix-freq {
+  margin-left: auto;
+  color: #ffe08a;
+}
+
+.lidc-phoenix-screen {
+  position: relative;
+  border: 1px solid #1f3d28;
+  background: #03140a;
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.55);
+}
+
+.lidc-phoenix-waterfall {
+  display: block;
+  width: 100%;
+  height: min(32vh, 240px);
+  cursor: crosshair;
+  image-rendering: pixelated;
+}
+
+.lidc-phoenix-scale {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 8px 6px;
+  font-size: 10px;
+  color: #5f8a68;
+}
+
+.lidc-phoenix-lock {
+  height: 8px;
+  margin: 8px 0 10px;
+  overflow: hidden;
+  border: 1px solid #35553a;
+  background: #0a160d;
+}
+
+.lidc-phoenix-lock-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #2f7a3e, #ffe08a);
+  box-shadow: 0 0 10px rgba(255, 224, 138, 0.45);
+}
+
+.lidc-phoenix-status {
+  min-height: 1.4em;
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #c8f5d0;
+}
+
+.lidc-phoenix-cipher {
+  display: grid;
+  gap: 8px;
+  padding: 10px 0 2px;
+}
+
+.lidc-phoenix-cipher p {
+  margin: 0;
+  font-size: 11px;
+  color: #ffe08a;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lidc-phoenix-digits {
+  display: flex;
+  gap: 8px;
+}
+
+.lidc-phoenix-digits span {
+  width: 38px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #4d6a40;
+  background: #07140b;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 28px;
+  color: #8cff9d;
+}
+
+.lidc-phoenix-digits span.is-typed {
+  border-color: #ffe08a;
+  color: #ffe08a;
+  box-shadow: inset 0 0 10px rgba(255, 224, 138, 0.2);
+}
+
+.lidc-phoenix-cipher-time {
+  height: 4px;
+  background: #1a2b1e;
+}
+
+.lidc-phoenix-cipher-time div {
+  height: 100%;
+  background: #ff7b72;
+}
+
+.lidc-phoenix-outcome {
+  position: absolute;
+  inset: 18% 12% auto;
+  z-index: 2;
+  padding: 18px 20px;
+  border: 1px solid #ffe08a;
+  background: rgba(8, 16, 10, 0.94);
+  text-align: center;
+}
+
+.lidc-phoenix-outcome h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.lidc-phoenix-outcome p {
+  margin: 0 0 14px;
+  color: #9ecfa8;
+  font-size: 12px;
+}
+
+.lidc-phoenix-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.lidc-phoenix-actions button {
+  min-width: 120px;
+  padding: 8px 12px;
+  border: 1px solid #7fba8c;
+  background: #123018;
+  color: #d8ffcf;
+  font: inherit;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.lidc-phoenix-actions button.is-ghost {
+  background: transparent;
+  border-color: #4d6a40;
+}
+
+.lidc-phoenix-stage .lidc-storyline-hud {
+  z-index: 9;
+}
+
+@keyframes lidc-phoenix-live {
+  from { opacity: 1; }
+  to { opacity: 0.25; }
+}
+
+@media (max-width: 720px) {
+  .lidc-phoenix-digits span {
+    width: 30px;
+    height: 38px;
+    font-size: 22px;
+  }
+}

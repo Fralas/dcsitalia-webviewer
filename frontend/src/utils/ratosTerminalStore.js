@@ -29,6 +29,7 @@ function normalizeCommandResult(result) {
     imageViewer: result.imageViewer ?? null,
     closeImageViewer: Boolean(result.closeImageViewer),
     installedPackages: result.installedPackages,
+    phoenixGame: Boolean(result.phoenixGame),
   };
 }
 
@@ -66,6 +67,7 @@ let state = {
   input: '',
   cwd: '/',
   imageViewer: null,
+  phoenixGame: false,
   bootComplete: false,
   bootPhase: 'idle',
   biosProgress: 0,
@@ -184,6 +186,7 @@ export function disposeRatosTerminal() {
     input: '',
     cwd: '/',
     imageViewer: null,
+    phoenixGame: false,
     bootComplete: false,
     bootPhase: 'idle',
     biosProgress: 0,
@@ -203,6 +206,14 @@ export function setRatosTerminalInput(value) {
 
 export function closeRatosImageViewer() {
   patch({ imageViewer: null });
+}
+
+export function closeRatosPhoenixGame() {
+  patch({ phoenixGame: false });
+}
+
+export function appendRatosTerminalLines(lines, variant = 'dim') {
+  appendLines(lines, variant);
 }
 
 export function navigateRatosHistory(direction, currentInput) {
@@ -261,7 +272,7 @@ export function submitRatosCommand(rawValue) {
   }
 
   if (result.clear) {
-    patch({ lines: [], cwd: nextCwd, imageViewer: null });
+    patch({ lines: [], cwd: nextCwd, imageViewer: null, phoenixGame: false });
     return;
   }
 
@@ -271,7 +282,13 @@ export function submitRatosCommand(rawValue) {
   }
 
   if (result.imageViewer) {
-    patch({ cwd: nextCwd, imageViewer: result.imageViewer });
+    patch({ cwd: nextCwd, imageViewer: result.imageViewer, phoenixGame: false });
+    return;
+  }
+
+  if (result.phoenixGame) {
+    patch({ cwd: nextCwd, phoenixGame: true, imageViewer: null });
+    appendLines(result.lines);
     return;
   }
 

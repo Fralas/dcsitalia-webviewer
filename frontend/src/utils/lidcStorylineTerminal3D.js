@@ -440,6 +440,27 @@ function drawTerminalContent(ctx, canvas, snapshot, timeMs = 0) {
   ctx.shadowBlur = 0;
 }
 
+function drawPhoenixStandby(ctx, canvas, timeMs) {
+  const { width, height } = canvas;
+  ctx.fillStyle = COLORS.bg;
+  ctx.fillRect(0, 0, width, height);
+  ctx.textBaseline = 'top';
+  ctx.font = '11px "IBM Plex Mono", "Courier New", monospace';
+  ctx.shadowColor = 'rgba(255, 210, 96, 0.35)';
+  ctx.shadowBlur = 3;
+  ctx.fillStyle = '#ffe08a';
+  ctx.fillText('PHOENIX DECRYPTOR v0.9.1', width * 0.07, height * 0.12);
+  ctx.fillStyle = COLORS.text;
+  ctx.fillText(t('lidc.storyline.terminal.phoenix.live'), width * 0.07, height * 0.2);
+
+  const pulse = 0.35 + (Math.sin(timeMs / 180) * 0.5 + 0.5) * 0.65;
+  ctx.fillStyle = `rgba(168, 255, 191, ${pulse})`;
+  ctx.fillRect(width * 0.07, height * 0.48, width * 0.86, 4);
+  ctx.fillStyle = COLORS.dim;
+  ctx.fillText('SIGINT uplink active', width * 0.07, height * 0.56);
+  ctx.shadowBlur = 0;
+}
+
 function disposeScreenRoot(root) {
   if (root.userData.imageTexture && root.userData.imageTexture !== root.userData.texture) {
     root.userData.imageTexture.dispose();
@@ -704,6 +725,13 @@ export function renderTerminal3DScreens(
     }
 
     restoreTerminalCanvasMap(root);
+    if (snapshot.phoenixGame) {
+      const { ctx, canvas } = root.userData;
+      drawPhoenixStandby(ctx, canvas, timeMs);
+      root.userData.texture.needsUpdate = true;
+      return;
+    }
+
     compositeTerminalFrame(root, snapshot, timeMs);
   });
 }

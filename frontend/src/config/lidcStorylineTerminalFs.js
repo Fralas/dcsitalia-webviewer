@@ -1,6 +1,7 @@
 import { t } from '../utils/locale';
 import { getTerminalImageViewer, isTerminalImageFile } from './lidcStorylineTerminalImages';
-import { runRatosAptCommand } from './lidcStorylineTerminalPackages';
+import { isRatosPackageInstalled, runRatosAptCommand } from './lidcStorylineTerminalPackages';
+import { PHOENIX_PACKAGE_ID } from './lidcStorylinePhoenixDecryptor';
 
 const ROOT = '/';
 
@@ -246,6 +247,18 @@ export function runRatosCommand(input, session = { cwd: ROOT }) {
     case 'apt':
     case 'apt-get':
       return runRatosAptCommand(args, session);
+
+    case 'phoenix':
+    case 'phoenix-decryptor':
+    case 'decryptor': {
+      if (!isRatosPackageInstalled(session.installedPackages, PHOENIX_PACKAGE_ID)) {
+        return { lines: t('lidc.storyline.terminal.commands.phoenixMissing') };
+      }
+      return {
+        lines: t('lidc.storyline.terminal.commands.phoenixLaunch'),
+        phoenixGame: true,
+      };
+    }
 
     case 'exit':
     case 'quit':
