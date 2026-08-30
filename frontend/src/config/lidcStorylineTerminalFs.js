@@ -5,7 +5,7 @@ import { PHOENIX_PACKAGE_ID } from './lidcStorylinePhoenixDecryptor';
 
 const ROOT = '/';
 
-const DIRECTORY_TREE = Object.freeze({
+const DIRECTORY_TREE = {
   [ROOT]: {
     type: 'dir',
     entries: ['README.TXT', 'DOCUMENTS', 'PHOTO', 'LOGS', 'COMMS', 'ARCHIVE'],
@@ -30,7 +30,9 @@ const DIRECTORY_TREE = Object.freeze({
     type: 'dir',
     entries: ['CASE_1187.ZIP', 'OLD_MANIFEST.TXT'],
   },
-});
+};
+
+const DYNAMIC_FILE_CONTENTS = {};
 
 const FILE_CONTENT_KEYS = Object.freeze({
   'README.TXT': 'readme',
@@ -135,9 +137,37 @@ function listDirectory(path) {
 }
 
 function readFileContent(fileName) {
-  const contentKey = FILE_CONTENT_KEYS[fileName.toUpperCase()];
+  const upper = fileName.toUpperCase();
+  if (DYNAMIC_FILE_CONTENTS[upper]) return DYNAMIC_FILE_CONTENTS[upper];
+  const contentKey = FILE_CONTENT_KEYS[upper];
   if (!contentKey) return null;
   return t(`lidc.storyline.terminal.files.${contentKey}`);
+}
+
+function ensureDirectory(parentPath, name) {
+  const parent = DIRECTORY_TREE[normalizeDirPath(parentPath)];
+  if (!parent) return null;
+
+  const entryName = name.toUpperCase();
+  if (!parent.entries.includes(entryName)) parent.entries.push(entryName);
+
+  const childPath = normalizeDirPath(parentPath) === ROOT
+    ? `/${name.toLowerCase()}`
+    : `${normalizeDirPath(parentPath)}/${name.toLowerCase()}`;
+
+  if (!DIRECTORY_TREE[childPath]) {
+    DIRECTORY_TREE[childPath] = { type: 'dir', entries: [] };
+  }
+
+  return childPath;
+}
+
+export function savePhoenixDecryptorTranscript(lines) {
+  ensureDirectory(ROOT, 'PHOENIX');
+  ensureDirectory('/phoenix', 'DECRYPTIONS');
+  const dir = DIRECTORY_TREE['/phoenix/decryptions'];
+  if (dir && !dir.entries.includes('FILE.TXT')) dir.entries.push('FILE.TXT');
+  DYNAMIC_FILE_CONTENTS['FILE.TXT'] = Array.isArray(lines) ? lines : [String(lines ?? '')];
 }
 
 function buildTreeLines(path = ROOT, prefix = '') {

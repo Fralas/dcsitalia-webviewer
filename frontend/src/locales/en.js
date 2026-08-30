@@ -516,7 +516,10 @@ export default {
           locked: 'DTMF LOCK — enter the numeric burst',
           cipherHint: 'Cipher burst in the clear. Type the digits before the line drops.',
           winTitle: 'Intercept session OK',
-          winBody: 'Three calls decrypted. Transcripts were written to the terminal.',
+          winBody: [
+            'Three calls decrypted. Transcripts were written to the terminal.',
+            'Transcripts saved to C:\\phoenix\\decryptions\\file.txt',
+          ],
           failTitle: 'Line lost',
           failBody: 'Too many drops. Retune and try again.',
           retry: 'Retry',

@@ -516,7 +516,10 @@ export default {
           locked: 'LOCK DTMF — inserisci il burst numerico',
           cipherHint: 'Burst cifrato in chiaro. Digita i numeri prima che cada la linea.',
           winTitle: 'Sessione intercettazione OK',
-          winBody: 'Tre telefonate decifrate. I transcript sono stati scritti sul terminale.',
+          winBody: [
+            'Tre telefonate decifrate. I transcript sono stati scritti sul terminale.',
+            'Transcript salvati in C:\\phoenix\\decryptions\\file.txt',
+          ],
           failTitle: 'Linea persa',
           failBody: 'Troppi drop. Riallinea il tuner e riprova.',
           retry: 'Riprova',
