@@ -224,6 +224,25 @@
   transform: rotate(6deg);
 }
 
+.lidc-whiteboard-pin.is-map {
+  z-index: 0;
+}
+
+.lidc-whiteboard-pin.is-map .lidc-whiteboard-photo {
+  padding: 8px 8px 12px;
+}
+
+.lidc-whiteboard-pin.is-map .lidc-whiteboard-tape {
+  width: 16%;
+  height: 14px;
+}
+
+.lidc-whiteboard-tape--center {
+  left: 50%;
+  width: 14%;
+  transform: translateX(-50%) rotate(-2deg);
+}
+
 .lidc-whiteboard-focus-backdrop {
   position: absolute;
   inset: 0;
@@ -238,6 +257,18 @@
   max-height: min(88vh, 900px);
   overflow: auto;
   padding: 20px 22px 24px;
+}
+
+.lidc-whiteboard-focus-card.is-map {
+  width: min(1080px, calc(100vw - 28px));
+  max-height: min(90vh, 920px);
+  overflow: auto;
+  padding: 16px 16px 18px;
+}
+
+.lidc-whiteboard-focus-card.is-map .lidc-whiteboard-focus-photo {
+  margin-bottom: 10px;
+  padding: 6px;
 }
 
 .lidc-whiteboard-dossier-head {

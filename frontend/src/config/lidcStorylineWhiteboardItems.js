@@ -3,6 +3,7 @@ import viktorSokolovImg from '../../img/characters/ViktorSokolov.png';
 import faridKhanImg from '../../img/characters/FaridKhan.png';
 import faisalNoorImg from '../../img/characters/FaisalNoor.png';
 import omarHakimiImg from '../../img/characters/OmarHakimi.png';
+import afghanistanChartImg from '../../img/lidc/chart.png';
 
 export const LIDC_STORYLINE_WHITEBOARD_ITEMS = [
   {
@@ -64,6 +65,17 @@ export const LIDC_STORYLINE_WHITEBOARD_ITEMS = [
     y: 10,
     width: 13,
     rotation: 0.5,
+  },
+  {
+    id: 'afghanistanChart',
+    type: 'map',
+    image: afghanistanChartImg,
+    labelKey: 'lidc.storyline.whiteboardItems.afghanistanChart.label',
+    detailTitleKey: 'lidc.storyline.whiteboardItems.afghanistanChart.title',
+    x: 58,
+    y: 38,
+    width: 34,
+    rotation: -1.2,
   },
 ];
 

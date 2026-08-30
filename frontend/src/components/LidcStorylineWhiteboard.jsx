@@ -333,7 +333,7 @@ export default function LidcStorylineWhiteboard({ onClose }) {
                 ref={(element) => {
                   pinRefs.current[item.id] = element;
                 }}
-                className={`lidc-whiteboard-pin ${activeItemId === item.id ? 'is-active' : ''}`}
+                className={`lidc-whiteboard-pin ${item.type === 'map' ? 'is-map' : ''} ${activeItemId === item.id ? 'is-active' : ''}`}
                 style={{
                   left: `${item.x}%`,
                   top: `${item.y}%`,
@@ -345,6 +345,9 @@ export default function LidcStorylineWhiteboard({ onClose }) {
                 aria-label={t(item.labelKey)}
               >
                 <span className="lidc-whiteboard-tape lidc-whiteboard-tape--left" aria-hidden="true" />
+                {item.type === 'map' && (
+                  <span className="lidc-whiteboard-tape lidc-whiteboard-tape--center" aria-hidden="true" />
+                )}
                 <span className="lidc-whiteboard-tape lidc-whiteboard-tape--right" aria-hidden="true" />
                 <span className="lidc-whiteboard-photo">
                   <img src={item.image} alt="" draggable={false} />
@@ -375,7 +378,7 @@ export default function LidcStorylineWhiteboard({ onClose }) {
       )}
 
       {activeItem && (
-        <article className={`lidc-whiteboard-focus-card ${activeItem.type === 'character' ? 'is-character' : ''}`} aria-live="polite">
+        <article className={`lidc-whiteboard-focus-card ${activeItem.type === 'character' ? 'is-character' : ''} ${activeItem.type === 'map' ? 'is-map' : ''}`} aria-live="polite">
           {activeItem.type === 'character' ? (
             <CharacterDossier itemId={activeItem.id} />
           ) : (

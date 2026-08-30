@@ -1063,6 +1063,11 @@ export default {
           ],
           treeLinkNote: 'Hakimi rappresenta il centro operativo militare della rete. È uno dei principali obiettivi della campagna: eliminare o catturare Hakimi non significa necessariamente distruggere l\'insurrezione, ma può provocare la perdita del coordinamento tra numerose cellule presenti nella regione.',
         },
+        afghanistanChart: {
+          label: 'Afghanistan',
+          title: 'Carta operativa — Afghanistan',
+          body: 'Mappa operativa del teatro settentrionale. Nessun collegamento in lavagna: riferimento geografico per Helmand, Kabul e le rotte di infiltrazione.',
+        },
       },
       backToRoom: 'Torna alla stanza',
       debug: {

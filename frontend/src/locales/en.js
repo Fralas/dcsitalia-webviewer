@@ -1063,6 +1063,11 @@ export default {
           ],
           treeLinkNote: 'Hakimi represents the military operational centre of the network. He is one of the campaign\'s main targets: eliminating or capturing Hakimi does not necessarily destroy the insurgency, but can cause loss of coordination among numerous cells in the region.',
         },
+        afghanistanChart: {
+          label: 'Afghanistan',
+          title: 'Operational chart — Afghanistan',
+          body: 'Northern theatre operational map. No board links: geographic reference for Helmand, Kabul and infiltration routes.',
+        },
       },
       backToRoom: 'Back to room',
       debug: {
