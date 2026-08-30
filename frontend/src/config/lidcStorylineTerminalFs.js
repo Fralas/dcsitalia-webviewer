@@ -7,13 +7,20 @@ import {
   PHOENIX_INTERCEPTS,
   PHOENIX_PACKAGE_ID,
 } from './lidcStorylinePhoenixDecryptor';
+import {
+  getWinRatArchiveByFileName,
+  getWinRatArchiveById,
+  getWinRatArchiveKinds,
+  getWinRatKindFolder,
+  WINRAT_PACKAGE_ID,
+} from './lidcStorylineWinRat';
 
 const ROOT = '/';
 
 const DIRECTORY_TREE = {
   [ROOT]: {
     type: 'dir',
-    entries: ['README.TXT', 'DOCUMENTS', 'PHOTO', 'LOGS', 'COMMS', 'ARCHIVE', 'PHOENIX'],
+    entries: ['README.TXT', 'DOCUMENTS', 'PHOTO', 'LOGS', 'COMMS', 'ARCHIVE', 'PHOENIX', 'WINRAT'],
   },
   '/documents': {
     type: 'dir',
@@ -33,13 +40,17 @@ const DIRECTORY_TREE = {
   },
   '/archive': {
     type: 'dir',
-    entries: ['CASE_1187.ZIP', 'OLD_MANIFEST.TXT'],
+    entries: ['CASE_1187.ZIP', 'CACHE_04.ZIP', 'TAPE_SET.ZIP', 'OLD_MANIFEST.TXT'],
   },
   '/phoenix': {
     type: 'dir',
     entries: ['DECRYPTIONS'],
   },
   '/phoenix/decryptions': {
+    type: 'dir',
+    entries: [],
+  },
+  '/winrat': {
     type: 'dir',
     entries: [],
   },
@@ -61,6 +72,8 @@ const FILE_CONTENT_KEYS = Object.freeze({
   'FREQ_LIST.TXT': 'freqList',
   'LAST_TX.LOG': 'lastTx',
   'CASE_1187.ZIP': 'caseArchive',
+  'CACHE_04.ZIP': 'cacheArchive',
+  'TAPE_SET.ZIP': 'tapeArchive',
   'OLD_MANIFEST.TXT': 'oldManifest',
 });
 
@@ -271,6 +284,131 @@ function hydratePhoenixTranscripts() {
 
 hydratePhoenixTranscripts();
 
+const WINRAT_EXTRACTS_STORAGE_KEY = 'lidc-storyline-winrat-extracts';
+
+let winratExtracts = [];
+
+function winratRootDir() {
+  ensureDirectory(ROOT, 'WINRAT');
+  return DIRECTORY_TREE['/winrat'];
+}
+
+function parseDecryptIndex(folderName) {
+  const match = String(folderName ?? '').toUpperCase().match(/^DECRYPT_(\d+)$/);
+  return match ? Number(match[1]) : 0;
+}
+
+function nextWinRatDecryptFolder() {
+  const used = winratExtracts.map((item) => parseDecryptIndex(item.folder));
+  const next = (used.length ? Math.max(...used) : 0) + 1;
+  return `DECRYPT_${next}`;
+}
+
+function persistWinRatExtracts() {
+  try {
+    window.localStorage.setItem(WINRAT_EXTRACTS_STORAGE_KEY, JSON.stringify({
+      items: winratExtracts,
+    }));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function writeWinRatExtractedFile(decryptFolder, kindFolder, fileName, lines) {
+  winratRootDir();
+  const decryptPath = ensureDirectory('/winrat', decryptFolder);
+  const kindPath = ensureDirectory(decryptPath, kindFolder);
+  const dir = DIRECTORY_TREE[kindPath];
+  const upper = String(fileName || 'FILE.BIN').toUpperCase();
+  if (dir && !dir.entries.includes(upper)) dir.entries.push(upper);
+  DYNAMIC_FILE_CONTENTS[upper] = Array.isArray(lines) ? lines : [String(lines ?? '')];
+}
+
+function applyWinRatExtract(archive, folderName) {
+  if (!archive || !folderName) return;
+  winratRootDir();
+  ensureDirectory('/winrat', folderName);
+  getWinRatArchiveKinds(archive).forEach((kind) => {
+    ensureDirectory(`/winrat/${folderName.toLowerCase()}`, getWinRatKindFolder(kind));
+  });
+  (archive.files ?? []).forEach((file) => {
+    const kindFolder = getWinRatKindFolder(file.kind);
+    const lines = t(`lidc.storyline.terminal.winrat.pending.${file.kind}`);
+    writeWinRatExtractedFile(folderName, kindFolder, file.fileName, lines);
+  });
+}
+
+export function getWinRatExtractFolder(archiveId) {
+  return winratExtracts.find((item) => item.id === archiveId)?.folder ?? null;
+}
+
+export function isWinRatArchiveDecrypted(archiveId) {
+  return Boolean(getWinRatExtractFolder(archiveId));
+}
+
+export function extractWinRatArchive(archiveId) {
+  const archive = getWinRatArchiveById(archiveId);
+  if (!archive) return null;
+
+  const existing = getWinRatExtractFolder(archiveId);
+  if (existing) return existing;
+
+  const folder = nextWinRatDecryptFolder();
+  winratExtracts = [...winratExtracts, { id: archiveId, folder }];
+  applyWinRatExtract(archive, folder);
+  persistWinRatExtracts();
+  return folder;
+}
+
+function hydrateWinRatExtracts() {
+  winratRootDir();
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(WINRAT_EXTRACTS_STORAGE_KEY));
+    const items = Array.isArray(stored?.items) ? stored.items : [];
+    winratExtracts = items
+      .map((item) => ({
+        id: String(item?.id ?? ''),
+        folder: String(item?.folder ?? '').toUpperCase(),
+      }))
+      .filter((item) => item.id && parseDecryptIndex(item.folder) > 0 && getWinRatArchiveById(item.id));
+  } catch {
+    winratExtracts = [];
+  }
+
+  winratExtracts.forEach((item) => {
+    applyWinRatExtract(getWinRatArchiveById(item.id), item.folder);
+  });
+}
+
+hydrateWinRatExtracts();
+
+function interpolateLines(value, params = {}) {
+  const lines = Array.isArray(value) ? value : [value];
+  const keys = Object.keys(params);
+  return lines.map((line) => {
+    if (typeof line !== 'string' || !keys.length) return String(line ?? '');
+    return keys.reduce(
+      (acc, key) => acc.replaceAll(`{{${key}}}`, String(params[key])),
+      line,
+    );
+  });
+}
+
+function buildWinRatZipCatLines(archive) {
+  const folder = getWinRatExtractFolder(archive.id);
+  if (!folder) {
+    return t(`lidc.storyline.terminal.files.${FILE_CONTENT_KEYS[archive.fileName] ?? 'caseArchive'}`);
+  }
+
+  const kinds = getWinRatArchiveKinds(archive);
+  const header = interpolateLines(t('lidc.storyline.terminal.winrat.zipOpen'), {
+    file: archive.fileName,
+    path: `C:\\WINRAT\\${folder}\\`,
+  });
+  const kindLines = kinds.map((kind) => `  ${getWinRatKindFolder(kind)}\\`);
+  return [...header, ...kindLines];
+}
+
 function buildTreeLines(path = ROOT, prefix = '') {
   const dirPath = normalizeDirPath(path);
   const dir = DIRECTORY_TREE[dirPath];
@@ -391,6 +529,19 @@ export function runRatosCommand(input, session = { cwd: ROOT }) {
       };
     }
 
+    case 'winrat':
+    case 'win-rat':
+    case 'winrar':
+    case 'unzip': {
+      if (!isRatosPackageInstalled(session.installedPackages, WINRAT_PACKAGE_ID)) {
+        return { lines: t('lidc.storyline.terminal.commands.winratMissing') };
+      }
+      return {
+        lines: t('lidc.storyline.terminal.commands.winratLaunch'),
+        winratGame: true,
+      };
+    }
+
     case 'exit':
     case 'quit':
       return { exit: true, lines: [] };
@@ -445,6 +596,12 @@ export function runRatosCommand(input, session = { cwd: ROOT }) {
         return {
           lines: t('lidc.storyline.terminal.commands.catImageHint', { file: resolved.fileName }),
         };
+      }
+
+      const archive = getWinRatArchiveByFileName(resolved.fileName);
+      if (archive) {
+        const lines = buildWinRatZipCatLines(archive);
+        return { lines: Array.isArray(lines) ? lines : [lines] };
       }
 
       const content = readFileContent(resolved.fileName);

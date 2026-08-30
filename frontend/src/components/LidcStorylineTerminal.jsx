@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   closeRatosImageViewer,
   closeRatosPhoenixGame,
+  closeRatosWinRatGame,
   getRatosTerminalSnapshot,
   navigateRatosHistory,
   setRatosTerminalExitHandler,
@@ -13,6 +14,7 @@ import {
   handlePhoenixKeyDown,
   handlePhoenixKeyUp,
 } from '../utils/lidcPhoenixDecryptorGame';
+import { handleWinRatKeyDown } from '../utils/lidcWinRatGame';
 import { t } from '../utils/locale';
 import { LidcStorylineHudNotice } from './LidcStorylineHud';
 import './LidcStorylineTerminal.css';
@@ -21,9 +23,12 @@ export default function LidcStorylineTerminal({ onClose }) {
   const [bootComplete, setBootComplete] = useState(false);
   const [imageViewer, setImageViewer] = useState(null);
   const [phoenixGame, setPhoenixGame] = useState(false);
+  const [winratGame, setWinratGame] = useState(false);
   const [input, setInput] = useState('');
   const [showExitHint, setShowExitHint] = useState(true);
   const inputRef = useRef(null);
+
+  const overlayGame = phoenixGame || winratGame;
 
   useEffect(() => {
     setRatosTerminalExitHandler(onClose);
@@ -35,6 +40,7 @@ export default function LidcStorylineTerminal({ onClose }) {
       setBootComplete(snapshot.bootComplete);
       setImageViewer(snapshot.imageViewer);
       setPhoenixGame(Boolean(snapshot.phoenixGame));
+      setWinratGame(Boolean(snapshot.winratGame));
       setInput(snapshot.input);
     });
     return unsubscribe;
@@ -52,10 +58,10 @@ export default function LidcStorylineTerminal({ onClose }) {
   }, []);
 
   useEffect(() => {
-    if (imageViewer || phoenixGame || !bootComplete) return undefined;
+    if (imageViewer || overlayGame || !bootComplete) return undefined;
     inputRef.current?.focus({ preventScroll: true });
     return undefined;
-  }, [bootComplete, imageViewer, phoenixGame]);
+  }, [bootComplete, imageViewer, overlayGame]);
 
   useEffect(() => {
     const hintTimer = window.setTimeout(() => setShowExitHint(false), 3200);
@@ -66,6 +72,10 @@ export default function LidcStorylineTerminal({ onClose }) {
         event.stopPropagation();
         if (phoenixGame) {
           closeRatosPhoenixGame();
+          return;
+        }
+        if (winratGame) {
+          closeRatosWinRatGame();
           return;
         }
         if (imageViewer) {
@@ -81,13 +91,19 @@ export default function LidcStorylineTerminal({ onClose }) {
       window.clearTimeout(hintTimer);
       document.removeEventListener('keydown', onKeyDown, true);
     };
-  }, [imageViewer, phoenixGame, onClose]);
+  }, [imageViewer, phoenixGame, winratGame, onClose]);
 
   useEffect(() => {
     const onKeyDown = (event) => {
       if (!bootComplete || imageViewer) return;
       if (phoenixGame) {
         if (handlePhoenixKeyDown(event)) {
+          event.stopPropagation();
+        }
+        return;
+      }
+      if (winratGame) {
+        if (handleWinRatKeyDown(event)) {
           event.stopPropagation();
         }
         return;
@@ -130,11 +146,11 @@ export default function LidcStorylineTerminal({ onClose }) {
       document.removeEventListener('keydown', onKeyDown, true);
       document.removeEventListener('keyup', onKeyUp, true);
     };
-  }, [bootComplete, imageViewer, phoenixGame]);
+  }, [bootComplete, imageViewer, phoenixGame, winratGame]);
 
   useEffect(() => {
     const onKeyPress = (event) => {
-      if (!bootComplete || imageViewer || phoenixGame) return;
+      if (!bootComplete || imageViewer || overlayGame) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.key.length !== 1) return;
 
@@ -146,16 +162,16 @@ export default function LidcStorylineTerminal({ onClose }) {
 
     document.addEventListener('keypress', onKeyPress, true);
     return () => document.removeEventListener('keypress', onKeyPress, true);
-  }, [bootComplete, imageViewer, phoenixGame]);
+  }, [bootComplete, imageViewer, overlayGame]);
 
   const onSubmit = (event) => {
     event.preventDefault();
-    if (phoenixGame) return;
+    if (overlayGame) return;
     submitRatosCommand(input);
   };
 
   const onInputKeyDown = (event) => {
-    if (phoenixGame) {
+    if (overlayGame) {
       event.preventDefault();
       return;
     }
@@ -172,9 +188,9 @@ export default function LidcStorylineTerminal({ onClose }) {
           ref={inputRef}
           className="lidc-ratos-input-capture-field"
           type="text"
-          value={phoenixGame ? '' : input}
+          value={overlayGame ? '' : input}
           onChange={(event) => {
-            if (phoenixGame) return;
+            if (overlayGame) return;
             setRatosTerminalInput(event.target.value);
           }}
           onKeyDown={onInputKeyDown}
@@ -186,7 +202,7 @@ export default function LidcStorylineTerminal({ onClose }) {
         />
       </form>
 
-      {showExitHint && !phoenixGame && (
+      {showExitHint && !overlayGame && (
         <LidcStorylineHudNotice
           primaryLabel={t('lidc.storyline.backToRoom')}
           secondary={bootComplete

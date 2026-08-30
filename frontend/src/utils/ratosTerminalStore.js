@@ -12,6 +12,11 @@ import {
   stopPhoenixDecryptorSession,
   setPhoenixSessionLogHandler,
 } from './lidcPhoenixDecryptorGame';
+import {
+  startWinRatSession,
+  stopWinRatSession,
+  setWinRatSessionLogHandler,
+} from './lidcWinRatGame';
 
 const INSTALLED_PACKAGES_STORAGE_KEY = 'lidc-storyline-ratos-packages';
 
@@ -35,6 +40,7 @@ function normalizeCommandResult(result) {
     closeImageViewer: Boolean(result.closeImageViewer),
     installedPackages: result.installedPackages,
     phoenixGame: Boolean(result.phoenixGame),
+    winratGame: Boolean(result.winratGame),
   };
 }
 
@@ -73,6 +79,7 @@ let state = {
   cwd: '/',
   imageViewer: null,
   phoenixGame: false,
+  winratGame: false,
   bootComplete: false,
   bootPhase: 'idle',
   biosProgress: 0,
@@ -105,6 +112,7 @@ function appendLines(nextLines, variant = 'normal') {
 }
 
 setPhoenixSessionLogHandler((lines) => appendLines(lines, 'dim'));
+setWinRatSessionLogHandler((lines) => appendLines(lines, 'dim'));
 
 function clearTimers() {
   if (biosTimer) {
@@ -186,6 +194,7 @@ export function disposeRatosTerminal() {
   initialized = false;
   exitHandler = null;
   stopPhoenixDecryptorSession();
+  stopWinRatSession();
   commandHistory.length = 0;
   historyIndex = -1;
   draftInput = '';
@@ -195,6 +204,7 @@ export function disposeRatosTerminal() {
     cwd: '/',
     imageViewer: null,
     phoenixGame: false,
+    winratGame: false,
     bootComplete: false,
     bootPhase: 'idle',
     biosProgress: 0,
@@ -219,6 +229,11 @@ export function closeRatosImageViewer() {
 export function closeRatosPhoenixGame() {
   stopPhoenixDecryptorSession();
   patch({ phoenixGame: false });
+}
+
+export function closeRatosWinRatGame() {
+  stopWinRatSession();
+  patch({ winratGame: false });
 }
 
 export function appendRatosTerminalLines(lines, variant = 'dim') {
@@ -282,7 +297,8 @@ export function submitRatosCommand(rawValue) {
 
   if (result.clear) {
     stopPhoenixDecryptorSession();
-    patch({ lines: [], cwd: nextCwd, imageViewer: null, phoenixGame: false });
+    stopWinRatSession();
+    patch({ lines: [], cwd: nextCwd, imageViewer: null, phoenixGame: false, winratGame: false });
     return;
   }
 
@@ -293,13 +309,23 @@ export function submitRatosCommand(rawValue) {
 
   if (result.imageViewer) {
     stopPhoenixDecryptorSession();
-    patch({ cwd: nextCwd, imageViewer: result.imageViewer, phoenixGame: false });
+    stopWinRatSession();
+    patch({ cwd: nextCwd, imageViewer: result.imageViewer, phoenixGame: false, winratGame: false });
     return;
   }
 
   if (result.phoenixGame) {
+    stopWinRatSession();
     startPhoenixDecryptorSession();
-    patch({ cwd: nextCwd, phoenixGame: true, imageViewer: null });
+    patch({ cwd: nextCwd, phoenixGame: true, winratGame: false, imageViewer: null });
+    appendLines(result.lines);
+    return;
+  }
+
+  if (result.winratGame) {
+    stopPhoenixDecryptorSession();
+    startWinRatSession();
+    patch({ cwd: nextCwd, winratGame: true, phoenixGame: false, imageViewer: null });
     appendLines(result.lines);
     return;
   }

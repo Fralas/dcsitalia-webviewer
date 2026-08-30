@@ -9,6 +9,7 @@ import {
 import { t } from './locale';
 import { getRatosTerminalSnapshot } from './ratosTerminalStore';
 import { drawPhoenixDecryptor, tickPhoenixDecryptor } from './lidcPhoenixDecryptorGame';
+import { drawWinRat, tickWinRat } from './lidcWinRatGame';
 import { getWhiteboardSurfaceMapping } from './lidcStorylineWhiteboard3D';
 import { applyZoneTransform, ZONE_TYPES } from './lidcStorylineZones';
 
@@ -699,6 +700,9 @@ export function renderTerminal3DScreens(
   if (snapshot.phoenixGame) {
     tickPhoenixDecryptor(timeMs);
   }
+  if (snapshot.winratGame) {
+    tickWinRat(timeMs);
+  }
 
   zoneGroups.forEach((group) => {
     if (group.userData.zoneType !== ZONE_TYPES.TERMINAL_SURFACE) return;
@@ -711,10 +715,14 @@ export function renderTerminal3DScreens(
     }
 
     restoreTerminalCanvasMap(root);
-    if (snapshot.phoenixGame) {
+    if (snapshot.phoenixGame || snapshot.winratGame) {
       ensureContentCanvas(root);
       const { ctx, canvas, contentCtx, contentCanvas, texture } = root.userData;
-      drawPhoenixDecryptor(contentCtx, contentCanvas, timeMs);
+      if (snapshot.phoenixGame) {
+        drawPhoenixDecryptor(contentCtx, contentCanvas, timeMs);
+      } else {
+        drawWinRat(contentCtx, contentCanvas, timeMs);
+      }
       ctx.fillStyle = COLORS.bg;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       const insetX = Math.round(canvas.width * PHOENIX_OVERSCAN_X);

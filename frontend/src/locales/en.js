@@ -441,6 +441,7 @@ export default {
             '  UNAME     System information',
             '  APT-GET   Packages (LIST, INSTALL <name>)',
             '  PHOENIX   Intercept phone calls (needs phoenix-decryptor)',
+            '  WINRAT    Decrypt locked ZIP archives (needs winrat)',
             '  EXIT      Close terminal',
           ],
           whoami: ['{{user}}@lidc-briefing'],
@@ -503,6 +504,14 @@ export default {
           phoenixLaunch: [
             'PHOENIX DECRYPTOR v0.9.1 — SIGINT uplink',
             'Select an intercept file to decrypt.',
+          ],
+          winratMissing: [
+            'E: winrat is not installed.',
+            'Try: APT-GET INSTALL winrat',
+          ],
+          winratLaunch: [
+            'WINRAT v1.4.2 — host breach / archive unlock',
+            'Select a locked ZIP to decrypt.',
           ],
         },
         phoenix: {
@@ -606,8 +615,49 @@ export default {
             ],
           },
         },
+        winrat: {
+          hostTitle: 'CONNECTING TO THE HOST',
+          hostTagline: 'COMPROMISING ARCHIVES ONE BYTE AT A TIME',
+          menuLocked: 'LOCKED',
+          menuOpen: 'OPEN',
+          menuHint: '↑ ↓ select · ENTER breach · click a ZIP',
+          menuBack: 'Menu [M]',
+          exitHint: 'Close WinRat',
+          hackHint: 'Digits scramble on snap · ENTER on the sequence · max 3 misses · 30s',
+          misses: 'ERRORS',
+          winTitle: 'ARCHIVE BREACHED',
+          winBody: [
+            '{{file}} extracted to {{path}}',
+          ],
+          failTitle: 'LINK DROPPED',
+          failBody: 'Host watchdog kicked the session. Retry the sequence.',
+          failMisses: 'Too many wrong attempts. The host closed the channel.',
+          retry: 'Retry',
+          back: 'Terminal',
+          logExtracted: [
+            'WINRAT extracted {{file}} -> {{path}} ({{kinds}})',
+          ],
+          zipOpen: [
+            '[WINRAT] {{file}} — OPEN',
+            'Extracted to {{path}}',
+          ],
+          pending: {
+            img: [
+              '[IMG BUFFER — CONTENT PENDING]',
+              'Payload will be assigned later.',
+            ],
+            photo: [
+              '[PHOTO STILL — CONTENT PENDING]',
+              'Payload will be assigned later.',
+            ],
+            audio: [
+              '[AUDIO STREAM — CONTENT PENDING]',
+              'Payload will be assigned later.',
+            ],
+          },
+        },
         packages: {
-          winrat: 'Generic archive utility. Create, extract and verify ZIP files and similar formats.',
+          winrat: 'Archive unlocker. Decrypts locked ZIP files and dumps the payload under C:\\WINRAT\\DECRYPT_n.',
           phoenixDecryptor: 'Decryption tool for radio frequencies, numeric sequences and other non-standard signals.',
         },
         files: {
@@ -670,7 +720,15 @@ export default {
           ],
           caseArchive: [
             '[ARCHIVE CASE_1187.ZIP — ENCRYPTED]',
-            'Use authorized extraction terminal.',
+            'Launch WINRAT to breach the host and extract.',
+          ],
+          cacheArchive: [
+            '[ARCHIVE CACHE_04.ZIP — ENCRYPTED]',
+            'Launch WINRAT to breach the host and extract.',
+          ],
+          tapeArchive: [
+            '[ARCHIVE TAPE_SET.ZIP — ENCRYPTED]',
+            'Launch WINRAT to breach the host and extract.',
           ],
           oldManifest: [
             'Manifest revision 1987-11-03',

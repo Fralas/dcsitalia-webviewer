@@ -71,6 +71,10 @@ import {
   handlePhoenixPointerMove,
   setPhoenixHolding,
 } from '../utils/lidcPhoenixDecryptorGame';
+import {
+  handleWinRatPointerDown,
+  handleWinRatPointerMove,
+} from '../utils/lidcWinRatGame';
 import './LidcStorylineRoom.css';
 
 const SURFACE_ZONE_DECOR_NAMES = new Set(['whiteboard-3d-decor', 'terminal-3d-screen']);
@@ -1621,6 +1625,15 @@ export default function LidcStorylineRoom({ onClose }) {
             const content = phoenixScreenUvToContent(uv.u, uv.v);
             handlePhoenixPointerDown(content.x, content.y);
           }
+        } else if (event.button === 0 && getRatosTerminalSnapshot().winratGame) {
+          const rect = renderer.domElement.getBoundingClientRect();
+          const ndcX = ((event.clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1;
+          const ndcY = -((event.clientY - rect.top) / Math.max(1, rect.height)) * 2 + 1;
+          const uv = pickTerminalScreenUv(zoneGroups, camera, ndcX, ndcY);
+          if (uv) {
+            const content = phoenixScreenUvToContent(uv.u, uv.v);
+            handleWinRatPointerDown(content.x, content.y);
+          }
         }
         return;
       }
@@ -1665,6 +1678,15 @@ export default function LidcStorylineRoom({ onClose }) {
           if (uv) {
             const content = phoenixScreenUvToContent(uv.u, uv.v);
             handlePhoenixPointerMove(content.x, content.y, Boolean(event.buttons & 1));
+          }
+        } else if (getRatosTerminalSnapshot().winratGame) {
+          const rect = renderer.domElement.getBoundingClientRect();
+          const ndcX = ((event.clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1;
+          const ndcY = -((event.clientY - rect.top) / Math.max(1, rect.height)) * 2 + 1;
+          const uv = pickTerminalScreenUv(zoneGroups, camera, ndcX, ndcY);
+          if (uv) {
+            const content = phoenixScreenUvToContent(uv.u, uv.v);
+            handleWinRatPointerMove(content.x, content.y);
           }
         }
         return;
