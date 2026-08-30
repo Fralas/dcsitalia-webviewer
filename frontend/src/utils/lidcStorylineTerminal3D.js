@@ -756,10 +756,19 @@ export function pickTerminalScreenUv(zoneGroups, camera, ndcX, ndcY) {
   return { u: hit.uv.x, v: hit.uv.y };
 }
 
-export function phoenixScreenUvToTunerRatio(u) {
-  const inner = 1 - PHOENIX_OVERSCAN_X * 2;
-  if (inner <= 0) return 0.5;
-  return (u - PHOENIX_OVERSCAN_X) / inner;
+export function phoenixScreenUvToContent(u, v) {
+  const innerX = 1 - PHOENIX_OVERSCAN_X * 2;
+  const innerY = 1 - PHOENIX_OVERSCAN_Y * 2;
+  const x = innerX <= 0 ? 0.5 : (u - PHOENIX_OVERSCAN_X) / innerX;
+  const y = innerY <= 0 ? 0.5 : ((1 - v) - PHOENIX_OVERSCAN_Y) / innerY;
+  return {
+    x: Math.min(1, Math.max(0, x)),
+    y: Math.min(1, Math.max(0, y)),
+  };
+}
+
+export function phoenixScreenUvToTunerRatio(u, v = 0.5) {
+  return phoenixScreenUvToContent(u, v).x;
 }
 
 export function disposeTerminal3DDecorations(root) {

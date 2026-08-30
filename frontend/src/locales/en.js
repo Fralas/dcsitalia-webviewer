@@ -502,7 +502,7 @@ export default {
           ],
           phoenixLaunch: [
             'PHOENIX DECRYPTOR v0.9.1 — SIGINT uplink',
-            'Tune the frequency and lock the voice burst.',
+            'Select an intercept file to decrypt.',
           ],
         },
         phoenix: {
@@ -517,13 +517,17 @@ export default {
           cipherHint: 'Cipher burst in the clear. Type the digits before the line drops.',
           winTitle: 'Intercept session OK',
           winBody: [
-            'Three calls decrypted. Transcripts were written to the terminal.',
-            'Transcripts saved to C:\\phoenix\\decryptions\\file.txt',
+            'File decrypted. Transcript in C:\\PHOENIX\\DECRYPTIONS\\GUARD_142.TXT (and the others).',
           ],
           failTitle: 'Line lost',
           failBody: 'Too many drops. Retune and try again.',
           retry: 'Retry',
           back: 'Terminal',
+          menuTitle: 'Queued intercepts',
+          menuHint: '↑ ↓ select · ENTER start · click a file',
+          menuPending: 'PENDING',
+          menuDecrypted: 'DECRYPTED',
+          menuBack: 'Menu [M]',
           exitHint: 'Close Phoenix',
           controls: '← → or A D tune · SPACE lock · digits for the burst',
           logHeader: '— PHOENIX INTERCEPT LOG —',
@@ -532,13 +536,73 @@ export default {
               '142.760 MHz  VOICE',
               '"Repeat the code. four-four-seven-zero-one. no names in the clear."',
             ],
+            guardA: [
+              '112.400 MHz  VOICE',
+              '"Guard node listening. Confirm the secondary channel."',
+            ],
+            guardB: [
+              '142.760 MHz  VOICE',
+              '"Repeat the code. four-four-seven-zero-one. no names in the clear."',
+            ],
+            guardC: [
+              '174.180 MHz  VOICE',
+              '"If they ask for a name, hang up. Number only."',
+            ],
+            guardD: [
+              '206.550 MHz  VOICE',
+              '"Next window after midnight. Same prefix."',
+            ],
+            guardE: [
+              '238.900 MHz  VOICE',
+              '"Guard off. Do not call back on this frequency."',
+            ],
             burst: [
               '241.020 MHz  VOICE',
               '"Uplink B is busy. Move the shipment after ramadan. The butcher pays in advance."',
             ],
+            burstA: [
+              '176.200 MHz  VOICE',
+              '"Uplink B is busy. Repeat in three minutes."',
+            ],
+            burstB: [
+              '209.440 MHz  VOICE',
+              '"Move the shipment after ramadan. No trucks in daylight."',
+            ],
+            burstC: [
+              '241.020 MHz  VOICE',
+              '"The butcher pays in advance. Confirm the weight."',
+            ],
+            burstD: [
+              '273.800 MHz  VOICE',
+              '"The warehouse is full. Hold the second lot."',
+            ],
+            burstE: [
+              '307.150 MHz  VOICE',
+              '"Closed. Do not use 241 again until further notice."',
+            ],
             relay: [
               '433.920 MHz  VOICE',
               '"Studio listening. If Hakimi calls, relay on 241."',
+            ],
+            relayA: [
+              '361.100 MHz  VOICE',
+              '"Relay up. Studio wants a proof of life."',
+            ],
+            relayB: [
+              '397.400 MHz  VOICE',
+              '"If Hakimi calls, do not answer in the clear."',
+            ],
+            relayC: [
+              '433.920 MHz  VOICE',
+              '"Studio listening. If Hakimi calls, relay on 241."',
+            ],
+            relayD: [
+              '469.250 MHz  VOICE',
+              '"The bridge holds. Repeat the number only, not the route."',
+            ],
+            relayE: [
+              '504.600 MHz  VOICE',
+              '"Relay on standby. Wait for the next burst from studio."',
             ],
           },
         },

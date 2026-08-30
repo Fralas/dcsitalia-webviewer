@@ -1,14 +1,19 @@
 import { t } from '../utils/locale';
 import { getTerminalImageViewer, isTerminalImageFile } from './lidcStorylineTerminalImages';
 import { isRatosPackageInstalled, runRatosAptCommand } from './lidcStorylineTerminalPackages';
-import { PHOENIX_PACKAGE_ID } from './lidcStorylinePhoenixDecryptor';
+import {
+  getPhoenixFileBursts,
+  getPhoenixTranscriptFileName,
+  PHOENIX_INTERCEPTS,
+  PHOENIX_PACKAGE_ID,
+} from './lidcStorylinePhoenixDecryptor';
 
 const ROOT = '/';
 
 const DIRECTORY_TREE = {
   [ROOT]: {
     type: 'dir',
-    entries: ['README.TXT', 'DOCUMENTS', 'PHOTO', 'LOGS', 'COMMS', 'ARCHIVE'],
+    entries: ['README.TXT', 'DOCUMENTS', 'PHOTO', 'LOGS', 'COMMS', 'ARCHIVE', 'PHOENIX'],
   },
   '/documents': {
     type: 'dir',
@@ -29,6 +34,14 @@ const DIRECTORY_TREE = {
   '/archive': {
     type: 'dir',
     entries: ['CASE_1187.ZIP', 'OLD_MANIFEST.TXT'],
+  },
+  '/phoenix': {
+    type: 'dir',
+    entries: ['DECRYPTIONS'],
+  },
+  '/phoenix/decryptions': {
+    type: 'dir',
+    entries: [],
   },
 };
 
@@ -162,13 +175,101 @@ function ensureDirectory(parentPath, name) {
   return childPath;
 }
 
-export function savePhoenixDecryptorTranscript(lines) {
+const PHOENIX_TRANSCRIPTS_STORAGE_KEY = 'lidc-storyline-phoenix-transcripts';
+const PHOENIX_DECRYPTED_STORAGE_KEY = 'lidc-storyline-phoenix-decrypted';
+
+function phoenixDecryptionsDir() {
   ensureDirectory(ROOT, 'PHOENIX');
   ensureDirectory('/phoenix', 'DECRYPTIONS');
-  const dir = DIRECTORY_TREE['/phoenix/decryptions'];
-  if (dir && !dir.entries.includes('FILE.TXT')) dir.entries.push('FILE.TXT');
-  DYNAMIC_FILE_CONTENTS['FILE.TXT'] = Array.isArray(lines) ? lines : [String(lines ?? '')];
+  return DIRECTORY_TREE['/phoenix/decryptions'];
 }
+
+function persistPhoenixTranscripts() {
+  const dir = DIRECTORY_TREE['/phoenix/decryptions'];
+  const payload = {};
+  dir?.entries.forEach((name) => {
+    const content = DYNAMIC_FILE_CONTENTS[name];
+    if (content) payload[name] = content;
+  });
+  try {
+    window.localStorage.setItem(PHOENIX_TRANSCRIPTS_STORAGE_KEY, JSON.stringify(payload));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function writePhoenixTranscriptFile(fileName, lines) {
+  const dir = phoenixDecryptionsDir();
+  const upper = String(fileName || 'FILE.TXT').toUpperCase();
+  if (dir && !dir.entries.includes(upper)) dir.entries.push(upper);
+  DYNAMIC_FILE_CONTENTS[upper] = Array.isArray(lines) ? lines : [String(lines ?? '')];
+}
+
+function isLegacyBurstTranscriptName(fileName) {
+  const name = String(fileName || '').toUpperCase();
+  return name === 'FILE.TXT' || /_[A-E]\.TXT$/.test(name);
+}
+
+export function savePhoenixDecryptorTranscript(fileName, lines) {
+  writePhoenixTranscriptFile(fileName, lines);
+  persistPhoenixTranscripts();
+}
+
+export function savePhoenixFrequencyTranscript(file, caughtIds = null) {
+  if (!file) return null;
+  const bursts = getPhoenixFileBursts(file).filter(
+    (burst) => !caughtIds || caughtIds.includes(burst.id),
+  );
+  const header = t('lidc.storyline.terminal.phoenix.logHeader');
+  const sections = bursts.flatMap((burst, index) => {
+    const logs = t(`lidc.storyline.terminal.phoenix.transcripts.${burst.transcriptKey}`);
+    const lines = Array.isArray(logs) ? logs : [String(logs ?? '')];
+    return index === 0 ? lines : ['', ...lines];
+  });
+  const content = [header, ...sections];
+  savePhoenixDecryptorTranscript(getPhoenixTranscriptFileName(file), content);
+  return content;
+}
+
+function hydratePhoenixTranscripts() {
+  phoenixDecryptionsDir();
+
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(PHOENIX_TRANSCRIPTS_STORAGE_KEY));
+    if (stored && typeof stored === 'object') {
+      Object.entries(stored).forEach(([name, content]) => {
+        if (isLegacyBurstTranscriptName(name)) return;
+        writePhoenixTranscriptFile(name, content);
+      });
+    }
+  } catch {
+    /* ignore corrupt storage */
+  }
+
+  const dir = DIRECTORY_TREE['/phoenix/decryptions'];
+  if (dir) {
+    dir.entries = dir.entries.filter((name) => !isLegacyBurstTranscriptName(name));
+  }
+
+  try {
+    const decrypted = JSON.parse(window.localStorage.getItem(PHOENIX_DECRYPTED_STORAGE_KEY));
+    if (Array.isArray(decrypted)) {
+      decrypted.forEach((id) => {
+        const file = PHOENIX_INTERCEPTS.find((item) => item.id === id);
+        if (!file) return;
+        const name = getPhoenixTranscriptFileName(file);
+        if (DYNAMIC_FILE_CONTENTS[name]) return;
+        savePhoenixFrequencyTranscript(file);
+      });
+    }
+  } catch {
+    /* ignore */
+  }
+
+  persistPhoenixTranscripts();
+}
+
+hydratePhoenixTranscripts();
 
 function buildTreeLines(path = ROOT, prefix = '') {
   const dirPath = normalizeDirPath(path);

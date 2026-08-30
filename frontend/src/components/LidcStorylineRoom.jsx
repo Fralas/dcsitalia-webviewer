@@ -55,7 +55,7 @@ import {
 import { syncWhiteboard3DDecorations } from '../utils/lidcStorylineWhiteboard3D';
 import {
   getTerminalScreenCameraView,
-  phoenixScreenUvToTunerRatio,
+  phoenixScreenUvToContent,
   pickTerminalScreenUv,
   renderTerminal3DScreens,
   syncTerminal3DDecorations,
@@ -66,7 +66,11 @@ import {
   initRatosTerminal,
   setRatosTerminalOperator,
 } from '../utils/ratosTerminalStore';
-import { setPhoenixHolding, setPhoenixTunerRatio } from '../utils/lidcPhoenixDecryptorGame';
+import {
+  handlePhoenixPointerDown,
+  handlePhoenixPointerMove,
+  setPhoenixHolding,
+} from '../utils/lidcPhoenixDecryptorGame';
 import './LidcStorylineRoom.css';
 
 const SURFACE_ZONE_DECOR_NAMES = new Set(['whiteboard-3d-decor', 'terminal-3d-screen']);
@@ -1614,8 +1618,8 @@ export default function LidcStorylineRoom({ onClose }) {
           const ndcY = -((event.clientY - rect.top) / Math.max(1, rect.height)) * 2 + 1;
           const uv = pickTerminalScreenUv(zoneGroups, camera, ndcX, ndcY);
           if (uv) {
-            setPhoenixTunerRatio(phoenixScreenUvToTunerRatio(uv.u));
-            setPhoenixHolding(true);
+            const content = phoenixScreenUvToContent(uv.u, uv.v);
+            handlePhoenixPointerDown(content.x, content.y);
           }
         }
         return;
@@ -1653,12 +1657,15 @@ export default function LidcStorylineRoom({ onClose }) {
 
     const onPointerMove = (event) => {
       if (terminalOpenRef.current) {
-        if ((event.buttons & 1) && getRatosTerminalSnapshot().phoenixGame) {
+        if (getRatosTerminalSnapshot().phoenixGame) {
           const rect = renderer.domElement.getBoundingClientRect();
           const ndcX = ((event.clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1;
           const ndcY = -((event.clientY - rect.top) / Math.max(1, rect.height)) * 2 + 1;
           const uv = pickTerminalScreenUv(zoneGroups, camera, ndcX, ndcY);
-          if (uv) setPhoenixTunerRatio(phoenixScreenUvToTunerRatio(uv.u));
+          if (uv) {
+            const content = phoenixScreenUvToContent(uv.u, uv.v);
+            handlePhoenixPointerMove(content.x, content.y, Boolean(event.buttons & 1));
+          }
         }
         return;
       }

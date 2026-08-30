@@ -87,7 +87,9 @@ export default function LidcStorylineTerminal({ onClose }) {
     const onKeyDown = (event) => {
       if (!bootComplete || imageViewer) return;
       if (phoenixGame) {
-        handlePhoenixKeyDown(event);
+        if (handlePhoenixKeyDown(event)) {
+          event.stopPropagation();
+        }
         return;
       }
       if (event.metaKey || event.ctrlKey || event.altKey) return;

@@ -1,8 +1,11 @@
+import { savePhoenixFrequencyTranscript } from '../config/lidcStorylineTerminalFs';
 import {
   clampPhoenixFreq,
   formatPhoenixFreq,
   freqToRatio,
+  getPhoenixFileBursts,
   PHOENIX_CIPHER_MS,
+  PHOENIX_FILE_CATCHES,
   PHOENIX_FREQ_MAX,
   PHOENIX_FREQ_MIN,
   PHOENIX_GATE_MHZ,
@@ -12,16 +15,36 @@ import {
   PHOENIX_TARGET_CATCHES,
   ratioToFreq,
 } from '../config/lidcStorylinePhoenixDecryptor';
-import { savePhoenixDecryptorTranscript } from '../config/lidcStorylineTerminalFs';
 import { t } from './locale';
 
 const TUNER_STEP = 14;
 const WATERFALL_HEIGHT = 240;
 
+const DECRYPTED_STORAGE_KEY = 'lidc-storyline-phoenix-decrypted';
+
 let session = null;
 let lastTick = 0;
 let logHandler = null;
 let audio = null;
+
+function loadDecryptedIds() {
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(DECRYPTED_STORAGE_KEY));
+    if (!Array.isArray(raw)) return [];
+    const valid = new Set(PHOENIX_INTERCEPTS.map((item) => item.id));
+    return raw.filter((id) => valid.has(id));
+  } catch {
+    return [];
+  }
+}
+
+function persistDecryptedIds(ids) {
+  try {
+    window.localStorage.setItem(DECRYPTED_STORAGE_KEY, JSON.stringify(ids));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
 
 function tLines(path) {
   const value = t(path);
@@ -78,13 +101,24 @@ function createAudio() {
   };
 }
 
+function remainingBursts(game) {
+  const bursts = getPhoenixFileBursts(game.targetIntercept);
+  if (bursts.length) {
+    return bursts.filter((burst) => !game.caught.includes(burst.id));
+  }
+  return PHOENIX_INTERCEPTS.filter((item) => !game.caught.includes(item.id));
+}
+
 function createContact(now, kind, intercept, existing) {
   const taken = existing.map((contact) => contact.freq);
-  let freq = intercept?.freqMhz ?? (PHOENIX_FREQ_MIN + 40 + Math.random() * 340);
-  let guard = 0;
-  while (taken.some((value) => Math.abs(value - freq) < 28) && guard < 8) {
-    freq = PHOENIX_FREQ_MIN + 40 + Math.random() * 340;
-    guard += 1;
+  const designed = Number.isFinite(intercept?.freqMhz);
+  let freq = designed ? intercept.freqMhz : (PHOENIX_FREQ_MIN + 40 + Math.random() * 340);
+  if (!designed) {
+    let guard = 0;
+    while (taken.some((value) => Math.abs(value - freq) < 28) && guard < 8) {
+      freq = PHOENIX_FREQ_MIN + 40 + Math.random() * 340;
+      guard += 1;
+    }
   }
 
   return {
@@ -92,9 +126,9 @@ function createContact(now, kind, intercept, existing) {
     kind,
     intercept,
     freq: clampPhoenixFreq(freq),
-    drift: (Math.random() * 2 - 1) * (kind === 'voice' ? 3.2 : 7.5),
+    drift: (Math.random() * 2 - 1) * (kind === 'voice' ? 2.2 : 7.5),
     born: now,
-    ttl: kind === 'voice' ? 9200 + Math.random() * 1800 : 5200 + Math.random() * 2400,
+    ttl: kind === 'voice' ? 24000 + Math.random() * 6000 : 5200 + Math.random() * 2400,
   };
 }
 
@@ -111,7 +145,12 @@ function createSession() {
     contacts: [],
     holding: false,
     lockMs: 0,
-    phase: 'scan',
+    phase: 'menu',
+    selectedIndex: 0,
+    decryptedIds: loadDecryptedIds(),
+    targetIntercept: null,
+    targetCount: PHOENIX_FILE_CATCHES,
+    menuRows: [],
     cipher: null,
     caught: [],
     catches: 0,
@@ -124,6 +163,42 @@ function createSession() {
   };
 }
 
+function returnToPhoenixMenu() {
+  if (!session) return;
+  session.phase = 'menu';
+  session.contacts = [];
+  session.holding = false;
+  session.lockMs = 0;
+  session.cipher = null;
+  session.caught = [];
+  session.catches = 0;
+  session.drops = 0;
+  session.logged = false;
+  session.targetIntercept = null;
+  session.spawnAt = performance.now() + 400;
+}
+
+function beginSelectedIntercept() {
+  if (!session) return;
+  const item = PHOENIX_INTERCEPTS[session.selectedIndex];
+  if (!item) return;
+
+  const bursts = getPhoenixFileBursts(item);
+  session.tuner = item.freqMhz;
+  session.contacts = [];
+  session.holding = false;
+  session.lockMs = 0;
+  session.phase = 'scan';
+  session.cipher = null;
+  session.caught = [];
+  session.catches = 0;
+  session.drops = 0;
+  session.spawnAt = performance.now() + 180;
+  session.logged = false;
+  session.targetIntercept = item;
+  session.targetCount = Math.max(PHOENIX_FILE_CATCHES, bursts.length);
+}
+
 function failDrop(game) {
   game.drops += 1;
   game.lockMs = 0;
@@ -133,9 +208,16 @@ function failDrop(game) {
 }
 
 function alignedContact(game) {
-  return game.contacts.find(
-    (contact) => Math.abs(contact.freq - game.tuner) <= PHOENIX_GATE_MHZ,
-  );
+  let best = null;
+  let bestDelta = PHOENIX_GATE_MHZ;
+  game.contacts.forEach((contact) => {
+    const delta = Math.abs(contact.freq - game.tuner);
+    if (delta < bestDelta) {
+      bestDelta = delta;
+      best = contact;
+    }
+  });
+  return best;
 }
 
 function drawSpectrumRow(game, width) {
@@ -176,18 +258,31 @@ function tickGame(now) {
   const dt = Math.min(0.05, (now - lastTick) / 1000 || 0.016);
   lastTick = now;
 
+  if (game.phase === 'menu' || game.phase === 'win' || game.phase === 'fail') {
+    return;
+  }
+
   if (game.phase === 'scan') {
     if (now >= game.spawnAt) {
-      const remaining = PHOENIX_INTERCEPTS.filter((item) => !game.caught.includes(item.id));
-      const hasVoice = game.contacts.some((contact) => contact.kind === 'voice');
-      if (!hasVoice && remaining.length) {
-        const next = remaining[Math.floor(Math.random() * remaining.length)];
+      const remaining = remainingBursts(game);
+      const liveVoiceIds = new Set(
+        game.contacts
+          .filter((contact) => contact.kind === 'voice' && contact.intercept?.id)
+          .map((contact) => contact.intercept.id),
+      );
+      const unspawned = remaining.filter((burst) => !liveVoiceIds.has(burst.id));
+      const decoys = game.contacts.filter((contact) => contact.kind === 'decoy').length;
+      if (unspawned.length) {
+        const next = unspawned[0];
         game.contacts.push(createContact(now, 'voice', next, game.contacts));
-        audio?.noise(0.09);
-      } else if (game.contacts.length < 4) {
+        audio?.noise(0.08);
+        game.spawnAt = now + 280 + Math.random() * 220;
+      } else if (decoys < 3) {
         game.contacts.push(createContact(now, 'decoy', null, game.contacts));
+        game.spawnAt = now + 1400 + Math.random() * 1200;
+      } else {
+        game.spawnAt = now + 1600 + Math.random() * 1400;
       }
-      game.spawnAt = now + 1600 + Math.random() * 1400;
     }
 
     game.contacts = game.contacts.filter((contact) => {
@@ -195,6 +290,7 @@ function tickGame(now) {
       if (contact.freq <= PHOENIX_FREQ_MIN + 4 || contact.freq >= PHOENIX_FREQ_MAX - 4) {
         contact.drift *= -1;
       }
+      if (contact.kind === 'voice') return true;
       return now - contact.born < contact.ttl;
     });
 
@@ -265,7 +361,7 @@ export function isPhoenixDecryptorRunning() {
 }
 
 export function setPhoenixTunerRatio(ratio) {
-  if (!session || session.phase === 'win' || session.phase === 'fail') return;
+  if (!session || (session.phase !== 'scan' && session.phase !== 'cipher')) return;
   session.tuner = clampPhoenixFreq(ratioToFreq(Math.min(1, Math.max(0, ratio))));
 }
 
@@ -282,10 +378,40 @@ export function restartPhoenixDecryptorSession() {
     startPhoenixDecryptorSession();
     return;
   }
-  const tuner = session.tuner;
-  session = createSession();
-  session.tuner = tuner;
-  lastTick = performance.now();
+  if (session.targetIntercept || session.phase === 'fail' || session.phase === 'win') {
+    beginSelectedIntercept();
+    lastTick = performance.now();
+    return;
+  }
+  returnToPhoenixMenu();
+}
+
+export function handlePhoenixPointerMove(x, y, dragging) {
+  if (!session) return;
+  if (session.phase === 'menu') {
+    const hit = session.menuRows.find((row) => y >= row.y0 && y < row.y1);
+    if (hit) session.selectedIndex = hit.index;
+    return;
+  }
+  if (dragging && session.phase === 'scan') {
+    setPhoenixTunerRatio(x);
+  }
+}
+
+export function handlePhoenixPointerDown(x, y) {
+  if (!session) return;
+  if (session.phase === 'menu') {
+    const hit = session.menuRows.find((row) => y >= row.y0 && y < row.y1);
+    if (hit) {
+      session.selectedIndex = hit.index;
+      beginSelectedIntercept();
+    }
+    return;
+  }
+  if (session.phase === 'scan') {
+    setPhoenixTunerRatio(x);
+    setPhoenixHolding(true);
+  }
 }
 
 export function handlePhoenixKeyDown(event) {
@@ -293,8 +419,51 @@ export function handlePhoenixKeyDown(event) {
 
   if (event.key === 'Escape') return false;
 
+  if (session.phase === 'menu') {
+    if (event.key === 'ArrowUp' || event.key === 'w' || event.key === 'W') {
+      event.preventDefault();
+      session.selectedIndex = Math.max(0, session.selectedIndex - 1);
+      return true;
+    }
+    if (event.key === 'ArrowDown' || event.key === 's' || event.key === 'S') {
+      event.preventDefault();
+      session.selectedIndex = Math.min(PHOENIX_INTERCEPTS.length - 1, session.selectedIndex + 1);
+      return true;
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      beginSelectedIntercept();
+      return true;
+    }
+    if (/^[1-9]$/.test(event.key)) {
+      const index = Number(event.key) - 1;
+      if (PHOENIX_INTERCEPTS[index]) {
+        event.preventDefault();
+        session.selectedIndex = index;
+        beginSelectedIntercept();
+        return true;
+      }
+    }
+    return false;
+  }
+
   if (session.phase === 'win' || session.phase === 'fail') {
-    if (event.key === 'r' || event.key === 'R' || event.key === 'Enter') {
+    if (event.key === 'r' || event.key === 'R') {
+      event.preventDefault();
+      restartPhoenixDecryptorSession();
+      return true;
+    }
+    if (
+      event.key === 'm'
+      || event.key === 'M'
+      || event.key === 'Backspace'
+      || (session.phase === 'win' && event.key === 'Enter')
+    ) {
+      event.preventDefault();
+      returnToPhoenixMenu();
+      return true;
+    }
+    if (session.phase === 'fail' && event.key === 'Enter') {
       event.preventDefault();
       restartPhoenixDecryptorSession();
       return true;
@@ -303,6 +472,11 @@ export function handlePhoenixKeyDown(event) {
   }
 
   if (session.phase === 'scan') {
+    if (event.key === 'm' || event.key === 'M' || event.key === 'Backspace') {
+      event.preventDefault();
+      returnToPhoenixMenu();
+      return true;
+    }
     if (event.key === 'ArrowLeft' || event.key === 'a' || event.key === 'A') {
       event.preventDefault();
       session.tuner = clampPhoenixFreq(session.tuner - TUNER_STEP);
@@ -328,26 +502,26 @@ export function handlePhoenixKeyDown(event) {
     audio?.tone(420 + Number(event.key) * 40, 0.06, 0.05);
 
     if (session.cipher.typed === session.cipher.digits) {
-      session.caught.push(session.cipher.id);
+      const burst = session.cipher;
+      session.caught.push(burst.id);
       session.catches = session.caught.length;
+      const targetCount = session.targetCount || PHOENIX_TARGET_CATCHES;
+      const file = session.targetIntercept;
+      const burstLogs = burst.transcriptKey
+        ? tLines(`lidc.storyline.terminal.phoenix.transcripts.${burst.transcriptKey}`)
+        : [];
+      const fileLines = savePhoenixFrequencyTranscript(file, session.caught);
+      logHandler?.(burstLogs.length ? burstLogs : fileLines);
       session.cipher = null;
       audio?.tone(980, 0.16, 0.07);
-      if (session.catches >= PHOENIX_TARGET_CATCHES) {
+      if (session.catches >= targetCount) {
         session.phase = 'win';
-        if (!session.logged) {
-          session.logged = true;
-          const logs = session.caught.flatMap((id) => {
-            const item = PHOENIX_INTERCEPTS.find((entry) => entry.id === id);
-            return item ? tLines(`lidc.storyline.terminal.phoenix.transcripts.${item.transcriptKey}`) : [];
-          });
-          const savedNote = t('lidc.storyline.terminal.phoenix.winBody');
-          const savedLines = Array.isArray(savedNote) ? savedNote : [savedNote];
-          savePhoenixDecryptorTranscript([
-            t('lidc.storyline.terminal.phoenix.logHeader'),
-            ...logs,
-          ]);
-          logHandler?.([t('lidc.storyline.terminal.phoenix.logHeader'), ...logs, ...savedLines.slice(1)]);
+        const fileId = file?.id;
+        if (fileId && !session.decryptedIds.includes(fileId)) {
+          session.decryptedIds = [...session.decryptedIds, fileId];
+          persistDecryptedIds(session.decryptedIds);
         }
+        session.logged = true;
       } else {
         session.phase = 'scan';
       }
@@ -425,13 +599,81 @@ export function drawPhoenixDecryptor(ctx, canvas, timeMs) {
   ctx.fillStyle = '#ffe08a';
   ctx.fillText('PHOENIX DECRYPTOR v0.9.1', padX, padY);
   ctx.textAlign = 'right';
-  ctx.fillText(t('lidc.storyline.terminal.phoenix.live'), width - padX, padY);
+  ctx.fillText(
+    game.phase === 'menu'
+      ? t('lidc.storyline.terminal.phoenix.menuTitle')
+      : t('lidc.storyline.terminal.phoenix.live'),
+    width - padX,
+    padY,
+  );
   ctx.textAlign = 'left';
 
+  const targetCount = game.targetCount || PHOENIX_TARGET_CATCHES;
   ctx.font = '12px "IBM Plex Mono", "Courier New", monospace';
   ctx.fillStyle = 'rgba(168, 255, 191, 0.88)';
+
+  const wfX = padX;
+  const wfY = padY + 38;
+  const wfW = maxTextWidth;
+  const wfH = Math.min(Math.round(height * 0.38), height - wfY - logHeight - 18);
+
+  if (game.phase === 'menu') {
+    ctx.fillText(
+      `${t('lidc.storyline.terminal.phoenix.menuDecrypted')} ${game.decryptedIds.length}/${PHOENIX_INTERCEPTS.length}`,
+      padX,
+      padY + 18,
+    );
+    ctx.fillStyle = '#ffe08a';
+    ctx.textAlign = 'right';
+    ctx.fillText('C:\\PHOENIX\\QUEUE', width - padX, padY + 18);
+    ctx.textAlign = 'left';
+
+    ctx.strokeStyle = 'rgba(77, 106, 64, 0.55)';
+    ctx.strokeRect(wfX, wfY, wfW, wfH);
+
+    const rowH = Math.floor(wfH / Math.max(3, PHOENIX_INTERCEPTS.length));
+    game.menuRows = PHOENIX_INTERCEPTS.map((item, index) => {
+      const rowY = wfY + index * rowH;
+      const selected = index === game.selectedIndex;
+      const decrypted = game.decryptedIds.includes(item.id);
+      if (selected) {
+        ctx.fillStyle = 'rgba(255, 196, 72, 0.16)';
+        ctx.fillRect(wfX + 2, rowY + 2, wfW - 4, rowH - 4);
+      }
+      ctx.font = '13px "IBM Plex Mono", "Courier New", monospace';
+      ctx.fillStyle = selected ? '#ffe08a' : '#c8f5d0';
+      const marker = selected ? '>' : ' ';
+      const status = decrypted
+        ? t('lidc.storyline.terminal.phoenix.menuDecrypted')
+        : t('lidc.storyline.terminal.phoenix.menuPending');
+      ctx.fillText(`${marker} ${index + 1}  ${item.fileName}`, wfX + 10, rowY + 8);
+      ctx.fillStyle = decrypted ? '#ffe08a' : 'rgba(168, 255, 191, 0.75)';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${formatPhoenixFreq(item.freqMhz)}  ${status}`, wfX + wfW - 10, rowY + 8);
+      ctx.textAlign = 'left';
+      return { index, y0: rowY / height, y1: (rowY + rowH) / height };
+    });
+
+    const logY = wfY + wfH + 20;
+    const logBoxH = height - padY - logY;
+    ctx.strokeStyle = 'rgba(77, 106, 64, 0.45)';
+    ctx.strokeRect(padX, logY, wfW, logBoxH);
+    ctx.font = '12px "IBM Plex Mono", "Courier New", monospace';
+    ctx.fillStyle = '#c8f5d0';
+    let cursorY = logY + 8;
+    wrapCanvasText(ctx, t('lidc.storyline.terminal.phoenix.menuHint'), maxTextWidth - 12).forEach((line) => {
+      ctx.fillText(line, padX + 6, cursorY);
+      cursorY += 15;
+    });
+    ctx.fillStyle = 'rgba(168, 255, 191, 0.82)';
+    ctx.fillText(`${t('lidc.storyline.terminal.phoenix.exitHint')} [ESC]`, padX + 6, cursorY + 4);
+    ctx.shadowBlur = 0;
+    return;
+  }
+
+  game.menuRows = [];
   ctx.fillText(
-    `${t('lidc.storyline.terminal.phoenix.catches')} ${game.catches}/${PHOENIX_TARGET_CATCHES}  ${t('lidc.storyline.terminal.phoenix.drops')} ${game.drops}/${PHOENIX_MAX_DROPS}`,
+    `${t('lidc.storyline.terminal.phoenix.catches')} ${game.catches}/${targetCount}  ${t('lidc.storyline.terminal.phoenix.drops')} ${game.drops}/${PHOENIX_MAX_DROPS}`,
     padX,
     padY + 18,
   );
@@ -440,10 +682,6 @@ export function drawPhoenixDecryptor(ctx, canvas, timeMs) {
   ctx.fillText(formatPhoenixFreq(game.tuner), width - padX, padY + 18);
   ctx.textAlign = 'left';
 
-  const wfX = padX;
-  const wfY = padY + 38;
-  const wfW = maxTextWidth;
-  const wfH = Math.min(Math.round(height * 0.38), height - wfY - logHeight - 18);
   ctx.drawImage(game.waterfall, wfX, wfY, wfW, wfH);
 
   const tunerX = wfX + freqToRatio(game.tuner) * wfW;
@@ -529,7 +767,11 @@ export function drawPhoenixDecryptor(ctx, canvas, timeMs) {
       });
     });
     ctx.fillStyle = 'rgba(168, 255, 191, 0.82)';
-    ctx.fillText(`${t('lidc.storyline.terminal.phoenix.retry')} [R]   ${t('lidc.storyline.terminal.phoenix.back')} [ESC]`, padX + 6, cursorY + 4);
+    ctx.fillText(
+      `${t('lidc.storyline.terminal.phoenix.retry')} [R]   ${t('lidc.storyline.terminal.phoenix.menuBack')}   ${t('lidc.storyline.terminal.phoenix.back')} [ESC]`,
+      padX + 6,
+      cursorY + 4,
+    );
   }
 
   ctx.shadowBlur = 0;

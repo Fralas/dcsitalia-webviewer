@@ -502,7 +502,7 @@ export default {
           ],
           phoenixLaunch: [
             'PHOENIX DECRYPTOR v0.9.1 — uplink SIGINT',
-            'Sintonizza la frequenza e blocca il burst vocale.',
+            'Seleziona un file intercept da decryptare.',
           ],
         },
         phoenix: {
@@ -517,13 +517,17 @@ export default {
           cipherHint: 'Burst cifrato in chiaro. Digita i numeri prima che cada la linea.',
           winTitle: 'Sessione intercettazione OK',
           winBody: [
-            'Tre telefonate decifrate. I transcript sono stati scritti sul terminale.',
-            'Transcript salvati in C:\\phoenix\\decryptions\\file.txt',
+            'File decryptato. Transcript in C:\\PHOENIX\\DECRYPTIONS\\GUARD_142.TXT (e analoghi).',
           ],
           failTitle: 'Linea persa',
           failBody: 'Troppi drop. Riallinea il tuner e riprova.',
           retry: 'Riprova',
           back: 'Terminale',
+          menuTitle: 'Intercept in coda',
+          menuHint: '↑ ↓ seleziona · INVIO avvia · click sul file',
+          menuPending: 'PENDING',
+          menuDecrypted: 'DECRYPTED',
+          menuBack: 'Menù [M]',
           exitHint: 'Chiudi Phoenix',
           controls: '← → o A D sintonizza · SPAZIO lock · numeri per il burst',
           logHeader: '— PHOENIX INTERCEPT LOG —',
@@ -532,13 +536,73 @@ export default {
               '142.760 MHz  VOICE',
               '"Ripetere il codice. quattro-quattro-sette-zero-uno. niente nomi in chiaro."',
             ],
+            guardA: [
+              '112.400 MHz  VOICE',
+              '"Nodo guardia in ascolto. Confermare canale secondario."',
+            ],
+            guardB: [
+              '142.760 MHz  VOICE',
+              '"Ripetere il codice. quattro-quattro-sette-zero-uno. niente nomi in chiaro."',
+            ],
+            guardC: [
+              '174.180 MHz  VOICE',
+              '"Se chiedono il nome, chiudi. Solo il numero."',
+            ],
+            guardD: [
+              '206.550 MHz  VOICE',
+              '"Finestra successiva dopo mezzanotte. Stesso prefisso."',
+            ],
+            guardE: [
+              '238.900 MHz  VOICE',
+              '"Guardia fuori. Non richiamare su questa frequenza."',
+            ],
             burst: [
               '241.020 MHz  VOICE',
               '"Uplink B occupato. Spostiamo il carico dopo il ramadan. Il macellaio paga in anticipo."',
             ],
+            burstA: [
+              '176.200 MHz  VOICE',
+              '"Uplink B occupato. Ripetere tra tre minuti."',
+            ],
+            burstB: [
+              '209.440 MHz  VOICE',
+              '"Spostiamo il carico dopo il ramadan. Niente camion di giorno."',
+            ],
+            burstC: [
+              '241.020 MHz  VOICE',
+              '"Il macellaio paga in anticipo. Confermare il peso."',
+            ],
+            burstD: [
+              '273.800 MHz  VOICE',
+              '"Il magazzino è pieno. Tenere il secondo lotto in attesa."',
+            ],
+            burstE: [
+              '307.150 MHz  VOICE',
+              '"Chiuso. Non usare più il 241 fino a nuovo ordine."',
+            ],
             relay: [
               '433.920 MHz  VOICE',
               '"Studio in ascolto. Se Hakimi chiama, inoltrare su 241."',
+            ],
+            relayA: [
+              '361.100 MHz  VOICE',
+              '"Relay acceso. Studio chiede prova di vita."',
+            ],
+            relayB: [
+              '397.400 MHz  VOICE',
+              '"Se Hakimi chiama, non rispondere in chiaro."',
+            ],
+            relayC: [
+              '433.920 MHz  VOICE',
+              '"Studio in ascolto. Se Hakimi chiama, inoltrare su 241."',
+            ],
+            relayD: [
+              '469.250 MHz  VOICE',
+              '"Il ponte tiene. Ripetere solo il numero, non la tratta."',
+            ],
+            relayE: [
+              '504.600 MHz  VOICE',
+              '"Relay in stand-by. Aspettare il prossimo burst da studio."',
             ],
           },
         },
