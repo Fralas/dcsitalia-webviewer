@@ -55,6 +55,7 @@ import {
 import { syncWhiteboard3DDecorations } from '../utils/lidcStorylineWhiteboard3D';
 import {
   getTerminalScreenCameraView,
+  pickTerminalScreenUv,
   renderTerminal3DScreens,
   syncTerminal3DDecorations,
 } from '../utils/lidcStorylineTerminal3D';
@@ -64,6 +65,7 @@ import {
   initRatosTerminal,
   setRatosTerminalOperator,
 } from '../utils/ratosTerminalStore';
+import { setPhoenixHolding, setPhoenixTunerRatio } from '../utils/lidcPhoenixDecryptorGame';
 import './LidcStorylineRoom.css';
 
 const SURFACE_ZONE_DECOR_NAMES = new Set(['whiteboard-3d-decor', 'terminal-3d-screen']);
@@ -1604,7 +1606,21 @@ export default function LidcStorylineRoom({ onClose }) {
     };
 
     const onPointerDown = (event) => {
-      if (event.button !== 0 || isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current || phoneOpenRef.current || isCameraTransitioning()) {
+      if (terminalOpenRef.current) {
+        if (event.button === 0 && getRatosTerminalSnapshot().phoenixGame) {
+          const rect = renderer.domElement.getBoundingClientRect();
+          const ndcX = ((event.clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1;
+          const ndcY = -((event.clientY - rect.top) / Math.max(1, rect.height)) * 2 + 1;
+          const uv = pickTerminalScreenUv(zoneGroups, camera, ndcX, ndcY);
+          if (uv) {
+            setPhoenixTunerRatio(uv.u);
+            setPhoenixHolding(true);
+          }
+        }
+        return;
+      }
+
+      if (event.button !== 0 || isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || phoneOpenRef.current || isCameraTransitioning()) {
         return;
       }
 
@@ -1616,7 +1632,12 @@ export default function LidcStorylineRoom({ onClose }) {
     };
 
     const onPointerUp = (event) => {
-      if (event.button !== 0 || isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current || phoneOpenRef.current || isCameraTransitioning()) {
+      if (terminalOpenRef.current) {
+        setPhoenixHolding(false);
+        return;
+      }
+
+      if (event.button !== 0 || isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || phoneOpenRef.current || isCameraTransitioning()) {
         return;
       }
 
@@ -1630,7 +1651,17 @@ export default function LidcStorylineRoom({ onClose }) {
     };
 
     const onPointerMove = (event) => {
-      if (isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || terminalOpenRef.current || phoneOpenRef.current || isCameraTransitioning()) return;
+      if (terminalOpenRef.current) {
+        if ((event.buttons & 1) && getRatosTerminalSnapshot().phoenixGame) {
+          const rect = renderer.domElement.getBoundingClientRect();
+          const ndcX = ((event.clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1;
+          const ndcY = -((event.clientY - rect.top) / Math.max(1, rect.height)) * 2 + 1;
+          const uv = pickTerminalScreenUv(zoneGroups, camera, ndcX, ndcY);
+          if (uv) setPhoenixTunerRatio(uv.u);
+        }
+        return;
+      }
+      if (isTransformDragging || debugOpenRef.current || whiteboardOpenRef.current || phoneOpenRef.current || isCameraTransitioning()) return;
       if (!isPointerLocked()) return;
 
       queueLookDelta(event.movementX, event.movementY);

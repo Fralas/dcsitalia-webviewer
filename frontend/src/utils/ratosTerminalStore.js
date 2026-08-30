@@ -7,6 +7,11 @@ import {
   runRatosCommand,
 } from '../config/lidcStorylineTerminal';
 import { t } from './locale';
+import {
+  startPhoenixDecryptorSession,
+  stopPhoenixDecryptorSession,
+  setPhoenixSessionLogHandler,
+} from './lidcPhoenixDecryptorGame';
 
 const INSTALLED_PACKAGES_STORAGE_KEY = 'lidc-storyline-ratos-packages';
 
@@ -99,6 +104,8 @@ function appendLines(nextLines, variant = 'normal') {
   });
 }
 
+setPhoenixSessionLogHandler((lines) => appendLines(lines, 'dim'));
+
 function clearTimers() {
   if (biosTimer) {
     window.clearInterval(biosTimer);
@@ -178,6 +185,7 @@ export function disposeRatosTerminal() {
   clearTimers();
   initialized = false;
   exitHandler = null;
+  stopPhoenixDecryptorSession();
   commandHistory.length = 0;
   historyIndex = -1;
   draftInput = '';
@@ -209,6 +217,7 @@ export function closeRatosImageViewer() {
 }
 
 export function closeRatosPhoenixGame() {
+  stopPhoenixDecryptorSession();
   patch({ phoenixGame: false });
 }
 
@@ -272,6 +281,7 @@ export function submitRatosCommand(rawValue) {
   }
 
   if (result.clear) {
+    stopPhoenixDecryptorSession();
     patch({ lines: [], cwd: nextCwd, imageViewer: null, phoenixGame: false });
     return;
   }
@@ -282,11 +292,13 @@ export function submitRatosCommand(rawValue) {
   }
 
   if (result.imageViewer) {
+    stopPhoenixDecryptorSession();
     patch({ cwd: nextCwd, imageViewer: result.imageViewer, phoenixGame: false });
     return;
   }
 
   if (result.phoenixGame) {
+    startPhoenixDecryptorSession();
     patch({ cwd: nextCwd, phoenixGame: true, imageViewer: null });
     appendLines(result.lines);
     return;

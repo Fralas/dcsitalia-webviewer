@@ -8,6 +8,7 @@ import {
 } from '../config/lidcStorylineTerminal';
 import { t } from './locale';
 import { getRatosTerminalSnapshot } from './ratosTerminalStore';
+import { drawPhoenixDecryptor, tickPhoenixDecryptor } from './lidcPhoenixDecryptorGame';
 import { getWhiteboardSurfaceMapping } from './lidcStorylineWhiteboard3D';
 import { applyZoneTransform, ZONE_TYPES } from './lidcStorylineZones';
 
@@ -440,27 +441,6 @@ function drawTerminalContent(ctx, canvas, snapshot, timeMs = 0) {
   ctx.shadowBlur = 0;
 }
 
-function drawPhoenixStandby(ctx, canvas, timeMs) {
-  const { width, height } = canvas;
-  ctx.fillStyle = COLORS.bg;
-  ctx.fillRect(0, 0, width, height);
-  ctx.textBaseline = 'top';
-  ctx.font = '11px "IBM Plex Mono", "Courier New", monospace';
-  ctx.shadowColor = 'rgba(255, 210, 96, 0.35)';
-  ctx.shadowBlur = 3;
-  ctx.fillStyle = '#ffe08a';
-  ctx.fillText('PHOENIX DECRYPTOR v0.9.1', width * 0.07, height * 0.12);
-  ctx.fillStyle = COLORS.text;
-  ctx.fillText(t('lidc.storyline.terminal.phoenix.live'), width * 0.07, height * 0.2);
-
-  const pulse = 0.35 + (Math.sin(timeMs / 180) * 0.5 + 0.5) * 0.65;
-  ctx.fillStyle = `rgba(168, 255, 191, ${pulse})`;
-  ctx.fillRect(width * 0.07, height * 0.48, width * 0.86, 4);
-  ctx.fillStyle = COLORS.dim;
-  ctx.fillText('SIGINT uplink active', width * 0.07, height * 0.56);
-  ctx.shadowBlur = 0;
-}
-
 function disposeScreenRoot(root) {
   if (root.userData.imageTexture && root.userData.imageTexture !== root.userData.texture) {
     root.userData.imageTexture.dispose();
@@ -714,6 +694,10 @@ export function renderTerminal3DScreens(
   snapshot = getRatosTerminalSnapshot(),
   timeMs = 0,
 ) {
+  if (snapshot.phoenixGame) {
+    tickPhoenixDecryptor(timeMs);
+  }
+
   zoneGroups.forEach((group) => {
     if (group.userData.zoneType !== ZONE_TYPES.TERMINAL_SURFACE) return;
     const root = group.getObjectByName('terminal-3d-screen');
@@ -726,14 +710,40 @@ export function renderTerminal3DScreens(
 
     restoreTerminalCanvasMap(root);
     if (snapshot.phoenixGame) {
-      const { ctx, canvas } = root.userData;
-      drawPhoenixStandby(ctx, canvas, timeMs);
-      root.userData.texture.needsUpdate = true;
+      ensureContentCanvas(root);
+      const { ctx, canvas, contentCtx, contentCanvas, texture } = root.userData;
+      drawPhoenixDecryptor(contentCtx, contentCanvas, timeMs);
+      ctx.fillStyle = COLORS.bg;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(contentCanvas, 0, 0);
+      drawVcrOverlay(ctx, canvas.width, canvas.height, timeMs);
+      texture.needsUpdate = true;
       return;
     }
 
     compositeTerminalFrame(root, snapshot, timeMs);
   });
+}
+
+const PICK_RAYCASTER = new THREE.Raycaster();
+const PICK_NDC = new THREE.Vector2();
+
+export function pickTerminalScreenUv(zoneGroups, camera, ndcX, ndcY) {
+  if (!zoneGroups || !camera) return null;
+
+  PICK_NDC.set(ndcX, ndcY);
+  PICK_RAYCASTER.setFromCamera(PICK_NDC, camera);
+  const meshes = [];
+  zoneGroups.forEach((group) => {
+    if (group.userData.zoneType !== ZONE_TYPES.TERMINAL_SURFACE) return;
+    const mesh = group.getObjectByName('terminal-3d-screen')?.getObjectByName('terminal-screen-mesh');
+    if (mesh) meshes.push(mesh);
+  });
+  if (!meshes.length) return null;
+
+  const hit = PICK_RAYCASTER.intersectObjects(meshes, false)[0];
+  if (!hit?.uv) return null;
+  return { u: hit.uv.x, v: hit.uv.y };
 }
 
 export function disposeTerminal3DDecorations(root) {

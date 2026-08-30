@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  appendRatosTerminalLines,
   closeRatosImageViewer,
   closeRatosPhoenixGame,
   getRatosTerminalSnapshot,
@@ -10,9 +9,12 @@ import {
   submitRatosCommand,
   subscribeRatosTerminal,
 } from '../utils/ratosTerminalStore';
+import {
+  handlePhoenixKeyDown,
+  handlePhoenixKeyUp,
+} from '../utils/lidcPhoenixDecryptorGame';
 import { t } from '../utils/locale';
 import { LidcStorylineHudNotice } from './LidcStorylineHud';
-import LidcPhoenixDecryptor from './LidcPhoenixDecryptor';
 import './LidcStorylineTerminal.css';
 
 export default function LidcStorylineTerminal({ onClose }) {
@@ -83,7 +85,11 @@ export default function LidcStorylineTerminal({ onClose }) {
 
   useEffect(() => {
     const onKeyDown = (event) => {
-      if (!bootComplete || imageViewer || phoenixGame) return;
+      if (!bootComplete || imageViewer) return;
+      if (phoenixGame) {
+        handlePhoenixKeyDown(event);
+        return;
+      }
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.key === 'Escape') return;
 
@@ -112,8 +118,16 @@ export default function LidcStorylineTerminal({ onClose }) {
       }
     };
 
+    const onKeyUp = (event) => {
+      if (phoenixGame) handlePhoenixKeyUp(event);
+    };
+
     document.addEventListener('keydown', onKeyDown, true);
-    return () => document.removeEventListener('keydown', onKeyDown, true);
+    document.addEventListener('keyup', onKeyUp, true);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown, true);
+      document.removeEventListener('keyup', onKeyUp, true);
+    };
   }, [bootComplete, imageViewer, phoenixGame]);
 
   useEffect(() => {
@@ -134,10 +148,15 @@ export default function LidcStorylineTerminal({ onClose }) {
 
   const onSubmit = (event) => {
     event.preventDefault();
+    if (phoenixGame) return;
     submitRatosCommand(input);
   };
 
   const onInputKeyDown = (event) => {
+    if (phoenixGame) {
+      event.preventDefault();
+      return;
+    }
     event.stopPropagation();
     if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
     event.preventDefault();
@@ -145,14 +164,17 @@ export default function LidcStorylineTerminal({ onClose }) {
   };
 
   return (
-    <div className={`lidc-ratos-input-capture${phoenixGame ? ' is-phoenix' : ''}`} role="presentation">
+    <div className="lidc-ratos-input-capture" role="presentation">
       <form className="lidc-ratos-input-capture-form" onSubmit={onSubmit}>
         <input
           ref={inputRef}
           className="lidc-ratos-input-capture-field"
           type="text"
-          value={input}
-          onChange={(event) => setRatosTerminalInput(event.target.value)}
+          value={phoenixGame ? '' : input}
+          onChange={(event) => {
+            if (phoenixGame) return;
+            setRatosTerminalInput(event.target.value);
+          }}
           onKeyDown={onInputKeyDown}
           autoComplete="off"
           autoCorrect="off"
@@ -161,13 +183,6 @@ export default function LidcStorylineTerminal({ onClose }) {
           aria-label={t('lidc.storyline.terminal.inputLabel')}
         />
       </form>
-
-      {phoenixGame && (
-        <LidcPhoenixDecryptor
-          onClose={closeRatosPhoenixGame}
-          onSessionLog={(lines) => appendRatosTerminalLines(lines, 'dim')}
-        />
-      )}
 
       {showExitHint && !phoenixGame && (
         <LidcStorylineHudNotice

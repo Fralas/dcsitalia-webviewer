@@ -921,10 +921,6 @@
   pointer-events: none;
 }
 
-.lidc-ratos-input-capture.is-phoenix {
-  pointer-events: auto;
-}
-
 .lidc-ratos-input-capture-form {
   pointer-events: auto;
 }
