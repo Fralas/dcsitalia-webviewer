@@ -16,6 +16,8 @@ const SURFACE_INSET = 0.004;
 const CANVAS_WIDTH = 512;
 const CANVAS_HEIGHT = 384;
 const SCREEN_FILL = 0.94;
+const PHOENIX_OVERSCAN_X = 0.05;
+const PHOENIX_OVERSCAN_Y = 0.05;
 const TERMINAL_CAMERA_DISTANCE = 0.42;
 const TERMINAL_CAMERA_FRAME_PADDING = 1.08;
 
@@ -715,7 +717,15 @@ export function renderTerminal3DScreens(
       drawPhoenixDecryptor(contentCtx, contentCanvas, timeMs);
       ctx.fillStyle = COLORS.bg;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(contentCanvas, 0, 0);
+      const insetX = Math.round(canvas.width * PHOENIX_OVERSCAN_X);
+      const insetY = Math.round(canvas.height * PHOENIX_OVERSCAN_Y);
+      ctx.drawImage(
+        contentCanvas,
+        insetX,
+        insetY,
+        canvas.width - insetX * 2,
+        canvas.height - insetY * 2,
+      );
       drawVcrOverlay(ctx, canvas.width, canvas.height, timeMs);
       texture.needsUpdate = true;
       return;
@@ -744,6 +754,12 @@ export function pickTerminalScreenUv(zoneGroups, camera, ndcX, ndcY) {
   const hit = PICK_RAYCASTER.intersectObjects(meshes, false)[0];
   if (!hit?.uv) return null;
   return { u: hit.uv.x, v: hit.uv.y };
+}
+
+export function phoenixScreenUvToTunerRatio(u) {
+  const inner = 1 - PHOENIX_OVERSCAN_X * 2;
+  if (inner <= 0) return 0.5;
+  return (u - PHOENIX_OVERSCAN_X) / inner;
 }
 
 export function disposeTerminal3DDecorations(root) {

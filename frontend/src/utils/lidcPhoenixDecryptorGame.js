@@ -16,7 +16,7 @@ import { savePhoenixDecryptorTranscript } from '../config/lidcStorylineTerminalF
 import { t } from './locale';
 
 const TUNER_STEP = 14;
-const WATERFALL_HEIGHT = 168;
+const WATERFALL_HEIGHT = 240;
 
 let session = null;
 let lastTick = 0;
@@ -387,15 +387,16 @@ export function drawPhoenixDecryptor(ctx, canvas, timeMs) {
 
   const game = session;
   const { width, height } = canvas;
-  const padX = Math.round(width * 0.08);
-  const padY = 8;
+  const padX = Math.round(width * 0.06);
+  const padY = Math.round(height * 0.045);
   const maxTextWidth = width - padX * 2;
+  const logHeight = Math.round(height * 0.34);
 
   ctx.fillStyle = '#010803';
   ctx.fillRect(0, 0, width, height);
   ctx.textBaseline = 'top';
-  ctx.font = '9px "IBM Plex Mono", "Courier New", monospace';
-  ctx.shadowColor = 'rgba(103, 255, 136, 0.22)';
+  ctx.font = '13px "IBM Plex Mono", "Courier New", monospace';
+  ctx.shadowColor = 'rgba(103, 255, 136, 0.24)';
   ctx.shadowBlur = 1.5;
 
   ctx.fillStyle = '#ffe08a';
@@ -404,52 +405,58 @@ export function drawPhoenixDecryptor(ctx, canvas, timeMs) {
   ctx.fillText(t('lidc.storyline.terminal.phoenix.live'), width - padX, padY);
   ctx.textAlign = 'left';
 
-  ctx.fillStyle = 'rgba(168, 255, 191, 0.82)';
+  ctx.font = '12px "IBM Plex Mono", "Courier New", monospace';
+  ctx.fillStyle = 'rgba(168, 255, 191, 0.88)';
   ctx.fillText(
     `${t('lidc.storyline.terminal.phoenix.catches')} ${game.catches}/${PHOENIX_TARGET_CATCHES}  ${t('lidc.storyline.terminal.phoenix.drops')} ${game.drops}/${PHOENIX_MAX_DROPS}`,
     padX,
-    padY + 13,
+    padY + 18,
   );
   ctx.fillStyle = '#ffe08a';
   ctx.textAlign = 'right';
-  ctx.fillText(formatPhoenixFreq(game.tuner), width - padX, padY + 13);
+  ctx.fillText(formatPhoenixFreq(game.tuner), width - padX, padY + 18);
   ctx.textAlign = 'left';
 
   const wfX = padX;
-  const wfY = padY + 28;
+  const wfY = padY + 38;
   const wfW = maxTextWidth;
-  const wfH = height * 0.36;
+  const wfH = Math.min(Math.round(height * 0.38), height - wfY - logHeight - 18);
   ctx.drawImage(game.waterfall, wfX, wfY, wfW, wfH);
 
   const tunerX = wfX + freqToRatio(game.tuner) * wfW;
   const gatePx = (PHOENIX_GATE_MHZ / (PHOENIX_FREQ_MAX - PHOENIX_FREQ_MIN)) * wfW;
   ctx.fillStyle = 'rgba(255, 196, 72, 0.1)';
   ctx.fillRect(tunerX - gatePx, wfY, gatePx * 2, wfH);
-  ctx.strokeStyle = 'rgba(255, 210, 96, 0.9)';
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(255, 210, 96, 0.95)';
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(tunerX, wfY);
   ctx.lineTo(tunerX, wfY + wfH);
   ctx.stroke();
 
-  ctx.fillStyle = 'rgba(127, 186, 140, 0.8)';
-  ctx.font = '8px "IBM Plex Mono", "Courier New", monospace';
-  ctx.fillText(`${PHOENIX_FREQ_MIN}`, wfX, wfY + wfH + 3);
+  ctx.fillStyle = 'rgba(127, 186, 140, 0.88)';
+  ctx.font = '11px "IBM Plex Mono", "Courier New", monospace';
+  ctx.fillText(`${PHOENIX_FREQ_MIN}`, wfX, wfY + wfH + 5);
   ctx.textAlign = 'center';
-  ctx.fillText('MHz', width / 2, wfY + wfH + 3);
+  ctx.fillText('MHz', width / 2, wfY + wfH + 5);
   ctx.textAlign = 'right';
-  ctx.fillText(`${PHOENIX_FREQ_MAX}`, wfX + wfW, wfY + wfH + 3);
+  ctx.fillText(`${PHOENIX_FREQ_MAX}`, wfX + wfW, wfY + wfH + 5);
   ctx.textAlign = 'left';
 
-  const lockY = wfY + wfH + 14;
+  const lockY = wfY + wfH + 20;
   ctx.fillStyle = '#0a160d';
-  ctx.fillRect(padX, lockY, wfW, 5);
+  ctx.fillRect(padX, lockY, wfW, 6);
   ctx.strokeStyle = '#35553a';
-  ctx.strokeRect(padX, lockY, wfW, 5);
+  ctx.strokeRect(padX, lockY, wfW, 6);
   ctx.fillStyle = '#ffe08a';
-  ctx.fillRect(padX, lockY, wfW * Math.min(1, game.lockMs / PHOENIX_LOCK_MS), 5);
+  ctx.fillRect(padX, lockY, wfW * Math.min(1, game.lockMs / PHOENIX_LOCK_MS), 6);
 
-  ctx.font = '9px "IBM Plex Mono", "Courier New", monospace';
+  const logY = lockY + 14;
+  const logBoxH = height - padY - logY;
+  ctx.strokeStyle = 'rgba(77, 106, 64, 0.45)';
+  ctx.strokeRect(padX, logY, wfW, logBoxH);
+
+  ctx.font = '12px "IBM Plex Mono", "Courier New", monospace';
   ctx.fillStyle = '#c8f5d0';
   const aligned = alignedContact(game);
   let status = t('lidc.storyline.terminal.phoenix.scanIdle');
@@ -462,31 +469,33 @@ export function drawPhoenixDecryptor(ctx, canvas, timeMs) {
       : 'lidc.storyline.terminal.phoenix.decoyContact');
   }
 
-  let cursorY = lockY + 9;
-  wrapCanvasText(ctx, status, maxTextWidth).forEach((line) => {
-    ctx.fillText(line, padX, cursorY);
-    cursorY += 11;
+  let cursorY = logY + 8;
+  wrapCanvasText(ctx, status, maxTextWidth - 12).forEach((line) => {
+    ctx.fillText(line, padX + 6, cursorY);
+    cursorY += 15;
   });
 
   if (game.phase === 'cipher' && game.cipher) {
     ctx.fillStyle = '#ffe08a';
-    wrapCanvasText(ctx, t('lidc.storyline.terminal.phoenix.cipherHint'), maxTextWidth).forEach((line) => {
-      ctx.fillText(line, padX, cursorY);
-      cursorY += 11;
+    wrapCanvasText(ctx, t('lidc.storyline.terminal.phoenix.cipherHint'), maxTextWidth - 12).forEach((line) => {
+      ctx.fillText(line, padX + 6, cursorY);
+      cursorY += 15;
     });
     game.cipher.digits.split('').forEach((digit, index) => {
-      const x = padX + index * 22;
+      const x = padX + 6 + index * 30;
       ctx.strokeStyle = index < game.cipher.typed.length ? '#ffe08a' : '#4d6a40';
-      ctx.strokeRect(x, cursorY, 18, 22);
+      ctx.strokeRect(x, cursorY, 24, 28);
       ctx.fillStyle = index < game.cipher.typed.length ? '#ffe08a' : '#8cff9d';
-      ctx.font = '13px "IBM Plex Mono", "Courier New", monospace';
-      ctx.fillText(digit, x + 4, cursorY + 4);
+      ctx.font = '18px "IBM Plex Mono", "Courier New", monospace';
+      ctx.fillText(digit, x + 5, cursorY + 5);
     });
-    ctx.font = '9px "IBM Plex Mono", "Courier New", monospace';
+    ctx.font = '12px "IBM Plex Mono", "Courier New", monospace';
     const left = Math.max(0, 1 - (timeMs - game.cipher.startedAt) / PHOENIX_CIPHER_MS);
+    ctx.fillStyle = '#1a2b1e';
+    ctx.fillRect(padX + 6, cursorY + 34, wfW - 12, 4);
     ctx.fillStyle = '#ff7b72';
-    ctx.fillRect(padX, cursorY + 26, wfW * left, 3);
-    cursorY += 34;
+    ctx.fillRect(padX + 6, cursorY + 34, (wfW - 12) * left, 4);
+    cursorY += 44;
   }
 
   if (game.phase === 'win' || game.phase === 'fail') {
@@ -496,18 +505,13 @@ export function drawPhoenixDecryptor(ctx, canvas, timeMs) {
     const bodyLines = Array.isArray(body) ? body : [body];
     ctx.fillStyle = '#ffe08a';
     bodyLines.forEach((line) => {
-      wrapCanvasText(ctx, line, maxTextWidth).forEach((wrapped) => {
-        ctx.fillText(wrapped, padX, cursorY);
-        cursorY += 11;
+      wrapCanvasText(ctx, line, maxTextWidth - 12).forEach((wrapped) => {
+        ctx.fillText(wrapped, padX + 6, cursorY);
+        cursorY += 15;
       });
     });
     ctx.fillStyle = 'rgba(168, 255, 191, 0.82)';
-    ctx.fillText(`${t('lidc.storyline.terminal.phoenix.retry')} [R]   ${t('lidc.storyline.terminal.phoenix.back')} [ESC]`, padX, cursorY + 2);
-  } else {
-    ctx.fillStyle = 'rgba(127, 186, 140, 0.75)';
-    wrapCanvasText(ctx, t('lidc.storyline.terminal.phoenix.controls'), maxTextWidth).forEach((line, index) => {
-      ctx.fillText(line, padX, height - 22 + index * 10);
-    });
+    ctx.fillText(`${t('lidc.storyline.terminal.phoenix.retry')} [R]   ${t('lidc.storyline.terminal.phoenix.back')} [ESC]`, padX + 6, cursorY + 4);
   }
 
   ctx.shadowBlur = 0;

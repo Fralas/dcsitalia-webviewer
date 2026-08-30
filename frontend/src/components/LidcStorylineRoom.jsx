@@ -55,6 +55,7 @@ import {
 import { syncWhiteboard3DDecorations } from '../utils/lidcStorylineWhiteboard3D';
 import {
   getTerminalScreenCameraView,
+  phoenixScreenUvToTunerRatio,
   pickTerminalScreenUv,
   renderTerminal3DScreens,
   syncTerminal3DDecorations,
@@ -1613,7 +1614,7 @@ export default function LidcStorylineRoom({ onClose }) {
           const ndcY = -((event.clientY - rect.top) / Math.max(1, rect.height)) * 2 + 1;
           const uv = pickTerminalScreenUv(zoneGroups, camera, ndcX, ndcY);
           if (uv) {
-            setPhoenixTunerRatio(uv.u);
+            setPhoenixTunerRatio(phoenixScreenUvToTunerRatio(uv.u));
             setPhoenixHolding(true);
           }
         }
@@ -1657,7 +1658,7 @@ export default function LidcStorylineRoom({ onClose }) {
           const ndcX = ((event.clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1;
           const ndcY = -((event.clientY - rect.top) / Math.max(1, rect.height)) * 2 + 1;
           const uv = pickTerminalScreenUv(zoneGroups, camera, ndcX, ndcY);
-          if (uv) setPhoenixTunerRatio(uv.u);
+          if (uv) setPhoenixTunerRatio(phoenixScreenUvToTunerRatio(uv.u));
         }
         return;
       }
