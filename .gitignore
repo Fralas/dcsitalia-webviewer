@@ -42,9 +42,14 @@ coverage/
 *.bak_*
 *.orig
 
-# Data files (JSON storage)
+# Data files (JSON storage — legacy; app state now lives in SQLite)
 data/historical/*.json
 backend/data/historical/*.json
+data/app.sqlite
+data/app.sqlite-*
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
 # No longer used (switched from SQLite to JSON)
 *.db
 *.sqlite

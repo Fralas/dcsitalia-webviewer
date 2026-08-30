@@ -30,6 +30,9 @@ import { generateToken } from './utils/jwt.js';
 import { authenticateToken, requireAdmin } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import logger from './utils/logger.js';
+import { getSqlitePath } from './db/client.js';
+import { DOC, loadJson, saveJson } from './db/jsonStore.js';
+import { SqliteSessionStore } from './db/sessionStore.js';
 import * as airbaseStatusParser from './services/airbaseStatusParser.js';
 import * as airbaseStatusManager from './services/airbaseStatusManager.js';
 import * as discordAuth from './services/discordAuth.js';
@@ -336,6 +339,7 @@ app.use(cookieParser());
 
 // Session configuration
 app.use(session({
+  store: new SqliteSessionStore(),
   secret: process.env.SESSION_SECRET || 'dcs-italia-secret-change-in-production',
   resave: false,
   saveUninitialized: false,
@@ -482,30 +486,19 @@ function normalizeHiddenLogisticsRouteAirportIds(rawValue) {
 }
 
 function persistHiddenLogisticsRouteAirportIds() {
-  const payload = {
+  saveJson(DOC.LOGISTICS_ROUTE_VISIBILITY, {
     hiddenAirportIds: Array.from(hiddenLogisticsRouteAirportIds).sort(),
     updatedAt: new Date().toISOString(),
-  };
-
-  const tempPath = `${LOGISTICS_ROUTE_VISIBILITY_FILE_PATH}.tmp`;
-  fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), 'utf8');
-  fs.renameSync(tempPath, LOGISTICS_ROUTE_VISIBILITY_FILE_PATH);
+  });
 }
 
 function loadHiddenLogisticsRouteAirportIds() {
-  if (!fs.existsSync(LOGISTICS_ROUTE_VISIBILITY_FILE_PATH)) {
-    hiddenLogisticsRouteAirportIds = new Set();
-    persistHiddenLogisticsRouteAirportIds();
-    return;
-  }
-
   try {
-    const raw = fs.readFileSync(LOGISTICS_ROUTE_VISIBILITY_FILE_PATH, 'utf8');
-    const parsed = JSON.parse(raw);
+    const parsed = loadJson(DOC.LOGISTICS_ROUTE_VISIBILITY, { hiddenAirportIds: [] }, LOGISTICS_ROUTE_VISIBILITY_FILE_PATH);
     hiddenLogisticsRouteAirportIds = new Set(normalizeHiddenLogisticsRouteAirportIds(parsed?.hiddenAirportIds));
     persistHiddenLogisticsRouteAirportIds();
   } catch (error) {
-    console.error('Error loading logistics route visibility file:', error.message);
+    console.error('Error loading logistics route visibility:', error.message);
     hiddenLogisticsRouteAirportIds = new Set();
     persistHiddenLogisticsRouteAirportIds();
   }
@@ -5671,6 +5664,7 @@ httpServer.listen(PORT, () => {
   if (isAuthBypassEnabled()) {
     logger.warn('AUTH BYPASS LOCAL enabled — Discord login not required in development');
   }
+  logger.info(`SQLite store: ${getSqlitePath()}`);
 });
 
 // ==================== ADMIN ENDPOINTS ====================

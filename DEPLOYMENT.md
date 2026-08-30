@@ -156,11 +156,11 @@ Serve the built `dist/` folder with a web server (Nginx, Apache, etc.)
 
 ### 8. Database Backups
 
-The application uses JSON files for data storage. Set up regular backups:
+The application stores mutable state in `data/app.sqlite` (WAL mode). Set up regular backups of that file (and `-wal`/`-shm` if the process is running). DCS export JSON files are a separate input/output path.
 
 ```bash
 # Add to crontab for daily backups
-0 2 * * * tar -czf /backups/dcs-data-$(date +\%Y\%m\%d).tar.gz /path/to/dcsitalia-webviewer/data
+0 2 * * * tar -czf /backups/dcs-data-$(date +\%Y\%m\%d).tar.gz /path/to/dcsitalia-webviewer/data/app.sqlite /path/to/dcsitalia-webviewer/data
 ```
 
 ### 9. Monitoring & Logging

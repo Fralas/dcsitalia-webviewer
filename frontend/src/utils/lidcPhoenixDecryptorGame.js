@@ -102,33 +102,57 @@ function createAudio() {
 }
 
 function remainingBursts(game) {
-  const bursts = getPhoenixFileBursts(game.targetIntercept);
+  const bursts = game.liveBursts?.length
+    ? game.liveBursts
+    : getPhoenixFileBursts(game.targetIntercept);
   if (bursts.length) {
     return bursts.filter((burst) => !game.caught.includes(burst.id));
   }
   return PHOENIX_INTERCEPTS.filter((item) => !game.caught.includes(item.id));
 }
 
-function createContact(now, kind, intercept, existing) {
-  const taken = existing.map((contact) => contact.freq);
-  const designed = Number.isFinite(intercept?.freqMhz);
-  let freq = designed ? intercept.freqMhz : (PHOENIX_FREQ_MIN + 40 + Math.random() * 340);
-  if (!designed) {
-    let guard = 0;
-    while (taken.some((value) => Math.abs(value - freq) < 28) && guard < 8) {
-      freq = PHOENIX_FREQ_MIN + 40 + Math.random() * 340;
-      guard += 1;
-    }
+function randomBurstDigits(length = 5) {
+  let digits = '';
+  while (digits.length < length) {
+    digits += Math.floor(Math.random() * 10);
   }
+  return digits;
+}
+
+function randomBandFreq(taken = [], minGap = 24) {
+  const low = PHOENIX_FREQ_MIN + 10;
+  const high = PHOENIX_FREQ_MAX - 10;
+  let freq = low + Math.random() * (high - low);
+  let guard = 0;
+  while (taken.some((value) => Math.abs(value - freq) < minGap) && guard < 12) {
+    freq = low + Math.random() * (high - low);
+    guard += 1;
+  }
+  return clampPhoenixFreq(freq);
+}
+
+function createLiveBursts(file) {
+  return getPhoenixFileBursts(file).map((burst) => ({
+    ...burst,
+    digits: randomBurstDigits(),
+    freqMhz: null,
+  }));
+}
+
+function createContact(now, kind, intercept, existing) {
+  const freq = randomBandFreq(existing.map((contact) => contact.freq));
+  const wander = 4.8 + Math.random() * 3.4;
 
   return {
     key: `${kind}-${now}-${Math.random().toString(36).slice(2, 7)}`,
     kind,
     intercept,
-    freq: clampPhoenixFreq(freq),
-    drift: (Math.random() * 2 - 1) * (kind === 'voice' ? 2.2 : 7.5),
+    freq,
+    drift: (Math.random() * 2 - 1) * wander,
     born: now,
-    ttl: kind === 'voice' ? 24000 + Math.random() * 6000 : 5200 + Math.random() * 2400,
+    ttl: 6200 + Math.random() * 4200,
+    sigma: 5.1 + Math.random() * 1.6,
+    peak: 0.58 + Math.random() * 0.22,
   };
 }
 
@@ -149,6 +173,7 @@ function createSession() {
     selectedIndex: 0,
     decryptedIds: loadDecryptedIds(),
     targetIntercept: null,
+    liveBursts: [],
     targetCount: PHOENIX_FILE_CATCHES,
     menuRows: [],
     cipher: null,
@@ -175,6 +200,7 @@ function returnToPhoenixMenu() {
   session.drops = 0;
   session.logged = false;
   session.targetIntercept = null;
+  session.liveBursts = [];
   session.spawnAt = performance.now() + 400;
 }
 
@@ -183,8 +209,8 @@ function beginSelectedIntercept() {
   const item = PHOENIX_INTERCEPTS[session.selectedIndex];
   if (!item) return;
 
-  const bursts = getPhoenixFileBursts(item);
-  session.tuner = item.freqMhz;
+  const liveBursts = createLiveBursts(item);
+  session.tuner = (PHOENIX_FREQ_MIN + PHOENIX_FREQ_MAX) / 2;
   session.contacts = [];
   session.holding = false;
   session.lockMs = 0;
@@ -196,7 +222,8 @@ function beginSelectedIntercept() {
   session.spawnAt = performance.now() + 180;
   session.logged = false;
   session.targetIntercept = item;
-  session.targetCount = Math.max(PHOENIX_FILE_CATCHES, bursts.length);
+  session.liveBursts = liveBursts;
+  session.targetCount = Math.max(PHOENIX_FILE_CATCHES, liveBursts.length);
 }
 
 function failDrop(game) {
@@ -230,10 +257,10 @@ function drawSpectrumRow(game, width) {
     let voice = 0;
     game.contacts.forEach((contact) => {
       const delta = Math.abs(freq - contact.freq);
-      const sigma = contact.kind === 'voice' ? 4.2 : 6.4;
+      const sigma = contact.sigma || 5.6;
       const peak = Math.exp(-(delta * delta) / (2 * sigma * sigma));
-      energy += peak * (contact.kind === 'voice' ? 0.92 : 0.55);
-      if (contact.kind === 'voice') voice += peak;
+      energy += peak * (contact.peak || 0.68);
+      if (contact.kind === 'voice') voice += peak * 0.18;
     });
     if (game.cipher) {
       const delta = Math.abs(freq - game.cipher.freq);
@@ -272,16 +299,18 @@ function tickGame(now) {
       );
       const unspawned = remaining.filter((burst) => !liveVoiceIds.has(burst.id));
       const decoys = game.contacts.filter((contact) => contact.kind === 'decoy').length;
-      if (unspawned.length) {
-        const next = unspawned[0];
+      const voices = game.contacts.filter((contact) => contact.kind === 'voice').length;
+      const spawnVoice = unspawned.length && (decoys >= 2 || voices === 0 || Math.random() < 0.45);
+      if (spawnVoice) {
+        const next = unspawned[Math.floor(Math.random() * unspawned.length)];
         game.contacts.push(createContact(now, 'voice', next, game.contacts));
         audio?.noise(0.08);
-        game.spawnAt = now + 280 + Math.random() * 220;
-      } else if (decoys < 3) {
+        game.spawnAt = now + 420 + Math.random() * 380;
+      } else if (decoys < 6) {
         game.contacts.push(createContact(now, 'decoy', null, game.contacts));
-        game.spawnAt = now + 1400 + Math.random() * 1200;
+        game.spawnAt = now + 380 + Math.random() * 520;
       } else {
-        game.spawnAt = now + 1600 + Math.random() * 1400;
+        game.spawnAt = now + 900 + Math.random() * 800;
       }
     }
 
@@ -290,7 +319,6 @@ function tickGame(now) {
       if (contact.freq <= PHOENIX_FREQ_MIN + 4 || contact.freq >= PHOENIX_FREQ_MAX - 4) {
         contact.drift *= -1;
       }
-      if (contact.kind === 'voice') return true;
       return now - contact.born < contact.ttl;
     });
 

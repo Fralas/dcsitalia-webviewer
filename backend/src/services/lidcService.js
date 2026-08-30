@@ -1,5 +1,4 @@
 ﻿import crypto from 'crypto';
-import fs from 'fs';
 import path from 'path';
 import {
   computeWarehouseDeltaDiff,
@@ -15,6 +14,7 @@ import {
   writeJsonAtomic,
 } from './lidcDcsBridge.js';
 import { getLidcAirportById, LIDC_AFGHANISTAN_AIRPORTS } from '../config/lidcAfghanistanAirports.js';
+import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data/lidc');
 // Filename kept from the pre-specialization schema so existing deployments keep their catalog.
@@ -265,49 +265,18 @@ const DEFAULT_CATALOG_SEED = Object.freeze({
 });
 
 function ensureStorage() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-
-  if (!fs.existsSync(CATALOG_FILE)) {
-    writeJsonAtomic(CATALOG_FILE, {
-      specializations: DEFAULT_CATALOG_SEED.specializations,
-      units: DEFAULT_CATALOG_SEED.units,
-      updatedAt: Date.now(),
-    });
-  }
-
-  if (!fs.existsSync(SQUADRONS_FILE)) {
-    writeJsonAtomic(SQUADRONS_FILE, []);
-  }
-
-  if (!fs.existsSync(DISCORD_USERS_FILE)) {
-    writeJsonAtomic(DISCORD_USERS_FILE, []);
-  }
-
-  if (!fs.existsSync(UCID_LINKS_FILE)) {
-    writeJsonAtomic(UCID_LINKS_FILE, {});
-  }
-
-  if (!fs.existsSync(LINK_CODES_FILE)) {
-    writeJsonAtomic(LINK_CODES_FILE, {});
-  }
-
-  if (!fs.existsSync(BASE_LOGISTICS_FILE)) {
-    writeJsonAtomic(BASE_LOGISTICS_FILE, { bases: {}, updatedAt: Date.now() });
-  }
+  loadJson(DOC.LIDC_CATALOG, {
+    specializations: DEFAULT_CATALOG_SEED.specializations,
+    units: DEFAULT_CATALOG_SEED.units,
+    updatedAt: Date.now(),
+  }, CATALOG_FILE);
+  loadJson(DOC.LIDC_SQUADRONS, [], SQUADRONS_FILE);
+  loadJson(DOC.LIDC_DISCORD_USERS, [], DISCORD_USERS_FILE);
+  loadJson(DOC.LIDC_UCID_LINKS, {}, UCID_LINKS_FILE);
+  loadJson(DOC.LIDC_LINK_CODES, {}, LINK_CODES_FILE);
+  loadJson(DOC.LIDC_BASE_LOGISTICS, { bases: {}, updatedAt: Date.now() }, BASE_LOGISTICS_FILE);
 
   ensureSquadronInviteCodes();
-}
-
-function readJson(filePath, fallback) {
-  try {
-    const raw = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(raw);
-  } catch (error) {
-    console.error(`LIDC read error (${filePath}):`, error.message);
-    return fallback;
-  }
 }
 
 function sanitizeText(value, maxLen = 500) {
@@ -429,11 +398,11 @@ function migrateLegacyTemplatesToSpecializations(rawTemplates) {
 }
 
 function readCatalogState() {
-  const raw = readJson(CATALOG_FILE, {
+  const raw = loadJson(DOC.LIDC_CATALOG, {
     specializations: DEFAULT_CATALOG_SEED.specializations,
     units: DEFAULT_CATALOG_SEED.units,
     updatedAt: Date.now(),
-  });
+  }, CATALOG_FILE);
 
   const units = Array.isArray(raw?.units)
     ? raw.units.map((entry, index) => normalizeUnit(entry, index)).filter(Boolean)
@@ -461,7 +430,7 @@ function readCatalogState() {
     updatedAt: Date.now(),
   };
 
-  writeJsonAtomic(CATALOG_FILE, migrated);
+  saveJson(DOC.LIDC_CATALOG, migrated);
   return migrated;
 }
 
@@ -507,26 +476,26 @@ function writeCatalogState(state) {
     updatedAt: Date.now(),
   };
 
-  writeJsonAtomic(CATALOG_FILE, payload);
+  saveJson(DOC.LIDC_CATALOG, payload);
   return payload;
 }
 
 function readSquadrons() {
-  const raw = readJson(SQUADRONS_FILE, []);
+  const raw = loadJson(DOC.LIDC_SQUADRONS, [], SQUADRONS_FILE);
   return Array.isArray(raw) ? raw : [];
 }
 
 function writeSquadrons(squadrons) {
-  writeJsonAtomic(SQUADRONS_FILE, Array.isArray(squadrons) ? squadrons : []);
+  saveJson(DOC.LIDC_SQUADRONS, Array.isArray(squadrons) ? squadrons : []);
 }
 
 function readDiscordUsers() {
-  const raw = readJson(DISCORD_USERS_FILE, []);
+  const raw = loadJson(DOC.LIDC_DISCORD_USERS, [], DISCORD_USERS_FILE);
   return Array.isArray(raw) ? raw : [];
 }
 
 function writeDiscordUsers(users) {
-  writeJsonAtomic(DISCORD_USERS_FILE, Array.isArray(users) ? users : []);
+  saveJson(DOC.LIDC_DISCORD_USERS, Array.isArray(users) ? users : []);
 }
 
 function buildAvatarUrl(userId, avatar) {
@@ -1334,7 +1303,7 @@ function createDefaultBaseLogistics(baseId) {
 }
 
 function readBaseLogisticsStore() {
-  const raw = readJson(BASE_LOGISTICS_FILE, { bases: {}, updatedAt: Date.now() });
+  const raw = loadJson(DOC.LIDC_BASE_LOGISTICS, { bases: {}, updatedAt: Date.now() }, BASE_LOGISTICS_FILE);
   return {
     bases: raw?.bases && typeof raw.bases === 'object' ? raw.bases : {},
     updatedAt: Number.isFinite(raw?.updatedAt) ? raw.updatedAt : Date.now(),
@@ -1342,7 +1311,7 @@ function readBaseLogisticsStore() {
 }
 
 function writeBaseLogisticsStore(store) {
-  writeJsonAtomic(BASE_LOGISTICS_FILE, {
+  saveJson(DOC.LIDC_BASE_LOGISTICS, {
     bases: store?.bases || {},
     updatedAt: Date.now(),
   });
@@ -2365,21 +2334,21 @@ export function getUserLidcState(userIdRaw) {
 }
 
 function readUcidLinks() {
-  const raw = readJson(UCID_LINKS_FILE, {});
+  const raw = loadJson(DOC.LIDC_UCID_LINKS, {}, UCID_LINKS_FILE);
   return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
 }
 
 function writeUcidLinks(links) {
-  writeJsonAtomic(UCID_LINKS_FILE, links);
+  saveJson(DOC.LIDC_UCID_LINKS, links);
 }
 
 function readLinkCodes() {
-  const raw = readJson(LINK_CODES_FILE, {});
+  const raw = loadJson(DOC.LIDC_LINK_CODES, {}, LINK_CODES_FILE);
   return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
 }
 
 function writeLinkCodes(codes) {
-  writeJsonAtomic(LINK_CODES_FILE, codes);
+  saveJson(DOC.LIDC_LINK_CODES, codes);
 }
 
 function pruneExpiredLinkCodes(codes = readLinkCodes()) {

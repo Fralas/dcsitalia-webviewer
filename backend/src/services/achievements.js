@@ -1,43 +1,11 @@
-import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
 
-const DATA_DIR = path.resolve(process.cwd(), 'data/achievements');
-const CATALOG_FILE = path.join(DATA_DIR, 'catalog.json');
-const AWARDS_FILE = path.join(DATA_DIR, 'awards.json');
-const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const CATALOG_FILE = path.resolve(process.cwd(), 'data/achievements/catalog.json');
+const AWARDS_FILE = path.resolve(process.cwd(), 'data/achievements/awards.json');
+const USERS_FILE = path.resolve(process.cwd(), 'data/achievements/users.json');
 const MAX_IMAGE_URL_LENGTH = 12_000_000;
-
-function ensureStorage() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(CATALOG_FILE)) {
-    fs.writeFileSync(CATALOG_FILE, JSON.stringify([], null, 2), 'utf8');
-  }
-  if (!fs.existsSync(AWARDS_FILE)) {
-    fs.writeFileSync(AWARDS_FILE, JSON.stringify({}, null, 2), 'utf8');
-  }
-  if (!fs.existsSync(USERS_FILE)) {
-    fs.writeFileSync(USERS_FILE, JSON.stringify({}, null, 2), 'utf8');
-  }
-}
-
-function readJson(filePath, fallback) {
-  try {
-    const raw = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(raw);
-  } catch (error) {
-    console.error(`Error reading ${filePath}:`, error.message);
-    return fallback;
-  }
-}
-
-function writeJsonAtomic(filePath, payload) {
-  const tempPath = `${filePath}.tmp`;
-  fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), 'utf8');
-  fs.renameSync(tempPath, filePath);
-}
 
 function sanitizeText(value, maxLen = 300) {
   if (typeof value !== 'string') return '';
@@ -88,17 +56,17 @@ function normalizeAwardEntry(entry, index = 0) {
 }
 
 function readCatalog() {
-  const list = readJson(CATALOG_FILE, []);
+  const list = loadJson(DOC.ACHIEVEMENTS_CATALOG, [], CATALOG_FILE);
   if (!Array.isArray(list)) return [];
   return list.map((entry, index) => normalizeCatalogEntry(entry, index)).filter((entry) => entry.id && entry.name);
 }
 
 function writeCatalog(catalog) {
-  writeJsonAtomic(CATALOG_FILE, (Array.isArray(catalog) ? catalog : []).map((entry, index) => normalizeCatalogEntry(entry, index)));
+  saveJson(DOC.ACHIEVEMENTS_CATALOG, (Array.isArray(catalog) ? catalog : []).map((entry, index) => normalizeCatalogEntry(entry, index)));
 }
 
 function readAwardsMap() {
-  const map = readJson(AWARDS_FILE, {});
+  const map = loadJson(DOC.ACHIEVEMENTS_AWARDS, {}, AWARDS_FILE);
   if (!map || typeof map !== 'object' || Array.isArray(map)) {
     return {};
   }
@@ -115,11 +83,11 @@ function readAwardsMap() {
 }
 
 function writeAwardsMap(awardsMap) {
-  writeJsonAtomic(AWARDS_FILE, awardsMap);
+  saveJson(DOC.ACHIEVEMENTS_AWARDS, awardsMap);
 }
 
 function readUsersMap() {
-  const map = readJson(USERS_FILE, {});
+  const map = loadJson(DOC.ACHIEVEMENTS_USERS, {}, USERS_FILE);
   if (!map || typeof map !== 'object' || Array.isArray(map)) {
     return {};
   }
@@ -134,14 +102,12 @@ function readUsersMap() {
 }
 
 function writeUsersMap(usersMap) {
-  writeJsonAtomic(USERS_FILE, usersMap);
+  saveJson(DOC.ACHIEVEMENTS_USERS, usersMap);
 }
 
 function sanitizeUserId(userId) {
   return sanitizeText(String(userId || ''), 80);
 }
-
-ensureStorage();
 
 export function getCatalog() {
   return readCatalog().sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));

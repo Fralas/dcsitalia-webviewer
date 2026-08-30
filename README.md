@@ -28,7 +28,7 @@ A real-time, web-based logistics dashboard for DCS World servers. Monitor wareho
 - **Backend:** Node.js + Express + Socket.io with JSON file storage
 - **Frontend:** React (Vite) + Tailwind CSS
 - **Real-time:** WebSocket events for instant updates across connected clients
-- **Storage:** JSON files for historical snapshots and missions (no database)
+- **Storage:** SQLite (`data/app.sqlite`) for mutable app state and Discord sessions. JSON files from DCS remain read/write bridges only. Existing `data/**/*.json` files are imported once on first start.
 
 ## Repository Layout
 ```
@@ -50,7 +50,7 @@ dcsitalia-webviewer/
 ```
 
 ## Requirements
-- Node.js 18+
+- Node.js 22.13+ (uses the built-in SQLite driver)
 - npm 9+
 - CSV exports from your DCS server (see [Data & CSV Files](#data--csv-files))
 

@@ -1,8 +1,7 @@
-import fs from 'fs';
 import path from 'path';
+import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
 
-const DATA_DIR = './data/profiles';
-const PROFILES_FILE = path.join(DATA_DIR, 'profiles.json');
+const PROFILES_FILE = path.join('./data/profiles', 'profiles.json');
 
 const DEFAULT_PROFILE = {
   selectedAircraft: [],
@@ -12,30 +11,13 @@ const DEFAULT_PROFILE = {
   },
 };
 
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-if (!fs.existsSync(PROFILES_FILE)) {
-  fs.writeFileSync(PROFILES_FILE, JSON.stringify({}, null, 2));
-}
-
 function readProfiles() {
-  try {
-    const data = fs.readFileSync(PROFILES_FILE, 'utf-8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Error reading profiles:', error.message);
-    return {};
-  }
+  const data = loadJson(DOC.USER_PROFILES, {}, PROFILES_FILE);
+  return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
 }
 
 function writeProfiles(profiles) {
-  try {
-    fs.writeFileSync(PROFILES_FILE, JSON.stringify(profiles, null, 2));
-  } catch (error) {
-    console.error('Error writing profiles:', error.message);
-  }
+  saveJson(DOC.USER_PROFILES, profiles);
 }
 
 function normalizeProfile(data) {

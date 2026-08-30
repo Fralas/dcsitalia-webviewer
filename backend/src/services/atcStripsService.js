@@ -1,5 +1,4 @@
 import crypto from 'crypto';
-import fs from 'fs';
 import path from 'path';
 import {
   ATC_BAYS,
@@ -29,37 +28,19 @@ import {
   canEditStrip,
   isHandoffSender,
 } from './atcStripModel.js';
+import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
 
-const DATA_DIR = path.resolve(process.cwd(), 'data/atc');
-const BOARD_FILE = path.join(DATA_DIR, 'board.json');
-const HISTORY_FILE = path.join(DATA_DIR, 'history.json');
+const BOARD_FILE = path.resolve(process.cwd(), 'data/atc/board.json');
+const HISTORY_FILE = path.resolve(process.cwd(), 'data/atc/history.json');
 const MAX_HISTORY = 5000;
 
 let boardState = { airports: {}, settings: { manualSort: false } };
 let historyState = { entries: [] };
 let initialized = false;
 
-function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-}
-
-function readJson(filePath, fallback) {
-  try {
-    if (!fs.existsSync(filePath)) return fallback;
-    const raw = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(raw);
-  } catch {
-    return fallback;
-  }
-}
-
-function writeJsonAtomic(filePath, data) {
-  ensureDataDir();
-  const tmp = `${filePath}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
-  fs.renameSync(tmp, filePath);
+function persist() {
+  saveJson(DOC.ATC_BOARD, boardState);
+  saveJson(DOC.ATC_HISTORY, historyState);
 }
 
 function normalizeStrip(raw = {}) {
@@ -95,11 +76,6 @@ function normalizeStrip(raw = {}) {
     createdBy: raw.createdBy || null,
     ...fields,
   };
-}
-
-function persist() {
-  writeJsonAtomic(BOARD_FILE, boardState);
-  writeJsonAtomic(HISTORY_FILE, historyState);
 }
 
 function appendHistory(entry) {
@@ -224,9 +200,9 @@ function nextStripPosition(board, bayId) {
 
 export function initAtcStripsService() {
   if (initialized) return;
-  ensureDataDir();
-  boardState = readJson(BOARD_FILE, { airports: {}, settings: { manualSort: false } });
-  historyState = readJson(HISTORY_FILE, { entries: [] });
+  boardState = loadJson(DOC.ATC_BOARD, { airports: {}, settings: { manualSort: false } }, BOARD_FILE);
+  historyState = loadJson(DOC.ATC_HISTORY, { entries: [] }, HISTORY_FILE);
+  if (!historyState?.entries) historyState = { entries: [] };
 
   if (!boardState.airports.aleppo?.strips?.length) {
     seedDemoBoard('aleppo');

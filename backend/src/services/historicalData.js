@@ -1,13 +1,12 @@
-import fs from 'fs';
 import path from 'path';
 import { isImportantWeapon, getPriority } from '../config/rules.config.js';
 import { getAirportById } from '../config/airports.config.js';
 import { calculateTotalWeight } from '../config/weaponWeights.config.js';
 import { calculateDistance } from '../utils/distanceCalculator.js';
+import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
 
-const DATA_DIR = './data/historical';
-const SNAPSHOTS_FILE = path.join(DATA_DIR, 'snapshots.json');
-const MISSIONS_FILE = path.join(DATA_DIR, 'missions.json');
+const SNAPSHOTS_FILE = path.join('./data/historical', 'snapshots.json');
+const MISSIONS_FILE = path.join('./data/historical', 'missions.json');
 
 const SNAPSHOT_WRITE_DELAY_MS = 1000;
 const MISSIONS_WRITE_DELAY_MS = 1000;
@@ -24,45 +23,16 @@ const MAX_CARRIER_SOURCE_DISTANCE_KM = 50;
 const KM_PER_NM = 1.852;
 const MAX_CARRIER_SOURCE_DISTANCE_NM = MAX_CARRIER_SOURCE_DISTANCE_KM / KM_PER_NM;
 
-function ensureStorage() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-
-  if (!fs.existsSync(SNAPSHOTS_FILE)) {
-    fs.writeFileSync(SNAPSHOTS_FILE, JSON.stringify([], null, 2));
-  }
-  if (!fs.existsSync(MISSIONS_FILE)) {
-    fs.writeFileSync(MISSIONS_FILE, JSON.stringify([], null, 2));
-  }
-}
-
-function readJsonFile(filePath, fallback) {
-  try {
-    const data = fs.readFileSync(filePath, 'utf-8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error(`Error reading ${filePath}:`, error.message);
-    return fallback;
-  }
-}
-
-async function writeJsonAtomic(filePath, payload) {
-  const tempPath = `${filePath}.tmp`;
-  await fs.promises.writeFile(tempPath, JSON.stringify(payload, null, 2), 'utf-8');
-  await fs.promises.rename(tempPath, filePath);
-}
-
 function scheduleSnapshotsWrite() {
   snapshotsDirty = true;
   if (snapshotsWriteTimer) return;
 
-  snapshotsWriteTimer = setTimeout(async () => {
+  snapshotsWriteTimer = setTimeout(() => {
     snapshotsWriteTimer = null;
     if (!snapshotsDirty) return;
     snapshotsDirty = false;
     try {
-      await writeJsonAtomic(SNAPSHOTS_FILE, snapshotsCache);
+      saveJson(DOC.HISTORICAL_SNAPSHOTS, snapshotsCache);
     } catch (error) {
       console.error('Error writing snapshots:', error.message);
     }
@@ -73,12 +43,12 @@ function scheduleMissionsWrite() {
   missionsDirty = true;
   if (missionsWriteTimer) return;
 
-  missionsWriteTimer = setTimeout(async () => {
+  missionsWriteTimer = setTimeout(() => {
     missionsWriteTimer = null;
     if (!missionsDirty) return;
     missionsDirty = false;
     try {
-      await writeJsonAtomic(MISSIONS_FILE, missionsCache);
+      saveJson(DOC.HISTORICAL_MISSIONS, missionsCache);
     } catch (error) {
       console.error('Error writing missions:', error.message);
     }
@@ -143,14 +113,12 @@ function rebuildMissionIndex() {
   });
 }
 
-ensureStorage();
-
-snapshotsCache = readJsonFile(SNAPSHOTS_FILE, []);
+snapshotsCache = loadJson(DOC.HISTORICAL_SNAPSHOTS, [], SNAPSHOTS_FILE);
 if (!Array.isArray(snapshotsCache)) {
   snapshotsCache = [];
 }
 
-missionsCache = readJsonFile(MISSIONS_FILE, []);
+missionsCache = loadJson(DOC.HISTORICAL_MISSIONS, [], MISSIONS_FILE);
 if (!Array.isArray(missionsCache)) {
   missionsCache = [];
 }

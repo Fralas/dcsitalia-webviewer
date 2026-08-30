@@ -1,34 +1,8 @@
-import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
 
-const DATA_DIR = path.resolve(process.cwd(), 'data/noe');
-const EVENTS_FILE = path.join(DATA_DIR, 'events.json');
-
-function ensureStorage() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(EVENTS_FILE)) {
-    fs.writeFileSync(EVENTS_FILE, JSON.stringify([], null, 2), 'utf8');
-  }
-}
-
-function readJson(filePath, fallback) {
-  try {
-    const raw = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(raw);
-  } catch (error) {
-    console.error(`Error reading ${filePath}:`, error.message);
-    return fallback;
-  }
-}
-
-function writeJsonAtomic(filePath, payload) {
-  const tempPath = `${filePath}.tmp`;
-  fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), 'utf8');
-  fs.renameSync(tempPath, filePath);
-}
+const EVENTS_FILE = path.resolve(process.cwd(), 'data/noe/events.json');
 
 function sanitizeText(value, maxLen = 200) {
   if (typeof value !== 'string') return '';
@@ -55,15 +29,13 @@ function normalizeEvent(event) {
 }
 
 function readEvents() {
-  const events = readJson(EVENTS_FILE, []);
+  const events = loadJson(DOC.NOE_EVENTS, [], EVENTS_FILE);
   return Array.isArray(events) ? events.map(normalizeEvent) : [];
 }
 
 function writeEvents(events) {
-  writeJsonAtomic(EVENTS_FILE, events.map(normalizeEvent));
+  saveJson(DOC.NOE_EVENTS, events.map(normalizeEvent));
 }
-
-ensureStorage();
 
 export function getEvents() {
   return readEvents().sort((a, b) => String(a.missionDate).localeCompare(String(b.missionDate)));

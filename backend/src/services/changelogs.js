@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data/changelogs');
 const POSTS_FILE = path.join(DATA_DIR, 'posts.json');
@@ -15,28 +16,24 @@ function ensureStorage() {
   if (!fs.existsSync(MEDIA_DIR)) {
     fs.mkdirSync(MEDIA_DIR, { recursive: true });
   }
-  if (!fs.existsSync(POSTS_FILE)) {
-    fs.writeFileSync(POSTS_FILE, JSON.stringify([], null, 2), 'utf8');
-  }
-  if (!fs.existsSync(DRAFTS_FILE)) {
-    fs.writeFileSync(DRAFTS_FILE, JSON.stringify({}, null, 2), 'utf8');
-  }
 }
 
-function readJson(filePath, fallback) {
-  try {
-    const raw = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(raw);
-  } catch (error) {
-    console.error(`Error reading ${filePath}:`, error.message);
-    return fallback;
-  }
+function readPosts() {
+  const posts = loadJson(DOC.CHANGELOG_POSTS, [], POSTS_FILE);
+  return Array.isArray(posts) ? posts.map(normalizePost) : [];
 }
 
-function writeJsonAtomic(filePath, payload) {
-  const tempPath = `${filePath}.tmp`;
-  fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), 'utf8');
-  fs.renameSync(tempPath, filePath);
+function writePosts(posts) {
+  saveJson(DOC.CHANGELOG_POSTS, posts.map(normalizePost));
+}
+
+function readDrafts() {
+  const drafts = loadJson(DOC.CHANGELOG_DRAFTS, {}, DRAFTS_FILE);
+  return drafts && typeof drafts === 'object' ? drafts : {};
+}
+
+function writeDrafts(drafts) {
+  saveJson(DOC.CHANGELOG_DRAFTS, drafts);
 }
 
 function sanitizeText(value, maxLen = 5000) {
@@ -130,24 +127,6 @@ function normalizePost(post) {
     createdAt,
     updatedAt: Number.isFinite(post?.updatedAt) ? post.updatedAt : createdAt,
   };
-}
-
-function readPosts() {
-  const posts = readJson(POSTS_FILE, []);
-  return Array.isArray(posts) ? posts.map(normalizePost) : [];
-}
-
-function writePosts(posts) {
-  writeJsonAtomic(POSTS_FILE, posts.map(normalizePost));
-}
-
-function readDrafts() {
-  const drafts = readJson(DRAFTS_FILE, {});
-  return drafts && typeof drafts === 'object' ? drafts : {};
-}
-
-function writeDrafts(drafts) {
-  writeJsonAtomic(DRAFTS_FILE, drafts);
 }
 
 ensureStorage();

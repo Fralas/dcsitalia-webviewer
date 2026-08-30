@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "DCS World Warehouse Management System",
   "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "node --watch-path=backend/src --watch backend/src/server.js",

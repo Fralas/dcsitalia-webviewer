@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
 import { getAirportById, default as airports } from '../config/airports.config.js';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data/lidc');
@@ -163,25 +164,15 @@ function hasBlockingInUseAirframes(squadron, dcsType, unitsById) {
 }
 
 function readWarehouseOpsState() {
-  try {
-    if (!fs.existsSync(WAREHOUSE_OPS_FILE)) {
-      return { ops: [], updatedAt: Date.now() };
-    }
-    const raw = fs.readFileSync(WAREHOUSE_OPS_FILE, 'utf8');
-    const parsed = JSON.parse(raw);
-    return {
-      ops: Array.isArray(parsed?.ops) ? parsed.ops : [],
-      updatedAt: Number(parsed?.updatedAt) || Date.now(),
-    };
-  } catch (error) {
-    console.error('LIDC warehouse ops read error:', error.message);
-    return { ops: [], updatedAt: Date.now() };
-  }
+  const parsed = loadJson(DOC.LIDC_WAREHOUSE_OPS, { ops: [], updatedAt: Date.now() }, WAREHOUSE_OPS_FILE);
+  return {
+    ops: Array.isArray(parsed?.ops) ? parsed.ops : [],
+    updatedAt: Number(parsed?.updatedAt) || Date.now(),
+  };
 }
 
 function writeWarehouseOpsState(state) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  writeJsonAtomic(WAREHOUSE_OPS_FILE, {
+  saveJson(DOC.LIDC_WAREHOUSE_OPS, {
     ops: state.ops,
     updatedAt: Date.now(),
   });

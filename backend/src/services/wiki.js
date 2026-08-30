@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data/wiki');
 const PAGES_FILE = path.join(DATA_DIR, 'pages.json');
@@ -17,7 +18,13 @@ const DEFAULT_PAGES_BY_ID = DEFAULT_PAGES.reduce((acc, page) => {
 function ensureStorage() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   if (!fs.existsSync(MEDIA_DIR)) fs.mkdirSync(MEDIA_DIR, { recursive: true });
-  if (!fs.existsSync(PAGES_FILE)) {
+}
+
+function readPages() {
+  const pagesRaw = loadJson(DOC.WIKI_PAGES, [], PAGES_FILE);
+  const pages = Array.isArray(pagesRaw) ? pagesRaw.map(normalizePage).filter((page) => page.id) : [];
+
+  if (pages.length === 0) {
     const now = Date.now();
     const seeded = DEFAULT_PAGES.map((page) => ({
       ...page,
@@ -25,27 +32,24 @@ function ensureStorage() {
       updatedAt: now,
       updatedBy: { id: 'system', name: 'System' },
     }));
-    fs.writeFileSync(PAGES_FILE, JSON.stringify(seeded, null, 2), 'utf8');
+    saveJson(DOC.WIKI_PAGES, seeded);
+    return seeded;
   }
-  if (!fs.existsSync(DRAFTS_FILE)) {
-    fs.writeFileSync(DRAFTS_FILE, JSON.stringify({}, null, 2), 'utf8');
-  }
+
+  return pages;
 }
 
-function readJson(filePath, fallback) {
-  try {
-    const raw = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(raw);
-  } catch (error) {
-    console.error(`Error reading ${filePath}:`, error.message);
-    return fallback;
-  }
+function writePages(pages) {
+  saveJson(DOC.WIKI_PAGES, pages.map(normalizePage).filter((page) => page.id));
 }
 
-function writeJsonAtomic(filePath, payload) {
-  const tempPath = `${filePath}.tmp`;
-  fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), 'utf8');
-  fs.renameSync(tempPath, filePath);
+function readDrafts() {
+  const drafts = loadJson(DOC.WIKI_DRAFTS, {}, DRAFTS_FILE);
+  return drafts && typeof drafts === 'object' ? drafts : {};
+}
+
+function writeDrafts(drafts) {
+  saveJson(DOC.WIKI_DRAFTS, drafts);
 }
 
 function sanitizeText(value, maxLen = 10000) {
@@ -224,38 +228,6 @@ function resolveNewPageId(pages, requestedId, title) {
   }
 
   throw new Error('Unable to generate unique page id');
-}
-
-function readPages() {
-  const pagesRaw = readJson(PAGES_FILE, []);
-  const pages = Array.isArray(pagesRaw) ? pagesRaw.map(normalizePage).filter((page) => page.id) : [];
-
-  if (pages.length === 0) {
-    const now = Date.now();
-    const seeded = DEFAULT_PAGES.map((page) => ({
-      ...page,
-      createdAt: now,
-      updatedAt: now,
-      updatedBy: { id: 'system', name: 'System' },
-    }));
-    writeJsonAtomic(PAGES_FILE, seeded);
-    return seeded;
-  }
-
-  return pages;
-}
-
-function writePages(pages) {
-  writeJsonAtomic(PAGES_FILE, pages.map(normalizePage).filter((page) => page.id));
-}
-
-function readDrafts() {
-  const drafts = readJson(DRAFTS_FILE, {});
-  return drafts && typeof drafts === 'object' ? drafts : {};
-}
-
-function writeDrafts(drafts) {
-  writeJsonAtomic(DRAFTS_FILE, drafts);
 }
 
 function draftKey(userId, pageId) {

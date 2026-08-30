@@ -1,8 +1,7 @@
-import fs from 'fs';
 import path from 'path';
+import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
 
-const DATA_DIR = path.resolve(process.cwd(), 'data/historical');
-const CONVOYS_FILE = path.join(DATA_DIR, 'convoys.json');
+const CONVOYS_FILE = path.resolve(process.cwd(), 'data/historical/convoys.json');
 const WRITE_DELAY_MS = 400;
 const MAX_HISTORY_PER_CONVOY = 200;
 const MAX_PATH_POINTS = 500;
@@ -12,45 +11,18 @@ let convoysById = new Map();
 let writeTimer = null;
 let dirty = false;
 
-function ensureStorage() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-
-  if (!fs.existsSync(CONVOYS_FILE)) {
-    fs.writeFileSync(CONVOYS_FILE, JSON.stringify([], null, 2), 'utf-8');
-  }
-}
-
-function readJson(filePath, fallback) {
-  try {
-    const raw = fs.readFileSync(filePath, 'utf-8');
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : fallback;
-  } catch (error) {
-    console.error(`Error reading ${filePath}:`, error.message);
-    return fallback;
-  }
-}
-
-async function writeJsonAtomic(filePath, payload) {
-  const tempPath = `${filePath}.tmp`;
-  await fs.promises.writeFile(tempPath, JSON.stringify(payload, null, 2), 'utf-8');
-  await fs.promises.rename(tempPath, filePath);
-}
-
 function scheduleWrite() {
   dirty = true;
   if (writeTimer) return;
 
-  writeTimer = setTimeout(async () => {
+  writeTimer = setTimeout(() => {
     writeTimer = null;
     if (!dirty) return;
     dirty = false;
     try {
-      await writeJsonAtomic(CONVOYS_FILE, convoysCache);
+      saveJson(DOC.HISTORICAL_CONVOYS, convoysCache);
     } catch (error) {
-      console.error('Error writing convoys file:', error.message);
+      console.error('Error writing convoys:', error.message);
     }
   }, WRITE_DELAY_MS);
 }
@@ -104,8 +76,8 @@ function pushHistory(convoy, entry) {
   }
 }
 
-ensureStorage();
-convoysCache = readJson(CONVOYS_FILE, []);
+const loadedConvoys = loadJson(DOC.HISTORICAL_CONVOYS, [], CONVOYS_FILE);
+convoysCache = Array.isArray(loadedConvoys) ? loadedConvoys : [];
 rebuildIndex();
 
 export const CONVOY_EVENT_TYPES = new Set(['spawned', 'update', 'arrived', 'destroyed']);
