@@ -2,25 +2,29 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
+import { optionalPath } from '../config/envPaths.js';
 import { getAirportById, default as airports } from '../config/airports.config.js';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data/lidc');
 const WAREHOUSE_OPS_FILE = path.join(DATA_DIR, 'warehouse-ops.json');
 
-const DCORE_LIDC_DBRIDGE_DIR = process.env.DCORE_LIDC_DBRIDGE_DIR
-  ? path.resolve(process.env.DCORE_LIDC_DBRIDGE_DIR)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE-LIDC\\src\\DBRIDGE';
+const DCORE_LIDC_DBRIDGE_DIR = optionalPath('DCORE_LIDC_DBRIDGE_DIR');
+
+function dbridgeFile(name) {
+  return DCORE_LIDC_DBRIDGE_DIR ? path.join(DCORE_LIDC_DBRIDGE_DIR, name) : null;
+}
 
 export const LIDC_EXPORT_FILES = Object.freeze({
-  linkRequests: path.join(DCORE_LIDC_DBRIDGE_DIR, 'Export_LIDC_LinkRequests.json'),
-  airframeState: path.join(DCORE_LIDC_DBRIDGE_DIR, 'Export_LIDC_AirframeState.json'),
-  policy: path.join(DCORE_LIDC_DBRIDGE_DIR, 'Export_LIDC_Policy.json'),
-  warehouseOps: path.join(DCORE_LIDC_DBRIDGE_DIR, 'Export_LIDC_WarehouseOps.json'),
-  warehouseOpsAck: path.join(DCORE_LIDC_DBRIDGE_DIR, 'Export_LIDC_WarehouseOps_Ack.json'),
-  airframeRegistry: path.join(DCORE_LIDC_DBRIDGE_DIR, 'Export_LIDC_AirframeRegistry.json'),
+  linkRequests: dbridgeFile('Export_LIDC_LinkRequests.json'),
+  airframeState: dbridgeFile('Export_LIDC_AirframeState.json'),
+  policy: dbridgeFile('Export_LIDC_Policy.json'),
+  warehouseOps: dbridgeFile('Export_LIDC_WarehouseOps.json'),
+  warehouseOpsAck: dbridgeFile('Export_LIDC_WarehouseOps_Ack.json'),
+  airframeRegistry: dbridgeFile('Export_LIDC_AirframeRegistry.json'),
 });
 
 export function writeJsonAtomic(targetPath, payload) {
+  if (!targetPath) return;
   const tempPath = `${targetPath}.tmp`;
   fs.mkdirSync(path.dirname(targetPath), { recursive: true });
   fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), 'utf8');
@@ -29,7 +33,7 @@ export function writeJsonAtomic(targetPath, payload) {
 
 export function readJsonFile(targetPath, fallback = null) {
   try {
-    if (!fs.existsSync(targetPath)) return fallback;
+    if (!targetPath || !fs.existsSync(targetPath)) return fallback;
     const raw = fs.readFileSync(targetPath, 'utf8');
     if (!raw || raw.trim() === '') return fallback;
     return JSON.parse(raw);

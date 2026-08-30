@@ -19,7 +19,7 @@ export default function LandingPage({
   onOpenCampaign,
 }) {
   const { user } = useUser();
-  const canManage = canManageNoe(user?.id);
+  const canManage = canManageNoe(user);
 
   const selectedCampaign = getCampaignById(selectedCampaignId);
   const [events, setEvents] = useState([]);

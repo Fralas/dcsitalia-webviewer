@@ -13,7 +13,8 @@
     "build": "cd frontend && npm run build",
     "start": "node backend/src/server.js",
     "data:backup": "node backend/src/db/backup.js",
-    "data:restore": "node backend/src/db/restore.js"
+    "data:restore": "node backend/src/db/restore.js",
+    "security:hash-password": "node backend/src/scripts/hashAdminPassword.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

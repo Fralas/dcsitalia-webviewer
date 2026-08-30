@@ -178,7 +178,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { user, loading: userLoading } = useUser();
-  const showAtc = canAccessAtc(user?.id);
+  const showAtc = canAccessAtc(user);
   const bootStartedAt = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now());
   const bootRevealDone = useRef(false);
   const [splashVisible, setSplashVisible] = useState(true);

@@ -16,6 +16,12 @@ if (!JWT_SECRET) {
   throw new Error('JWT_SECRET is not defined in environment variables');
 }
 
+if (String(process.env.NODE_ENV || '').toLowerCase() === 'production') {
+  if (JWT_SECRET.length < 32 || /change-me|change-this|your-super-secret/i.test(JWT_SECRET)) {
+    throw new Error('JWT_SECRET is too short or looks like a placeholder (min 32 characters)');
+  }
+}
+
 /**
  * Generate a JWT token for authenticated users
  * @param {Object} payload - The payload to include in the token

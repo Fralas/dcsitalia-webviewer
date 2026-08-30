@@ -3,7 +3,6 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
-import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcrypt';
 import chokidar from 'chokidar';
@@ -36,8 +35,10 @@ import { SqliteSessionStore } from './db/sessionStore.js';
 import * as airbaseStatusParser from './services/airbaseStatusParser.js';
 import * as airbaseStatusManager from './services/airbaseStatusManager.js';
 import * as discordAuth from './services/discordAuth.js';
-import { ATC_DISCORD_IDS, LIDC_DISCORD_IDS, requireFeatureAccess } from './config/featureAccess.js';
+import { canAccessAtc, canAccessLidc, canEditChangelog, canEditWiki, canManageNoe, requireFeatureFlag } from './config/featureAccess.js';
 import { authBypassMiddleware, isAuthBypassEnabled } from './config/authBypass.js';
+import { assertRuntimeSecrets, createHelmetMiddleware, createJsonBodyParser, resolveAdminPasswordHash } from './config/security.js';
+import { optionalPath } from './config/envPaths.js';
 import * as combatMissionDispatch from './services/combatMissionDispatch.js';
 import * as luaZoneSync from './services/luaZoneSync.js';
 import * as activeUsers from './services/activeUsers.js';
@@ -63,6 +64,7 @@ const __dirname = path.dirname(__filename);
 
 // Load environment variables from backend/.env
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
+assertRuntimeSecrets();
 
 const app = express();
 const httpServer = createServer(app);
@@ -106,80 +108,32 @@ const PORT = process.env.PORT || 3001;
 const CONVOY_API_TOKEN = process.env.CONVOY_API_TOKEN || '';
 const DISCORD_GUILD_ID = String(process.env.DISCORD_GUILD_ID || '').trim();
 const DISCORD_BOT_TOKEN = String(process.env.DISCORD_BOT_TOKEN || '').trim();
-const DISCORD_LOGISTICS_ROUTE_ROLE_ID = String(process.env.DISCORD_LOGISTICS_ROUTE_ROLE_ID || '1447684923518484500').trim();
+const DISCORD_LOGISTICS_ROUTE_ROLE_ID = String(process.env.DISCORD_LOGISTICS_ROUTE_ROLE_ID || '').trim();
 const DISCORD_ROLE_CACHE_TTL_MS = 10 * 60 * 1000;
-const CHANGELOG_AUTHOR_IDS = new Set([
-  '153370631772045313',
-  '371212324054237206',
-  '453594416863641600',
-  '675706661570347041',
-  '714087060343881778',
-  '812070579888848988',
-  '1026508512152518708',
-  '1385701793345962035',
-]);
-const NOE_AUTHOR_IDS = new Set([
-  '153370631772045313',
-  '371212324054237206',
-  '453594416863641600',
-  '675706661570347041',
-  '714087060343881778',
-  '812070579888848988',
-  '1026508512152518708',
-  '1385701793345962035',
-]);
-const WIKI_EDITOR_IDS = new Set([
-  '153370631772045313',
-  '371212324054237206',
-  '453594416863641600',
-  '675706661570347041',
-  '714087060343881778',
-  '812070579888848988',
-  '1026508512152518708',
-  '1385701793345962035',
-]);
 const MAX_CARRIER_SOURCE_DISTANCE_KM = 50;
 const KM_PER_NM = 1.852;
 const MAX_CARRIER_SOURCE_DISTANCE_NM = MAX_CARRIER_SOURCE_DISTANCE_KM / KM_PER_NM;
 // March 13, 2026 17:00 Europe/Rome (CET => 16:00 UTC)
 const LAUNCH_TARGET_UTC_MS = Date.UTC(2026, 2, 13, 16, 0, 0);
-const CONVOY_SYNC_FILE = process.env.CONVOY_SYNC_FILE
-  ? path.resolve(process.env.CONVOY_SYNC_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DRED_GROUND\\Export_Ground_Convoys.json';
-const DCSAR_SYNC_FILE = process.env.DCSAR_SYNC_FILE
-  ? path.resolve(process.env.DCSAR_SYNC_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DMAP\\Export_DCSAR_Positions.json';
-const AIRLIFT_PLAYERS_SYNC_FILE = process.env.AIRLIFT_PLAYERS_SYNC_FILE
-  ? path.resolve(process.env.AIRLIFT_PLAYERS_SYNC_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DRED_AIR\\Export_AirliftPlayers.json';
+const CONVOY_SYNC_FILE = optionalPath('CONVOY_SYNC_FILE');
+const DCSAR_SYNC_FILE = optionalPath('DCSAR_SYNC_FILE');
+const AIRLIFT_PLAYERS_SYNC_FILE = optionalPath('AIRLIFT_PLAYERS_SYNC_FILE');
 
 // Production Points state exported by DCORE (DSCORE_Rigs.lua) for the map.
-const PRODUCTION_POINTS_FILE = process.env.PRODUCTION_POINTS_FILE
-  ? path.resolve(process.env.PRODUCTION_POINTS_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DSCORE\\Export_Production_Points.json';
+const PRODUCTION_POINTS_FILE = optionalPath('PRODUCTION_POINTS_FILE');
 
 // Web -> DCORE command bridge (DBRIDGE). The webviewer OWNS the command queue file
 // (append + prune); DCORE owns the result file (read-only here).
-const WEB_COMMANDS_FILE = process.env.WEB_COMMANDS_FILE
-  ? path.resolve(process.env.WEB_COMMANDS_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE-LIDC\\src\\DBRIDGE\\Export_WebCommands.json';
+const WEB_COMMANDS_FILE = optionalPath('WEB_COMMANDS_FILE');
 
-const WEB_COMMANDS_RESULT_FILE = process.env.WEB_COMMANDS_RESULT_FILE
-  ? path.resolve(process.env.WEB_COMMANDS_RESULT_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE-LIDC\\src\\DBRIDGE\\Export_WebCommands_Result.json';
+const WEB_COMMANDS_RESULT_FILE = optionalPath('WEB_COMMANDS_RESULT_FILE');
 
 // Tracked crate positions exported by DMAS (live until moved/activated in-game).
-const WEB_SPAWN_MARKERS_FILE = process.env.WEB_SPAWN_MARKERS_FILE
-  ? path.resolve(process.env.WEB_SPAWN_MARKERS_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE-LIDC\\src\\DBRIDGE\\Export_WebSpawn_Markers.json';
+const WEB_SPAWN_MARKERS_FILE = optionalPath('WEB_SPAWN_MARKERS_FILE');
 
-const DBUILD_SITES_FILE = process.env.DBUILD_SITES_FILE
-  ? path.resolve(process.env.DBUILD_SITES_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE-LIDC\\src\\DBRIDGE\\Export_DBUILD_Sites.json';
+const DBUILD_SITES_FILE = optionalPath('DBUILD_SITES_FILE');
 
-const TANKER_ROUTES_FILE = process.env.TANKER_ROUTES_FILE
-  ? path.resolve(process.env.TANKER_ROUTES_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE-LIDC\\src\\DBRIDGE\\Export_Tanker_Routes.json';
+const TANKER_ROUTES_FILE = optionalPath('TANKER_ROUTES_FILE');
 
 // Max placement distance from airport center (matches DMAS blue_airbase_radius_m).
 const AIRPORT_SPAWN_RADIUS_M = Number.parseInt(process.env.AIRPORT_SPAWN_RADIUS_M, 10) || 2500;
@@ -303,18 +257,14 @@ const CSV_DIR = process.env.CSV_DIR
 logger.info(`📁 CSV Directory: ${CSV_DIR}`);
 
 // Airbase status - loaded from airbases_status.lua
-const AIRBASE_STATUS_FILE = process.env.AIRBASE_STATUS_FILE
-  ? path.resolve(process.env.AIRBASE_STATUS_FILE)
-  : 'C:\\Users\\DCS ITALIA\\Saved Games\\DCS.server1\\Score_save\\Warehouse\\airbases_status.lua';
+const AIRBASE_STATUS_FILE = optionalPath('AIRBASE_STATUS_FILE');
 let airbaseStatus = {};
 
-// Security Middleware
-app.use(helmet({
-  contentSecurityPolicy: false,
-  crossOriginOpenerPolicy: false,
-  crossOriginEmbedderPolicy: false,
-  crossOriginResourcePolicy: false
-}));
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
+app.use(createHelmetMiddleware());
 
 // CORS
 app.use(cors({
@@ -334,13 +284,13 @@ if (process.env.NODE_ENV === 'production') {
 
   app.use(limiter);
 }
-app.use(express.json({ limit: '80mb' }));
+app.use(createJsonBodyParser());
 app.use(cookieParser());
 
 // Session configuration
 app.use(session({
   store: new SqliteSessionStore(),
-  secret: process.env.SESSION_SECRET || 'dcs-italia-secret-change-in-production',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -441,18 +391,25 @@ async function ensureSessionUserPermissions(req, options = {}) {
     && Number.isFinite(lastResolvedAt)
     && (Date.now() - lastResolvedAt) < DISCORD_ROLE_CACHE_TTL_MS
     && typeof sessionUser.canManageLogisticsRouteVisibility === 'boolean'
-    && typeof sessionUser.canEditWiki === 'boolean';
+    && typeof sessionUser.canEditWiki === 'boolean'
+    && typeof sessionUser.canAccessLidc === 'boolean'
+    && typeof sessionUser.canAccessAtc === 'boolean';
 
   if (cacheValid) {
     return sessionUser;
   }
 
   const permissions = await resolveDiscordLogisticsRoutePermission(sessionUser.id);
+  const roleIds = permissions.roleIds;
   req.session.user = {
     ...sessionUser,
-    discordRoleIds: permissions.roleIds,
+    discordRoleIds: roleIds,
     canManageLogisticsRouteVisibility: permissions.canManageLogisticsRouteVisibility,
-    canEditWiki: isWikiEditor(sessionUser.id),
+    canEditWiki: canEditWiki(sessionUser.id, roleIds),
+    canAccessLidc: canAccessLidc(sessionUser.id, roleIds),
+    canAccessAtc: canAccessAtc(sessionUser.id, roleIds),
+    canManageNoe: canManageNoe(sessionUser.id, roleIds),
+    canEditChangelog: canEditChangelog(sessionUser.id, roleIds),
   };
   req.session.userPermissionsResolvedAt = Date.now();
   return req.session.user;
@@ -1042,7 +999,7 @@ function normalizeConvoyEntry(entry) {
 
 function syncConvoysFromFile() {
   try {
-    if (!fs.existsSync(CONVOY_SYNC_FILE)) {
+    if (!CONVOY_SYNC_FILE || !fs.existsSync(CONVOY_SYNC_FILE)) {
       return;
     }
 
@@ -1130,7 +1087,7 @@ function parseDcsarLine(line, index) {
 
 function syncDcsarFromFile() {
   try {
-    if (!fs.existsSync(DCSAR_SYNC_FILE)) return;
+    if (!DCSAR_SYNC_FILE || !fs.existsSync(DCSAR_SYNC_FILE)) return;
 
     const raw = fs.readFileSync(DCSAR_SYNC_FILE, 'utf8');
     if (raw === dcsarSyncSignature) return;
@@ -1202,7 +1159,7 @@ function normalizeAirliftPlayerEntry(entry) {
 
 function syncAirliftPlayersFromFile() {
   try {
-    if (!fs.existsSync(AIRLIFT_PLAYERS_SYNC_FILE)) return;
+    if (!AIRLIFT_PLAYERS_SYNC_FILE || !fs.existsSync(AIRLIFT_PLAYERS_SYNC_FILE)) return;
 
     const raw = fs.readFileSync(AIRLIFT_PLAYERS_SYNC_FILE, 'utf8');
     if (!raw || raw.trim() === '') return;
@@ -1259,7 +1216,7 @@ function normalizeProductionPointEntry(entry) {
 
 function syncProductionPointsFromFile() {
   try {
-    if (!fs.existsSync(PRODUCTION_POINTS_FILE)) return;
+    if (!PRODUCTION_POINTS_FILE || !fs.existsSync(PRODUCTION_POINTS_FILE)) return;
 
     const raw = fs.readFileSync(PRODUCTION_POINTS_FILE, 'utf8');
     if (!raw || raw.trim() === '') return;
@@ -1287,6 +1244,7 @@ function writeJsonAtomic(targetPath, obj) {
 }
 
 function persistWebCommands() {
+  if (!WEB_COMMANDS_FILE) return;
   try {
     writeJsonAtomic(WEB_COMMANDS_FILE, {
       commands: webCommands,
@@ -1300,6 +1258,10 @@ function persistWebCommands() {
 
 function loadWebCommandsQueue() {
   try {
+    if (!WEB_COMMANDS_FILE) {
+      webCommands = [];
+      return;
+    }
     if (!fs.existsSync(WEB_COMMANDS_FILE)) {
       webCommands = [];
       persistWebCommands();
@@ -1443,7 +1405,7 @@ function validateProductionPointRetrieveDistance(pp, lat, lon) {
 
 function syncDbuildSitesFromFile() {
   try {
-    if (!fs.existsSync(DBUILD_SITES_FILE)) return;
+    if (!DBUILD_SITES_FILE || !fs.existsSync(DBUILD_SITES_FILE)) return;
 
     const raw = fs.readFileSync(DBUILD_SITES_FILE, 'utf8');
     if (!raw || raw.trim() === '') return;
@@ -1483,7 +1445,7 @@ function syncDbuildSitesFromFile() {
 
 function syncWebSpawnMarkersFromFile() {
   try {
-    if (!fs.existsSync(WEB_SPAWN_MARKERS_FILE)) return;
+    if (!WEB_SPAWN_MARKERS_FILE || !fs.existsSync(WEB_SPAWN_MARKERS_FILE)) return;
 
     const raw = fs.readFileSync(WEB_SPAWN_MARKERS_FILE, 'utf8');
     if (!raw || raw.trim() === '') return;
@@ -1517,7 +1479,7 @@ function syncWebSpawnMarkersFromFile() {
 
 function syncTankerRoutesFromFile() {
   try {
-    if (!fs.existsSync(TANKER_ROUTES_FILE)) return;
+    if (!TANKER_ROUTES_FILE || !fs.existsSync(TANKER_ROUTES_FILE)) return;
 
     const raw = fs.readFileSync(TANKER_ROUTES_FILE, 'utf8');
     if (!raw || raw.trim() === '') return;
@@ -1572,7 +1534,7 @@ let lidcAirframeStateSignature = '';
 function syncLidcAirframeStateFromFile() {
   try {
     const stateFile = LIDC_EXPORT_FILES.airframeState;
-    if (!fs.existsSync(stateFile)) return;
+    if (!stateFile || !fs.existsSync(stateFile)) return;
 
     const raw = fs.readFileSync(stateFile, 'utf8');
     if (!raw || raw.trim() === '') return;
@@ -1595,7 +1557,7 @@ function syncLidcAirframeStateFromFile() {
 function syncLidcWarehouseOpsAckFromFile() {
   try {
     const ackFile = LIDC_EXPORT_FILES.warehouseOpsAck;
-    if (!fs.existsSync(ackFile)) return;
+    if (!ackFile || !fs.existsSync(ackFile)) return;
 
     const raw = fs.readFileSync(ackFile, 'utf8');
     if (!raw || raw.trim() === '') return;
@@ -1616,7 +1578,7 @@ function syncLidcWarehouseOpsAckFromFile() {
 function syncLidcLinkRequestsFromFile() {
   try {
     const linkRequestsFile = LIDC_EXPORT_FILES.linkRequests;
-    if (!fs.existsSync(linkRequestsFile)) return;
+    if (!linkRequestsFile || !fs.existsSync(linkRequestsFile)) return;
 
     const raw = fs.readFileSync(linkRequestsFile, 'utf8');
     if (!raw || raw.trim() === '') return;
@@ -1662,7 +1624,7 @@ function syncLidcLinkRequestsFromFile() {
 
 function syncWebCommandResultsFromFile() {
   try {
-    if (!fs.existsSync(WEB_COMMANDS_RESULT_FILE)) return;
+    if (!WEB_COMMANDS_RESULT_FILE || !fs.existsSync(WEB_COMMANDS_RESULT_FILE)) return;
 
     const raw = fs.readFileSync(WEB_COMMANDS_RESULT_FILE, 'utf8');
     if (!raw || raw.trim() === '') return;
@@ -1767,6 +1729,7 @@ function persistDcsarToFile(points) {
     })
     .filter(Boolean);
 
+  if (!DCSAR_SYNC_FILE) return;
   fs.writeFileSync(DCSAR_SYNC_FILE, `${lines.join('\n')}${lines.length > 0 ? '\n' : ''}`, 'utf8');
   dcsarSyncSignature = fs.readFileSync(DCSAR_SYNC_FILE, 'utf8');
 }
@@ -1776,6 +1739,11 @@ function persistDcsarToFile(points) {
  */
 function loadAirbaseStatus() {
   try {
+    if (!AIRBASE_STATUS_FILE) {
+      airbaseStatus = {};
+      airbaseStatusManager.updateAirbaseStatus({});
+      return;
+    }
     airbaseStatus = airbaseStatusParser.parseAirbaseStatus(AIRBASE_STATUS_FILE);
     console.log(`🏠 Airbase status loaded: ${Object.keys(airbaseStatus).length} airbases`);
 
@@ -2002,7 +1970,11 @@ app.get('/api/auth/discord/callback', async (req, res) => {
       globalName: discordUser.global_name || discordUser.username,
       discordRoleIds: [],
       canManageLogisticsRouteVisibility: false,
-      canEditWiki: isWikiEditor(discordUser.id),
+      canEditWiki: canEditWiki(discordUser.id),
+      canAccessLidc: canAccessLidc(discordUser.id),
+      canAccessAtc: canAccessAtc(discordUser.id),
+      canManageNoe: canManageNoe(discordUser.id),
+      canEditChangelog: canEditChangelog(discordUser.id),
     };
 
     await ensureSessionUserPermissions(req, { forceRefresh: true });
@@ -2216,8 +2188,19 @@ app.patch('/api/lidc/airports/:baseId/logistics/orders/:orderId', (req, res) => 
   }
 });
 
-app.use('/api/lidc', requireFeatureAccess(LIDC_DISCORD_IDS));
-app.use('/api/atc', requireFeatureAccess(ATC_DISCORD_IDS));
+async function attachSessionPermissions(req, res, next) {
+  try {
+    if (req.session?.user?.id) {
+      await ensureSessionUserPermissions(req);
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+}
+
+app.use('/api/lidc', attachSessionPermissions, requireFeatureFlag('canAccessLidc'));
+app.use('/api/atc', attachSessionPermissions, requireFeatureFlag('canAccessAtc'));
 
 /**
  * POST /api/lidc/link/start - Generate one-time DCS account link code
@@ -2601,10 +2584,6 @@ app.put('/api/lidc/specializations', async (req, res) => {
   }
 });
 
-function isWikiEditor(sessionUserId) {
-  return WIKI_EDITOR_IDS.has(String(sessionUserId || '').trim());
-}
-
 /**
  * GET /api/achievements/catalog - Public list of all available achievements
  */
@@ -2622,7 +2601,7 @@ app.post('/api/achievements/catalog', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!isWikiEditor(userId)) {
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can manage achievements' });
   }
 
@@ -2652,7 +2631,7 @@ app.put('/api/achievements/catalog/:achievementId', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!isWikiEditor(userId)) {
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can manage achievements' });
   }
 
@@ -2681,7 +2660,7 @@ app.delete('/api/achievements/catalog/:achievementId', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!isWikiEditor(userId)) {
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can manage achievements' });
   }
 
@@ -2710,7 +2689,7 @@ app.get('/api/achievements/users/:userId', (req, res) => {
   if (!targetUserId) {
     return res.status(400).json({ error: 'userId is required' });
   }
-  if (requesterId !== targetUserId && !isWikiEditor(requesterId)) {
+  if (requesterId !== targetUserId && !canEditWiki(requesterId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can inspect other users achievements' });
   }
 
@@ -2735,7 +2714,7 @@ app.post('/api/achievements/assign', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!isWikiEditor(userId)) {
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can assign achievements' });
   }
 
@@ -2793,7 +2772,7 @@ app.get('/api/wiki/drafts/:pageId', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!isWikiEditor(userId)) {
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit wiki pages' });
   }
   const draft = wikiService.getDraft(userId, req.params.pageId);
@@ -2808,7 +2787,7 @@ app.put('/api/wiki/drafts/:pageId', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!isWikiEditor(userId)) {
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit wiki pages' });
   }
   const draft = wikiService.saveDraft(userId, req.params.pageId, req.body || {});
@@ -2823,7 +2802,7 @@ app.delete('/api/wiki/drafts/:pageId', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!isWikiEditor(userId)) {
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit wiki pages' });
   }
   wikiService.deleteDraft(userId, req.params.pageId);
@@ -2839,7 +2818,7 @@ app.post('/api/wiki/pages', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!isWikiEditor(userId)) {
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit wiki pages' });
   }
 
@@ -2868,7 +2847,7 @@ app.put('/api/wiki/pages/:pageId', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!isWikiEditor(userId)) {
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit wiki pages' });
   }
 
@@ -2894,7 +2873,7 @@ app.post('/api/wiki/media', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!isWikiEditor(userId)) {
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit wiki pages' });
   }
 
@@ -2934,7 +2913,7 @@ app.get('/api/changelogs/draft', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+  if (!canEditChangelog(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
   }
   const draft = changelogsService.getDraft(userId);
@@ -2949,7 +2928,7 @@ app.put('/api/changelogs/draft', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+  if (!canEditChangelog(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
   }
   const draft = changelogsService.saveDraft(userId, req.body || {});
@@ -2964,7 +2943,7 @@ app.delete('/api/changelogs/draft', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+  if (!canEditChangelog(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
   }
   changelogsService.deleteDraft(userId);
@@ -2979,7 +2958,7 @@ app.post('/api/changelogs/media', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+  if (!canEditChangelog(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
   }
 
@@ -3001,7 +2980,7 @@ app.post('/api/changelogs', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+  if (!canEditChangelog(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
   }
 
@@ -3025,7 +3004,7 @@ app.post('/api/changelogs/translate', async (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+  if (!canEditChangelog(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
   }
 
@@ -3053,7 +3032,7 @@ app.put('/api/changelogs/:postId', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+  if (!canEditChangelog(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
   }
 
@@ -3077,7 +3056,7 @@ app.delete('/api/changelogs/:postId', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+  if (!canEditChangelog(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
   }
 
@@ -3107,7 +3086,7 @@ function requireNoeAdmin(req, res) {
     res.status(401).json({ error: 'Not authenticated' });
     return null;
   }
-  if (!NOE_AUTHOR_IDS.has(String(userId))) {
+  if (!canManageNoe(userId, req.session?.user?.discordRoleIds)) {
     res.status(403).json({ error: 'Only allowed admins can manage NOE events' });
     return null;
   }
@@ -5416,29 +5395,26 @@ watcher.on('error', (error) => {
   console.error('File watcher error:', error);
 });
 
-// Watch airbase_status.lua file for changes
-const airbaseStatusWatcher = chokidar.watch(AIRBASE_STATUS_FILE, {
-  persistent: true,
-  ignoreInitial: true,
-  awaitWriteFinish: {
-    stabilityThreshold: 1000,
-    pollInterval: 100
-  }
-});
+if (AIRBASE_STATUS_FILE) {
+  const airbaseStatusWatcher = chokidar.watch(AIRBASE_STATUS_FILE, {
+    persistent: true,
+    ignoreInitial: true,
+    awaitWriteFinish: {
+      stabilityThreshold: 1000,
+      pollInterval: 100
+    }
+  });
 
-airbaseStatusWatcher.on('change', () => {
-  console.log('🏠 Airbase status file changed, reloading...');
+  airbaseStatusWatcher.on('change', () => {
+    console.log('🏠 Airbase status file changed, reloading...');
+    loadAirbaseStatus();
+    scheduleRefresh('airbase-status-change');
+  });
 
-  // Reload airbase status
-  loadAirbaseStatus();
-
-  // Refresh airport data with new active airports list
-  scheduleRefresh('airbase-status-change');
-});
-
-airbaseStatusWatcher.on('error', (error) => {
-  console.error('Airbase status file watcher error:', error);
-});
+  airbaseStatusWatcher.on('error', (error) => {
+    console.error('Airbase status file watcher error:', error);
+  });
+}
 
 // Buffered Lua zone sync (refreshes every 5 minutes by default)
 const luaZoneWatcher = luaZoneSync.initialize((result) => {
@@ -5669,16 +5645,20 @@ httpServer.listen(PORT, () => {
 
 // ==================== ADMIN ENDPOINTS ====================
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const ADMIN_PASSWORD_HASH = resolveAdminPasswordHash();
 
-if (!ADMIN_PASSWORD) {
-  logger.error('⚠️  ADMIN_PASSWORD is not set in environment variables');
-}
+const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Too many admin login attempts, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 /**
  * POST /api/admin/login - Verify admin password and return JWT
  */
-app.post('/api/admin/login', async (req, res) => {
+app.post('/api/admin/login', adminLoginLimiter, async (req, res) => {
   try {
     const { password } = req.body;
 
@@ -5689,9 +5669,15 @@ app.post('/api/admin/login', async (req, res) => {
       });
     }
 
-    // Simple password comparison (in production, use hashed passwords)
-    if (password === ADMIN_PASSWORD) {
-      // Generate JWT token
+    if (!ADMIN_PASSWORD_HASH) {
+      return res.status(503).json({
+        success: false,
+        message: 'Admin login is not configured'
+      });
+    }
+
+    const valid = await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
+    if (valid) {
       const token = generateToken({
         role: 'admin',
         timestamp: Date.now()

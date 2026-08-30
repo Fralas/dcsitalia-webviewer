@@ -12,6 +12,10 @@ export const LOCAL_DEV_USER = Object.freeze({
   avatar: null,
   discordRoleIds: [],
   canEditWiki: true,
+  canAccessLidc: true,
+  canAccessAtc: true,
+  canManageNoe: true,
+  canEditChangelog: true,
   canManageLogisticsRouteVisibility: true,
   isLocalBypass: true,
 });
