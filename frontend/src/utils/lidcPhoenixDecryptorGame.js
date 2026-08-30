@@ -224,8 +224,12 @@ function tickGame(now) {
     }
   }
 
-  if (game.phase === 'cipher' && game.cipher && now - game.cipher.startedAt >= PHOENIX_CIPHER_MS) {
-    failDrop(game);
+  if (game.phase === 'cipher' && game.cipher) {
+    if (game.cipher.failAt && now >= game.cipher.failAt) {
+      failDrop(game);
+    } else if (!game.cipher.failAt && now - game.cipher.startedAt >= PHOENIX_CIPHER_MS) {
+      failDrop(game);
+    }
   }
 
   const { waterfall, wfCtx, wfShift } = game;
@@ -318,6 +322,8 @@ export function handlePhoenixKeyDown(event) {
 
   if (session.phase === 'cipher' && session.cipher && /^\d$/.test(event.key)) {
     event.preventDefault();
+    if (session.cipher.failAt) return true;
+
     session.cipher.typed = `${session.cipher.typed}${event.key}`.slice(0, session.cipher.digits.length);
     audio?.tone(420 + Number(event.key) * 40, 0.06, 0.05);
 
@@ -346,7 +352,8 @@ export function handlePhoenixKeyDown(event) {
         session.phase = 'scan';
       }
     } else if (session.cipher.typed.length === session.cipher.digits.length) {
-      failDrop(session);
+      session.cipher.failAt = performance.now() + 750;
+      audio?.tone(120, 0.2, 0.08);
     }
     return true;
   }
@@ -380,6 +387,22 @@ function wrapCanvasText(ctx, text, maxWidth) {
 
   if (current) lines.push(current);
   return lines;
+}
+
+function drawAsciiProgress(ctx, x, y, ratio, size = 22) {
+  const count = Math.max(1, Math.min(48, Math.floor(Number(size) || 22)));
+  const filled = Math.max(0, Math.min(count, Math.round(Math.min(1, Math.max(0, Number(ratio) || 0)) * count)));
+  ctx.font = '12px "IBM Plex Mono", "Courier New", monospace';
+  ctx.fillStyle = '#c4b48a';
+  ctx.fillText('[', x, y);
+  const bracket = ctx.measureText('[').width;
+  const hashWidth = ctx.measureText('#').width || 7;
+  ctx.fillStyle = '#ffe08a';
+  ctx.fillText('#'.repeat(filled), x + bracket, y);
+  ctx.fillStyle = '#6a6248';
+  ctx.fillText('-'.repeat(count - filled), x + bracket + hashWidth * filled, y);
+  ctx.fillStyle = '#c4b48a';
+  ctx.fillText(']', x + bracket + hashWidth * count, y);
 }
 
 export function drawPhoenixDecryptor(ctx, canvas, timeMs) {
@@ -444,14 +467,9 @@ export function drawPhoenixDecryptor(ctx, canvas, timeMs) {
   ctx.textAlign = 'left';
 
   const lockY = wfY + wfH + 20;
-  ctx.fillStyle = '#0a160d';
-  ctx.fillRect(padX, lockY, wfW, 6);
-  ctx.strokeStyle = '#35553a';
-  ctx.strokeRect(padX, lockY, wfW, 6);
-  ctx.fillStyle = '#ffe08a';
-  ctx.fillRect(padX, lockY, wfW * Math.min(1, game.lockMs / PHOENIX_LOCK_MS), 6);
+  drawAsciiProgress(ctx, padX, lockY, game.lockMs / PHOENIX_LOCK_MS, 28);
 
-  const logY = lockY + 14;
+  const logY = lockY + 18;
   const logBoxH = height - padY - logY;
   ctx.strokeStyle = 'rgba(77, 106, 64, 0.45)';
   ctx.strokeRect(padX, logY, wfW, logBoxH);
@@ -482,20 +500,20 @@ export function drawPhoenixDecryptor(ctx, canvas, timeMs) {
       cursorY += 15;
     });
     game.cipher.digits.split('').forEach((digit, index) => {
+      const typedChar = game.cipher.typed[index];
       const x = padX + 6 + index * 30;
-      ctx.strokeStyle = index < game.cipher.typed.length ? '#ffe08a' : '#4d6a40';
+      const isTyped = typedChar !== undefined;
+      const isWrong = isTyped && typedChar !== digit;
+      ctx.strokeStyle = isWrong ? '#ff7b72' : isTyped ? '#ffe08a' : '#4d6a40';
       ctx.strokeRect(x, cursorY, 24, 28);
-      ctx.fillStyle = index < game.cipher.typed.length ? '#ffe08a' : '#8cff9d';
+      ctx.fillStyle = isWrong ? '#ff7b72' : isTyped ? '#ffe08a' : '#8cff9d';
       ctx.font = '18px "IBM Plex Mono", "Courier New", monospace';
-      ctx.fillText(digit, x + 5, cursorY + 5);
+      ctx.fillText(isTyped ? typedChar : digit, x + 5, cursorY + 5);
     });
     ctx.font = '12px "IBM Plex Mono", "Courier New", monospace';
     const left = Math.max(0, 1 - (timeMs - game.cipher.startedAt) / PHOENIX_CIPHER_MS);
-    ctx.fillStyle = '#1a2b1e';
-    ctx.fillRect(padX + 6, cursorY + 34, wfW - 12, 4);
-    ctx.fillStyle = '#ff7b72';
-    ctx.fillRect(padX + 6, cursorY + 34, (wfW - 12) * left, 4);
-    cursorY += 44;
+    drawAsciiProgress(ctx, padX + 6, cursorY + 34, left, 26);
+    cursorY += 50;
   }
 
   if (game.phase === 'win' || game.phase === 'fail') {
