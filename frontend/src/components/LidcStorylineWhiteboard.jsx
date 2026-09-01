@@ -10,6 +10,33 @@ const MIN_VIEW_SCALE = 0.38;
 const MAX_VIEW_SCALE = 1.08;
 const ZOOM_SENSITIVITY = 0.0012;
 
+const SECTION_ROMAN = {
+  profile: 'I',
+  personality: 'II',
+  appearance: 'III',
+  network: 'IV',
+  relationships: 'V',
+  weakness: 'VI',
+  treeLink: 'VII',
+  secret: 'VIII',
+  resources: 'IX',
+  relationship: 'X',
+  suppliedMaterial: 'XI',
+  transmissions: 'XII',
+};
+
+const FILE_CODES = {
+  samiullahBarakzai: '201-KDR-0142',
+  rahmatullahHotak: '201-KDR-0287',
+  hamidullahSafi: '201-KDR-0319',
+  zahirPopalzai: '201-HLM-0441',
+  nazarMohammadAlizai: '201-KDR-0516',
+  izatullahNoorzai: '201-KDR-0590',
+  bashirAchakzai: '201-KDR-0663',
+  latifIshaqzai: '201-HLM-0738',
+  hajiKhairullahBarech: '201-HLM-0812',
+};
+
 function clampViewScale(scale) {
   return Math.min(MAX_VIEW_SCALE, Math.max(MIN_VIEW_SCALE, scale));
 }
@@ -24,142 +51,152 @@ function renderParagraphs(text) {
 
 function DossierSection({ base, sectionId }) {
   const title = t(`${base}.sections.${sectionId}`);
+  const roman = SECTION_ROMAN[sectionId] || '—';
+  let body = null;
 
   switch (sectionId) {
     case 'profile':
     case 'personality':
     case 'secret':
     case 'weakness':
-      return (
-        <section>
-          <h3>{title}</h3>
-          {renderParagraphs(t(`${base}.${sectionId}`))}
-        </section>
-      );
+      body = renderParagraphs(t(`${base}.${sectionId}`));
+      break;
 
     case 'appearance': {
       const appearanceItems = t(`${base}.appearanceItems`);
-      return (
-        <section>
-          <h3>{title}</h3>
-          <ul>
-            {Array.isArray(appearanceItems) && appearanceItems.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        </section>
+      body = (
+        <ul className="lidc-cia-obs">
+          {Array.isArray(appearanceItems) && appearanceItems.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
       );
+      break;
     }
 
     case 'network': {
       const networkSteps = t(`${base}.networkSteps`);
-      return (
-        <section>
-          <h3>{title}</h3>
-          <ol className="lidc-whiteboard-dossier-flow">
+      body = (
+        <>
+          <ol className="lidc-cia-flow">
             {Array.isArray(networkSteps) && networkSteps.map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ol>
           {renderParagraphs(t(`${base}.networkNote`))}
-        </section>
+        </>
       );
+      break;
     }
 
     case 'resources': {
       const resourceItems = t(`${base}.resourceItems`);
-      return (
-        <section>
-          <h3>{title}</h3>
-          <p>{t(`${base}.resourcesIntro`)}</p>
-          <ul>
+      body = (
+        <>
+          <p className="lidc-cia-lede">{t(`${base}.resourcesIntro`)}</p>
+          <ul className="lidc-cia-obs">
             {Array.isArray(resourceItems) && resourceItems.map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ul>
-        </section>
+        </>
       );
+      break;
     }
 
     case 'relationship': {
       const relationshipSteps = t(`${base}.relationshipSteps`);
-      return (
-        <section>
-          <h3>{title}</h3>
-          <ol className="lidc-whiteboard-dossier-flow">
+      body = (
+        <>
+          <ol className="lidc-cia-flow">
             {Array.isArray(relationshipSteps) && relationshipSteps.map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ol>
           {renderParagraphs(t(`${base}.relationshipNote`))}
-        </section>
+        </>
       );
+      break;
     }
 
     case 'suppliedMaterial': {
       const suppliedMaterialItems = t(`${base}.suppliedMaterialItems`);
-      return (
-        <section>
-          <h3>{title}</h3>
-          <p>{t(`${base}.suppliedMaterialIntro`)}</p>
-          <ul>
+      body = (
+        <>
+          <p className="lidc-cia-lede">{t(`${base}.suppliedMaterialIntro`)}</p>
+          <ul className="lidc-cia-obs">
             {Array.isArray(suppliedMaterialItems) && suppliedMaterialItems.map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ul>
           {renderParagraphs(t(`${base}.suppliedMaterialNote`))}
-        </section>
+        </>
       );
+      break;
     }
 
     case 'transmissions': {
       const transmissionItems = t(`${base}.transmissionItems`);
-      return (
-        <section>
-          <h3>{title}</h3>
-          <p>{t(`${base}.transmissionsIntro`)}</p>
-          <ul>
+      body = (
+        <>
+          <p className="lidc-cia-lede">{t(`${base}.transmissionsIntro`)}</p>
+          <ul className="lidc-cia-obs">
             {Array.isArray(transmissionItems) && transmissionItems.map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ul>
           {renderParagraphs(t(`${base}.transmissionsNote`))}
-        </section>
+        </>
       );
+      break;
     }
 
     case 'relationships': {
       const relationshipItems = t(`${base}.relationshipItems`);
-      return (
-        <section>
-          <h3>{title}</h3>
-          <ul className="lidc-whiteboard-dossier-relationships">
-            {Array.isArray(relationshipItems) && relationshipItems.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        </section>
+      body = (
+        <ul className="lidc-cia-relations">
+          {Array.isArray(relationshipItems) && relationshipItems.map((line) => {
+            const [name, rest] = String(line).split(' — ');
+            return (
+              <li key={line}>
+                <strong>{name}</strong>
+                {rest ? <span> — {rest}</span> : null}
+              </li>
+            );
+          })}
+        </ul>
       );
+      break;
     }
 
     case 'treeLink': {
       const treeLinkSteps = t(`${base}.treeLinkSteps`);
-      return (
-        <section>
-          <h3>{title}</h3>
-          <ol className="lidc-whiteboard-dossier-flow lidc-whiteboard-dossier-flow--chain">
+      body = (
+        <>
+          <ol className="lidc-cia-flow lidc-cia-flow--chain">
             {Array.isArray(treeLinkSteps) && treeLinkSteps.map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ol>
           {renderParagraphs(t(`${base}.treeLinkNote`))}
-        </section>
+        </>
       );
+      break;
     }
 
     default:
       return null;
   }
+
+  return (
+    <section className={`lidc-cia-section lidc-cia-section--${sectionId}`}>
+      <header className="lidc-cia-section-head">
+        <span className="lidc-cia-section-index">{roman}</span>
+        <h3>{title}</h3>
+      </header>
+      <div className="lidc-cia-section-body">{body}</div>
+    </section>
+  );
 }
 
 function CharacterDossier({ itemId }) {
@@ -167,29 +204,61 @@ function CharacterDossier({ itemId }) {
   const metaFields = ['name', 'nickname', 'age', 'nationality', 'origin', 'faction', 'role', 'category', 'association'];
   const item = LIDC_STORYLINE_WHITEBOARD_ITEMS.find((entry) => entry.id === itemId);
   const sections = item?.dossierSections ?? ['profile', 'personality', 'appearance'];
+  const fileCode = FILE_CODES[itemId] || '201-AFG-0000';
 
   return (
-    <div className="lidc-whiteboard-dossier">
-      <header className="lidc-whiteboard-dossier-head">
-        <div className="lidc-whiteboard-focus-photo">
-          <img src={item?.image} alt="" draggable={false} />
-        </div>
-        <div>
-          <h2>{t(`${base}.title`)}</h2>
-          <dl className="lidc-whiteboard-dossier-meta">
-            {metaFields.map((field) => (
-              <div key={field}>
-                <dt>{t(`${base}.meta.${field}.label`)}</dt>
-                <dd>{t(`${base}.meta.${field}.value`)}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      </header>
+    <div className="lidc-cia-folder">
+      <div className="lidc-cia-tab" aria-hidden="true">
+        <span className="lidc-cia-tab-stamp">{t('lidc.storyline.dossier.tab')}</span>
+      </div>
+      <div className="lidc-cia-sheaf" aria-hidden="true" />
+      <div className="lidc-cia-cover">
+        <div className="lidc-cia-page">
+          <div className="lidc-cia-banner">{t('lidc.storyline.dossier.banner')}</div>
 
-      {sections.map((sectionId) => (
-        <DossierSection key={sectionId} base={base} sectionId={sectionId} />
-      ))}
+          <header className="lidc-cia-letterhead">
+            <p className="lidc-cia-agency">{t('lidc.storyline.dossier.agency')}</p>
+            <p className="lidc-cia-directorate">{t('lidc.storyline.dossier.directorate')}</p>
+            <div className="lidc-cia-letterhead-row">
+              <span>{t('lidc.storyline.dossier.fileType')}</span>
+              <span>{t('lidc.storyline.dossier.fileNo')} {fileCode}</span>
+              <span>{t('lidc.storyline.dossier.copy')}</span>
+            </div>
+          </header>
+
+          <div className="lidc-cia-subject">
+            <figure className="lidc-cia-photo">
+              <img src={item?.image} alt="" draggable={false} />
+              <figcaption>{t('lidc.storyline.dossier.photoCaption')}</figcaption>
+            </figure>
+
+            <div className="lidc-cia-identity">
+              <p className="lidc-cia-subject-kicker">{t('lidc.storyline.dossier.subject')}</p>
+              <h2>{t(`${base}.title`)}</h2>
+              <dl className="lidc-cia-meta">
+                {metaFields.map((field) => (
+                  <div key={field} className="lidc-cia-meta-row">
+                    <dt>{t(`${base}.meta.${field}.label`)}</dt>
+                    <dd>{t(`${base}.meta.${field}.value`)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </div>
+
+          {sections.map((sectionId) => (
+            <DossierSection key={sectionId} base={base} sectionId={sectionId} />
+          ))}
+
+          <footer className="lidc-cia-footer">
+            <p>{t('lidc.storyline.dossier.handle')}</p>
+            <p>{t('lidc.storyline.dossier.control')}</p>
+            <p>{t('lidc.storyline.dossier.originated')} · {fileCode}</p>
+          </footer>
+
+          <div className="lidc-cia-banner lidc-cia-banner--foot">{t('lidc.storyline.dossier.banner')}</div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -378,7 +447,11 @@ export default function LidcStorylineWhiteboard({ onClose }) {
       )}
 
       {activeItem && (
-        <article className={`lidc-whiteboard-focus-card ${activeItem.type === 'character' ? 'is-character' : ''} ${activeItem.type === 'map' ? 'is-map' : ''}`} aria-live="polite">
+        <article
+          className={`lidc-whiteboard-focus-card ${activeItem.type === 'character' ? 'is-character' : ''} ${activeItem.type === 'map' ? 'is-map' : ''}`}
+          aria-live="polite"
+          onClick={(event) => event.stopPropagation()}
+        >
           {activeItem.type === 'character' ? (
             <CharacterDossier itemId={activeItem.id} />
           ) : (
