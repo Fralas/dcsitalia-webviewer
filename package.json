@@ -7,7 +7,8 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "concurrently -k \"npm run dev:backend\" \"npm run wait:api && npm run dev:frontend\"",
+    "wait:api": "node scripts/wait-for-port.mjs 3001",
     "dev:backend": "node --watch-path=backend/src --watch backend/src/server.js",
     "dev:frontend": "cd frontend && npm run dev",
     "build": "cd frontend && npm run build",

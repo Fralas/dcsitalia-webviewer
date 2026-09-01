@@ -5,6 +5,20 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const backendProxy = {
+  target: 'http://127.0.0.1:3001',
+  changeOrigin: true,
+  timeout: 30000,
+  proxyTimeout: 30000,
+  configure(proxy) {
+    proxy.on('error', (_err, _req, res) => {
+      if (!res || res.headersSent || typeof res.writeHead !== 'function') return;
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Backend not ready' }));
+    });
+  },
+};
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -15,6 +29,7 @@ export default defineConfig({
   assetsInclude: ['**/*.glb', '**/*.gltf'],
   server: {
     port: 3000,
+    strictPort: true,
     watch: {
       // The backend (luaZoneSync) rewrites this data file every ~30s with live
       // frontline zones. It lives in src/ only as a build-time bootstrap default;
@@ -28,13 +43,11 @@ export default defineConfig({
       ],
     },
     proxy: {
-      '/api': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-      },
-      '/sfx': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
+      '/api': backendProxy,
+      '/sfx': backendProxy,
+      '/socket.io': {
+        ...backendProxy,
+        ws: true,
       },
     },
   },

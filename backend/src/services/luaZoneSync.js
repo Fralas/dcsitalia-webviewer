@@ -280,7 +280,16 @@ function writeZoneBuffer(payload, bufferFilePath) {
 
 function writeFrontlineZones(zones) {
   const { outputJsonPath } = getLuaPaths();
-  fs.writeFileSync(outputJsonPath, JSON.stringify(zones, null, 2), 'utf8');
+  const next = JSON.stringify(zones, null, 2);
+  try {
+    if (fs.existsSync(outputJsonPath) && fs.readFileSync(outputJsonPath, 'utf8') === next) {
+      return false;
+    }
+  } catch {
+    // Rewrite if the existing file cannot be read.
+  }
+  fs.writeFileSync(outputJsonPath, next, 'utf8');
+  return true;
 }
 
 function buildZonesFromLua() {
@@ -417,8 +426,14 @@ export function refreshBufferAndSync(bufferFilePath) {
     return buildResult;
   }
 
-  writeFrontlineZones(buildResult.zones);
-  console.log(`[lua] Synced ${buildResult.count} zones to frontlineZones.json`);
+  if (buildResult.skipped) {
+    return buildResult;
+  }
+
+  const wrote = writeFrontlineZones(buildResult.zones);
+  if (wrote) {
+    console.log(`[lua] Synced ${buildResult.count} zones to frontlineZones.json`);
+  }
 
   return buildResult;
 }
@@ -446,13 +461,13 @@ export function initialize(onSync = null, options = {}) {
   console.log(`[lua] Initializing buffered zone sync (interval ${intervalMs}ms)`);
 
   const initialResult = refreshBufferAndSync(bufferFilePath);
-  if (onSync && initialResult.success) {
+  if (onSync && initialResult.success && !initialResult.skipped) {
     onSync(initialResult);
   }
 
   const intervalId = setInterval(() => {
     const result = refreshBufferAndSync(bufferFilePath);
-    if (onSync && result.success) {
+    if (onSync && result.success && !result.skipped) {
       onSync(result);
     }
   }, intervalMs);

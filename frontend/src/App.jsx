@@ -402,24 +402,39 @@ function App() {
   }, [splashVisible, splashFading]);
 
   const loadData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const [airportsData, airbaseStatusData, airportCatalogData] = await Promise.all([
-        api.getAirports(),
-        api.getAirbaseStatus().catch(() => ({})),
-        api.getAirportCatalog().catch(() => []),
-      ]);
+    setLoading(true);
+    setError(null);
 
-      setAirports(airportsData);
-      setAirbaseStatus(airbaseStatusData || {});
-      setAirportCatalog(Array.isArray(airportCatalogData) ? airportCatalogData : []);
-    } catch (err) {
-      setError(err.message);
-      console.error('Failed to load data:', err);
-    } finally {
-      setLoading(false);
+    const maxAttempts = 40;
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const [airportsData, airbaseStatusData, airportCatalogData] = await Promise.all([
+          api.getAirports(),
+          api.getAirbaseStatus().catch(() => ({})),
+          api.getAirportCatalog().catch(() => []),
+        ]);
+
+        setAirports(airportsData);
+        setAirbaseStatus(airbaseStatusData || {});
+        setAirportCatalog(Array.isArray(airportCatalogData) ? airportCatalogData : []);
+        lastError = null;
+        break;
+      } catch (err) {
+        lastError = err;
+        await new Promise((resolve) => {
+          window.setTimeout(resolve, Math.min(250 * attempt, 1500));
+        });
+      }
     }
+
+    if (lastError) {
+      setError(lastError.message);
+      console.error('Failed to load data:', lastError);
+    }
+
+    setLoading(false);
   };
 
   return (

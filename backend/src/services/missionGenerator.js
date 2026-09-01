@@ -67,7 +67,6 @@ export function checkAndGenerateMissions(recipientAirportId, recipientWeapons, a
 
     // Check if a mission already exists for this weapon
     if (historicalData.missionExistsForWeapon(recipientAirportId, weaponId)) {
-      console.log(`Mission already exists for ${weaponId} at ${recipientAirportId}`);
       return;
     }
 

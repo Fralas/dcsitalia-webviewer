@@ -93,7 +93,7 @@ const corsOriginHandler = (origin, callback) => {
     callback(null, true);
     return;
   }
-  callback(new Error(`CORS blocked for origin: ${origin}`));
+  callback(null, false);
 };
 
 const io = new Server(httpServer, {
@@ -5395,8 +5395,9 @@ watcher.on('error', (error) => {
   console.error('File watcher error:', error);
 });
 
+let airbaseStatusWatcher = null;
 if (AIRBASE_STATUS_FILE) {
-  const airbaseStatusWatcher = chokidar.watch(AIRBASE_STATUS_FILE, {
+  airbaseStatusWatcher = chokidar.watch(AIRBASE_STATUS_FILE, {
     persistent: true,
     ignoreInitial: true,
     awaitWriteFinish: {
@@ -5622,7 +5623,7 @@ lidcService.exportLidcPolicy();
 syncLidcAirframeStateFromFile();
 atcStripsService.initAtcStripsService();
 
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, '127.0.0.1', () => {
   const activeAirports = airbaseStatusManager.getActiveAirports();
   logger.info(`
 ╔═══════════════════════════════════════════════════════╗
@@ -5782,10 +5783,10 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // ==================== GRACEFUL SHUTDOWN ====================
-process.on('SIGTERM', () => {
+function shutdown() {
   console.log('👋 Shutting down gracefully...');
   watcher.close();
-  airbaseStatusWatcher.close();
+  airbaseStatusWatcher?.close();
   if (luaZoneWatcher && typeof luaZoneWatcher.stop === 'function') {
     luaZoneWatcher.stop();
   }
@@ -5793,5 +5794,8 @@ process.on('SIGTERM', () => {
     console.log('✅ Server closed');
     process.exit(0);
   });
-});
+}
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 

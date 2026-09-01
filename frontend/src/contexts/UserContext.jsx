@@ -57,20 +57,35 @@ export function UserProvider({ children }) {
   }, [user]);
 
   const checkAuth = async () => {
-    try {
-      const response = await fetch(`${resolveApiBase()}/auth/user`, {
-        credentials: 'include',
-      });
+    const maxAttempts = 40;
 
-      if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const response = await fetch(`${resolveApiBase()}/auth/user`, {
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          setUser(userData);
+          break;
+        }
+
+        if (response.status !== 503 && response.status !== 500) {
+          break;
+        }
+      } catch (error) {
+        if (attempt === maxAttempts) {
+          console.error('Auth check failed:', error);
+        }
       }
-    } catch (error) {
-      console.error('Auth check failed:', error);
-    } finally {
-      setLoading(false);
+
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, Math.min(250 * attempt, 1500));
+      });
     }
+
+    setLoading(false);
   };
 
   const logout = () => {
