@@ -595,3 +595,26 @@
   height: 18px;
   flex-shrink: 0;
 }
+
+.login-modal__legal {
+  margin: 14px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--header-text-dim);
+}
+
+.login-modal__legal-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--header-accent);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.login-modal__legal-link:hover {
+  color: var(--header-accent-hover);
+}

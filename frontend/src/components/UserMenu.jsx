@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { LogOut, User, UserCircle2, ChevronDown, X } from 'lucide-react';
+import { LogOut, Shield, User, UserCircle2, ChevronDown, X } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { t } from '../utils/locale';
 
@@ -18,7 +18,7 @@ function DiscordIcon({ className }) {
 /**
  * User Menu Component - Discord Authentication
  */
-export default function UserMenu({ onOpenProfile, variant = 'default' }) {
+export default function UserMenu({ onOpenProfile, onOpenPrivacy, variant = 'default' }) {
   const { user, loading, setUser } = useUser();
   const [menuOpen, setMenuOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
@@ -54,6 +54,14 @@ export default function UserMenu({ onOpenProfile, variant = 'default' }) {
       onOpenProfile();
     }
     setMenuOpen(false);
+  };
+
+  const handleOpenPrivacy = () => {
+    if (typeof onOpenPrivacy === 'function') {
+      onOpenPrivacy();
+    }
+    setMenuOpen(false);
+    setLoginModalOpen(false);
   };
 
   if (loading) {
@@ -103,6 +111,16 @@ export default function UserMenu({ onOpenProfile, variant = 'default' }) {
               <DiscordIcon className="login-modal__discord-icon" />
               {t('general.auth.discordButton')}
             </button>
+            <p className="login-modal__legal">
+              {t('general.auth.privacyBeforeLogin')}{' '}
+              <button
+                type="button"
+                className="login-modal__legal-link"
+                onClick={handleOpenPrivacy}
+              >
+                {t('general.auth.privacyLink')}
+              </button>
+            </p>
           </div>
         </div>
       </div>
@@ -183,6 +201,16 @@ export default function UserMenu({ onOpenProfile, variant = 'default' }) {
             >
               <UserCircle2 className="w-4 h-4" />
               Profilo
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenPrivacy}
+              className={isBrand
+                ? 'app-header__menu-item'
+                : 'w-full px-3 py-2 text-left text-sm text-yt-text-primary hover:bg-yt-bg-tertiary flex items-center gap-2 transition-all'}
+            >
+              <Shield className="w-4 h-4" />
+              {t('privacy.nav')}
             </button>
             <button
               onClick={handleLogout}

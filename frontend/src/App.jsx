@@ -7,6 +7,7 @@ import UserMenu from './components/UserMenu';
 import UserProfile from './components/UserProfile';
 import ChangelogPage from './components/ChangelogPage';
 import WikiPage from './components/WikiPage';
+import PrivacyPage from './components/PrivacyPage';
 import LidcPage from './components/LidcPage';
 import AtcStripPage from './components/atc/AtcStripPage';
 import * as api from './services/api';
@@ -46,6 +47,7 @@ const VIEW_TO_PATH = Object.freeze({
   wiki: '/wiki',
   lidc: '/lidc',
   atc: '/atc',
+  privacy: '/privacy',
 });
 
 function normalizeView(view) {
@@ -85,6 +87,9 @@ function viewFromLocation() {
   }
   if (currentPath === '/atc') {
     return { view: 'atc', tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
+  }
+  if (currentPath === '/privacy') {
+    return { view: 'privacy', tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
   }
   if (currentPath === '/') {
     return { view: 'landing', tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
@@ -604,7 +609,11 @@ function App() {
               </button>
             )}
 
-            <UserMenu onOpenProfile={() => goToView('profile')} variant="brand" />
+            <UserMenu
+              onOpenProfile={() => goToView('profile')}
+              onOpenPrivacy={() => goToView('privacy')}
+              variant="brand"
+            />
           </div>
         </div>
       </header>
@@ -641,6 +650,9 @@ function App() {
         )}
         {currentView === 'wiki' && (
           <WikiPage language={appLanguage} />
+        )}
+        {currentView === 'privacy' && (
+          <PrivacyPage />
         )}
         {currentView === 'lidc' && showLidc && (
           <LidcPage />

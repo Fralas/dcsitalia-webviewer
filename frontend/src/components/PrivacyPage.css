@@ -1,0 +1,92 @@
+.privacy-page {
+  --privacy-accent: #ff8c00;
+  --privacy-text: #ededed;
+  --privacy-dim: #9a9a9a;
+  --privacy-line: #3c3c3c;
+  --privacy-font: "Inter", "Aptos", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+
+  max-width: 720px;
+  margin: 0 auto 48px;
+  padding: 8px 4px 24px;
+  color: var(--privacy-text);
+  font-family: var(--privacy-font);
+}
+
+.privacy-page h1 {
+  margin: 0 0 12px;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+}
+
+.privacy-page h2 {
+  margin: 28px 0 12px;
+  padding-top: 22px;
+  border-top: 1px solid var(--privacy-line);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  line-height: 1.3;
+}
+
+.privacy-page h3 {
+  margin: 20px 0 8px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--privacy-text);
+}
+
+.privacy-page p {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #c8c8c8;
+}
+
+.privacy-page p:has(> strong:only-child) {
+  color: var(--privacy-dim);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.privacy-page ul {
+  margin: 0 0 14px;
+  padding-left: 1.2em;
+}
+
+.privacy-page li {
+  margin: 0 0 6px;
+  font-size: 14px;
+  line-height: 1.65;
+  color: #c8c8c8;
+}
+
+.privacy-page strong {
+  color: var(--privacy-text);
+  font-weight: 700;
+}
+
+.privacy-page code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  color: var(--privacy-accent);
+}
+
+.privacy-page hr {
+  margin: 28px 0 0;
+  border: 0;
+  border-top: 1px solid var(--privacy-line);
+}
+
+.privacy-page a {
+  color: var(--privacy-accent);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.privacy-page a:hover {
+  color: #ffa733;
+}

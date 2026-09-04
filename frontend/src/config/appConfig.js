@@ -6,4 +6,5 @@ export const appConfig = {
   fallbackLocale: 'en',
   localeStorageKey: 'dcsitalia.locale',
   italianRegions: ['IT', 'SM', 'VA'],
+  discordInviteUrl: 'https://discord.gg/M4BVrRswp7',
 };

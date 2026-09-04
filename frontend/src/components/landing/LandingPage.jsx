@@ -6,11 +6,12 @@ import CampaignInfoCard from './CampaignInfoCard';
 import NoeEventAdminModal from './NoeEventAdminModal';
 import { getCampaignById } from '../../config/campaigns';
 import { canManageNoe } from '../../config/featureAccess';
+import { appConfig } from '../../config/appConfig';
 import { useUser } from '../../contexts/UserContext';
 import * as api from '../../services/api';
 import './LandingPage.css';
 
-const DISCORD_URL = import.meta.env.VITE_DISCORD_INVITE_URL || 'https://discord.gg/dcsitalia';
+const DISCORD_URL = import.meta.env.VITE_DISCORD_INVITE_URL || appConfig.discordInviteUrl;
 
 export default function LandingPage({
   language = 'en',

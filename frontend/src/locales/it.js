@@ -49,6 +49,8 @@ export default {
       signInHint: 'Autenticati per accettare e gestire le missioni',
       discordButton: 'Continua con Discord',
       close: 'Chiudi',
+      privacyBeforeLogin: 'Accedendo, Discord ci comunica il tuo profilo pubblico (identificativo, nome e avatar). Dettagli:',
+      privacyLink: 'Informativa privacy',
     },
     prompts: {
       confirmComplete: 'Segnare questa missione come completata?',
@@ -1346,6 +1348,10 @@ export default {
       tLanded: 'Atterrato',
       archive: 'Archivio',
     },
+  },
+  privacy: {
+    nav: 'Privacy',
+    title: 'Informativa privacy',
   },
 };
 
