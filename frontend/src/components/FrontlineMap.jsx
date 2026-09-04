@@ -30,6 +30,7 @@ import MapFilterBar from './map/MapFilterBar';
 import MapActionContextMenu from './map/MapActionContextMenu';
 import ProductionPointPanel from './map/ProductionPointPanel';
 import ProductionPointRetrieveBanner from './map/ProductionPointRetrieveBanner';
+import HidcMapAirportHoverPointer from './map/HidcMapAirportHoverPointer';
 import './map/AirportSpawnPanel.css';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
@@ -56,7 +57,22 @@ const MAPLIBRE_PP_FACTORY_BLUE_IMAGE_ID = 'pp-factory-blue';
 const MAPLIBRE_PP_FACTORY_RED_IMAGE_ID = 'pp-factory-red';
 const CRATE_CLUSTER_RADIUS_M = 20;
 const DBUILD_SITE_MATCH_RADIUS_M = 150;
-const MAPLIBRE_AIRPORT_ICON_SIZE = ['interpolate', ['linear'], ['zoom'], 5, 0.78, 8, 0.95, 10, 1.12];
+const MAPLIBRE_AIRPORT_ICON_SIZE = [
+  'interpolate',
+  ['linear'],
+  ['zoom'],
+  4, 0.32,
+  5, 0.40,
+  6, 0.52,
+  8, 0.88,
+  10, 1.12,
+];
+const MAPLIBRE_AIRPORT_GLOW_RADIUS = [
+  'case',
+  ['==', ['get', 'main'], 1],
+  ['interpolate', ['linear'], ['zoom'], 4, 4, 6, 6, 8, 9, 10, 11],
+  ['interpolate', ['linear'], ['zoom'], 4, 3.2, 6, 5, 8, 7.5, 10, 9],
+];
 
 function isDesktopGlobeDevice() {
   if (typeof window === 'undefined') return true;
@@ -773,6 +789,7 @@ function createAirportMarkerIcon(isMainBase = false, isCarrier = false) {
   const IconComponent = isCarrier ? Anchor : TowerControl;
   const html = renderToStaticMarkup(
     <div
+      className="airport-marker-icon__inner"
       style={{
         width: `${frameSize}px`,
         height: `${frameSize}px`,
@@ -1258,16 +1275,48 @@ function FlatMapFocus({ center, targetZoom }) {
   return null;
 }
 
-function FlatMapZoomWatcher({ onZoomChange }) {
+function airportIconScaleFromZoom(zoom) {
+  const z = Number(zoom);
+  if (!Number.isFinite(z) || z <= 4) return 0.28;
+  if (z >= 10) return 1;
+  if (z <= 6) return 0.28 + ((z - 4) * 0.16);
+  return 0.6 + ((z - 6) * 0.1);
+}
+
+function applyMapLibreAirportIconSize(map) {
+  if (!map?.getLayer?.('airports-core-layer')) return;
+  const scale = airportIconScaleFromZoom(map.getZoom());
+  map.setLayoutProperty('airports-core-layer', 'icon-size', Number((scale * 1.12).toFixed(3)));
+  if (map.getLayer('airports-glow-layer')) {
+    map.setPaintProperty('airports-glow-layer', 'circle-radius', Number((3 + scale * 8).toFixed(2)));
+  }
+}
+
+function applyLeafletAirportIconScale(map) {
+  const scale = airportIconScaleFromZoom(map.getZoom());
+  const container = map.getContainer();
+  container.style.setProperty('--hidc-airport-icon-scale', String(scale));
+  container.querySelectorAll('.airport-marker-icon__inner').forEach((el) => {
+    el.style.transform = `scale(${scale})`;
+  });
+}
+
+function FlatMapZoomWatcher({ onZoomChange, airportCount, showAirports }) {
   const map = useMapEvents({
+    zoom: () => {
+      applyLeafletAirportIconScale(map);
+    },
     zoomend: () => {
+      applyLeafletAirportIconScale(map);
       onZoomChange(map.getZoom());
     },
   });
 
   useEffect(() => {
+    const frame = window.requestAnimationFrame(() => applyLeafletAirportIconScale(map));
     onZoomChange(map.getZoom());
-  }, [map, onZoomChange]);
+    return () => window.cancelAnimationFrame(frame);
+  }, [map, onZoomChange, airportCount, showAirports]);
 
   return null;
 }
@@ -1618,6 +1667,15 @@ function formatCrateTypesHtml(types) {
     .join('');
 }
 
+function LeafletMapCapture({ onMap }) {
+  const map = useMap();
+  useEffect(() => {
+    onMap(map);
+    return () => onMap(null);
+  }, [map, onMap]);
+  return null;
+}
+
 function FlatMapView({
   zones,
   airportsData,
@@ -1681,9 +1739,57 @@ function FlatMapView({
     airportsData.forEach((airport) => map.set(airport.id, airport));
     return map;
   }, [airportsData]);
+  const [leafletMap, setLeafletMap] = useState(null);
+  const [hoveredAirport, setHoveredAirport] = useState(null);
+
+  useEffect(() => {
+    if (!showAirports) setHoveredAirport(null);
+  }, [showAirports]);
+
+  useEffect(() => {
+    if (!leafletMap) return undefined;
+
+    const onMouseMove = (event) => {
+      if (!showAirports) {
+        setHoveredAirport((current) => (current ? null : current));
+        return;
+      }
+      const cursor = event.containerPoint;
+      if (!cursor) return;
+      let nearest = null;
+      let nearestDist = 28;
+      airportsData.forEach((airport) => {
+        const lat = airport.coordinates?.lat;
+        const lon = airport.coordinates?.lon;
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+        const point = leafletMap.latLngToContainerPoint([lat, lon]);
+        const dist = cursor.distanceTo(point);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearest = {
+            lon,
+            lat,
+            name: airport.displayName || airport.name || airport.id,
+          };
+        }
+      });
+      setHoveredAirport((current) => {
+        if (!nearest) return current ? null : current;
+        if (current && current.lon === nearest.lon && current.lat === nearest.lat && current.name === nearest.name) {
+          return current;
+        }
+        return nearest;
+      });
+    };
+
+    leafletMap.on('mousemove', onMouseMove);
+    return () => {
+      leafletMap.off('mousemove', onMouseMove);
+    };
+  }, [leafletMap, airportsData, showAirports]);
 
   return (
-    <div className="h-full w-full">
+    <div className="relative h-full w-full">
       <MapContainer
         center={[center.lat, center.lon]}
         zoom={7}
@@ -1696,7 +1802,12 @@ function FlatMapView({
           attribution={activeBasemap.leafletAttribution}
           url={activeBasemap.leafletUrl}
         />
-        <FlatMapZoomWatcher onZoomChange={onZoomChange} />
+        <LeafletMapCapture onMap={setLeafletMap} />
+        <FlatMapZoomWatcher
+          onZoomChange={onZoomChange}
+          airportCount={airportsData.length}
+          showAirports={showAirports}
+        />
         <FlatMapFocus
           center={focusTargetKey ? focusCoordinates : null}
           targetZoom={
@@ -1957,11 +2068,7 @@ function FlatMapView({
             eventHandlers={{
               click: () => onAirportClick && onAirportClick(airport.id),
             }}
-          >
-            <Tooltip direction="top" offset={[0, -4]} opacity={0.95}>
-              {airport.displayName || airport.name || airport.id}
-            </Tooltip>
-          </Marker>
+          />
         ))}
 
         {showProductionPoints && (productionPoints || []).map((pp) => {
@@ -2096,6 +2203,7 @@ function FlatMapView({
         />
         <FlatMapSpawnClickHandler active={placementActive} onPlace={onPlacementPlace} />
       </MapContainer>
+      <HidcMapAirportHoverPointer map={leafletMap} airport={hoveredAirport} engine="leaflet" />
     </div>
   );
 }
@@ -2173,6 +2281,8 @@ function MapLibreFlatMapView({
   const effectiveMaxZoom = mapMaxZoom || MAP_ZOOM_DEFAULT_MAX;
   const containerRef = useRef(null);
   const mapRef = useRef(null);
+  const [mapInstance, setMapInstance] = useState(null);
+  const [hoveredAirport, setHoveredAirport] = useState(null);
   const dcsarByIdRef = useRef(new Map());
   const domes3dRef = useRef({
     scene: null,
@@ -3125,6 +3235,7 @@ function MapLibreFlatMapView({
       pitchWithRotate: false,
     });
     mapRef.current = map;
+    setMapInstance(map);
     map.dragRotate.disable();
     // Reduce zoom aggressiveness from fast wheel input to avoid unstable camera states.
     map.scrollZoom.setWheelZoomRate(1 / 1500);
@@ -3468,7 +3579,7 @@ function MapLibreFlatMapView({
         type: 'circle',
         source: 'airports-src',
         paint: {
-          'circle-radius': ['case', ['==', ['get', 'main'], 1], 11, 9],
+          'circle-radius': MAPLIBRE_AIRPORT_GLOW_RADIUS,
           'circle-color': ['case', ['==', ['get', 'main'], 1], '#22c55e', '#60a5fa'],
           'circle-opacity': 0.16,
         },
@@ -3488,10 +3599,11 @@ function MapLibreFlatMapView({
           'icon-size': MAPLIBRE_AIRPORT_ICON_SIZE,
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,
-          'icon-pitch-alignment': 'map',
-          'icon-rotation-alignment': 'map',
+          'icon-pitch-alignment': 'viewport',
+          'icon-rotation-alignment': 'viewport',
         },
       });
+      applyMapLibreAirportIconSize(map);
 
       map.addLayer({
         id: 'production-points-layer',
@@ -3739,15 +3851,31 @@ function MapLibreFlatMapView({
         const airportId = feature?.properties?.id;
         if (airportId && onAirportClick) onAirportClick(airportId);
       });
-      map.on('mousemove', 'airports-core-layer', (event) => {
+      map.on('mousemove', (event) => {
+        if (!map.getLayer('airports-core-layer')) {
+          setHoveredAirport((current) => (current ? null : current));
+          return;
+        }
+        const hoverLayers = ['airports-core-layer'];
+        if (map.getLayer('airports-glow-layer')) hoverLayers.push('airports-glow-layer');
+        const features = map.queryRenderedFeatures(event.point, { layers: hoverLayers });
+        if (!features.length) {
+          setHoveredAirport((current) => (current ? null : current));
+          return;
+        }
+        const feature = features[0];
+        const coords = feature?.geometry?.coordinates;
+        const lon = Number(coords?.[0]);
+        const lat = Number(coords?.[1]);
+        const airportName = String(feature?.properties?.name || feature?.properties?.id || 'Airport');
+        if (!Number.isFinite(lon) || !Number.isFinite(lat)) return;
         map.getCanvas().style.cursor = 'pointer';
-        const feature = event?.features?.[0];
-        const airportName = feature?.properties?.name || feature?.properties?.id || 'Airport';
-        showHoverPopup(event.lngLat, `<div style="font-size:11px;font-weight:600;">${airportName}</div>`);
-      });
-      map.on('mouseleave', 'airports-core-layer', () => {
-        map.getCanvas().style.cursor = '';
-        hideHoverPopup();
+        setHoveredAirport((current) => {
+          if (current && current.lon === lon && current.lat === lat && current.name === airportName) {
+            return current;
+          }
+          return { lon, lat, name: airportName };
+        });
       });
 
       map.on('click', 'convoy-points-hit-layer', (event) => {
@@ -3822,6 +3950,7 @@ function MapLibreFlatMapView({
       });
 
       map.on('zoomend', () => {
+        applyMapLibreAirportIconSize(map);
         if (onZoomChange) onZoomChange(map.getZoom());
       });
       map.on('moveend', () => {
@@ -3849,6 +3978,7 @@ function MapLibreFlatMapView({
         });
       });
       map.on('zoom', () => {
+        applyMapLibreAirportIconSize(map);
         if (zoomGuardRef.current) return;
         const currentZoom = map.getZoom();
         const clampedZoom = Math.max(MIN_SAFE_ZOOM, Math.min(map.getMaxZoom(), currentZoom));
@@ -3914,6 +4044,8 @@ function MapLibreFlatMapView({
       }
       map.remove();
       mapRef.current = null;
+      setMapInstance(null);
+      setHoveredAirport(null);
     };
   }, [style, logMapDebug, disposeThreeNode]);
 
@@ -3983,6 +4115,10 @@ function MapLibreFlatMapView({
     const source = map.getSource('airports-src');
     if (source?.setData) source.setData(fcAirports);
   }, [fcAirports]);
+
+  useEffect(() => {
+    if (!showAirports) setHoveredAirport(null);
+  }, [showAirports]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -4292,6 +4428,7 @@ function MapLibreFlatMapView({
   return (
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
+      <HidcMapAirportHoverPointer map={mapInstance} airport={hoveredAirport} />
     </div>
   );
 }

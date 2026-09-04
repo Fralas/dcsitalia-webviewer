@@ -1,0 +1,51 @@
+.hidc-airport-pointer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+}
+
+.hidc-airport-pointer,
+.hidc-airport-pointer__svg,
+.hidc-airport-pointer__line,
+.hidc-airport-pointer__dot,
+.hidc-airport-pointer__label {
+  pointer-events: none !important;
+}
+
+.hidc-airport-pointer__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.hidc-airport-pointer__line {
+  fill: none;
+  stroke: #4e4e4e;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hidc-airport-pointer__dot {
+  fill: #0e0e0e;
+  stroke: #4e4e4e;
+}
+
+.hidc-airport-pointer__label {
+  position: absolute;
+  box-sizing: border-box;
+  transform: translate(0, -100%);
+  padding: 0 0 3px;
+  color: #ffffff;
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.15;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
+}

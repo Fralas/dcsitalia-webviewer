@@ -15,6 +15,7 @@
   position: absolute;
   top: 20px;
   right: 20px;
+  bottom: 20px;
   z-index: 2000;
   width: auto;
   min-width: 0;
@@ -53,16 +54,26 @@
   position: relative;
   --lf-card-width: 470px;
   --lf-toggle-size: 24px;
+  flex: 0 1 auto;
+  min-height: 0;
 }
 
 .live-feed-card--ops {
-  max-height: calc(100vh - 140px);
   position: relative;
   --lf-card-width: 470px;
   --lf-toggle-size: 24px;
 }
 
+.live-feed-card--ops:not(.is-collapsed) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .live-feed-card--ops.is-collapsed {
+  flex: 0 0 auto;
   max-height: none;
 }
 
@@ -197,6 +208,11 @@
 
 .live-feed-card__body--ops {
   padding: 12px 10px 10px;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .live-feed-card__list {

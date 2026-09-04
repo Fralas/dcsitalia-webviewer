@@ -129,6 +129,17 @@ code {
   display: none !important;
 }
 
+.airport-marker-icon {
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.airport-marker-icon__inner {
+  transform: scale(var(--hidc-airport-icon-scale, 1));
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
 /* MapLibre hover popups (zones/airports/routes): compact dark theme */
 .frontline-hover-popup .maplibregl-popup-content {
   background: rgba(12, 18, 30, 0.96);

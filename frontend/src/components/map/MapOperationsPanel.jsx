@@ -831,21 +831,6 @@ export default function MapOperationsPanel({
           </>
         )}
 
-        {activeTab === 'mission' && (
-          <div className="map-ops-section__task-filters">
-            {missionTasks.map((task) => (
-              <button
-                key={task}
-                type="button"
-                className={`map-ops-section__pill${taskFilter === task ? ' is-active' : ''}`}
-                onClick={() => toggleTaskFilter(task)}
-              >
-                {task}
-              </button>
-            ))}
-          </div>
-        )}
-
         {activeTab === 'production' && (
           <div
             className="map-ops-section__stock-wrap"
@@ -1000,6 +985,7 @@ export default function MapOperationsPanel({
         </button>
       </div>
 
+      <div className={`map-ops-section__results${activeTab === 'mission' ? ' map-ops-section__results--mission' : ''}`}>
       <div className="map-ops-section__list">
         {activeRows.length === 0 ? (
           <div className="map-ops-section__row map-ops-section__row--empty">
@@ -1111,6 +1097,21 @@ export default function MapOperationsPanel({
               </button>
             );
           })
+        )}
+      </div>
+        {activeTab === 'mission' && (
+          <div className="map-ops-section__task-filters" role="group" aria-label={t('map.rightPanel.ops.tabs.mission')}>
+            {missionTasks.map((task) => (
+              <button
+                key={task}
+                type="button"
+                className={`map-ops-section__pill${taskFilter === task ? ' is-active' : ''}`}
+                onClick={() => toggleTaskFilter(task)}
+              >
+                {task}
+              </button>
+            ))}
+          </div>
         )}
       </div>
     </section>

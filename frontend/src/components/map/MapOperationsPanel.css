@@ -6,10 +6,10 @@
 
   display: flex;
   flex-direction: column;
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-  height: 100%;
+  height: auto;
 }
 
 .map-ops-section__tabs {
@@ -95,12 +95,12 @@
 
 .map-ops-section__toolbar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: stretch;
   gap: 8px;
   margin: 0 0 12px;
   padding-top: 12px;
-  padding-right: 34px;
+  padding-right: 42px;
   border-top: 1px solid #4e4e4e;
   flex: 0 0 auto;
   min-width: 0;
@@ -109,17 +109,12 @@
 }
 
 .map-ops-section__aircraft,
-.map-ops-section__task-filters,
 .map-ops-section__route-selects,
 .map-ops-section__logistic-route {
   display: flex;
+  flex-wrap: nowrap;
   gap: 8px;
   flex-shrink: 0;
-}
-
-/* tighter chips row to fit all pills */
-.map-ops-section__task-filters {
-  gap: 6px;
 }
 
 .map-ops-section__aircraft-btn,
@@ -181,24 +176,44 @@
   border-color: #757575;
 }
 
+.map-ops-section__results {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.map-ops-section__results--mission {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 58px;
+  align-items: stretch;
+  gap: 8px;
+  height: auto;
+}
+
 .map-ops-section__task-filters {
-  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  gap: 8px;
   min-width: 0;
+  min-height: 0;
 }
 
 .map-ops-section__pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 auto;
+  flex: 1 1 0;
+  width: 100%;
   min-width: 0;
-  min-height: 32px;
-  padding: 0 10px;
+  min-height: 28px;
+  padding: 0 3px;
   color: #ffffff;
   font-size: 12px;
   font-weight: 700;
   line-height: 1;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
   white-space: nowrap;
   cursor: pointer;
   transition: background 0.15s ease;
@@ -238,7 +253,7 @@
 
 .map-ops-section__select-wrap--airport,
 .map-ops-section__select-wrap--departure {
-  flex: 0 0 135px;
+  flex: 0 1 135px;
   min-width: 0;
 }
 
@@ -523,6 +538,7 @@
   gap: 8px;
   flex: 1 1 auto;
   min-height: 0;
+  height: 100%;
   padding: calc(4px * var(--lf-item-scale)) 0 calc(8px * var(--lf-item-scale));
   overflow-y: auto;
   scrollbar-width: none;
