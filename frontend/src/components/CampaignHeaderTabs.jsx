@@ -6,12 +6,18 @@ const COMING_SOON_TAB_IDS = new Set([
   'lidc-persian-gulf',
 ]);
 
-export default function CampaignHeaderTabs({ activeCampaignId, onSelectCampaign }) {
+export default function CampaignHeaderTabs({
+  activeCampaignId,
+  onSelectCampaign,
+  canAccessLidc = false,
+}) {
   return (
     <nav className="app-header__tabs" aria-label="Campaigns">
       {CAMPAIGNS.map((campaign) => {
         const target = getCampaignNavTarget(campaign);
-        const isNavigable = target.type === 'hidc' || target.type === 'lidc';
+        const isNavigable = target.type === 'hidc'
+          || (target.type === 'lidc' && canAccessLidc);
+        const isLidcLocked = target.type === 'lidc' && !canAccessLidc;
         const isActive = campaign.id === activeCampaignId;
         const hasComingSoon = COMING_SOON_TAB_IDS.has(campaign.id);
 
@@ -27,7 +33,11 @@ export default function CampaignHeaderTabs({ activeCampaignId, onSelectCampaign 
             ].filter(Boolean).join(' ')}
             aria-current={isActive ? 'page' : undefined}
             aria-disabled={!isNavigable ? 'true' : undefined}
-            onClick={() => onSelectCampaign(campaign)}
+            disabled={isLidcLocked}
+            onClick={() => {
+              if (isLidcLocked) return;
+              onSelectCampaign(campaign);
+            }}
           >
             <span className="app-header__tab-label">{campaign.label}</span>
             {hasComingSoon && (

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Copy,
@@ -13,7 +13,6 @@ import {
   Trash2,
   UserPlus,
   Maximize2,
-  ScrollText,
   X,
 } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
@@ -37,10 +36,7 @@ import LidcDeckBuilder, {
 import LidcSpecializationPicker, { sumSpecializationCaps } from './LidcSpecializationPicker';
 import LidcSquadronIdentityStep from './LidcSquadronIdentityStep';
 import InlineError from './InlineError';
-import BootSplash from './BootSplash';
 import './LidcPage.css';
-
-const LidcStorylineRoom = lazy(() => import('./LidcStorylineRoom'));
 
 const WIZARD_STEPS = ['info', 'specializations', 'deck', 'review'];
 const SPECIALIZATION_SLOTS = 2;
@@ -367,7 +363,6 @@ export default function LidcPage() {
   const sidebarCloseTimerRef = useRef(null);
   const [panelMode, setPanelMode] = useState('home');
   const [isWizardOpen, setIsWizardOpen] = useState(false);
-  const [isStorylineOpen, setIsStorylineOpen] = useState(false);
 
   const [currentStep, setCurrentStep] = useState(0);
   const [name, setName] = useState('');
@@ -534,7 +529,7 @@ export default function LidcPage() {
     && Boolean(user?.id)
     && !Boolean(userLidcState.hasSquadron)
     && panelMode === 'join';
-  const shouldBlurBehindOverlay = isWizardOpen || isEntryWizardVisible || Boolean(airportWizardTab) || isStorylineOpen;
+  const shouldBlurBehindOverlay = isWizardOpen || isEntryWizardVisible || Boolean(airportWizardTab);
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
@@ -2882,11 +2877,6 @@ export default function LidcPage() {
   const wizardPortalTarget = typeof document !== 'undefined'
     ? document.getElementById('lidc-overlay-root') || document.body
     : null;
-  const storylineLaunchTarget = typeof document !== 'undefined' ? document.body : null;
-  const showStorylineLaunch = !isStorylineOpen
-    && !isWizardOpen
-    && !isEntryWizardVisible
-    && !airportWizardTab;
   const showNotInSquadronHomePopup = isLogged && !userHasSquadron && panelMode === 'home' && !loadingUserState;
   const showInlineCenterStage = !isWizardOpen
     && !isEntryWizardVisible
@@ -2941,37 +2931,8 @@ export default function LidcPage() {
         </div>
       </div>
 
-      {!isStorylineOpen && storylineLaunchTarget && showStorylineLaunch && createPortal(
-        <button
-          type="button"
-          className="lidc-storyline-launch"
-          onClick={() => setIsStorylineOpen(true)}
-          title={t('lidc.storyline.open')}
-          aria-label={t('lidc.storyline.open')}
-        >
-          <ScrollText size={16} aria-hidden="true" />
-          <span>{t('lidc.storyline.open')}</span>
-        </button>,
-        storylineLaunchTarget,
-      )}
-
       {renderDebugLeaveHeaderButton()}
       {renderMemberContextMenu()}
-
-      {isStorylineOpen && wizardPortalTarget && createPortal(
-        <Suspense fallback={(
-          <div className="lidc-storyline-root" aria-busy="true" aria-label={t('lidc.storyline.loading')}>
-            <BootSplash
-              status={t('general.bootStatus')}
-              hint={t('general.bootHint')}
-            />
-          </div>
-        )}
-        >
-          <LidcStorylineRoom onClose={() => setIsStorylineOpen(false)} />
-        </Suspense>,
-        wizardPortalTarget,
-      )}
 
       {isEntryWizardVisible && wizardPortalTarget && createPortal(
         <div className="lidc-center-stage lidc-center-stage-global">

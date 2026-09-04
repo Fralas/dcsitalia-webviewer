@@ -1402,37 +1402,6 @@ body.lidc-wizard-open {
   user-select: none;
 }
 
-.lidc-storyline-launch {
-  position: fixed;
-  right: clamp(16px, 1.4vw, 24px);
-  bottom: clamp(16px, 1.4vw, 24px);
-  z-index: 2000;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 42px;
-  padding: 0 16px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-  background: rgba(14, 14, 14, 0.88);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  color: #ffffff;
-  font: inherit;
-  font-size: 0.88rem;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
-  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
-  pointer-events: auto;
-}
-
-.lidc-storyline-launch:hover {
-  transform: translateY(-1px);
-  border-color: rgba(255, 187, 0, 0.55);
-  background: rgba(24, 24, 24, 0.94);
-}
-
 .lidc-panel-row--member {
   gap: clamp(12px, 0.73vw, 28px);
   cursor: default;

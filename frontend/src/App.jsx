@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
-import { BookOpen, CalendarSync, ChevronDown, TowerControl } from 'lucide-react';
+import { lazy, Suspense, useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { BookOpen, CalendarSync, ChevronDown, ScrollText, TowerControl } from 'lucide-react';
 import FrontlineMap from './components/FrontlineMap';
 import LandingPage from './components/landing/LandingPage';
 import UserMenu from './components/UserMenu';
@@ -27,8 +28,11 @@ import {
   getTacticalMapByCampaignId,
   resolveTacticalMapFromPath,
 } from './config/tacticalMaps';
-import { canAccessAtc } from './config/featureAccess';
+import { canAccessAtc, canAccessLidc } from './config/featureAccess';
 import './AppHeader.css';
+
+const LidcStorylineRoom = lazy(() => import('./components/LidcStorylineRoom'));
+const LIDC_STORYLINE_CAMPAIGN_ID = 'lidc-afghanistan';
 
 const MIN_BOOT_MS = 1600;
 const BOOT_SETTLE_MS = 480;
@@ -179,12 +183,15 @@ function App() {
   const [error, setError] = useState(null);
   const { user, loading: userLoading } = useUser();
   const showAtc = canAccessAtc(user);
+  const showLidc = canAccessLidc(user);
   const bootStartedAt = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now());
   const bootRevealDone = useRef(false);
   const [splashVisible, setSplashVisible] = useState(true);
   const [splashFading, setSplashFading] = useState(false);
   const [splashKey, setSplashKey] = useState(0);
   const [splashPreview, setSplashPreview] = useState(() => isSplashPreviewUrl());
+  const [isStorylineOpen, setIsStorylineOpen] = useState(false);
+  const storylineReturnViewRef = useRef('landing');
   const bootReady = !loading && !userLoading;
 
   const hideSplash = () => {
@@ -214,6 +221,9 @@ function App() {
       setActiveTacticalMapId(nextMapId);
       setCurrentView('frontline');
       syncUrlWithView('frontline', { tacticalMapId: nextMapId, ...options });
+      return;
+    }
+    if (normalized === 'lidc' && !showLidc) {
       return;
     }
     if (normalized === 'landing') {
@@ -247,7 +257,26 @@ function App() {
       return;
     }
     if (target?.type === 'lidc') {
+      if (target.openStoryline) {
+        storylineReturnViewRef.current = 'landing';
+        setIsStorylineOpen(true);
+        if (currentView !== 'landing') {
+          goToView('landing');
+        }
+        setSelectedCampaignId(LIDC_STORYLINE_CAMPAIGN_ID);
+        return;
+      }
       goToView('lidc');
+    }
+  };
+
+  const closeStoryline = () => {
+    setIsStorylineOpen(false);
+    if (storylineReturnViewRef.current === 'landing') {
+      if (currentView !== 'landing') {
+        goToView('landing');
+      }
+      setSelectedCampaignId(LIDC_STORYLINE_CAMPAIGN_ID);
     }
   };
   const isItalian = appLanguage === 'it';
@@ -357,6 +386,13 @@ function App() {
       syncUrlWithView('frontline', { replace: true });
     }
   }, [currentView, showAtc]);
+
+  useEffect(() => {
+    if (userLoading) return;
+    if (currentView === 'lidc' && !showLidc) {
+      goToView('landing');
+    }
+  }, [currentView, showLidc, userLoading]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -469,10 +505,11 @@ function App() {
       ) : null}
 
       {!error && bootReady && (!splashVisible || splashFading) ? (
+    <>
     <div
       className={`app-shell h-screen flex flex-col overflow-hidden ${(currentView === 'landing' || currentView === 'lidc') ? 'bg-[#0E0E0E]' : 'bg-yt-bg-primary'}`}
-      aria-hidden={splashVisible}
-      {...(splashVisible ? { inert: '' } : {})}
+      aria-hidden={splashVisible || isStorylineOpen}
+      {...((splashVisible || isStorylineOpen) ? { inert: '' } : {})}
     >
       <header className={`app-header${currentView === 'landing' ? ' app-header--landing' : ''}${currentView === 'lidc' ? ' app-header--lidc' : ''}${currentView === 'frontline' ? ' app-header--frontline' : ''}`}>
         <div className="app-header__inner">
@@ -495,11 +532,27 @@ function App() {
           <CampaignHeaderTabs
             activeCampaignId={headerActiveCampaignId}
             onSelectCampaign={handleSelectCampaign}
+            canAccessLidc={showLidc}
           />
 
           <div className="app-header__right">
             {currentView === 'lidc' && (
               <div id="app-header-debug-slot" className="app-header__debug-slot" />
+            )}
+
+            {currentView === 'lidc' && !isStorylineOpen && (
+              <button
+                type="button"
+                onClick={() => {
+                  storylineReturnViewRef.current = 'lidc';
+                  setIsStorylineOpen(true);
+                }}
+                className="app-header__nav-btn app-header__nav-btn--lang"
+                title={t('lidc.storyline.open')}
+                aria-label={t('lidc.storyline.open')}
+              >
+                <ScrollText className="w-4 h-4" aria-hidden="true" />
+              </button>
             )}
 
             <button
@@ -589,7 +642,7 @@ function App() {
         {currentView === 'wiki' && (
           <WikiPage language={appLanguage} />
         )}
-        {currentView === 'lidc' && (
+        {currentView === 'lidc' && showLidc && (
           <LidcPage />
         )}
         {currentView === 'atc' && showAtc && (
@@ -605,6 +658,23 @@ function App() {
         </footer>
       )}
     </div>
+    {isStorylineOpen && typeof document !== 'undefined' && createPortal(
+      (
+        <Suspense fallback={(
+          <div className="lidc-storyline-root" aria-busy="true" aria-label={t('lidc.storyline.loading')}>
+            <BootSplash
+              status={t('general.bootStatus')}
+              hint={t('general.bootHint')}
+            />
+          </div>
+        )}
+        >
+          <LidcStorylineRoom onClose={closeStoryline} />
+        </Suspense>
+      ),
+      document.getElementById('lidc-overlay-root') || document.body,
+    )}
+    </>
       ) : null}
     </>
   );

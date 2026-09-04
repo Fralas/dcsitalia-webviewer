@@ -49,9 +49,9 @@ function hasRole(roleIds, envName) {
   return Array.isArray(roleIds) && roleIds.map(String).includes(roleId);
 }
 
-export function canAccessLidc(userId, roleIds = []) {
+export function canAccessLidc(userId, _roleIds = []) {
   const id = normalizeDiscordId(userId);
-  return Boolean(id) && (LIDC_DISCORD_IDS.has(id) || hasRole(roleIds, 'DISCORD_LIDC_ROLE_ID'));
+  return Boolean(id) && LIDC_DISCORD_IDS.has(id);
 }
 
 export function canAccessAtc(userId, roleIds = []) {

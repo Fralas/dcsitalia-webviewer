@@ -7,11 +7,13 @@ const HIDC_SYRIA_CONTENT_ID = 'hidc-modern-syria';
 const LABELS = {
   en: {
     openMap: 'OPEN MAP',
+    goToStory: 'Go to the story',
     comingSoon: 'COMING SOON',
     selectCampaign: 'SELECT CAMPAIGN',
   },
   it: {
     openMap: 'APRI MAPPA',
+    goToStory: 'Vai alla storia',
     comingSoon: 'PROSSIMAMENTE',
     selectCampaign: 'SELEZIONA CAMPAGNA',
   },
@@ -92,7 +94,7 @@ export default function CampaignInfoCard({ campaign, language = 'en', onOpenCamp
       return;
     }
     if (canOpenLidc) {
-      onOpenCampaign?.({ type: 'lidc' });
+      onOpenCampaign?.({ type: 'lidc', openStoryline: true });
     }
   };
 
@@ -141,7 +143,9 @@ export default function CampaignInfoCard({ campaign, language = 'en', onOpenCamp
         disabled={!canOpen}
         onClick={handleOpen}
       >
-        {isOverview ? L.selectCampaign : (canOpen ? L.openMap : L.comingSoon)}
+        {isOverview
+          ? L.selectCampaign
+          : (canOpen ? (canOpenLidc ? L.goToStory : L.openMap) : L.comingSoon)}
       </button>
     </section>
   );
