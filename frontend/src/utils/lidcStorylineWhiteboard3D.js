@@ -4,6 +4,7 @@ import {
   LIDC_STORYLINE_WHITEBOARD_ITEMS,
 } from '../config/lidcStorylineWhiteboardItems';
 import { ZONE_TYPES } from './lidcStorylineZones';
+import { fromPinCanvasSize } from './lidcStorylineWhiteboardCanvas';
 
 const SURFACE_INSET = 0.004;
 const PHOTO_FRAME_PADDING = 0.08;
@@ -56,9 +57,10 @@ function percentToLocalPoint(u, v, mapping) {
 }
 
 function getPinLayout(item, imageAspect) {
-  const left = item.x / 100;
-  const top = item.y / 100;
-  const width = item.width / 100;
+  const left = Math.min(1, Math.max(0, Number(item.x) / 100));
+  const top = Math.min(1, Math.max(0, Number(item.y) / 100));
+  const widthValue = Number(item.width);
+  const width = Math.max(0.01, (widthValue > 0 && widthValue < 8 ? fromPinCanvasSize(widthValue) : widthValue) / 100);
   const photoHeight = width / Math.max(imageAspect, 0.1);
   const totalHeight = photoHeight * (1 + PHOTO_FRAME_PADDING * 2 + CAPTION_HEIGHT_RATIO);
 
@@ -68,8 +70,8 @@ function getPinLayout(item, imageAspect) {
 function getAnchorPercent(item, anchor, imageAspect) {
   const layout = getPinLayout(item, imageAspect);
   return {
-    u: layout.left + layout.width * anchor.x,
-    v: layout.top + layout.totalHeight * anchor.y,
+    u: layout.left + layout.width * (anchor?.x ?? 0.5),
+    v: layout.top + layout.photoHeight * 0.045,
   };
 }
 

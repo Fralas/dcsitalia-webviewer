@@ -763,7 +763,7 @@ export default {
         title: 'Layout debug',
         subtitle: 'Move the room or whiteboard, then save.',
         pinLayoutTitle: 'Board photos',
-        pinLayoutHint: 'With the board open, drag the photos. Fine-tune X/Y, width and rotation here. Copy JSON and paste into lidcStorylineWhiteboardItems.js.',
+        pinLayoutHint: 'With the board open, zoom out and drag photos across the full surface, including the edges. X/Y 0–100 cover the area visible at minimum zoom. Copy JSON and paste into lidcStorylineWhiteboardItems.js.',
         pinWidth: 'Width %',
         pinRotation: 'Rotation',
         pinLayoutCopy: 'Copy pin layout',

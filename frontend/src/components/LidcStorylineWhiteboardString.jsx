@@ -7,6 +7,9 @@ const CONSTRAINT_ITERATIONS = 8;
 const MOUSE_RADIUS = 48;
 const MOUSE_STRENGTH = 2.2;
 const CONSTRAINT_STIFFNESS = 0.88;
+const PIN_HEAD_RADIUS = 8.2;
+const PIN_NEEDLE_LENGTH = 14;
+const PIN_HIGHLIGHT_OFFSET = { x: -2.2, y: -2.4, r: 2.1 };
 
 function createPoints(anchorA, anchorB, count) {
   const points = [];
@@ -42,15 +45,13 @@ function getLocalPoint(clientX, clientY, container) {
 
 function getAnchorPoint(pinEl, anchorNorm, container) {
   if (!pinEl || !container) return null;
+  if (pinEl.parentElement !== container) return null;
 
-  const pinRect = pinEl.getBoundingClientRect();
-  const containerRect = container.getBoundingClientRect();
-  const scaleX = container.offsetWidth > 0 ? containerRect.width / container.offsetWidth : 1;
-  const scaleY = container.offsetHeight > 0 ? containerRect.height / container.offsetHeight : 1;
+  const photoEl = pinEl.querySelector('.lidc-whiteboard-photo') || pinEl;
 
   return {
-    x: (pinRect.left - containerRect.left) / scaleX + (pinRect.width / scaleX) * anchorNorm.x,
-    y: (pinRect.top - containerRect.top) / scaleY + (pinRect.height / scaleY) * anchorNorm.y,
+    x: pinEl.offsetLeft + photoEl.offsetLeft + photoEl.offsetWidth * (anchorNorm?.x ?? 0.5),
+    y: pinEl.offsetTop + photoEl.offsetTop + PIN_HEAD_RADIUS,
   };
 }
 
@@ -223,14 +224,24 @@ export default function LidcStorylineWhiteboardString({
       <path className="lidc-whiteboard-string-hit" />
       <path className="lidc-whiteboard-string-path" />
       <g className="lidc-whiteboard-string-pin" data-pin="from">
-        <line className="lidc-whiteboard-string-pin-needle" x1="0" y1="0" x2="0" y2="14" />
-        <circle className="lidc-whiteboard-string-pin-head" cx="0" cy="0" r="8.2" />
-        <circle className="lidc-whiteboard-string-pin-highlight" cx="-2.2" cy="-2.4" r="2.1" />
+        <line className="lidc-whiteboard-string-pin-needle" x1="0" y1="0" x2="0" y2={PIN_NEEDLE_LENGTH} />
+        <circle className="lidc-whiteboard-string-pin-head" cx="0" cy="0" r={PIN_HEAD_RADIUS} />
+        <circle
+          className="lidc-whiteboard-string-pin-highlight"
+          cx={PIN_HIGHLIGHT_OFFSET.x}
+          cy={PIN_HIGHLIGHT_OFFSET.y}
+          r={PIN_HIGHLIGHT_OFFSET.r}
+        />
       </g>
       <g className="lidc-whiteboard-string-pin" data-pin="to">
-        <line className="lidc-whiteboard-string-pin-needle" x1="0" y1="0" x2="0" y2="14" />
-        <circle className="lidc-whiteboard-string-pin-head" cx="0" cy="0" r="8.2" />
-        <circle className="lidc-whiteboard-string-pin-highlight" cx="-2.2" cy="-2.4" r="2.1" />
+        <line className="lidc-whiteboard-string-pin-needle" x1="0" y1="0" x2="0" y2={PIN_NEEDLE_LENGTH} />
+        <circle className="lidc-whiteboard-string-pin-head" cx="0" cy="0" r={PIN_HEAD_RADIUS} />
+        <circle
+          className="lidc-whiteboard-string-pin-highlight"
+          cx={PIN_HIGHLIGHT_OFFSET.x}
+          cy={PIN_HIGHLIGHT_OFFSET.y}
+          r={PIN_HIGHLIGHT_OFFSET.r}
+        />
       </g>
     </svg>
   );

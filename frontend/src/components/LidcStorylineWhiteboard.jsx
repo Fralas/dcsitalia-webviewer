@@ -2,12 +2,18 @@ import { useEffect, useRef, useState } from 'react';
 import { LIDC_STORYLINE_WHITEBOARD_CONNECTIONS, LIDC_STORYLINE_WHITEBOARD_ITEMS } from '../config/lidcStorylineWhiteboardItems';
 import { t } from '../utils/locale';
 import { mergeWhiteboardItems } from '../utils/lidcStorylineWhiteboardLayout';
+import {
+  WHITEBOARD_MIN_VIEW_SCALE,
+  WHITEBOARD_PIN_CANVAS_PERCENT,
+  WHITEBOARD_PIN_PAD_PERCENT,
+  pinCanvasWidth,
+} from '../utils/lidcStorylineWhiteboardCanvas';
 import LidcStorylineWhiteboardString from './LidcStorylineWhiteboardString';
 import { LidcStorylineHudNotice } from './LidcStorylineHud';
 import './LidcStorylineWhiteboard.css';
 
 const DEFAULT_VIEW_SCALE = 0.62;
-const MIN_VIEW_SCALE = 0.38;
+const MIN_VIEW_SCALE = WHITEBOARD_MIN_VIEW_SCALE;
 const MAX_VIEW_SCALE = 1.08;
 const ZOOM_SENSITIVITY = 0.0012;
 
@@ -382,8 +388,8 @@ export default function LidcStorylineWhiteboard({
       const pointer = clientToBoardPercent(event.clientX, event.clientY);
       if (!pointer) return;
       onPinLayoutLiveChange?.(drag.id, {
-        x: Math.min(92, Math.max(-2, pointer.x - drag.offsetX)),
-        y: Math.min(92, Math.max(-2, pointer.y - drag.offsetY)),
+        x: Math.min(100, Math.max(0, pointer.x - drag.offsetX)),
+        y: Math.min(100, Math.max(0, pointer.y - drag.offsetY)),
       });
       return;
     }
@@ -462,6 +468,10 @@ export default function LidcStorylineWhiteboard({
             className="lidc-whiteboard-content"
             ref={contentRef}
             style={{
+              left: `${-WHITEBOARD_PIN_PAD_PERCENT}%`,
+              top: `${-WHITEBOARD_PIN_PAD_PERCENT}%`,
+              width: `${WHITEBOARD_PIN_CANVAS_PERCENT}%`,
+              height: `${WHITEBOARD_PIN_CANVAS_PERCENT}%`,
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${viewScale})`,
             }}
           >
@@ -476,7 +486,7 @@ export default function LidcStorylineWhiteboard({
                 style={{
                   left: `${item.x}%`,
                   top: `${item.y}%`,
-                  width: `${item.width}%`,
+                  width: `${pinCanvasWidth(item.width)}%`,
                   '--pin-rotation': `${item.rotation}deg`,
                   transform: `rotate(${item.rotation}deg)`,
                 }}

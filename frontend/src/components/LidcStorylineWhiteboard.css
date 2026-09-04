@@ -64,7 +64,7 @@
 
 .lidc-whiteboard-content {
   position: absolute;
-  inset: 0;
+  overflow: visible;
   transform-origin: center center;
   will-change: transform;
 }

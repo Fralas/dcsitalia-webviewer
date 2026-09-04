@@ -763,7 +763,7 @@ export default {
         title: 'Debug layout',
         subtitle: 'Sposta stanza o lavagna, poi salva.',
         pinLayoutTitle: 'Foto sulla lavagna',
-        pinLayoutHint: 'Con la lavagna aperta, trascina le foto. Qui puoi rifinire X/Y, larghezza e rotazione. Copia il JSON e aggiorna lidcStorylineWhiteboardItems.js.',
+        pinLayoutHint: 'Con la lavagna aperta, zoom out e trascina le foto su tutta la superficie, anche i bordi. X/Y 0–100 coprono l’area visibile allo zoom minimo. Copia il JSON e aggiorna lidcStorylineWhiteboardItems.js.',
         pinWidth: 'Larghezza %',
         pinRotation: 'Rotazione',
         pinLayoutCopy: 'Copia layout pin',

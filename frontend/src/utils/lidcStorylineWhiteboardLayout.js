@@ -1,6 +1,6 @@
 import { LIDC_STORYLINE_WHITEBOARD_ITEMS } from '../config/lidcStorylineWhiteboardItems';
 
-export const WHITEBOARD_PIN_LAYOUT_STORAGE_KEY = 'lidc-storyline-whiteboard-pin-layout';
+export const WHITEBOARD_PIN_LAYOUT_STORAGE_KEY = 'lidc-storyline-whiteboard-pin-layout-v4';
 
 export function getDefaultWhiteboardPinLayout() {
   return Object.fromEntries(
