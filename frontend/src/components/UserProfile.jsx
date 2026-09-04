@@ -5,6 +5,7 @@ import { useUser } from '../contexts/UserContext';
 import * as api from '../services/api';
 import InlineError from './InlineError';
 import PatchViewer from './PatchViewer';
+import { loadSeenAwards, rememberAwardKeys } from '../utils/achievementSeen';
 import './UserProfile.css';
 
 function formatDate(timestamp) {
@@ -71,10 +72,12 @@ export default function UserProfile() {
   const [editStatus, setEditStatus] = useState('');
   const [patchViewerAchievement, setPatchViewerAchievement] = useState(null);
   const [pendingAchievementClaims, setPendingAchievementClaims] = useState([]);
+  const [awardsReady, setAwardsReady] = useState(false);
   const hasInitialAwardsSnapshotRef = useRef(false);
   const knownAwardKeysRef = useRef(new Set());
   const fetchInFlightRef = useRef(false);
   const patchViewerOpenRef = useRef(false);
+  const awardsReadyForUserRef = useRef(null);
 
   const canManageAchievements = Boolean(user?.canEditWiki);
   const displayName = user?.globalName || user?.username || '';
@@ -117,6 +120,8 @@ export default function UserProfile() {
       setCatalog(Array.isArray(catalogResponse?.achievements) ? catalogResponse.achievements : []);
       setUserAchievements(Array.isArray(userAchievementsResponse?.achievements) ? userAchievementsResponse.achievements : []);
       setLeaderboard(Array.isArray(leaderboardResponse?.leaderboard) ? leaderboardResponse.leaderboard : []);
+      awardsReadyForUserRef.current = user.id;
+      setAwardsReady(true);
 
       if (canManageAchievements) {
         try {
@@ -198,28 +203,47 @@ export default function UserProfile() {
     hasInitialAwardsSnapshotRef.current = false;
     knownAwardKeysRef.current = new Set();
     setPendingAchievementClaims([]);
+    setAwardsReady(false);
+    awardsReadyForUserRef.current = null;
   }, [user?.id]);
 
   useEffect(() => {
-    const achievements = Array.isArray(userAchievements) ? userAchievements : [];
-    const currentKeys = new Set();
-    const justUnlocked = [];
+    if (!user?.id || !awardsReady || awardsReadyForUserRef.current !== user.id) return;
 
-    achievements.forEach((achievement) => {
-      const key = getAchievementAwardKey(achievement);
-      currentKeys.add(key);
-      if (hasInitialAwardsSnapshotRef.current && !knownAwardKeysRef.current.has(key)) {
-        justUnlocked.push(achievement);
-      }
-    });
+    const achievements = Array.isArray(userAchievements) ? userAchievements : [];
+    const currentKeys = new Set(achievements.map((achievement) => getAchievementAwardKey(achievement)));
+    const stored = loadSeenAwards(user.id);
 
     if (!hasInitialAwardsSnapshotRef.current) {
-      knownAwardKeysRef.current = currentKeys;
+      if (!stored.seeded) {
+        knownAwardKeysRef.current = rememberAwardKeys(user.id, currentKeys);
+      } else {
+        knownAwardKeysRef.current = new Set(stored.keys);
+        const unseen = achievements.filter((achievement) => {
+          const key = getAchievementAwardKey(achievement);
+          return Boolean(key) && !stored.keys.has(key);
+        });
+        if (unseen.length > 0) {
+          const sortedUnlocked = [...unseen].sort(
+            (a, b) => (Number(b?.awardedAt) || 0) - (Number(a?.awardedAt) || 0),
+          );
+          setPendingAchievementClaims(sortedUnlocked);
+          unseen.forEach((achievement) => {
+            knownAwardKeysRef.current.add(getAchievementAwardKey(achievement));
+          });
+        }
+      }
       hasInitialAwardsSnapshotRef.current = true;
       return;
     }
 
-    knownAwardKeysRef.current = currentKeys;
+    const justUnlocked = achievements.filter((achievement) => {
+      const key = getAchievementAwardKey(achievement);
+      return key && !knownAwardKeysRef.current.has(key);
+    });
+    justUnlocked.forEach((achievement) => {
+      knownAwardKeysRef.current.add(getAchievementAwardKey(achievement));
+    });
 
     if (justUnlocked.length === 0) return;
 
@@ -237,11 +261,20 @@ export default function UserProfile() {
       if (additions.length === 0) return prev;
       return [...additions, ...prev];
     });
-  }, [userAchievements]);
+  }, [awardsReady, user?.id, userAchievements]);
+
+  const rememberSeenAward = (achievement) => {
+    if (!user?.id) return;
+    const key = getAchievementAwardKey(achievement);
+    if (!key) return;
+    knownAwardKeysRef.current.add(key);
+    rememberAwardKeys(user.id, [key]);
+  };
 
   const openPatchViewer = (achievement) => {
     const imageUrl = String(achievement?.imageUrl || '').trim();
     if (!imageUrl) return false;
+    rememberSeenAward(achievement);
     setPatchViewerAchievement({
       name: String(achievement?.name || 'Achievement'),
       description: String(achievement?.description || '').trim(),
