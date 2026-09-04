@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { CARTO_DARK_NOLABELS_TILE_URL } from '../config/cartoBasemap';
 import socketService from '../services/socket';
 import { getFrontlineZones } from '../services/api';
 
@@ -9,7 +10,7 @@ const DARK_RASTER_STYLE = {
   sources: {
     cartoDark: {
       type: 'raster',
-      tiles: ['https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png'],
+      tiles: [CARTO_DARK_NOLABELS_TILE_URL],
       tileSize: 256,
       attribution: '&copy; OpenStreetMap contributors, &copy; CARTO',
     },

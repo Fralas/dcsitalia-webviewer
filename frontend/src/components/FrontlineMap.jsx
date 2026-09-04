@@ -33,6 +33,7 @@ import ProductionPointRetrieveBanner from './map/ProductionPointRetrieveBanner';
 import './map/AirportSpawnPanel.css';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
+import { CARTO_DARK_NOLABELS_TILE_URL } from '../config/cartoBasemap';
 
 const MAP_ENGINE = String(import.meta.env.VITE_MAP_ENGINE || 'leaflet').trim().toLowerCase();
 const LOGISTICS_ROUTE_TOGGLE_ROLE_ID = '1447684923518484500';
@@ -67,7 +68,7 @@ function isDesktopGlobeDevice() {
 
 const BASEMAP_CONFIG = {
   [BASEMAP_MODE_DARK]: {
-    leafletUrl: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
+    leafletUrl: CARTO_DARK_NOLABELS_TILE_URL,
     leafletAttribution: '&copy; OpenStreetMap contributors, &copy; CARTO',
     maplibreLayerId: 'carto-darkmatter-raster',
   },
@@ -2210,12 +2211,7 @@ function MapLibreFlatMapView({
     sources: {
       cartoDarkMatter: {
         type: 'raster',
-        tiles: [
-          'https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png',
-          'https://b.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png',
-          'https://c.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png',
-          'https://d.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png',
-        ],
+        tiles: [CARTO_DARK_NOLABELS_TILE_URL],
         tileSize: 256,
         attribution: '&copy; OpenStreetMap contributors, &copy; CARTO',
       },

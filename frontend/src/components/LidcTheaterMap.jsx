@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { getLidcAirportById } from '../config/lidcAfghanistanAirports';
+import { CARTO_DARK_ALL_TILE_URL } from '../config/cartoBasemap';
 import LidcMapAirportPointers from './LidcMapAirportPointers';
 
 /** Approximate Afghanistan theater viewport [west, south, east, north]. */
@@ -15,12 +16,7 @@ const MAP_STYLE = {
   sources: {
     cartoDark: {
       type: 'raster',
-      tiles: [
-        'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-        'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-        'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-        'https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-      ],
+      tiles: [CARTO_DARK_ALL_TILE_URL],
       tileSize: 256,
       attribution: '&copy; OpenStreetMap contributors, &copy; CARTO',
     },

@@ -52,6 +52,7 @@ import * as changelogTranslator from './services/changelogTranslator.js';
 import * as wikiService from './services/wiki.js';
 import * as achievementsService from './services/achievements.js';
 import * as lidcService from './services/lidcService.js';
+import { proxyCartoBasemapTile } from './services/cartoBasemapProxy.js';
 import {
   LIDC_EXPORT_FILES,
   exportPendingWarehouseOps,
@@ -3703,6 +3704,11 @@ app.get('/api/time', (req, res) => {
     launchRemainingMs,
   });
 });
+
+/**
+ * GET /api/basemap/carto/:style/:z/:x/:y.png - Proxied Carto raster tiles
+ */
+app.get('/api/basemap/carto/:style/:z/:x/:y', proxyCartoBasemapTile);
 
 /**
  * GET /api/config/airports - Public airport catalog (coordinates + DCS keys)
