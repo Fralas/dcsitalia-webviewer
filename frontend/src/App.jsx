@@ -665,7 +665,7 @@ function App() {
       {currentView !== 'landing' && currentView !== 'frontline' && currentView !== 'lidc' && currentView !== 'atc' && (
         <footer className="bg-yt-bg-secondary border-t border-yt-border mt-8">
           <div className="container mx-auto px-4 py-3 text-center text-xs text-yt-text-secondary">
-            <p>DCS Italia Warehouse Viewer v1.0 - Real-time logistics management</p>
+            <p>DCS Italia Warehouse 3.0</p>
           </div>
         </footer>
       )}
