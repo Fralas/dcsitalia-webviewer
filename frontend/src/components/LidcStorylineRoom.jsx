@@ -3,7 +3,8 @@ import { flushSync } from 'react-dom';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
-import { Loader2, Settings2, X } from 'lucide-react';
+import { Settings2, X } from 'lucide-react';
+import BootSplash from './BootSplash';
 import roomModelUrl from '../../3D/LIDC/room.glb';
 import whiteboardModelUrl from '../../3D/LIDC/whiteboard.glb';
 import LidcStorylineDebugPanel from './LidcStorylineDebugPanel';
@@ -262,6 +263,7 @@ function createWhiteboardGroup(whiteboardScene, roomLocalBounds) {
 
 const CONTROLS_HINT_VISIBLE_MS = 10000;
 const CONTROLS_HINT_FADE_MS = 600;
+const STORYLINE_BOOT_FADE_MS = 700;
 
 export default function LidcStorylineRoom({ onClose }) {
   const { user } = useUser();
@@ -281,7 +283,8 @@ export default function LidcStorylineRoom({ onClose }) {
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [loadProgress, setLoadProgress] = useState(0);
+  const [bootSplashVisible, setBootSplashVisible] = useState(true);
+  const [bootSplashFading, setBootSplashFading] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
   const [debugTarget, setDebugTarget] = useState(DEBUG_TARGETS.WHITEBOARD);
   const [selectedZoneId, setSelectedZoneId] = useState(null);
@@ -331,7 +334,29 @@ export default function LidcStorylineRoom({ onClose }) {
   }, [activeInteractEvent]);
 
   useEffect(() => {
-    if (loading || loadError) {
+    if (loading) {
+      setBootSplashVisible(true);
+      setBootSplashFading(false);
+      return undefined;
+    }
+
+    if (loadError) {
+      setBootSplashVisible(false);
+      setBootSplashFading(false);
+      return undefined;
+    }
+
+    setBootSplashFading(true);
+    const fadeTimer = window.setTimeout(() => {
+      setBootSplashVisible(false);
+      setBootSplashFading(false);
+    }, STORYLINE_BOOT_FADE_MS);
+
+    return () => window.clearTimeout(fadeTimer);
+  }, [loading, loadError]);
+
+  useEffect(() => {
+    if (loading || loadError || bootSplashVisible) {
       setShowControlsHint(false);
       setControlsHintFading(false);
       return undefined;
@@ -350,7 +375,7 @@ export default function LidcStorylineRoom({ onClose }) {
       window.clearTimeout(fadeTimer);
       window.clearTimeout(hideTimer);
     };
-  }, [loading, loadError]);
+  }, [loading, loadError, bootSplashVisible]);
 
   useEffect(() => {
     debugTargetRef.current = debugTarget;
@@ -1375,29 +1400,13 @@ export default function LidcStorylineRoom({ onClose }) {
     });
 
     const loader = new GLTFLoader();
-    const progress = { room: 0, whiteboard: 0, easterEggs: 0 };
-    const syncProgress = () => {
-      const easterEggWeight = LIDC_STORYLINE_EASTER_EGGS.length;
-      const totalWeight = 2 + easterEggWeight;
-      setLoadProgress((progress.room + progress.whiteboard + progress.easterEggs * easterEggWeight) / totalWeight);
-    };
-
     const easterEggLoadPromises = LIDC_STORYLINE_EASTER_EGGS.map((eggDefinition) => (
-      loadEasterEggAsset(loader, eggDefinition, (value) => {
-        progress.easterEggs = Math.max(progress.easterEggs, value);
-        syncProgress();
-      }).then((group) => ({ eggDefinition, group }))
+      loadEasterEggAsset(loader, eggDefinition).then((group) => ({ eggDefinition, group }))
     ));
 
     Promise.all([
-      loadGltf(loader, roomModelUrl, (value) => {
-        progress.room = value;
-        syncProgress();
-      }),
-      loadGltf(loader, whiteboardModelUrl, (value) => {
-        progress.whiteboard = value;
-        syncProgress();
-      }),
+      loadGltf(loader, roomModelUrl),
+      loadGltf(loader, whiteboardModelUrl),
       ...easterEggLoadPromises,
     ])
       .then(([roomGltf, whiteboardGltf, ...loadedEasterEggs]) => {
@@ -1483,7 +1492,6 @@ export default function LidcStorylineRoom({ onClose }) {
 
         resize();
         setLoading(false);
-        window.requestAnimationFrame(() => requestPointerLock());
       })
       .catch((error) => {
         if (disposed) return;
@@ -1960,7 +1968,7 @@ export default function LidcStorylineRoom({ onClose }) {
     const api = sceneApiRef.current;
     if (!api) return undefined;
 
-    if (debugOpen || whiteboardOpen || terminalOpen || phoneOpen || loading || loadError) {
+    if (debugOpen || whiteboardOpen || terminalOpen || phoneOpen || loading || loadError || bootSplashVisible) {
       api.exitPointerLock?.();
       return undefined;
     }
@@ -1972,7 +1980,7 @@ export default function LidcStorylineRoom({ onClose }) {
 
     const frameId = window.requestAnimationFrame(() => api.requestPointerLock?.());
     return () => window.cancelAnimationFrame(frameId);
-  }, [debugOpen, whiteboardOpen, terminalOpen, phoneOpen, loading, loadError]);
+  }, [debugOpen, whiteboardOpen, terminalOpen, phoneOpen, loading, loadError, bootSplashVisible]);
 
   useEffect(() => {
     document.body.classList.add('lidc-storyline-open');
@@ -1993,17 +2001,15 @@ export default function LidcStorylineRoom({ onClose }) {
   }, []);
 
   return (
-    <div className={`lidc-storyline-root ${debugOpen ? 'is-debug-open' : ''} ${whiteboardOpen ? 'is-whiteboard-open' : ''} ${terminalOpen ? 'is-terminal-open' : ''} ${phoneOpen ? 'is-phone-open' : ''}`} role="dialog" aria-modal="true" aria-label={t('lidc.storyline.title')}>
+    <div className={`lidc-storyline-root ${debugOpen ? 'is-debug-open' : ''} ${whiteboardOpen ? 'is-whiteboard-open' : ''} ${terminalOpen ? 'is-terminal-open' : ''} ${phoneOpen ? 'is-phone-open' : ''} ${bootSplashVisible ? 'is-boot-splash' : ''}`} role="dialog" aria-modal="true" aria-label={t('lidc.storyline.title')}>
       <div ref={containerRef} className="lidc-storyline-canvas" />
 
-      {loading && (
-        <div className="lidc-storyline-overlay-panel">
-          <Loader2 size={28} className="spin" aria-hidden="true" />
-          <p>{t('lidc.storyline.loading')}</p>
-          <div className="lidc-storyline-progress" aria-hidden="true">
-            <span style={{ width: `${Math.round(loadProgress * 100)}%` }} />
-          </div>
-        </div>
+      {bootSplashVisible && (
+        <BootSplash
+          fading={bootSplashFading}
+          status={t('general.bootStatus')}
+          hint={t('general.bootHint')}
+        />
       )}
 
       {!loading && loadError && (
@@ -2015,7 +2021,7 @@ export default function LidcStorylineRoom({ onClose }) {
         </div>
       )}
 
-      {!loading && !loadError && !debugOpen && !whiteboardOpen && !terminalOpen && !phoneOpen && activeInteractEvent === WHITEBOARD_ZONE_EVENT_ID && (
+      {!loading && !loadError && !bootSplashVisible && !debugOpen && !whiteboardOpen && !terminalOpen && !phoneOpen && activeInteractEvent === WHITEBOARD_ZONE_EVENT_ID && (
         <LidcStorylineInteractPrompt
           keys="E"
           label={t('lidc.storyline.whiteboardPromptAction')}
@@ -2026,7 +2032,7 @@ export default function LidcStorylineRoom({ onClose }) {
         />
       )}
 
-      {!loading && !loadError && !debugOpen && !whiteboardOpen && !terminalOpen && !phoneOpen && activeInteractEvent === TERMINAL_ZONE_EVENT_ID && (
+      {!loading && !loadError && !bootSplashVisible && !debugOpen && !whiteboardOpen && !terminalOpen && !phoneOpen && activeInteractEvent === TERMINAL_ZONE_EVENT_ID && (
         <LidcStorylineInteractPrompt
           keys="E"
           label={t('lidc.storyline.terminalPromptAction')}
@@ -2034,7 +2040,7 @@ export default function LidcStorylineRoom({ onClose }) {
         />
       )}
 
-      {!loading && !loadError && !debugOpen && !whiteboardOpen && !terminalOpen && !phoneOpen && activeInteractEvent === PHONE_ZONE_EVENT_ID && (
+      {!loading && !loadError && !bootSplashVisible && !debugOpen && !whiteboardOpen && !terminalOpen && !phoneOpen && activeInteractEvent === PHONE_ZONE_EVENT_ID && (
         <LidcStorylineInteractPrompt
           keys="E"
           label={t('lidc.storyline.phonePromptAction')}
@@ -2046,14 +2052,14 @@ export default function LidcStorylineRoom({ onClose }) {
         />
       )}
 
-      {!loading && !loadError && !debugOpen && !whiteboardOpen && !terminalOpen && !phoneOpen && !activeInteractEvent && showControlsHint && (
+      {!loading && !loadError && !bootSplashVisible && !debugOpen && !whiteboardOpen && !terminalOpen && !phoneOpen && !activeInteractEvent && showControlsHint && (
         <LidcStorylineControlsHint
           segments={t('lidc.storyline.controlsHint')}
           fadeOut={controlsHintFading}
         />
       )}
 
-      {!loading && !loadError && !whiteboardOpen && !terminalOpen && !phoneOpen && (
+      {!loading && !loadError && !bootSplashVisible && !whiteboardOpen && !terminalOpen && !phoneOpen && (
         <button
           type="button"
           className={`lidc-storyline-debug-toggle ${debugOpen ? 'is-active' : ''}`}
@@ -2067,7 +2073,7 @@ export default function LidcStorylineRoom({ onClose }) {
         </button>
       )}
 
-      {!loading && !loadError && debugOpen && !terminalOpen && !phoneOpen && (
+      {!loading && !loadError && !bootSplashVisible && debugOpen && !terminalOpen && !phoneOpen && (
         <LidcStorylineDebugPanel
           transform={transform}
           transformMode={transformMode}

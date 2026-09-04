@@ -37,6 +37,7 @@ import LidcDeckBuilder, {
 import LidcSpecializationPicker, { sumSpecializationCaps } from './LidcSpecializationPicker';
 import LidcSquadronIdentityStep from './LidcSquadronIdentityStep';
 import InlineError from './InlineError';
+import BootSplash from './BootSplash';
 import './LidcPage.css';
 
 const LidcStorylineRoom = lazy(() => import('./LidcStorylineRoom'));
@@ -2960,10 +2961,10 @@ export default function LidcPage() {
       {isStorylineOpen && wizardPortalTarget && createPortal(
         <Suspense fallback={(
           <div className="lidc-storyline-root" aria-busy="true" aria-label={t('lidc.storyline.loading')}>
-            <div className="lidc-storyline-overlay-panel">
-              <Loader2 size={28} className="spin" aria-hidden="true" />
-              <p>{t('lidc.storyline.loading')}</p>
-            </div>
+            <BootSplash
+              status={t('general.bootStatus')}
+              hint={t('general.bootHint')}
+            />
           </div>
         )}
         >

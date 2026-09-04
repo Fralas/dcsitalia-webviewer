@@ -54,20 +54,8 @@
   max-width: 420px;
 }
 
-.lidc-storyline-progress {
-  width: min(280px, 70vw);
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  overflow: hidden;
-}
-
-.lidc-storyline-progress span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #ffbb00, #ff6b01);
-  transition: width 180ms ease;
+.lidc-storyline-root.is-boot-splash .lidc-storyline-close {
+  z-index: 10001;
 }
 
 .lidc-storyline-close {
