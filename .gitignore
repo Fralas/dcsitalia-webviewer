@@ -80,9 +80,13 @@ backend/data/lidc/ucid-links.json
 backend/data/lidc/link-codes.json
 backend/data/lidc/warehouse-ops.json
 
-# Per-user achievement progress
-data/achievements/users.json
-backend/data/achievements/users.json
+# Achievement catalog, awards, and per-user progress
+data/achievements/
+backend/data/achievements/
+
+# User profile JSON
+data/profiles/
+backend/data/profiles/
 
 # Runtime server config (written live)
 logistics-route-visibility.json
