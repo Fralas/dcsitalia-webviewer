@@ -264,9 +264,11 @@ function createWhiteboardGroup(whiteboardScene, roomLocalBounds) {
 const CONTROLS_HINT_VISIBLE_MS = 10000;
 const CONTROLS_HINT_FADE_MS = 600;
 const STORYLINE_BOOT_FADE_MS = 700;
+const STORYLINE_DEBUG_USER_ID = '675706661570347041';
 
 export default function LidcStorylineRoom({ onClose }) {
   const { user } = useUser();
+  const canUseStorylineDebug = String(user?.id || '') === STORYLINE_DEBUG_USER_ID;
   const containerRef = useRef(null);
   const sceneApiRef = useRef(null);
   const transformRef = useRef(loadSavedTransform());
@@ -311,6 +313,12 @@ export default function LidcStorylineRoom({ onClose }) {
   useEffect(() => {
     debugOpenRef.current = debugOpen;
   }, [debugOpen]);
+
+  useEffect(() => {
+    if (!canUseStorylineDebug && debugOpen) {
+      setDebugOpen(false);
+    }
+  }, [canUseStorylineDebug, debugOpen]);
 
   useEffect(() => {
     whiteboardOpenRef.current = whiteboardOpen;
@@ -1930,13 +1938,8 @@ export default function LidcStorylineRoom({ onClose }) {
 
       if (event.target?.tagName === 'INPUT' || event.target?.tagName === 'TEXTAREA') return;
 
-      if (event.code === 'KeyL' && !event.metaKey && !event.ctrlKey && !event.altKey) {
-        event.preventDefault();
-        toggleDebug();
-        return;
-      }
-
-      if (event.key === '`') {
+      if ((event.code === 'KeyL' || event.key === '`') && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        if (!canUseStorylineDebug) return;
         event.preventDefault();
         toggleDebug();
         return;
@@ -1962,7 +1965,7 @@ export default function LidcStorylineRoom({ onClose }) {
 
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [debugOpen, whiteboardOpen, terminalOpen, phoneOpen, onClose]);
+  }, [canUseStorylineDebug, debugOpen, whiteboardOpen, terminalOpen, phoneOpen, onClose]);
 
   useEffect(() => {
     const api = sceneApiRef.current;
@@ -2054,12 +2057,13 @@ export default function LidcStorylineRoom({ onClose }) {
 
       {!loading && !loadError && !bootSplashVisible && !debugOpen && !whiteboardOpen && !terminalOpen && !phoneOpen && !activeInteractEvent && showControlsHint && (
         <LidcStorylineControlsHint
-          segments={t('lidc.storyline.controlsHint')}
+          segments={(Array.isArray(t('lidc.storyline.controlsHint')) ? t('lidc.storyline.controlsHint') : [])
+            .filter((segment) => canUseStorylineDebug || String(segment?.key || '') !== 'L')}
           fadeOut={controlsHintFading}
         />
       )}
 
-      {!loading && !loadError && !bootSplashVisible && !whiteboardOpen && !terminalOpen && !phoneOpen && (
+      {canUseStorylineDebug && !loading && !loadError && !bootSplashVisible && !whiteboardOpen && !terminalOpen && !phoneOpen && (
         <button
           type="button"
           className={`lidc-storyline-debug-toggle ${debugOpen ? 'is-active' : ''}`}
@@ -2073,7 +2077,7 @@ export default function LidcStorylineRoom({ onClose }) {
         </button>
       )}
 
-      {!loading && !loadError && !bootSplashVisible && debugOpen && !terminalOpen && !phoneOpen && (
+      {canUseStorylineDebug && !loading && !loadError && !bootSplashVisible && debugOpen && !terminalOpen && !phoneOpen && (
         <LidcStorylineDebugPanel
           transform={transform}
           transformMode={transformMode}
