@@ -13,6 +13,8 @@ const STRING_RADIUS = 0.004;
 const STRING_SAG_RATIO = 0.07;
 const STRING_SEGMENTS = 20;
 const PIN_RADIUS = 0.012;
+const BOARD_3D_MARGIN = 0.07;
+const BOARD_3D_PIN_SIZE_SCALE = 0.62;
 
 const STRING_COLOR = 0xc62828;
 const PIN_COLOR = 0xd32f2f;
@@ -48,6 +50,43 @@ export function getWhiteboardSurfaceMapping(zoneScale = [1, 1, 1]) {
   };
 }
 
+function estimatePinBlockHeight(item) {
+  const width = Number(item.width) || 10.4;
+  const aspect = item.type === 'map' ? 1.35 : 0.72;
+  return (width / aspect) * (1 + PHOTO_FRAME_PADDING * 2 + CAPTION_HEIGHT_RATIO);
+}
+
+function createBoard3dUvMapper(items) {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  items.forEach((item) => {
+    const width = Number(item.width) || 10.4;
+    const height = estimatePinBlockHeight(item);
+    minX = Math.min(minX, Number(item.x));
+    minY = Math.min(minY, Number(item.y));
+    maxX = Math.max(maxX, Number(item.x) + width);
+    maxY = Math.max(maxY, Number(item.y) + height);
+  });
+
+  const srcW = Math.max(maxX - minX, 1);
+  const srcH = Math.max(maxY - minY, 1);
+  const dst = 1 - BOARD_3D_MARGIN * 2;
+
+  return {
+    mapX(x) {
+      return BOARD_3D_MARGIN + ((Number(x) - minX) / srcW) * dst;
+    },
+    mapY(y) {
+      return BOARD_3D_MARGIN + ((Number(y) - minY) / srcH) * dst;
+    },
+  };
+}
+
+const board3dUv = createBoard3dUvMapper(LIDC_STORYLINE_WHITEBOARD_ITEMS);
+
 function percentToLocalPoint(u, v, mapping) {
   const local = new THREE.Vector3();
   local.setComponent(mapping.uAxis, u - 0.5);
@@ -57,12 +96,13 @@ function percentToLocalPoint(u, v, mapping) {
 }
 
 function getPinLayout(item, imageAspect) {
-  const left = Math.min(1, Math.max(0, Number(item.x) / 100));
-  const top = Math.min(1, Math.max(0, Number(item.y) / 100));
   const widthValue = Number(item.width);
-  const width = Math.max(0.01, (widthValue > 0 && widthValue < 8 ? fromPinCanvasSize(widthValue) : widthValue) / 100);
+  const sourceWidth = widthValue > 0 && widthValue < 8 ? fromPinCanvasSize(widthValue) : widthValue;
+  const width = Math.max(0.01, (sourceWidth / 100) * BOARD_3D_PIN_SIZE_SCALE);
   const photoHeight = width / Math.max(imageAspect, 0.1);
   const totalHeight = photoHeight * (1 + PHOTO_FRAME_PADDING * 2 + CAPTION_HEIGHT_RATIO);
+  const left = Math.min(1 - width, Math.max(0, board3dUv.mapX(item.x)));
+  const top = Math.min(1 - totalHeight, Math.max(0, board3dUv.mapY(item.y)));
 
   return { left, top, width, photoHeight, totalHeight };
 }
