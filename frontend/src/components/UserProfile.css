@@ -582,8 +582,8 @@
 
 .profile-viewer__hit {
   position: relative;
-  width: min(72vh, 72vw);
-  height: min(72vh, 72vw);
+  width: min(56vh, 72vw, 520px);
+  height: min(56vh, 72vw, 520px);
   margin: 0 auto;
   user-select: none;
   touch-action: none;
@@ -592,6 +592,53 @@
 
 .profile-viewer__hit.is-dragging {
   cursor: grabbing;
+}
+
+.profile-viewer__spin {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.profile-viewer__slice,
+.profile-viewer__face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.profile-viewer__slice {
+  background-repeat: repeat;
+  background-position: 0 0;
+  background-size: 180px 180px;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.profile-viewer__face {
+  object-fit: contain;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.profile-viewer__face--back {
+  background-repeat: repeat;
+  background-position: 0 0;
+  background-size: 180px 180px;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
 }
 
 @media (max-width: 960px) {

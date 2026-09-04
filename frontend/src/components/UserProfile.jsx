@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { useUser } from '../contexts/UserContext';
 import * as api from '../services/api';
 import InlineError from './InlineError';
-import velcroTextureImg from '../../img/velcrotexture.jpg';
+import PatchViewer from './PatchViewer';
 import './UserProfile.css';
 
 function formatDate(timestamp) {
@@ -26,12 +26,6 @@ function normalizeUserName(value, fallback = '') {
   return String(fallback || '').trim();
 }
 
-const PATCH_DEPTH_STEPS = [-5, -3, -1, 1, 3, 5];
-const PATCH_GIMBAL_EPSILON_DEG = 0.05;
-const PATCH_TEXTURE_TILE_SIZE_PX = 220;
-const PATCH_SPIN_DEG_PER_PX = 0.45;
-const PATCH_MOMENTUM_FRICTION_PER_FRAME = 0.94;
-const PATCH_MIN_MOMENTUM_DEG_PER_MS = 0.01;
 const ACHIEVEMENTS_REFRESH_INTERVAL_MS = 15000;
 
 function getAchievementAwardKey(achievement) {
@@ -42,14 +36,6 @@ function getAchievementAwardKey(achievement) {
   const awardedAt = Number(achievement?.awardedAt || 0);
   const achievementName = String(achievement?.name || '').trim();
   return `fallback:${achievementId}:${awardedAt}:${achievementName}`;
-}
-
-function avoidOrthogonalYaw(yawDeg) {
-  const normalized = ((yawDeg % 180) + 180) % 180;
-  if (Math.abs(normalized - 90) < 0.0001) {
-    return yawDeg + PATCH_GIMBAL_EPSILON_DEG;
-  }
-  return yawDeg;
 }
 
 export default function UserProfile() {
@@ -85,19 +71,10 @@ export default function UserProfile() {
   const [editStatus, setEditStatus] = useState('');
   const [patchViewerAchievement, setPatchViewerAchievement] = useState(null);
   const [pendingAchievementClaims, setPendingAchievementClaims] = useState([]);
-  const [patchRotation, setPatchRotation] = useState({ x: -12, y: 18 });
-  const [patchZoom, setPatchZoom] = useState(1);
-  const [isDraggingPatch, setIsDraggingPatch] = useState(false);
-  const [isPatchMomentumActive, setIsPatchMomentumActive] = useState(false);
   const hasInitialAwardsSnapshotRef = useRef(false);
   const knownAwardKeysRef = useRef(new Set());
   const fetchInFlightRef = useRef(false);
-  const patchDragRef = useRef({ active: false, lastX: 0, lastY: 0, lastMoveTs: 0 });
-  const patchMomentumRef = useRef({
-    velocityDegPerMs: 0,
-    lastTs: 0,
-    rafId: null,
-  });
+  const patchViewerOpenRef = useRef(false);
 
   const canManageAchievements = Boolean(user?.canEditWiki);
   const displayName = user?.globalName || user?.username || '';
@@ -170,6 +147,7 @@ export default function UserProfile() {
   useEffect(() => {
     if (!user?.id) return undefined;
     const intervalId = window.setInterval(() => {
+      if (patchViewerOpenRef.current) return;
       fetchAchievementData({ background: true });
     }, ACHIEVEMENTS_REFRESH_INTERVAL_MS);
     return () => window.clearInterval(intervalId);
@@ -213,33 +191,8 @@ export default function UserProfile() {
   }, [editAchievementId, catalog]);
 
   useEffect(() => {
-    if (!patchViewerAchievement) return undefined;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    const handleEscape = (event) => {
-      if (event.key === 'Escape') {
-        stopPatchMomentum();
-        setIsDraggingPatch(false);
-        patchDragRef.current.active = false;
-        setPatchViewerAchievement(null);
-      }
-    };
-
-    window.addEventListener('keydown', handleEscape);
-    return () => {
-      window.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = previousOverflow;
-    };
+    patchViewerOpenRef.current = Boolean(patchViewerAchievement);
   }, [patchViewerAchievement]);
-
-  useEffect(() => () => {
-    if (patchMomentumRef.current.rafId !== null) {
-      window.cancelAnimationFrame(patchMomentumRef.current.rafId);
-      patchMomentumRef.current.rafId = null;
-    }
-  }, []);
 
   useEffect(() => {
     hasInitialAwardsSnapshotRef.current = false;
@@ -286,70 +239,9 @@ export default function UserProfile() {
     });
   }, [userAchievements]);
 
-  const stopPatchMomentum = () => {
-    if (patchMomentumRef.current.rafId !== null) {
-      window.cancelAnimationFrame(patchMomentumRef.current.rafId);
-      patchMomentumRef.current.rafId = null;
-    }
-    patchMomentumRef.current.velocityDegPerMs = 0;
-    patchMomentumRef.current.lastTs = 0;
-    setIsPatchMomentumActive(false);
-  };
-
-  const startPatchMomentum = () => {
-    const initialVelocity = patchMomentumRef.current.velocityDegPerMs;
-    if (!Number.isFinite(initialVelocity) || Math.abs(initialVelocity) < PATCH_MIN_MOMENTUM_DEG_PER_MS) {
-      stopPatchMomentum();
-      return;
-    }
-
-    if (patchMomentumRef.current.rafId !== null) {
-      window.cancelAnimationFrame(patchMomentumRef.current.rafId);
-      patchMomentumRef.current.rafId = null;
-    }
-
-    patchMomentumRef.current.lastTs = 0;
-    setIsPatchMomentumActive(true);
-
-    const tick = (timestamp) => {
-      const state = patchMomentumRef.current;
-      if (!patchViewerAchievement) {
-        stopPatchMomentum();
-        return;
-      }
-
-      if (!state.lastTs) {
-        state.lastTs = timestamp;
-      }
-
-      const dtMs = Math.max(0, timestamp - state.lastTs);
-      state.lastTs = timestamp;
-
-      if (dtMs > 0) {
-        const deltaYaw = state.velocityDegPerMs * dtMs;
-        setPatchRotation((prev) => ({ x: 0, y: prev.y + deltaYaw }));
-
-        const friction = Math.pow(PATCH_MOMENTUM_FRICTION_PER_FRAME, dtMs / 16.6667);
-        state.velocityDegPerMs *= friction;
-      }
-
-      if (Math.abs(state.velocityDegPerMs) < PATCH_MIN_MOMENTUM_DEG_PER_MS) {
-        stopPatchMomentum();
-        return;
-      }
-
-      state.rafId = window.requestAnimationFrame(tick);
-    };
-
-    patchMomentumRef.current.rafId = window.requestAnimationFrame(tick);
-  };
-
   const openPatchViewer = (achievement) => {
     const imageUrl = String(achievement?.imageUrl || '').trim();
     if (!imageUrl) return false;
-    stopPatchMomentum();
-    setPatchRotation({ x: 0, y: 0 });
-    setPatchZoom(1);
     setPatchViewerAchievement({
       name: String(achievement?.name || 'Achievement'),
       description: String(achievement?.description || '').trim(),
@@ -358,66 +250,9 @@ export default function UserProfile() {
     return true;
   };
 
-  const closePatchViewer = () => {
-    stopPatchMomentum();
+  const closePatchViewer = useCallback(() => {
     setPatchViewerAchievement(null);
-    setIsDraggingPatch(false);
-    patchDragRef.current.active = false;
-  };
-
-  const handlePatchPointerDown = (event) => {
-    stopPatchMomentum();
-    patchDragRef.current = {
-      active: true,
-      lastX: event.clientX,
-      lastY: event.clientY,
-      lastMoveTs: performance.now(),
-    };
-    patchMomentumRef.current.velocityDegPerMs = 0;
-    setIsDraggingPatch(true);
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-  };
-
-  const handlePatchPointerMove = (event) => {
-    if (!patchDragRef.current.active) return;
-
-    const dx = event.clientX - patchDragRef.current.lastX;
-    const nowTs = performance.now();
-    const dtMs = Math.max(1, nowTs - patchDragRef.current.lastMoveTs);
-    const deltaYaw = dx * PATCH_SPIN_DEG_PER_PX;
-    const instantVelocity = deltaYaw / dtMs;
-    patchMomentumRef.current.velocityDegPerMs = (patchMomentumRef.current.velocityDegPerMs * 0.65) + (instantVelocity * 0.35);
-
-    patchDragRef.current.lastX = event.clientX;
-    patchDragRef.current.lastY = event.clientY;
-    patchDragRef.current.lastMoveTs = nowTs;
-
-    setPatchRotation((prev) => {
-      const nextY = prev.y + deltaYaw;
-      return { x: 0, y: nextY };
-    });
-  };
-
-  const handlePatchPointerUp = (event) => {
-    const wasDragging = patchDragRef.current.active;
-    patchDragRef.current.active = false;
-    setIsDraggingPatch(false);
-    if (wasDragging) {
-      startPatchMomentum();
-    }
-    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
-      event.currentTarget.releasePointerCapture?.(event.pointerId);
-    }
-  };
-
-  const handlePatchWheel = (event) => {
-    event.preventDefault();
-    const delta = event.deltaY;
-    setPatchZoom((prev) => {
-      const next = delta < 0 ? prev + 0.12 : prev - 0.12;
-      return Math.max(1, Math.min(2.5, next));
-    });
-  };
+  }, []);
 
   const pendingClaim = pendingAchievementClaims[0] || null;
 
@@ -596,96 +431,6 @@ export default function UserProfile() {
       setDeletingAchievement(false);
     }
   };
-
-  const patchViewerModal = patchViewerAchievement ? (
-    <div className="profile-viewer" onClick={closePatchViewer}>
-      <button type="button" className="profile-viewer__close" onClick={closePatchViewer}>
-        Chiudi
-      </button>
-      <div
-        className="profile-viewer__stage"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <p className="profile-viewer__name">{patchViewerAchievement.name}</p>
-        <p className="profile-viewer__desc">
-          {patchViewerAchievement.description || 'Nessuna descrizione disponibile.'}
-        </p>
-
-        <div className="profile-viewer__canvas">
-          <div
-            className={`profile-viewer__hit${isDraggingPatch ? ' is-dragging' : ''}`}
-            onPointerDown={handlePatchPointerDown}
-            onPointerMove={handlePatchPointerMove}
-            onPointerUp={handlePatchPointerUp}
-            onPointerCancel={handlePatchPointerUp}
-            onPointerLeave={handlePatchPointerUp}
-            onWheel={handlePatchWheel}
-          >
-            <div
-              className="relative h-full w-full [transform-style:preserve-3d]"
-              style={{
-                transform: `scale(${patchZoom}) rotateX(${patchRotation.x}deg) rotateY(${avoidOrthogonalYaw(patchRotation.y)}deg)`,
-                transition: (isDraggingPatch || isPatchMomentumActive) ? 'none' : 'transform 120ms ease-out',
-              }}
-            >
-              {PATCH_DEPTH_STEPS.map((depth) => (
-                <div
-                  key={`patch-depth-${depth}`}
-                  className="absolute inset-0"
-                  style={{
-                    transform: `translateZ(${depth}px)`,
-                    WebkitMaskImage: `url(${patchViewerAchievement.imageUrl})`,
-                    maskImage: `url(${patchViewerAchievement.imageUrl})`,
-                    WebkitMaskRepeat: 'no-repeat',
-                    maskRepeat: 'no-repeat',
-                    WebkitMaskPosition: 'center',
-                    maskPosition: 'center',
-                    WebkitMaskSize: 'contain',
-                    maskSize: 'contain',
-                    backgroundImage: `url(${velcroTextureImg})`,
-                    backgroundRepeat: 'repeat',
-                    backgroundPosition: '0 0',
-                    backgroundSize: `${PATCH_TEXTURE_TILE_SIZE_PX}px ${PATCH_TEXTURE_TILE_SIZE_PX}px`,
-                    opacity: 0.96,
-                  }}
-                />
-              ))}
-              <div className="absolute inset-0 [backface-visibility:hidden] [transform:translateZ(7px)]">
-                <img
-                  src={patchViewerAchievement.imageUrl}
-                  alt={patchViewerAchievement.name}
-                  className="h-full w-full object-contain drop-shadow-[0_24px_34px_rgba(0,0,0,0.52)]"
-                  draggable={false}
-                />
-              </div>
-              <div
-                className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)_translateZ(7px)]"
-                style={{
-                  WebkitMaskImage: `url(${patchViewerAchievement.imageUrl})`,
-                  maskImage: `url(${patchViewerAchievement.imageUrl})`,
-                  WebkitMaskRepeat: 'no-repeat',
-                  maskRepeat: 'no-repeat',
-                  WebkitMaskPosition: 'center',
-                  maskPosition: 'center',
-                  WebkitMaskSize: 'contain',
-                  maskSize: 'contain',
-                  backgroundImage: `url(${velcroTextureImg})`,
-                  backgroundRepeat: 'repeat',
-                  backgroundPosition: '0 0',
-                  backgroundSize: `${PATCH_TEXTURE_TILE_SIZE_PX}px ${PATCH_TEXTURE_TILE_SIZE_PX}px`,
-                }}
-              >
-                <div
-                  aria-label="Retro patch velcro"
-                  className="h-full w-full drop-shadow-[0_24px_34px_rgba(0,0,0,0.52)]"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  ) : null;
 
   return (
     <div className="profile">
@@ -998,7 +743,10 @@ export default function UserProfile() {
         </div>
       )}
 
-      {typeof document !== 'undefined' && patchViewerModal ? createPortal(patchViewerModal, document.body) : null}
+      {typeof document !== 'undefined' && patchViewerAchievement ? createPortal(
+        <PatchViewer achievement={patchViewerAchievement} onClose={closePatchViewer} />,
+        document.body,
+      ) : null}
     </div>
   );
 }
