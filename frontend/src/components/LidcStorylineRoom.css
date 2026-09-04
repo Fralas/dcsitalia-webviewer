@@ -54,33 +54,6 @@
   max-width: 420px;
 }
 
-.lidc-storyline-root.is-boot-splash .lidc-storyline-close {
-  z-index: 10001;
-}
-
-.lidc-storyline-close {
-  position: absolute;
-  top: clamp(12px, 1.4vw, 20px);
-  right: clamp(12px, 1.4vw, 20px);
-  z-index: 10;
-  width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
-  background: rgba(14, 14, 14, 0.72);
-  color: #ffffff;
-  cursor: pointer;
-  transition: background 160ms ease, border-color 160ms ease;
-}
-
-.lidc-storyline-close:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.32);
-}
-
 .lidc-storyline-root.is-whiteboard-open .lidc-storyline-canvas {
   visibility: hidden;
 }
@@ -180,57 +153,6 @@ body.lidc-storyline-open {
 
 .lidc-storyline-root.is-debug-open .lidc-storyline-canvas canvas {
   cursor: default;
-}
-
-.lidc-storyline-root.is-debug-open .lidc-storyline-close {
-  right: auto;
-  left: clamp(12px, 1.4vw, 20px);
-}
-
-.lidc-storyline-debug-toggle {
-  position: absolute;
-  top: clamp(12px, 1.4vw, 20px);
-  right: clamp(12px, 1.4vw, 20px);
-  z-index: 10;
-  min-width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 0 12px 0 10px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
-  background: rgba(14, 14, 14, 0.88);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  color: #ffffff;
-  font: inherit;
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
-}
-
-.lidc-storyline-root.is-debug-open .lidc-storyline-debug-toggle {
-  right: min(380px, calc(100vw - 24px));
-}
-
-.lidc-storyline-debug-toggle-label {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 16px;
-  height: 16px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.12);
-  font-size: 0.68rem;
-  line-height: 1;
-}
-
-.lidc-storyline-debug-toggle.is-active {
-  border-color: rgba(255, 187, 0, 0.65);
-  background: rgba(255, 187, 0, 0.12);
 }
 
 .lidc-storyline-debug-panel {

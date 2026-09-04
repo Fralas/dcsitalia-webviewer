@@ -3,7 +3,6 @@ import { flushSync } from 'react-dom';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
-import { Settings2, X } from 'lucide-react';
 import BootSplash from './BootSplash';
 import roomModelUrl from '../../3D/LIDC/room.glb';
 import whiteboardModelUrl from '../../3D/LIDC/whiteboard.glb';
@@ -2063,20 +2062,6 @@ export default function LidcStorylineRoom({ onClose }) {
         />
       )}
 
-      {canUseStorylineDebug && !loading && !loadError && !bootSplashVisible && !whiteboardOpen && !terminalOpen && !phoneOpen && (
-        <button
-          type="button"
-          className={`lidc-storyline-debug-toggle ${debugOpen ? 'is-active' : ''}`}
-          onClick={() => setDebugOpen((value) => !value)}
-          title={t('lidc.storyline.debug.toggle')}
-          aria-label={t('lidc.storyline.debug.toggle')}
-          aria-pressed={debugOpen}
-        >
-          <Settings2 size={16} />
-          <span className="lidc-storyline-debug-toggle-label">L</span>
-        </button>
-      )}
-
       {canUseStorylineDebug && !loading && !loadError && !bootSplashVisible && debugOpen && !terminalOpen && !phoneOpen && (
         <LidcStorylineDebugPanel
           transform={transform}
@@ -2123,18 +2108,6 @@ export default function LidcStorylineRoom({ onClose }) {
 
       {phoneOpen && (
         <LidcStorylinePhone onClose={() => setPhoneOpen(false)} />
-      )}
-
-      {!whiteboardOpen && !terminalOpen && !phoneOpen && (
-        <button
-          type="button"
-          className="lidc-storyline-close"
-          onClick={onClose}
-          aria-label={t('lidc.storyline.close')}
-          title={t('lidc.storyline.close')}
-        >
-          <X size={18} />
-        </button>
       )}
     </div>
   );
