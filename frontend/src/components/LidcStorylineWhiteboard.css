@@ -116,6 +116,24 @@
   pointer-events: none;
 }
 
+.lidc-whiteboard-stage.is-layout-edit .lidc-whiteboard-pin {
+  cursor: grab;
+  transition: none;
+  outline: 1px dashed rgba(47, 58, 68, 0.35);
+  outline-offset: 4px;
+}
+
+.lidc-whiteboard-stage.is-layout-edit .lidc-whiteboard-pin.is-layout-selected {
+  outline: 2px solid #c62828;
+  z-index: 6;
+}
+
+.lidc-whiteboard-stage.is-layout-edit .lidc-whiteboard-pin.is-dragging {
+  cursor: grabbing;
+  z-index: 7;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.28));
+}
+
 .lidc-whiteboard-pin {
   position: absolute;
   margin: 0;

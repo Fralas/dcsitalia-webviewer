@@ -1,4 +1,5 @@
 import { Copy, Download, Link2, Plus, RotateCcw, Save, Trash2, Unlink, X } from 'lucide-react';
+import { LIDC_STORYLINE_WHITEBOARD_ITEMS } from '../config/lidcStorylineWhiteboardItems';
 import { DEBUG_TARGETS } from '../utils/lidcStorylineTransform';
 import { PHONE_ZONE_EVENT_ID, TERMINAL_ZONE_EVENT_ID, WHITEBOARD_ZONE_EVENT_ID, ZONE_TYPES } from '../utils/lidcStorylineZones';
 import { t } from '../utils/locale';
@@ -106,6 +107,13 @@ export default function LidcStorylineDebugPanel({
   onCopy,
   onSnapPlayerToRoom,
   onClose,
+  whiteboardOpen = false,
+  pinLayout = null,
+  selectedPinId = null,
+  onSelectPin,
+  onPinLayoutChange,
+  onResetPinLayout,
+  onCopyPinLayout,
 }) {
   const { room, whiteboard, player, zones = [], easterEggs = [] } = transform;
   const terminalCamera = transform.terminalCamera ?? {
@@ -131,6 +139,9 @@ export default function LidcStorylineDebugPanel({
         ? t('lidc.storyline.debug.whiteboardTransform')
         : t('lidc.storyline.debug.roomTransform');
 
+  const selectedPin = LIDC_STORYLINE_WHITEBOARD_ITEMS.find((item) => item.id === selectedPinId) ?? null;
+  const selectedPinLayout = selectedPin ? pinLayout?.[selectedPin.id] : null;
+
   return (
     <aside className="lidc-storyline-debug-panel">
       <header className="lidc-storyline-debug-head">
@@ -148,6 +159,64 @@ export default function LidcStorylineDebugPanel({
           <X size={16} />
         </button>
       </header>
+
+      {whiteboardOpen && (
+        <section className="lidc-storyline-debug-section">
+          <h3>{t('lidc.storyline.debug.pinLayoutTitle')}</h3>
+          <p className="lidc-storyline-debug-help">{t('lidc.storyline.debug.pinLayoutHint')}</p>
+          <ul className="lidc-storyline-debug-zone-list">
+            {LIDC_STORYLINE_WHITEBOARD_ITEMS.map((item) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  className={`lidc-storyline-debug-zone-item ${selectedPinId === item.id ? 'is-active' : ''}`}
+                  onClick={() => onSelectPin?.(item.id)}
+                >
+                  <span className="lidc-storyline-debug-zone-name">{t(item.labelKey)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          {selectedPin && selectedPinLayout && (
+            <>
+              <VectorFields
+                labels={['X %', 'Y %']}
+                values={[selectedPinLayout.x, selectedPinLayout.y]}
+                step={0.1}
+                onChange={(values, index, nextValue) => {
+                  onPinLayoutChange?.(selectedPin.id, {
+                    [index === 0 ? 'x' : 'y']: nextValue,
+                  });
+                }}
+              />
+              <VectorFields
+                labels={[t('lidc.storyline.debug.pinWidth'), t('lidc.storyline.debug.pinRotation')]}
+                values={[selectedPinLayout.width, selectedPinLayout.rotation]}
+                step={0.1}
+                onChange={(values, index, nextValue) => {
+                  onPinLayoutChange?.(selectedPin.id, {
+                    [index === 0 ? 'width' : 'rotation']: nextValue,
+                  });
+                }}
+              />
+            </>
+          )}
+          <div className="lidc-storyline-debug-inline-actions">
+            <button
+              type="button"
+              className="lidc-storyline-debug-action"
+              onClick={onCopyPinLayout}
+            >
+              <Copy size={14} />
+              {t('lidc.storyline.debug.pinLayoutCopy')}
+            </button>
+            <button type="button" className="lidc-storyline-debug-action" onClick={onResetPinLayout}>
+              <RotateCcw size={14} />
+              {t('lidc.storyline.debug.pinLayoutResetAction')}
+            </button>
+          </div>
+        </section>
+      )}
 
       <div className="lidc-storyline-debug-targets">
         {[DEBUG_TARGETS.ROOM, DEBUG_TARGETS.WHITEBOARD].map((target) => (

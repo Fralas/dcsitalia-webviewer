@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { LIDC_STORYLINE_WHITEBOARD_CONNECTIONS, LIDC_STORYLINE_WHITEBOARD_ITEMS } from '../config/lidcStorylineWhiteboardItems';
 import { t } from '../utils/locale';
+import { mergeWhiteboardItems } from '../utils/lidcStorylineWhiteboardLayout';
 import LidcStorylineWhiteboardString from './LidcStorylineWhiteboardString';
 import { LidcStorylineHudNotice } from './LidcStorylineHud';
 import './LidcStorylineWhiteboard.css';
@@ -27,14 +28,19 @@ const SECTION_ROMAN = {
 
 const FILE_CODES = {
   samiullahBarakzai: '201-KDR-0142',
+  faisalNoor: '201-KDR-0198',
+  omarHakimi: '201-KDR-0211',
   rahmatullahHotak: '201-KDR-0287',
   hamidullahSafi: '201-KDR-0319',
+  faridAhmadKhan: '201-KDR-0334',
   zahirPopalzai: '201-HLM-0441',
   nazarMohammadAlizai: '201-KDR-0516',
   izatullahNoorzai: '201-KDR-0590',
   bashirAchakzai: '201-KDR-0663',
   latifIshaqzai: '201-HLM-0738',
   hajiKhairullahBarech: '201-HLM-0812',
+  abdulRahman: '201-HLM-0887',
+  viktorSokolov: '201-RUS-0903',
 };
 
 function clampViewScale(scale) {
@@ -263,19 +269,30 @@ function CharacterDossier({ itemId }) {
   );
 }
 
-export default function LidcStorylineWhiteboard({ onClose }) {
+export default function LidcStorylineWhiteboard({
+  onClose,
+  layoutEdit = false,
+  pinLayout = null,
+  selectedPinId = null,
+  onSelectPin,
+  onPinLayoutLiveChange,
+  onPinLayoutCommit,
+}) {
   const [activeItemId, setActiveItemId] = useState(null);
   const [showExitHint, setShowExitHint] = useState(true);
   const [viewScale, setViewScale] = useState(DEFAULT_VIEW_SCALE);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
+  const [draggingPinId, setDraggingPinId] = useState(null);
   const contentRef = useRef(null);
   const surfaceRef = useRef(null);
   const pinRefs = useRef({});
   const panSessionRef = useRef(null);
+  const dragSessionRef = useRef(null);
   const viewStateRef = useRef({ scale: DEFAULT_VIEW_SCALE, pan: { x: 0, y: 0 } });
 
-  const activeItem = LIDC_STORYLINE_WHITEBOARD_ITEMS.find((item) => item.id === activeItemId) ?? null;
+  const items = mergeWhiteboardItems(pinLayout);
+  const activeItem = items.find((item) => item.id === activeItemId) ?? null;
 
   useEffect(() => {
     viewStateRef.current = { scale: viewScale, pan };
@@ -309,6 +326,10 @@ export default function LidcStorylineWhiteboard({ onClose }) {
     return () => surface.removeEventListener('wheel', onWheel);
   }, [activeItem]);
 
+  useEffect(() => {
+    if (!layoutEdit) setActiveItemId(null);
+  }, [layoutEdit]);
+
   const onSurfacePointerDown = (event) => {
     if (activeItem) return;
     if (event.button !== 0 && event.button !== 1) return;
@@ -326,7 +347,47 @@ export default function LidcStorylineWhiteboard({ onClose }) {
     setIsPanning(true);
   };
 
+  const clientToBoardPercent = (clientX, clientY) => {
+    const content = contentRef.current;
+    if (!content) return null;
+    const rect = content.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    return {
+      x: ((clientX - rect.left) / rect.width) * 100,
+      y: ((clientY - rect.top) / rect.height) * 100,
+    };
+  };
+
+  const onPinPointerDown = (event, item) => {
+    if (!layoutEdit || event.button !== 0) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    onSelectPin?.(item.id);
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    const pointer = clientToBoardPercent(event.clientX, event.clientY);
+    dragSessionRef.current = {
+      pointerId: event.pointerId,
+      id: item.id,
+      offsetX: pointer ? pointer.x - item.x : 0,
+      offsetY: pointer ? pointer.y - item.y : 0,
+    };
+    setDraggingPinId(item.id);
+  };
+
   const onSurfacePointerMove = (event) => {
+    const drag = dragSessionRef.current;
+    if (drag && drag.pointerId === event.pointerId) {
+      const pointer = clientToBoardPercent(event.clientX, event.clientY);
+      if (!pointer) return;
+      onPinLayoutLiveChange?.(drag.id, {
+        x: Math.min(92, Math.max(-2, pointer.x - drag.offsetX)),
+        y: Math.min(92, Math.max(-2, pointer.y - drag.offsetY)),
+      });
+      return;
+    }
+
     const session = panSessionRef.current;
     if (!session || session.pointerId !== event.pointerId) return;
 
@@ -337,6 +398,15 @@ export default function LidcStorylineWhiteboard({ onClose }) {
   };
 
   const endPanSession = (event) => {
+    const drag = dragSessionRef.current;
+    if (drag && drag.pointerId === event.pointerId) {
+      const item = items.find((entry) => entry.id === drag.id);
+      dragSessionRef.current = null;
+      setDraggingPinId(null);
+      if (item) onPinLayoutCommit?.(item.id, { x: item.x, y: item.y });
+      return;
+    }
+
     const session = panSessionRef.current;
     if (!session || session.pointerId !== event.pointerId) return;
 
@@ -370,7 +440,7 @@ export default function LidcStorylineWhiteboard({ onClose }) {
   }, [activeItemId, onClose]);
 
   return (
-    <div className="lidc-whiteboard-stage" role="dialog" aria-modal="true" aria-label={t('lidc.storyline.whiteboardTitle')}>
+    <div className={`lidc-whiteboard-stage ${layoutEdit ? 'is-layout-edit' : ''}`} role="dialog" aria-modal="true" aria-label={t('lidc.storyline.whiteboardTitle')}>
       <div className="lidc-whiteboard-frame">
         <div
           className={`lidc-whiteboard-surface ${isPanning ? 'is-panning' : ''}`}
@@ -395,14 +465,14 @@ export default function LidcStorylineWhiteboard({ onClose }) {
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${viewScale})`,
             }}
           >
-            {LIDC_STORYLINE_WHITEBOARD_ITEMS.map((item) => (
+            {items.map((item) => (
               <button
                 key={item.id}
                 type="button"
                 ref={(element) => {
                   pinRefs.current[item.id] = element;
                 }}
-                className={`lidc-whiteboard-pin ${item.type === 'map' ? 'is-map' : ''} ${activeItemId === item.id ? 'is-active' : ''}`}
+                className={`lidc-whiteboard-pin ${item.type === 'map' ? 'is-map' : ''} ${activeItemId === item.id ? 'is-active' : ''} ${layoutEdit ? 'is-layout' : ''} ${selectedPinId === item.id ? 'is-layout-selected' : ''} ${draggingPinId === item.id ? 'is-dragging' : ''}`}
                 style={{
                   left: `${item.x}%`,
                   top: `${item.y}%`,
@@ -410,7 +480,17 @@ export default function LidcStorylineWhiteboard({ onClose }) {
                   '--pin-rotation': `${item.rotation}deg`,
                   transform: `rotate(${item.rotation}deg)`,
                 }}
-                onClick={() => setActiveItemId((current) => (current === item.id ? null : item.id))}
+                onPointerDown={(event) => onPinPointerDown(event, item)}
+                onPointerMove={onSurfacePointerMove}
+                onPointerUp={endPanSession}
+                onPointerCancel={endPanSession}
+                onClick={() => {
+                  if (layoutEdit) {
+                    onSelectPin?.(item.id);
+                    return;
+                  }
+                  setActiveItemId((current) => (current === item.id ? null : item.id));
+                }}
                 aria-label={t(item.labelKey)}
               >
                 <span className="lidc-whiteboard-tape lidc-whiteboard-tape--left" aria-hidden="true" />
@@ -431,7 +511,7 @@ export default function LidcStorylineWhiteboard({ onClose }) {
                 connection={connection}
                 pinRefs={pinRefs}
                 containerRef={contentRef}
-                interactive={!activeItem}
+                interactive={!activeItem && !layoutEdit}
               />
             ))}
           </div>
@@ -466,11 +546,10 @@ export default function LidcStorylineWhiteboard({ onClose }) {
         </article>
       )}
 
-      {showExitHint && !activeItem && (
+      {layoutEdit && (
         <LidcStorylineHudNotice
-          primaryLabel={t('lidc.storyline.backToRoom')}
-          secondary={t('lidc.storyline.whiteboardNavHint')}
-          fadeOut
+          primaryLabel={t('lidc.storyline.debug.pinLayoutTitle')}
+          secondary={t('lidc.storyline.debug.pinLayoutHint')}
         />
       )}
     </div>

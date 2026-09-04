@@ -14,6 +14,13 @@ import { LidcStorylineControlsHint, LidcStorylineInteractPrompt } from './LidcSt
 import { useUser } from '../contexts/UserContext';
 import { t } from '../utils/locale';
 import {
+  getDefaultWhiteboardPinLayout,
+  loadWhiteboardPinLayout,
+  persistWhiteboardPinLayout,
+  roundPinLayout,
+  formatWhiteboardPinLayoutJson,
+} from '../utils/lidcStorylineWhiteboardLayout';
+import {
   applyLinkedScaleChange,
   applyObjectTransform,
   cloneTransform,
@@ -303,6 +310,12 @@ export default function LidcStorylineRoom({ onClose }) {
   const [cameraRotation, setCameraRotation] = useState([0, 0, 0]);
   const [saveStatus, setSaveStatus] = useState('');
   const [lastTriggerEvent, setLastTriggerEvent] = useState(null);
+  const [pinLayout, setPinLayout] = useState(() => getDefaultWhiteboardPinLayout());
+  const [selectedPinId, setSelectedPinId] = useState(null);
+
+  useEffect(() => {
+    setPinLayout(loadWhiteboardPinLayout());
+  }, []);
 
   useEffect(() => {
     setRatosTerminalOperator(user?.username);
@@ -2095,11 +2108,61 @@ export default function LidcStorylineRoom({ onClose }) {
           onCopy={handleCopy}
           onSnapPlayerToRoom={() => sceneApiRef.current?.snapPlayerToRoom()}
           onClose={() => setDebugOpen(false)}
+          whiteboardOpen={whiteboardOpen}
+          pinLayout={pinLayout}
+          selectedPinId={selectedPinId}
+          onSelectPin={setSelectedPinId}
+          onPinLayoutChange={(id, patch) => {
+            setPinLayout((current) => {
+              const next = roundPinLayout({
+                ...current,
+                [id]: { ...current[id], ...patch },
+              });
+              persistWhiteboardPinLayout(next);
+              return next;
+            });
+          }}
+          onResetPinLayout={() => {
+            const next = getDefaultWhiteboardPinLayout();
+            setPinLayout(next);
+            persistWhiteboardPinLayout(next);
+            setSaveStatus(t('lidc.storyline.debug.pinLayoutReset'));
+          }}
+          onCopyPinLayout={async () => {
+            try {
+              await navigator.clipboard.writeText(formatWhiteboardPinLayoutJson(pinLayout));
+              setSaveStatus(t('lidc.storyline.debug.pinLayoutCopied'));
+            } catch {
+              setSaveStatus(t('lidc.storyline.debug.copyFailed'));
+            }
+          }}
         />
       )}
 
       {whiteboardOpen && (
-        <LidcStorylineWhiteboard onClose={() => setWhiteboardOpen(false)} />
+        <LidcStorylineWhiteboard
+          onClose={() => setWhiteboardOpen(false)}
+          layoutEdit={debugOpen}
+          pinLayout={pinLayout}
+          selectedPinId={selectedPinId}
+          onSelectPin={setSelectedPinId}
+          onPinLayoutLiveChange={(id, patch) => {
+            setPinLayout((current) => ({
+              ...current,
+              [id]: { ...current[id], ...patch },
+            }));
+          }}
+          onPinLayoutCommit={(id, patch) => {
+            setPinLayout((current) => {
+              const next = roundPinLayout({
+                ...current,
+                [id]: { ...current[id], ...patch },
+              });
+              persistWhiteboardPinLayout(next);
+              return next;
+            });
+          }}
+        />
       )}
 
       {terminalOpen && (

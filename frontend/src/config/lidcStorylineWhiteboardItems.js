@@ -7,6 +7,11 @@ import izatullahNoorzaiImg from '../../img/characters/IzatullahNoorzai.png';
 import bashirAchakzaiImg from '../../img/characters/BashirAchakzai.png';
 import latifIshaqzaiImg from '../../img/characters/LatifIshaqzai.png';
 import hajiKhairullahBarechImg from '../../img/characters/HajiKhairullahBarech.png';
+import abdulRahmanImg from '../../img/characters/AbdulRahman.png';
+import omarHakimiImg from '../../img/characters/OmarHakimi.png';
+import faisalNoorImg from '../../img/characters/FaisalNoor.png';
+import viktorSokolovImg from '../../img/characters/ViktorSokolov.png';
+import faridAhmadKhanImg from '../../img/characters/FaridKhan.png';
 import afghanistanChartImg from '../../img/lidc/chart.png';
 
 const PHOTO_WIDTH = 10.4;
@@ -26,6 +31,30 @@ export const LIDC_STORYLINE_WHITEBOARD_ITEMS = [
     rotation: -0.7,
   },
   {
+    id: 'faisalNoor',
+    type: 'character',
+    image: faisalNoorImg,
+    labelKey: 'lidc.storyline.whiteboardItems.faisalNoor.label',
+    detailTitleKey: 'lidc.storyline.whiteboardItems.faisalNoor.title',
+    dossierSections: DOSSIER,
+    x: 24.6,
+    y: 2.1,
+    width: PHOTO_WIDTH,
+    rotation: -1.1,
+  },
+  {
+    id: 'omarHakimi',
+    type: 'character',
+    image: omarHakimiImg,
+    labelKey: 'lidc.storyline.whiteboardItems.omarHakimi.label',
+    detailTitleKey: 'lidc.storyline.whiteboardItems.omarHakimi.title',
+    dossierSections: DOSSIER,
+    x: 40.2,
+    y: 1.4,
+    width: PHOTO_WIDTH,
+    rotation: 0.5,
+  },
+  {
     id: 'nazarMohammadAlizai',
     type: 'character',
     image: nazarMohammadAlizaiImg,
@@ -36,6 +65,18 @@ export const LIDC_STORYLINE_WHITEBOARD_ITEMS = [
     y: 1.8,
     width: PHOTO_WIDTH,
     rotation: 0.9,
+  },
+  {
+    id: 'viktorSokolov',
+    type: 'character',
+    image: viktorSokolovImg,
+    labelKey: 'lidc.storyline.whiteboardItems.viktorSokolov.label',
+    detailTitleKey: 'lidc.storyline.whiteboardItems.viktorSokolov.title',
+    dossierSections: DOSSIER,
+    x: 81.6,
+    y: 2.0,
+    width: PHOTO_WIDTH,
+    rotation: -0.8,
   },
   {
     id: 'rahmatullahHotak',
@@ -71,6 +112,18 @@ export const LIDC_STORYLINE_WHITEBOARD_ITEMS = [
     y: 24.8,
     width: 16.8,
     rotation: -0.5,
+  },
+  {
+    id: 'faridAhmadKhan',
+    type: 'character',
+    image: faridAhmadKhanImg,
+    labelKey: 'lidc.storyline.whiteboardItems.faridAhmadKhan.label',
+    detailTitleKey: 'lidc.storyline.whiteboardItems.faridAhmadKhan.title',
+    dossierSections: DOSSIER,
+    x: 54.6,
+    y: 26.6,
+    width: PHOTO_WIDTH,
+    rotation: 0.7,
   },
   {
     id: 'izatullahNoorzai',
@@ -132,11 +185,44 @@ export const LIDC_STORYLINE_WHITEBOARD_ITEMS = [
     width: PHOTO_WIDTH,
     rotation: 0.8,
   },
+  {
+    id: 'abdulRahman',
+    type: 'character',
+    image: abdulRahmanImg,
+    labelKey: 'lidc.storyline.whiteboardItems.abdulRahman.label',
+    detailTitleKey: 'lidc.storyline.whiteboardItems.abdulRahman.title',
+    dossierSections: DOSSIER,
+    x: 2.0,
+    y: 44.8,
+    width: PHOTO_WIDTH,
+    rotation: -0.6,
+  },
 ];
 
 const pinTop = { x: 0.5, y: 0.05 };
 
 export const LIDC_STORYLINE_WHITEBOARD_CONNECTIONS = [
+  {
+    id: 'samiullah-faisal',
+    from: 'samiullahBarakzai',
+    to: 'faisalNoor',
+    fromAnchor: pinTop,
+    toAnchor: pinTop,
+  },
+  {
+    id: 'samiullah-hakimi',
+    from: 'samiullahBarakzai',
+    to: 'omarHakimi',
+    fromAnchor: pinTop,
+    toAnchor: pinTop,
+  },
+  {
+    id: 'samiullah-rahman',
+    from: 'samiullahBarakzai',
+    to: 'abdulRahman',
+    fromAnchor: pinTop,
+    toAnchor: pinTop,
+  },
   {
     id: 'samiullah-hotak',
     from: 'samiullahBarakzai',
@@ -152,6 +238,20 @@ export const LIDC_STORYLINE_WHITEBOARD_CONNECTIONS = [
     toAnchor: pinTop,
   },
   {
+    id: 'faisal-safi',
+    from: 'faisalNoor',
+    to: 'hamidullahSafi',
+    fromAnchor: pinTop,
+    toAnchor: pinTop,
+  },
+  {
+    id: 'hotak-farid',
+    from: 'rahmatullahHotak',
+    to: 'faridAhmadKhan',
+    fromAnchor: pinTop,
+    toAnchor: pinTop,
+  },
+  {
     id: 'hotak-bashir',
     from: 'rahmatullahHotak',
     to: 'bashirAchakzai',
@@ -159,9 +259,30 @@ export const LIDC_STORYLINE_WHITEBOARD_CONNECTIONS = [
     toAnchor: pinTop,
   },
   {
+    id: 'rahman-zahir',
+    from: 'abdulRahman',
+    to: 'zahirPopalzai',
+    fromAnchor: pinTop,
+    toAnchor: pinTop,
+  },
+  {
     id: 'zahir-bashir',
     from: 'zahirPopalzai',
     to: 'bashirAchakzai',
+    fromAnchor: pinTop,
+    toAnchor: pinTop,
+  },
+  {
+    id: 'hakimi-tufan',
+    from: 'omarHakimi',
+    to: 'nazarMohammadAlizai',
+    fromAnchor: pinTop,
+    toAnchor: pinTop,
+  },
+  {
+    id: 'sokolov-hakimi',
+    from: 'viktorSokolov',
+    to: 'omarHakimi',
     fromAnchor: pinTop,
     toAnchor: pinTop,
   },

@@ -155,6 +155,10 @@ body.lidc-storyline-open {
   cursor: default;
 }
 
+.lidc-storyline-root.is-whiteboard-open.is-debug-open .lidc-storyline-debug-panel {
+  z-index: 6700;
+}
+
 .lidc-storyline-debug-panel {
   position: absolute;
   top: clamp(12px, 1.4vw, 20px);
