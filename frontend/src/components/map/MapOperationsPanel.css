@@ -16,8 +16,8 @@
   display: flex;
   flex-wrap: nowrap;
   align-items: stretch;
-  gap: 9px;
-  margin: 0 42px 14px 0;
+  gap: 6px;
+  margin: 0 34px 14px 0;
   flex: 0 0 auto;
   min-width: 0;
   overflow: visible;
@@ -28,11 +28,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  flex: 0 0 auto;
+  gap: 6px;
+  flex: 1 1 0;
   min-width: 0;
-  height: 34px;
-  padding: 0 10px;
+  height: 32px;
+  padding: 0 8px;
   border: 1px solid #4e4e4e;
   border-radius: 8px;
   background: #0e0e0e;
@@ -42,15 +42,15 @@
 }
 
 .map-ops-section__tab--mission {
-  width: 116px;
+  width: auto;
 }
 
 .map-ops-section__tab--logistic {
-  width: 126px;
+  width: auto;
 }
 
 .map-ops-section__tab--production {
-  width: 201px;
+  width: auto;
 }
 
 .map-ops-section__tab.is-active {
@@ -95,12 +95,12 @@
 
 .map-ops-section__toolbar {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: stretch;
   gap: 8px;
   margin: 0 0 12px;
   padding-top: 12px;
-  padding-right: 42px;
+  padding-right: 34px;
   border-top: 1px solid #4e4e4e;
   flex: 0 0 auto;
   min-width: 0;

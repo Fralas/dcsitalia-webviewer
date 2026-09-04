@@ -1,7 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@600;700&display=swap');
 
 .airport-spawn-panel {
-  --asp-scale: 0.6;
+  --asp-scale: 0.42;
+  --asp-type: 0.6;
   --asp-radius-card: calc(25px * var(--asp-scale));
   --asp-radius-control: 10px;
   --asp-radius-option: 8px;
@@ -31,7 +32,7 @@
 .airport-spawn-panel__title {
   margin: 0;
   min-width: 0;
-  font-size: 20px;
+  font-size: calc(20px * var(--asp-type));
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: 0.08em;
@@ -45,14 +46,14 @@
 .airport-spawn-panel__block {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: calc(12px * 0.7);
 }
 
 .airport-spawn-panel__block-title {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: 0.08em;
@@ -61,8 +62,8 @@
 }
 
 .airport-spawn-panel__block-icon {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   flex-shrink: 0;
   color: #ffffff;
 }
@@ -70,7 +71,7 @@
 .airport-spawn-panel__action-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  gap: calc(6px * 0.7);
 }
 
 .airport-spawn-panel__action-btn {
@@ -78,7 +79,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 32px;
+  min-height: 28px;
   padding: 0 10px;
   background: var(--asp-control-bg);
   border: 1px solid var(--asp-control-border);
@@ -113,8 +114,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: calc(34px * 0.7);
+  height: calc(34px * 0.7);
   flex-shrink: 0;
   background: var(--asp-control-bg);
   border: 1px solid var(--asp-control-border);
@@ -130,8 +131,8 @@
 }
 
 .airport-spawn-panel__close svg {
-  width: 14px;
-  height: 14px;
+  width: calc(14px * 0.7);
+  height: calc(14px * 0.7);
 }
 
 .airport-spawn-panel__divider {
@@ -165,16 +166,16 @@
   border: 1px dashed var(--asp-control-border);
   border-radius: var(--asp-radius-control);
   color: #949494;
-  font-size: calc(16px * var(--asp-scale));
+  font-size: calc(16px * var(--asp-type));
   font-weight: 600;
   line-height: 1.35;
 }
 
 .airport-spawn-panel__section-title {
   margin: 0 0 calc(10px * var(--asp-scale));
-  font-size: calc(15px * var(--asp-scale));
+  font-size: calc(15px * var(--asp-type));
   font-weight: 600;
-  line-height: calc(18px * var(--asp-scale));
+  line-height: calc(18px * var(--asp-type));
   color: #949494;
   text-transform: uppercase;
 }
@@ -182,7 +183,7 @@
 .airport-spawn-panel__pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: calc(6px * 0.7);
 }
 
 .airport-spawn-panel__pill {
@@ -190,7 +191,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 32px;
+  min-height: 28px;
   padding: 0 10px;
   background: var(--asp-control-bg);
   border: 1px solid var(--asp-control-border);
@@ -236,7 +237,7 @@
 
 .airport-spawn-panel__qty-title {
   margin: 0 0 calc(10px * var(--asp-scale));
-  font-size: calc(15px * var(--asp-scale));
+  font-size: calc(15px * var(--asp-type));
   font-weight: 600;
   line-height: 1.2;
   color: #ffffff;
@@ -246,7 +247,7 @@
 .airport-spawn-panel__qty-pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: calc(6px * 0.7);
 }
 
 .airport-spawn-panel__qty-pill {
@@ -254,8 +255,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 32px;
-  min-height: 32px;
+  min-width: 28px;
+  min-height: 28px;
   padding: 0 10px;
   background: var(--asp-control-bg);
   border: 1px solid var(--asp-control-border);
@@ -281,7 +282,7 @@
 
 .airport-spawn-panel__hint {
   margin: 0;
-  font-size: calc(13px * var(--asp-scale));
+  font-size: calc(13px * var(--asp-type));
   line-height: 1.35;
   color: #949494;
 }

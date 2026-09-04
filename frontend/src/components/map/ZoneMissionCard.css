@@ -2,7 +2,8 @@
 
 .zone-mission-card {
   /* Match ZONE ### pill rem size to map-ops DEAD/SEAD/STRIKE pills (12px / 0.75rem) */
-  --zmc-scale: 0.6;
+  --zmc-scale: 0.42;
+  --zmc-type: 0.6;
   --zmc-blue: #3b82f6;
   /* Match map-ops control rounding/colors (CAS/DEAD pills, selects, tabs) */
   --zmc-radius-control: 10px;
@@ -162,7 +163,7 @@
 }
 
 .zone-mission-card__menu-option-label {
-  font-size: calc(16px * var(--zmc-scale));
+  font-size: calc(16px * var(--zmc-type));
   font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
@@ -206,9 +207,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: calc(20px * var(--zmc-scale));
+  font-size: calc(20px * var(--zmc-type));
   font-weight: 600;
-  line-height: calc(24px * var(--zmc-scale));
+  line-height: calc(24px * var(--zmc-type));
 }
 
 .zone-mission-card__dot {
@@ -271,7 +272,7 @@
 
 .zone-mission-card__meta-line {
   margin: 0;
-  font-size: calc(20px * var(--zmc-scale));
+  font-size: calc(20px * var(--zmc-type));
   font-weight: 600;
   line-height: 160%;
   color: #ffffff;
@@ -306,9 +307,9 @@
 
 .zone-mission-card__section-title {
   margin: 0 0 calc(20px * var(--zmc-scale));
-  font-size: calc(15px * var(--zmc-scale));
+  font-size: calc(15px * var(--zmc-type));
   font-weight: 600;
-  line-height: calc(18px * var(--zmc-scale));
+  line-height: calc(18px * var(--zmc-type));
   color: #ffffff;
   text-transform: uppercase;
 }
@@ -316,11 +317,11 @@
 .zone-mission-card__pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: calc(6px * 0.7);
 }
 
 .zone-mission-card__pills--neighbor {
-  gap: 6px;
+  gap: calc(6px * 0.7);
 }
 
 .zone-mission-card__pill {
@@ -328,7 +329,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 32px;
+  min-height: 28px;
   padding: 0 10px;
   background: var(--zmc-control-bg);
   border: 1px solid var(--zmc-control-border);
@@ -369,9 +370,9 @@
   border-radius: var(--zmc-radius-control);
   border: 1px solid var(--zmc-control-border);
   font-family: inherit;
-  font-size: calc(20px * var(--zmc-scale));
+  font-size: calc(20px * var(--zmc-type));
   font-weight: 600;
-  line-height: calc(24px * var(--zmc-scale));
+  line-height: calc(24px * var(--zmc-type));
   text-align: center;
   color: #ffffff;
   cursor: pointer;
@@ -403,14 +404,14 @@
 
 .zone-mission-card__hint {
   margin: calc(8px * var(--zmc-scale)) 0 0;
-  font-size: calc(13px * var(--zmc-scale));
+  font-size: calc(13px * var(--zmc-type));
   line-height: 1.35;
   color: #949494;
 }
 
 @media (max-width: 720px) {
   .zone-mission-card {
-    --zmc-scale: 0.65;
+    --zmc-scale: 0.455;
     width: 100%;
   }
 
@@ -437,6 +438,6 @@
   .zone-mission-card__pills--neighbor .zone-mission-card__pill {
     width: auto;
     min-width: 0;
-    padding: 0 10px;
+    padding: 0 calc(10px * 0.7);
   }
 }
