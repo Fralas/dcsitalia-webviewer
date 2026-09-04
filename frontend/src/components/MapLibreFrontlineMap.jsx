@@ -17,6 +17,13 @@ const DARK_RASTER_STYLE = {
   },
   layers: [
     {
+      id: 'background',
+      type: 'background',
+      paint: {
+        'background-color': '#000000',
+      },
+    },
+    {
       id: 'carto-dark-layer',
       type: 'raster',
       source: 'cartoDark',

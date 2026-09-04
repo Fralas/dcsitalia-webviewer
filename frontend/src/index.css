@@ -90,7 +90,43 @@ code {
 
 /* Ensure map container has proper background */
 .leaflet-container {
-  background: #1e293b;
+  background: #000000;
+}
+
+.leaflet-control-attribution {
+  margin: 0 8px 8px 0 !important;
+  padding: 3px 7px !important;
+  border: none !important;
+  border-radius: 6px !important;
+  background: rgba(15, 15, 15, 0.28) !important;
+  box-shadow: none !important;
+  color: rgba(237, 237, 237, 0.38) !important;
+  font-family: var(--font-sans) !important;
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.04em !important;
+  line-height: 1.3 !important;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.leaflet-control-attribution a {
+  color: rgba(237, 237, 237, 0.45) !important;
+  text-decoration: none !important;
+}
+
+.leaflet-control-attribution a:hover {
+  color: rgba(255, 140, 0, 0.75) !important;
+}
+
+.leaflet-control-attribution:hover {
+  background: rgba(15, 15, 15, 0.48) !important;
+  color: rgba(237, 237, 237, 0.62) !important;
+}
+
+.leaflet-control-attribution .leaflet-attribution-flag {
+  display: none !important;
 }
 
 /* MapLibre hover popups (zones/airports/routes): compact dark theme */

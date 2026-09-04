@@ -2239,7 +2239,7 @@ function MapLibreFlatMapView({
         id: 'background',
         type: 'background',
         paint: {
-          'background-color': '#0b1220',
+          'background-color': '#000000',
         },
       },
       {
