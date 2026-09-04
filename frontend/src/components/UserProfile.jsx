@@ -61,6 +61,7 @@ export default function UserProfile() {
   const [assigningAchievement, setAssigningAchievement] = useState(false);
   const [assignStatus, setAssignStatus] = useState('');
   const [managementOpen, setManagementOpen] = useState(false);
+  const [opsMode, setOpsMode] = useState('assign');
 
   const [editAchievementId, setEditAchievementId] = useState('');
   const [editAchievementName, setEditAchievementName] = useState('');
@@ -586,181 +587,208 @@ export default function UserProfile() {
           </button>
 
           {managementOpen && (
-            <div className="profile__ops-grid">
-              <form onSubmit={handleCreateAchievement} className="profile__ops-panel">
-                <h4>Crea</h4>
-                <input
-                  type="text"
-                  value={newAchievementName}
-                  onChange={(event) => setNewAchievementName(event.target.value)}
-                  placeholder="Nome"
-                  className="profile-input"
-                />
-                <textarea
-                  rows={3}
-                  value={newAchievementDescription}
-                  onChange={(event) => setNewAchievementDescription(event.target.value)}
-                  placeholder="Descrizione"
-                  className="profile-textarea"
-                />
-                <input
-                  type="text"
-                  value={newAchievementImageUrl}
-                  onChange={(event) => setNewAchievementImageUrl(event.target.value)}
-                  placeholder="URL immagine"
-                  className="profile-input"
-                />
-                <label className="profile-file">
-                  <Upload className="h-3.5 w-3.5" />
-                  Carica
-                  <input type="file" accept="image/*" className="hidden" onChange={handleImageFilePick} />
-                </label>
-                {newAchievementImageName && <span className="profile-file-name">{newAchievementImageName}</span>}
-                {newAchievementImageUrl && (
-                  <div className="profile-preview">
-                    <img src={newAchievementImageUrl} alt="" />
-                  </div>
-                )}
-                {createStatus && (
-                  <p className={`profile-msg${createStatus.includes('successo') ? ' is-ok' : ' is-warn'}`}>
-                    {createStatus}
-                  </p>
-                )}
-                <button type="submit" disabled={creatingAchievement} className="profile-btn">
-                  {creatingAchievement && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  Crea
-                </button>
-              </form>
-
-              <form onSubmit={handleAssignAchievement} className="profile__ops-panel">
-                <h4>Assegna</h4>
-                <select
-                  value={assignAchievementId}
-                  onChange={(event) => setAssignAchievementId(event.target.value)}
-                  className="profile-select"
+            <div className="profile-ops">
+              <div className="profile-ops__tabs" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={opsMode === 'assign'}
+                  className={`profile-ops__tab${opsMode === 'assign' ? ' is-active' : ''}`}
+                  onClick={() => setOpsMode('assign')}
                 >
-                  {catalog.length === 0 ? (
-                    <option value="">Nessun achievement</option>
-                  ) : (
-                    catalog.map((entry) => (
-                      <option key={entry.id} value={entry.id}>{entry.name}</option>
-                    ))
-                  )}
-                </select>
-                <input
-                  type="text"
-                  value={assignUserId}
-                  onChange={(event) => setAssignUserId(event.target.value)}
-                  placeholder="Discord user ID"
-                  className="profile-input"
-                />
-                <input
-                  type="text"
-                  value={assignUserName}
-                  onChange={(event) => setAssignUserName(event.target.value)}
-                  placeholder="Nome visualizzato"
-                  className="profile-input"
-                />
-                {knownUsers.length > 0 && (
-                  <div className="profile-online">
-                    {knownUsers.map((entry) => (
-                      <button
-                        key={entry.id}
-                        type="button"
-                        className="profile-chip"
-                        onClick={() => {
-                          setAssignUserId(entry.id);
-                          setAssignUserName(entry.name);
-                        }}
-                      >
-                        {entry.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {assignStatus && (
-                  <p className={`profile-msg${assignStatus.includes('successo') ? ' is-ok' : ' is-warn'}`}>
-                    {assignStatus}
-                  </p>
-                )}
-                <button type="submit" disabled={assigningAchievement || catalog.length === 0} className="profile-btn">
-                  {assigningAchievement && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                   Assegna
                 </button>
-              </form>
-
-              <form onSubmit={handleUpdateAchievement} className="profile__ops-panel">
-                <h4>Modifica</h4>
-                <select
-                  value={editAchievementId}
-                  onChange={(event) => setEditAchievementId(event.target.value)}
-                  className="profile-select"
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={opsMode === 'create'}
+                  className={`profile-ops__tab${opsMode === 'create' ? ' is-active' : ''}`}
+                  onClick={() => setOpsMode('create')}
                 >
-                  {catalog.length === 0 ? (
-                    <option value="">Nessun achievement</option>
-                  ) : (
-                    catalog.map((entry) => (
-                      <option key={entry.id} value={entry.id}>{entry.name}</option>
-                    ))
+                  Nuova
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={opsMode === 'edit'}
+                  className={`profile-ops__tab${opsMode === 'edit' ? ' is-active' : ''}`}
+                  onClick={() => setOpsMode('edit')}
+                >
+                  Modifica
+                </button>
+              </div>
+
+              {opsMode === 'assign' && (
+                <form onSubmit={handleAssignAchievement} className="profile-ops__form">
+                  <label className="profile-ops__label">
+                    Patch
+                    <select
+                      value={assignAchievementId}
+                      onChange={(event) => setAssignAchievementId(event.target.value)}
+                      className="profile-input"
+                    >
+                      {catalog.length === 0 ? (
+                        <option value="">Nessuna patch</option>
+                      ) : (
+                        catalog.map((entry) => (
+                          <option key={entry.id} value={entry.id}>{entry.name}</option>
+                        ))
+                      )}
+                    </select>
+                  </label>
+                  <label className="profile-ops__label">
+                    Pilota
+                    <input
+                      type="text"
+                      value={assignUserName}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setAssignUserName(value);
+                        const match = knownUsers.find((entry) => entry.name === value || entry.id === value);
+                        setAssignUserId(match ? match.id : value);
+                      }}
+                      placeholder="Nome o Discord ID"
+                      className="profile-input"
+                    />
+                  </label>
+                  {knownUsers.length > 0 && (
+                    <div className="profile-online">
+                      {knownUsers.map((entry) => (
+                        <button
+                          key={entry.id}
+                          type="button"
+                          className={`profile-chip${assignUserId === entry.id ? ' is-active' : ''}`}
+                          onClick={() => {
+                            setAssignUserId(entry.id);
+                            setAssignUserName(entry.name);
+                          }}
+                        >
+                          {entry.name}
+                        </button>
+                      ))}
+                    </div>
                   )}
-                </select>
-                <input
-                  type="text"
-                  value={editAchievementName}
-                  onChange={(event) => setEditAchievementName(event.target.value)}
-                  placeholder="Nome"
-                  className="profile-input"
-                />
-                <textarea
-                  rows={3}
-                  value={editAchievementDescription}
-                  onChange={(event) => setEditAchievementDescription(event.target.value)}
-                  placeholder="Descrizione"
-                  className="profile-textarea"
-                />
-                <input
-                  type="text"
-                  value={editAchievementImageUrl}
-                  onChange={(event) => setEditAchievementImageUrl(event.target.value)}
-                  placeholder="URL immagine"
-                  className="profile-input"
-                />
-                <label className="profile-file">
-                  <Upload className="h-3.5 w-3.5" />
-                  Carica
-                  <input type="file" accept="image/*" className="hidden" onChange={handleEditImageFilePick} />
-                </label>
-                {editAchievementImageName && <span className="profile-file-name">{editAchievementImageName}</span>}
-                {editAchievementImageUrl && (
-                  <div className="profile-preview">
-                    <img src={editAchievementImageUrl} alt="" />
+                  {assignStatus && (
+                    <p className={`profile-msg${assignStatus.includes('successo') ? ' is-ok' : ' is-warn'}`}>
+                      {assignStatus}
+                    </p>
+                  )}
+                  <button type="submit" disabled={assigningAchievement || catalog.length === 0} className="profile-btn">
+                    {assigningAchievement && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                    Assegna
+                  </button>
+                </form>
+              )}
+
+              {opsMode === 'create' && (
+                <form onSubmit={handleCreateAchievement} className="profile-ops__form profile-ops__form--split">
+                  <label className="profile-file profile-file--drop">
+                    {newAchievementImageUrl ? (
+                      <img src={newAchievementImageUrl} alt="" />
+                    ) : (
+                      <span>
+                        <Upload className="h-4 w-4" />
+                        Immagine
+                      </span>
+                    )}
+                    <input type="file" accept="image/*" className="hidden" onChange={handleImageFilePick} />
+                  </label>
+                  <div className="profile-ops__fields">
+                    <input
+                      type="text"
+                      value={newAchievementName}
+                      onChange={(event) => setNewAchievementName(event.target.value)}
+                      placeholder="Nome"
+                      className="profile-input"
+                    />
+                    <textarea
+                      rows={2}
+                      value={newAchievementDescription}
+                      onChange={(event) => setNewAchievementDescription(event.target.value)}
+                      placeholder="Descrizione"
+                      className="profile-textarea"
+                    />
+                    {createStatus && (
+                      <p className={`profile-msg${createStatus.includes('successo') ? ' is-ok' : ' is-warn'}`}>
+                        {createStatus}
+                      </p>
+                    )}
+                    <button type="submit" disabled={creatingAchievement} className="profile-btn">
+                      {creatingAchievement && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      Crea
+                    </button>
                   </div>
-                )}
-                {editStatus && (
-                  <p className={`profile-msg${editStatus.includes('successo') || editStatus.includes('Rimossi') ? ' is-ok' : ' is-warn'}`}>
-                    {editStatus}
-                  </p>
-                )}
-                <div className="profile-actions">
-                  <button
-                    type="submit"
-                    disabled={editingAchievement || deletingAchievement || catalog.length === 0}
-                    className="profile-btn profile-btn--ghost"
-                  >
-                    {editingAchievement ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Pencil className="h-3.5 w-3.5" />}
-                    Salva
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDeleteAchievement}
-                    disabled={editingAchievement || deletingAchievement || catalog.length === 0}
-                    className="profile-btn profile-btn--danger"
-                  >
-                    {deletingAchievement ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                    Elimina
-                  </button>
-                </div>
-              </form>
+                </form>
+              )}
+
+              {opsMode === 'edit' && (
+                <form onSubmit={handleUpdateAchievement} className="profile-ops__form profile-ops__form--split">
+                  <label className="profile-file profile-file--drop">
+                    {editAchievementImageUrl ? (
+                      <img src={editAchievementImageUrl} alt="" />
+                    ) : (
+                      <span>
+                        <Upload className="h-4 w-4" />
+                        Immagine
+                      </span>
+                    )}
+                    <input type="file" accept="image/*" className="hidden" onChange={handleEditImageFilePick} />
+                  </label>
+                  <div className="profile-ops__fields">
+                    <select
+                      value={editAchievementId}
+                      onChange={(event) => setEditAchievementId(event.target.value)}
+                      className="profile-input"
+                    >
+                      {catalog.length === 0 ? (
+                        <option value="">Nessuna patch</option>
+                      ) : (
+                        catalog.map((entry) => (
+                          <option key={entry.id} value={entry.id}>{entry.name}</option>
+                        ))
+                      )}
+                    </select>
+                    <input
+                      type="text"
+                      value={editAchievementName}
+                      onChange={(event) => setEditAchievementName(event.target.value)}
+                      placeholder="Nome"
+                      className="profile-input"
+                    />
+                    <textarea
+                      rows={2}
+                      value={editAchievementDescription}
+                      onChange={(event) => setEditAchievementDescription(event.target.value)}
+                      placeholder="Descrizione"
+                      className="profile-textarea"
+                    />
+                    {editStatus && (
+                      <p className={`profile-msg${editStatus.includes('successo') || editStatus.includes('Rimossi') ? ' is-ok' : ' is-warn'}`}>
+                        {editStatus}
+                      </p>
+                    )}
+                    <div className="profile-actions">
+                      <button
+                        type="submit"
+                        disabled={editingAchievement || deletingAchievement || catalog.length === 0}
+                        className="profile-btn"
+                      >
+                        {editingAchievement ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Pencil className="h-3.5 w-3.5" />}
+                        Salva
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDeleteAchievement}
+                        disabled={editingAchievement || deletingAchievement || catalog.length === 0}
+                        className="profile-btn profile-btn--danger"
+                      >
+                        {deletingAchievement ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        Elimina
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              )}
             </div>
           )}
         </section>
