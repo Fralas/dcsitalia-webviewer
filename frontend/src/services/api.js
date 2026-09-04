@@ -474,6 +474,15 @@ export async function assignAchievement(payload) {
 }
 
 /**
+ * Discord guild members (wiki editor only)
+ */
+export async function getDiscordGuildMembers() {
+  return fetchAPI('/discord/guild-members', {
+    credentials: 'include',
+  });
+}
+
+/**
  * Get achievements leaderboard
  */
 export async function getAchievementsLeaderboard(limit = 50) {
@@ -1163,6 +1172,7 @@ export default {
   deleteAchievement,
   getUserAchievements,
   assignAchievement,
+  getDiscordGuildMembers,
   getAchievementsLeaderboard,
   getChangelogs,
   getChangelogDraft,

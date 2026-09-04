@@ -255,12 +255,18 @@ export function getUserDisplayName(userId) {
   return sanitizeText(usersMap[safeUserId]?.name || '', 140);
 }
 
-export function assignAchievement({ userId, userName, achievementId, awardedById, awardedByName }) {
-  const safeUserId = sanitizeUserId(userId);
-  const safeAchievementId = sanitizeText(achievementId || '', 80);
-  if (!safeUserId) {
-    throw new Error('userId is required');
+const MAX_ASSIGN_RECIPIENTS = 200;
+
+export function assignAchievementToUsers({ recipients, achievementId, awardedById, awardedByName }) {
+  const list = Array.isArray(recipients) ? recipients : [];
+  if (list.length === 0) {
+    throw new Error('recipients is required');
   }
+  if (list.length > MAX_ASSIGN_RECIPIENTS) {
+    throw new Error(`Too many recipients (max ${MAX_ASSIGN_RECIPIENTS})`);
+  }
+
+  const safeAchievementId = sanitizeText(achievementId || '', 80);
   if (!safeAchievementId) {
     throw new Error('achievementId is required');
   }
@@ -272,32 +278,83 @@ export function assignAchievement({ userId, userName, achievementId, awardedById
   }
 
   const awardsMap = readAwardsMap();
-  const userAwards = Array.isArray(awardsMap[safeUserId]) ? awardsMap[safeUserId] : [];
-  if (userAwards.some((entry) => entry.achievementId === safeAchievementId)) {
-    throw new Error('Achievement already assigned to this user');
-  }
-
   const awardedAt = Date.now();
-  const newAward = normalizeAwardEntry({
-    id: `award_${awardedAt}_${crypto.randomBytes(4).toString('hex')}`,
-    achievementId: safeAchievementId,
-    awardedAt,
-    awardedBy: {
-      id: sanitizeText(awardedById || '', 80),
-      name: sanitizeText(awardedByName || '', 140),
-    },
+  const awardedBy = {
+    id: sanitizeText(awardedById || '', 80),
+    name: sanitizeText(awardedByName || '', 140),
+  };
+  const assigned = [];
+  const skipped = [];
+  const failed = [];
+  const seen = new Set();
+  const namesToRemember = [];
+
+  list.forEach((recipient) => {
+    const safeUserId = sanitizeUserId(recipient?.userId || recipient?.id);
+    if (!safeUserId) {
+      failed.push({ userId: '', reason: 'invalid userId' });
+      return;
+    }
+    if (seen.has(safeUserId)) {
+      skipped.push({ userId: safeUserId, reason: 'duplicate' });
+      return;
+    }
+    seen.add(safeUserId);
+
+    const userAwards = Array.isArray(awardsMap[safeUserId]) ? awardsMap[safeUserId] : [];
+    if (userAwards.some((entry) => entry.achievementId === safeAchievementId)) {
+      skipped.push({ userId: safeUserId, reason: 'already assigned' });
+      return;
+    }
+
+    const newAward = normalizeAwardEntry({
+      id: `award_${awardedAt}_${crypto.randomBytes(4).toString('hex')}`,
+      achievementId: safeAchievementId,
+      awardedAt,
+      awardedBy,
+    });
+    awardsMap[safeUserId] = [...userAwards, newAward]
+      .sort((a, b) => (Number(b.awardedAt) || 0) - (Number(a.awardedAt) || 0));
+    assigned.push({ userId: safeUserId, award: newAward });
+    namesToRemember.push({
+      userId: safeUserId,
+      name: recipient?.userName || recipient?.name || '',
+    });
   });
 
-  awardsMap[safeUserId] = [...userAwards, newAward]
-    .sort((a, b) => (Number(b.awardedAt) || 0) - (Number(a.awardedAt) || 0));
-  writeAwardsMap(awardsMap);
-
-  rememberUser({ userId: safeUserId, name: userName });
+  if (assigned.length > 0) {
+    writeAwardsMap(awardsMap);
+    namesToRemember.forEach((entry) => rememberUser(entry));
+  }
 
   return {
-    userId: safeUserId,
-    award: newAward,
     achievement: targetAchievement,
+    assigned,
+    skipped,
+    failed,
+  };
+}
+
+export function assignAchievement({ userId, userName, achievementId, awardedById, awardedByName }) {
+  const result = assignAchievementToUsers({
+    recipients: [{ userId, userName }],
+    achievementId,
+    awardedById,
+    awardedByName,
+  });
+  if (result.failed.length > 0) {
+    throw new Error('userId is required');
+  }
+  if (result.skipped.some((entry) => entry.reason === 'already assigned')) {
+    throw new Error('Achievement already assigned to this user');
+  }
+  if (result.assigned.length === 0) {
+    throw new Error('Failed to assign achievement');
+  }
+  return {
+    userId: result.assigned[0].userId,
+    award: result.assigned[0].award,
+    achievement: result.achievement,
   };
 }
 
@@ -370,6 +427,7 @@ export default {
   rememberUser,
   getUserDisplayName,
   assignAchievement,
+  assignAchievementToUsers,
   getUserAchievements,
   getLeaderboard,
 };

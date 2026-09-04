@@ -2706,8 +2706,63 @@ app.get('/api/achievements/users/:userId', (req, res) => {
   });
 });
 
+function parseAchievementRecipients(body) {
+  if (Array.isArray(body?.recipients)) {
+    return body.recipients.map((entry) => ({
+      userId: entry?.userId || entry?.id,
+      userName: entry?.userName || entry?.name,
+    }));
+  }
+  if (Array.isArray(body?.userIds)) {
+    return body.userIds.map((id) => ({ userId: id, userName: '' }));
+  }
+  if (body?.userId) {
+    return [{ userId: body.userId, userName: body.userName }];
+  }
+  return [];
+}
+
 /**
- * POST /api/achievements/assign - Assign achievement to a user (wiki editor only)
+ * GET /api/discord/guild-members - All Discord guild members (wiki editor only)
+ */
+app.get('/api/discord/guild-members', async (req, res) => {
+  const sessionUser = req.session?.user;
+  const userId = sessionUser?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
+    return res.status(403).json({ error: 'Only allowed contributors can list guild members' });
+  }
+  if (!DISCORD_GUILD_ID || !DISCORD_BOT_TOKEN) {
+    return res.status(503).json({ error: 'Discord guild is not configured' });
+  }
+
+  try {
+    const members = await discordAuth.listGuildMembers(DISCORD_GUILD_ID, DISCORD_BOT_TOKEN);
+    return res.json({ members });
+  } catch (error) {
+    const discordStatus = Number(error?.status) || 0;
+    if (discordStatus === 503 && error?.message) {
+      return res.status(503).json({ error: error.message });
+    }
+    if (discordStatus === 401) {
+      return res.status(503).json({
+        error: 'Token bot Discord non valido. Aggiorna DISCORD_BOT_TOKEN (Bot → Reset Token), non l’Application ID.',
+      });
+    }
+    if (discordStatus === 403) {
+      return res.status(503).json({
+        error: 'Il bot Discord non può elencare i membri. Abilita Server Members Intent e verifica che il bot sia nel server.',
+      });
+    }
+    logger.error('Failed to list Discord guild members', { error: error?.message || String(error) });
+    return res.status(502).json({ error: 'Impossibile caricare i membri Discord' });
+  }
+});
+
+/**
+ * POST /api/achievements/assign - Assign achievement to one or more users (wiki editor only)
  */
 app.post('/api/achievements/assign', (req, res) => {
   const sessionUser = req.session?.user;
@@ -2719,13 +2774,31 @@ app.post('/api/achievements/assign', (req, res) => {
     return res.status(403).json({ error: 'Only allowed contributors can assign achievements' });
   }
 
+  const recipients = parseAchievementRecipients(req.body);
+  const awardedByName = sessionUser.globalName || sessionUser.username || String(userId);
+
   try {
-    const result = achievementsService.assignAchievement({
-      userId: req.body?.userId,
-      userName: req.body?.userName,
+    if (recipients.length === 1) {
+      const result = achievementsService.assignAchievement({
+        userId: recipients[0].userId,
+        userName: recipients[0].userName,
+        achievementId: req.body?.achievementId,
+        awardedById: userId,
+        awardedByName,
+      });
+      return res.status(201).json({
+        ...result,
+        assigned: [{ userId: result.userId, award: result.award }],
+        skipped: [],
+        failed: [],
+      });
+    }
+
+    const result = achievementsService.assignAchievementToUsers({
+      recipients,
       achievementId: req.body?.achievementId,
       awardedById: userId,
-      awardedByName: sessionUser.globalName || sessionUser.username || String(userId),
+      awardedByName,
     });
     return res.status(201).json(result);
   } catch (error) {

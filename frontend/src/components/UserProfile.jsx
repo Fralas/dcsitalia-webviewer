@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Award, ChevronDown, Loader2, Pencil, Trash2, Upload, User as UserIcon } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useUser } from '../contexts/UserContext';
@@ -46,7 +46,11 @@ export default function UserProfile() {
   const [catalog, setCatalog] = useState([]);
   const [userAchievements, setUserAchievements] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
-  const [loggedInUsers, setLoggedInUsers] = useState([]);
+  const [guildMembers, setGuildMembers] = useState([]);
+  const [guildMembersLoading, setGuildMembersLoading] = useState(false);
+  const [guildMembersError, setGuildMembersError] = useState('');
+  const [memberSearch, setMemberSearch] = useState('');
+  const [selectedAssignIds, setSelectedAssignIds] = useState([]);
 
   const [newAchievementName, setNewAchievementName] = useState('');
   const [newAchievementDescription, setNewAchievementDescription] = useState('');
@@ -55,8 +59,6 @@ export default function UserProfile() {
   const [creatingAchievement, setCreatingAchievement] = useState(false);
   const [createStatus, setCreateStatus] = useState('');
 
-  const [assignUserId, setAssignUserId] = useState('');
-  const [assignUserName, setAssignUserName] = useState('');
   const [assignAchievementId, setAssignAchievementId] = useState('');
   const [assigningAchievement, setAssigningAchievement] = useState(false);
   const [assignStatus, setAssignStatus] = useState('');
@@ -84,27 +86,6 @@ export default function UserProfile() {
   const displayName = user?.globalName || user?.username || '';
   const avatarUrl = user?.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png` : null;
 
-  const knownUsers = useMemo(() => {
-    const map = new Map();
-    if (user?.id) {
-      map.set(String(user.id), {
-        id: String(user.id),
-        name: normalizeUserName(displayName, String(user.id)),
-      });
-    }
-    (Array.isArray(loggedInUsers) ? loggedInUsers : []).forEach((entry) => {
-      const id = String(entry?.id || '').trim();
-      if (!id) return;
-      if (!map.has(id)) {
-        map.set(id, {
-          id,
-          name: normalizeUserName(entry?.globalName || entry?.username, id),
-        });
-      }
-    });
-    return Array.from(map.values());
-  }, [displayName, loggedInUsers, user?.id]);
-
   const fetchAchievementData = useCallback(async ({ background = false } = {}) => {
     if (!user?.id || fetchInFlightRef.current) return;
     fetchInFlightRef.current = true;
@@ -123,17 +104,6 @@ export default function UserProfile() {
       setLeaderboard(Array.isArray(leaderboardResponse?.leaderboard) ? leaderboardResponse.leaderboard : []);
       awardsReadyForUserRef.current = user.id;
       setAwardsReady(true);
-
-      if (canManageAchievements) {
-        try {
-          const loggedInUsersResponse = await api.getLoggedInUsers();
-          setLoggedInUsers(Array.isArray(loggedInUsersResponse) ? loggedInUsersResponse : []);
-        } catch {
-          setLoggedInUsers([]);
-        }
-      } else {
-        setLoggedInUsers([]);
-      }
     } catch (requestError) {
       if (!background) {
         setError(requestError?.message || 'Errore durante il caricamento dei riconoscimenti.');
@@ -144,7 +114,7 @@ export default function UserProfile() {
         setLoading(false);
       }
     }
-  }, [canManageAchievements, user?.id]);
+  }, [user?.id]);
 
   useEffect(() => {
     fetchAchievementData();
@@ -160,10 +130,27 @@ export default function UserProfile() {
   }, [fetchAchievementData, user?.id]);
 
   useEffect(() => {
-    if (!user?.id) return;
-    setAssignUserId(String(user.id));
-    setAssignUserName(normalizeUserName(displayName, String(user.id)));
-  }, [displayName, user?.id]);
+    if (!canManageAchievements || !managementOpen) return undefined;
+    let cancelled = false;
+    setGuildMembersLoading(true);
+    setGuildMembersError('');
+    api.getDiscordGuildMembers()
+      .then((response) => {
+        if (cancelled) return;
+        setGuildMembers(Array.isArray(response?.members) ? response.members : []);
+      })
+      .catch((requestError) => {
+        if (cancelled) return;
+        setGuildMembers([]);
+        setGuildMembersError(requestError?.message || 'Impossibile caricare i membri Discord.');
+      })
+      .finally(() => {
+        if (!cancelled) setGuildMembersLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canManageAchievements, managementOpen]);
 
   useEffect(() => {
     if (assignAchievementId) return;
@@ -376,22 +363,38 @@ export default function UserProfile() {
     event.preventDefault();
     setAssignStatus('');
 
-    const targetUserId = String(assignUserId || '').trim();
     const targetAchievementId = String(assignAchievementId || '').trim();
-    const targetUserName = normalizeUserName(assignUserName, targetUserId);
-    if (!targetUserId || !targetAchievementId) {
-      setAssignStatus('Inserisci utente e achievement da assegnare.');
+    const selectedIds = selectedAssignIds.map((id) => String(id || '').trim()).filter(Boolean);
+    if (!targetAchievementId || selectedIds.length === 0) {
+      setAssignStatus('Seleziona una patch e almeno un pilota.');
       return;
     }
 
+    const membersById = new Map(guildMembers.map((entry) => [String(entry.id), entry]));
+    const recipients = selectedIds.map((id) => {
+      const member = membersById.get(id);
+      return {
+        userId: id,
+        userName: normalizeUserName(member?.name || member?.username, id),
+      };
+    });
+
     setAssigningAchievement(true);
     try {
-      await api.assignAchievement({
-        userId: targetUserId,
-        userName: targetUserName,
+      const result = await api.assignAchievement({
         achievementId: targetAchievementId,
+        recipients,
       });
-      setAssignStatus('Achievement assegnato con successo.');
+      const assignedCount = Array.isArray(result?.assigned) ? result.assigned.length : 0;
+      const skippedCount = Array.isArray(result?.skipped) ? result.skipped.length : 0;
+      if (assignedCount === 0 && skippedCount > 0) {
+        setAssignStatus('Nessuna nuova assegnazione: i piloti selezionati hanno già questa patch.');
+      } else if (skippedCount > 0) {
+        setAssignStatus(`Assegnata a ${assignedCount} pilota/i. ${skippedCount} già in possesso.`);
+      } else {
+        setAssignStatus(`Assegnata a ${assignedCount} pilota/i.`);
+      }
+      setSelectedAssignIds([]);
       await fetchAchievementData();
     } catch (requestError) {
       setAssignStatus(requestError?.message || 'Impossibile assegnare l achievement.');
@@ -465,6 +468,26 @@ export default function UserProfile() {
       setDeletingAchievement(false);
     }
   };
+
+  const toggleAssignMember = (memberId) => {
+    const id = String(memberId || '').trim();
+    if (!id) return;
+    setSelectedAssignIds((prev) => (
+      prev.includes(id) ? prev.filter((entry) => entry !== id) : [...prev, id]
+    ));
+  };
+
+  const memberQuery = String(memberSearch || '').trim().toLowerCase();
+  const visibleMembers = guildMembers.filter((entry) => {
+    if (!memberQuery) return true;
+    const name = String(entry?.name || '').toLowerCase();
+    const username = String(entry?.username || '').toLowerCase();
+    const id = String(entry?.id || '');
+    return name.includes(memberQuery) || username.includes(memberQuery) || id.includes(memberQuery);
+  });
+  const visibleMemberIds = visibleMembers.map((entry) => String(entry.id));
+  const allVisibleSelected = visibleMemberIds.length > 0
+    && visibleMemberIds.every((id) => selectedAssignIds.includes(id));
 
   return (
     <div className="profile">
@@ -637,45 +660,84 @@ export default function UserProfile() {
                     </select>
                   </label>
                   <label className="profile-ops__label">
-                    Pilota
+                    Piloti
                     <input
-                      type="text"
-                      value={assignUserName}
-                      onChange={(event) => {
-                        const value = event.target.value;
-                        setAssignUserName(value);
-                        const match = knownUsers.find((entry) => entry.name === value || entry.id === value);
-                        setAssignUserId(match ? match.id : value);
-                      }}
-                      placeholder="Nome o Discord ID"
+                      type="search"
+                      value={memberSearch}
+                      onChange={(event) => setMemberSearch(event.target.value)}
+                      placeholder="Cerca nome o username"
                       className="profile-input"
                     />
                   </label>
-                  {knownUsers.length > 0 && (
-                    <div className="profile-online">
-                      {knownUsers.map((entry) => (
-                        <button
+                  <div className="profile-member-toolbar">
+                    <span>{selectedAssignIds.length} selezionati</span>
+                    <button
+                      type="button"
+                      className="profile-member-link"
+                      disabled={visibleMemberIds.length === 0}
+                      onClick={() => {
+                        if (allVisibleSelected) {
+                          setSelectedAssignIds((prev) => prev.filter((id) => !visibleMemberIds.includes(id)));
+                          return;
+                        }
+                        setSelectedAssignIds((prev) => Array.from(new Set([...prev, ...visibleMemberIds])));
+                      }}
+                    >
+                      {allVisibleSelected ? 'Deseleziona visibili' : 'Seleziona visibili'}
+                    </button>
+                    <button
+                      type="button"
+                      className="profile-member-link"
+                      disabled={selectedAssignIds.length === 0}
+                      onClick={() => setSelectedAssignIds([])}
+                    >
+                      Nessuno
+                    </button>
+                  </div>
+                  <div className="profile-member-list" role="listbox" aria-multiselectable="true">
+                    {guildMembersLoading && (
+                      <p className="profile-msg">Caricamento membri Discord…</p>
+                    )}
+                    {!guildMembersLoading && guildMembersError && (
+                      <p className="profile-msg is-warn">{guildMembersError}</p>
+                    )}
+                    {!guildMembersLoading && !guildMembersError && visibleMembers.length === 0 && (
+                      <p className="profile-msg">Nessun membro trovato.</p>
+                    )}
+                    {!guildMembersLoading && visibleMembers.map((entry) => {
+                      const selected = selectedAssignIds.includes(entry.id);
+                      return (
+                        <label
                           key={entry.id}
-                          type="button"
-                          className={`profile-chip${assignUserId === entry.id ? ' is-active' : ''}`}
-                          onClick={() => {
-                            setAssignUserId(entry.id);
-                            setAssignUserName(entry.name);
-                          }}
+                          className={`profile-member${selected ? ' is-selected' : ''}`}
                         >
-                          {entry.name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => toggleAssignMember(entry.id)}
+                          />
+                          <span className="profile-member__name">{entry.name}</span>
+                          {entry.username ? (
+                            <span className="profile-member__user">@{entry.username}</span>
+                          ) : null}
+                        </label>
+                      );
+                    })}
+                  </div>
                   {assignStatus && (
-                    <p className={`profile-msg${assignStatus.includes('successo') ? ' is-ok' : ' is-warn'}`}>
+                    <p className={`profile-msg${assignStatus.startsWith('Assegnata') || assignStatus.includes('successo') ? ' is-ok' : ' is-warn'}`}>
                       {assignStatus}
                     </p>
                   )}
-                  <button type="submit" disabled={assigningAchievement || catalog.length === 0} className="profile-btn">
+                  <button
+                    type="submit"
+                    disabled={assigningAchievement || catalog.length === 0 || selectedAssignIds.length === 0}
+                    className="profile-btn"
+                  >
                     {assigningAchievement && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                    Assegna
+                    {selectedAssignIds.length > 1
+                      ? `Assegna a ${selectedAssignIds.length}`
+                      : 'Assegna'}
                   </button>
                 </form>
               )}
