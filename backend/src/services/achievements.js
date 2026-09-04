@@ -109,6 +109,25 @@ function sanitizeUserId(userId) {
   return sanitizeText(String(userId || ''), 80);
 }
 
+function looksLikeDiscordId(value) {
+  return /^\d{17,20}$/.test(String(value || '').trim());
+}
+
+function isUsefulDisplayName(name, userId) {
+  const safeName = sanitizeText(name || '', 140);
+  const safeUserId = sanitizeUserId(userId);
+  if (!safeName) return false;
+  if (safeUserId && safeName === safeUserId) return false;
+  if (looksLikeDiscordId(safeName)) return false;
+  return true;
+}
+
+function resolveStoredDisplayName(usersMap, userId) {
+  const safeUserId = sanitizeUserId(userId);
+  const stored = sanitizeText(usersMap[safeUserId]?.name || '', 140);
+  return isUsefulDisplayName(stored, safeUserId) ? stored : '';
+}
+
 export function getCatalog() {
   return readCatalog().sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
 }
@@ -235,24 +254,38 @@ export function deleteAchievement(achievementId) {
 }
 
 export function rememberUser({ userId, name }) {
-  const safeUserId = sanitizeUserId(userId);
-  const safeName = sanitizeText(name || '', 140);
-  if (!safeUserId || !safeName) return;
+  rememberUsers([{ userId, name }]);
+}
+
+export function rememberUsers(entries) {
+  const list = Array.isArray(entries) ? entries : [];
+  if (list.length === 0) return;
 
   const usersMap = readUsersMap();
-  usersMap[safeUserId] = normalizeUserRecord({
-    ...(usersMap[safeUserId] || {}),
-    name: safeName,
-    updatedAt: Date.now(),
+  let changed = false;
+
+  list.forEach((entry) => {
+    const safeUserId = sanitizeUserId(entry?.userId);
+    const safeName = sanitizeText(entry?.name || '', 140);
+    if (!safeUserId || !isUsefulDisplayName(safeName, safeUserId)) return;
+    const current = sanitizeText(usersMap[safeUserId]?.name || '', 140);
+    if (current === safeName) return;
+    usersMap[safeUserId] = normalizeUserRecord({
+      ...(usersMap[safeUserId] || {}),
+      name: safeName,
+      updatedAt: Date.now(),
+    });
+    changed = true;
   });
-  writeUsersMap(usersMap);
+
+  if (changed) writeUsersMap(usersMap);
 }
 
 export function getUserDisplayName(userId) {
   const safeUserId = sanitizeUserId(userId);
   if (!safeUserId) return '';
   const usersMap = readUsersMap();
-  return sanitizeText(usersMap[safeUserId]?.name || '', 140);
+  return resolveStoredDisplayName(usersMap, safeUserId);
 }
 
 const MAX_ASSIGN_RECIPIENTS = 200;
@@ -397,7 +430,7 @@ export function getLeaderboard(limit = 50) {
       const safeAwards = Array.isArray(awards) ? awards.map((entry, index) => normalizeAwardEntry(entry, index)) : [];
       return {
         userId: safeUserId,
-        displayName: sanitizeText(usersMap[safeUserId]?.name || '', 140),
+        displayName: resolveStoredDisplayName(usersMap, safeUserId),
         achievementCount: safeAwards.length,
         latestAwardedAt: safeAwards.reduce((max, entry) => Math.max(max, Number(entry.awardedAt) || 0), 0),
       };
@@ -419,15 +452,47 @@ export function getLeaderboard(limit = 50) {
   return rows;
 }
 
+export function applyDiscordNamesToLeaderboard(rows, members) {
+  const list = Array.isArray(rows) ? rows : [];
+  const namesById = new Map();
+  (Array.isArray(members) ? members : []).forEach((member) => {
+    const id = sanitizeUserId(member?.id);
+    const name = sanitizeText(member?.name || member?.username || '', 140);
+    if (!id || !isUsefulDisplayName(name, id)) return;
+    namesById.set(id, name);
+  });
+
+  const toRemember = [];
+  const next = list.map((row) => {
+    const userId = sanitizeUserId(row?.userId);
+    const discordName = namesById.get(userId) || '';
+    const storedName = isUsefulDisplayName(row?.displayName, userId) ? sanitizeText(row.displayName, 140) : '';
+    const displayName = discordName || storedName;
+    if (discordName) {
+      toRemember.push({ userId, name: discordName });
+    }
+    return {
+      ...row,
+      userId,
+      displayName,
+    };
+  });
+
+  rememberUsers(toRemember);
+  return next;
+}
+
 export default {
   getCatalog,
   createAchievement,
   updateAchievement,
   deleteAchievement,
   rememberUser,
+  rememberUsers,
   getUserDisplayName,
   assignAchievement,
   assignAchievementToUsers,
   getUserAchievements,
   getLeaderboard,
+  applyDiscordNamesToLeaderboard,
 };

@@ -2812,10 +2812,22 @@ app.post('/api/achievements/assign', (req, res) => {
 /**
  * GET /api/achievements/leaderboard - Public leaderboard by achievement count
  */
-app.get('/api/achievements/leaderboard', (req, res) => {
+app.get('/api/achievements/leaderboard', async (req, res) => {
   const rawLimit = Number.parseInt(String(req.query?.limit || ''), 10);
   const limit = Number.isFinite(rawLimit) ? rawLimit : 50;
-  const leaderboard = achievementsService.getLeaderboard(limit);
+  let leaderboard = achievementsService.getLeaderboard(limit);
+
+  if (DISCORD_GUILD_ID && DISCORD_BOT_TOKEN) {
+    try {
+      const members = await discordAuth.listGuildMembers(DISCORD_GUILD_ID, DISCORD_BOT_TOKEN);
+      leaderboard = achievementsService.applyDiscordNamesToLeaderboard(leaderboard, members);
+    } catch (error) {
+      logger.warn('Could not resolve Discord nicknames for leaderboard', {
+        error: error?.message || String(error),
+      });
+    }
+  }
+
   res.json({ leaderboard });
 });
 

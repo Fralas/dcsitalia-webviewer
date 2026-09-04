@@ -522,7 +522,6 @@ export default function UserProfile() {
         <section className="profile__board">
           <div className="profile__section-head">
             <h2 className="profile__section-title">Riconoscimenti</h2>
-            <p className="profile__section-note">Clicca una patch per ruotarla</p>
           </div>
 
           {loading && (
