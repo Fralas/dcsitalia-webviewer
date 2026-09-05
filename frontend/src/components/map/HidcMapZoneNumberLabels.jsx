@@ -39,9 +39,13 @@ function projectPoint(map, engine, lat, lon) {
   return map.project([lon, lat]);
 }
 
-function metersToScreenPx(zoom, lat, meters) {
-  const mPerPx = (156543.03392 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom;
-  return meters / Math.max(mPerPx, 0.01);
+function screenSpanPx(map, engine, lat, lon, meters) {
+  const dLat = meters / 111320;
+  const from = projectPoint(map, engine, lat, lon);
+  const to = projectPoint(map, engine, lat + dLat, lon);
+  const span = Math.hypot((to?.x ?? 0) - (from?.x ?? 0), (to?.y ?? 0) - (from?.y ?? 0));
+  if (!Number.isFinite(span) || span > 800) return 0;
+  return span;
 }
 
 function subscribeMapView(map, engine, onChange) {
@@ -89,8 +93,14 @@ function buildFrames(map, engine, zones, selectedZoneId, hoveredZoneId) {
     if (!Number.isFinite(point?.x) || !Number.isFinite(point?.y)) return [];
 
     const pitch = engine === 'leaflet' ? 0 : Number(map.getPitch?.() || 0);
-    const pitchBoost = 1 / Math.max(0.35, Math.cos((pitch * Math.PI) / 180));
-    const lift = metersToScreenPx(zoom, lat, DOME_HEIGHT_METERS) * Math.min(pitchBoost, 2.4) + LABEL_GAP_PX;
+    const apparentRadiusPx = screenSpanPx(map, engine, lat, lon, 1000);
+    if (showAll) {
+      const minSpanPx = 7 + Math.max(0, pitch - 10) * 0.12;
+      if (apparentRadiusPx < minSpanPx) return [];
+      if (pitch > 52 && point.y < height * 0.12) return [];
+    }
+
+    const lift = Math.max(10, screenSpanPx(map, engine, lat, lon, DOME_HEIGHT_METERS)) + LABEL_GAP_PX;
     const x = point.x;
     const y = point.y - lift;
     if (x < -48 || y < -48 || x > width + 48 || y > height + 48) return [];
