@@ -1,13 +1,10 @@
 .map-filter-bar-wrap {
   position: absolute;
-  top: 12px;
+  top: 0;
   left: 50%;
   z-index: 1000;
   transform: translateX(-50%);
-  pointer-events: none;
-}
-
-.map-filter-bar-wrap .map-filter-bar {
+  padding: 12px 80px 64px;
   pointer-events: auto;
 }
 
@@ -22,6 +19,33 @@
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .map-filter-bar {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-4px);
+    transition:
+      opacity 0.45s ease,
+      transform 0.45s ease;
+    transition-delay: 0.16s;
+  }
+
+  .map-filter-bar-wrap:hover .map-filter-bar,
+  .map-filter-bar-wrap:focus-within .map-filter-bar {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+    transition-delay: 0s;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-filter-bar {
+    transition: opacity 0.2s ease;
+    transform: none;
+  }
 }
 
 .map-filter-bar__item {
