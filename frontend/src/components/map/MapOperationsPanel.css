@@ -113,6 +113,20 @@
   position: relative;
 }
 
+.map-ops-section__toolbar--mission {
+  justify-content: center;
+  padding-left: 42px;
+}
+
+.map-ops-section__toolbar-cluster {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .map-ops-section__aircraft,
 .map-ops-section__route-selects,
 .map-ops-section__logistic-route {
@@ -196,11 +210,122 @@
 }
 
 .map-ops-section__results--mission {
+  position: relative;
+  isolation: isolate;
+}
+
+.map-ops-section__results--mission .map-ops-section__list {
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: 0;
+  transition: padding-right 0.45s ease;
+}
+
+.map-ops-section__results--mission:has(.map-ops-section__task-filters-wrap:hover) .map-ops-section__list,
+.map-ops-section__results--mission:has(.map-ops-section__task-filters-wrap:focus-within) .map-ops-section__list {
+  padding-right: 75px;
+}
+
+.map-ops-section__task-filters-wrap {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 1px 58px;
+  grid-template-columns: 1px 58px;
   align-items: stretch;
   gap: 8px;
-  height: auto;
+  width: 24px;
+  padding-left: 0;
+  box-sizing: content-box;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: width 0.45s ease, padding-left 0.45s ease;
+}
+
+.map-ops-section__task-hint {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 40px;
+  color: var(--ops-gold);
+  background: rgba(255, 187, 0, 0.14);
+  border-radius: 8px 0 0 8px;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: opacity 0.25s ease;
+}
+
+.map-ops-section__task-hint svg {
+  width: 14px;
+  height: 14px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .map-ops-section__task-filters-wrap .map-ops-section__mission-split,
+  .map-ops-section__task-filters-wrap .map-ops-section__task-filters {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(6px);
+    transition:
+      opacity 0.45s ease,
+      transform 0.45s ease;
+    transition-delay: 0.16s;
+  }
+
+  .map-ops-section__task-filters-wrap:hover,
+  .map-ops-section__task-filters-wrap:focus-within {
+    width: 67px;
+    padding-left: 8px;
+  }
+
+  .map-ops-section__task-filters-wrap:hover .map-ops-section__mission-split,
+  .map-ops-section__task-filters-wrap:hover .map-ops-section__task-filters,
+  .map-ops-section__task-filters-wrap:focus-within .map-ops-section__mission-split,
+  .map-ops-section__task-filters-wrap:focus-within .map-ops-section__task-filters {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+    transition-delay: 0s;
+  }
+
+  .map-ops-section__task-filters-wrap:hover .map-ops-section__task-hint,
+  .map-ops-section__task-filters-wrap:focus-within .map-ops-section__task-hint {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-ops-section__results--mission .map-ops-section__list,
+  .map-ops-section__task-filters-wrap {
+    transition: none;
+  }
+
+  .map-ops-section__task-filters-wrap .map-ops-section__mission-split,
+  .map-ops-section__task-filters-wrap .map-ops-section__task-filters {
+    transition: opacity 0.2s ease;
+    transform: none;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .map-ops-section__results--mission .map-ops-section__list {
+    padding-right: 75px;
+  }
+
+  .map-ops-section__task-filters-wrap {
+    width: 67px;
+    padding-left: 8px;
+  }
+
+  .map-ops-section__task-hint {
+    display: none;
+  }
 }
 
 .map-ops-section__mission-split {
@@ -230,6 +355,7 @@
   min-height: 34px;
   height: 34px;
   padding: 0 4px;
+  border-radius: 8px;
   color: #ffffff;
   font-size: 10px;
   font-weight: 800;

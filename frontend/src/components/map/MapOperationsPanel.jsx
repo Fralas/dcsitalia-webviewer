@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Factory, Forklift, Helicopter, MapPin, Plane, RotateCcw } from 'lucide-react';
+import { ChevronDown, ChevronsLeft, Factory, Forklift, Helicopter, MapPin, Plane, RotateCcw } from 'lucide-react';
 import {
   getAirportLabel,
   getCoords,
@@ -765,28 +765,7 @@ export default function MapOperationsPanel({
         })}
       </div>
 
-      <div className="map-ops-section__toolbar">
-        {activeTab === 'mission' && (
-          <div className="map-ops-section__aircraft">
-            <button
-              type="button"
-              className={`map-ops-section__aircraft-btn${aircraftMode === 'plane' ? ' is-active' : ''}`}
-              onClick={() => setAircraftMode('plane')}
-              aria-label={t('map.rightPanel.ops.fixedWing')}
-            >
-              <Plane strokeWidth={2} />
-            </button>
-            <button
-              type="button"
-              className={`map-ops-section__aircraft-btn${aircraftMode === 'heli' ? ' is-active' : ''}`}
-              onClick={() => setAircraftMode('heli')}
-              aria-label={t('map.rightPanel.ops.rotaryWing')}
-            >
-              <Helicopter strokeWidth={2} />
-            </button>
-          </div>
-        )}
-
+      <div className={`map-ops-section__toolbar${activeTab === 'mission' ? ' map-ops-section__toolbar--mission' : ''}`}>
         {activeTab === 'logistic' && (
             <OpsSelect
               id="logistic-aircraft"
@@ -919,31 +898,50 @@ export default function MapOperationsPanel({
               ]}
             />
           </div>
-        ) : (
-          <OpsSelect
-            id="mission-departure"
-            openSelectId={openSelectId}
-            setOpenSelectId={setOpenSelectId}
-            wrapClassName="map-ops-section__select-wrap--airport"
-            icon={<TakeoffIcon />}
-            value={missionAirportId}
-            onChange={setMissionAirportId}
-            ariaLabel={t('map.rightPanel.ops.departure')}
-            options={[
-              { value: '', label: t('map.rightPanel.ops.departure') },
-              ...filteredAirportOptions.map((airport) => ({
-                value: airport.id,
-                label: getAirportLabel(airport),
-              })),
-            ]}
-          />
-        )}
-
-        {activeTab === 'mission' && renderRadiusField({
-          value: radiusNm,
-          onChange: setRadiusNm,
-          ariaLabel: t('map.rightPanel.ops.radius'),
-        })}
+        ) : activeTab === 'mission' ? (
+          <div className="map-ops-section__toolbar-cluster">
+            <div className="map-ops-section__aircraft">
+              <button
+                type="button"
+                className={`map-ops-section__aircraft-btn${aircraftMode === 'plane' ? ' is-active' : ''}`}
+                onClick={() => setAircraftMode('plane')}
+                aria-label={t('map.rightPanel.ops.fixedWing')}
+              >
+                <Plane strokeWidth={2} />
+              </button>
+              <button
+                type="button"
+                className={`map-ops-section__aircraft-btn${aircraftMode === 'heli' ? ' is-active' : ''}`}
+                onClick={() => setAircraftMode('heli')}
+                aria-label={t('map.rightPanel.ops.rotaryWing')}
+              >
+                <Helicopter strokeWidth={2} />
+              </button>
+            </div>
+            <OpsSelect
+              id="mission-departure"
+              openSelectId={openSelectId}
+              setOpenSelectId={setOpenSelectId}
+              wrapClassName="map-ops-section__select-wrap--airport"
+              icon={<TakeoffIcon />}
+              value={missionAirportId}
+              onChange={setMissionAirportId}
+              ariaLabel={t('map.rightPanel.ops.departure')}
+              options={[
+                { value: '', label: t('map.rightPanel.ops.departure') },
+                ...filteredAirportOptions.map((airport) => ({
+                  value: airport.id,
+                  label: getAirportLabel(airport),
+                })),
+              ]}
+            />
+            {renderRadiusField({
+              value: radiusNm,
+              onChange: setRadiusNm,
+              ariaLabel: t('map.rightPanel.ops.radius'),
+            })}
+          </div>
+        ) : null}
 
         <button
           type="button"
@@ -1070,7 +1068,13 @@ export default function MapOperationsPanel({
         )}
       </div>
         {activeTab === 'mission' && (
-          <>
+          <div
+            className="map-ops-section__task-filters-wrap"
+            title={t('map.rightPanel.ops.tabs.mission')}
+          >
+            <span className="map-ops-section__task-hint" aria-hidden="true">
+              <ChevronsLeft strokeWidth={2.5} />
+            </span>
             <div className="map-ops-section__mission-split" aria-hidden="true" />
             <div className="map-ops-section__task-filters" role="group" aria-label={t('map.rightPanel.ops.tabs.mission')}>
             {missionTasks.map((task) => (
@@ -1083,8 +1087,8 @@ export default function MapOperationsPanel({
                 {task}
               </button>
             ))}
+            </div>
           </div>
-          </>
         )}
       </div>
     </section>

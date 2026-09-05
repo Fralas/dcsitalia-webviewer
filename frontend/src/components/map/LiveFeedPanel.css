@@ -11,6 +11,11 @@
   --lf-card-width: 672px;
   --lf-toggle-size: 34px;
   --lf-collapsed-size: calc(var(--lf-toggle-size) + 20px);
+  --lf-feed-open-height: calc(
+    38px + 1px + 14px
+    + (var(--lf-visible-events) * var(--lf-item-min-h))
+    + ((var(--lf-visible-events) - 1) * var(--lf-item-gap))
+  );
 
   position: absolute;
   top: 20px;
@@ -56,8 +61,13 @@
   position: relative;
   --lf-card-width: 470px;
   --lf-toggle-size: 24px;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
+}
+
+.live-feed-card--feed:not(.is-collapsed) {
+  height: var(--lf-feed-open-height);
+  max-height: var(--lf-feed-open-height);
 }
 
 .live-feed-card--ops {
@@ -69,7 +79,10 @@
 .live-feed-card--ops:not(.is-collapsed) {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
+  margin-top: auto;
+  height: calc(100% - var(--lf-feed-open-height) - 12px);
+  max-height: calc(100% - var(--lf-feed-open-height) - 12px);
   min-height: 0;
   overflow: hidden;
 }
