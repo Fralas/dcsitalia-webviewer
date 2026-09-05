@@ -2243,6 +2243,7 @@ function MapLibreFlatMapView({
     ? onTankerPlace
     : (spawnPlacementActive ? onSpawnPlace : onRetrievePlace);
   const ZONE_DOME_RADIUS_METERS = 3000;
+  const ZONE_DOME_TERRAIN_CLEARANCE_M = 80;
   const LOGISTICS_ROUTE_RADIUS_METERS = 120;
   const LOGISTICS_C130_MODEL_SIZE_METERS = 110;
   const LOGISTICS_CH47_MODEL_SIZE_METERS = 92;
@@ -2692,6 +2693,18 @@ function MapLibreFlatMapView({
     });
   }, []);
 
+  const applyZoneDomePose = useCallback((map, mesh, glowMesh, lon, lat) => {
+    if (!map || !mesh || !glowMesh) return;
+    const terrainElevation = map.queryTerrainElevation([lon, lat], { exaggerated: true });
+    const altitudeMeters = (Number.isFinite(terrainElevation) ? terrainElevation : 0) + ZONE_DOME_TERRAIN_CLEARANCE_M;
+    const merc = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], altitudeMeters);
+    const scale = merc.meterInMercatorCoordinateUnits() * ZONE_DOME_RADIUS_METERS;
+    mesh.position.set(merc.x, merc.y, merc.z);
+    mesh.scale.set(scale, scale, scale);
+    glowMesh.position.set(merc.x, merc.y, merc.z);
+    glowMesh.scale.set(scale * 1.045, scale * 1.045, scale * 1.045);
+  }, []);
+
   const rebuildThreeDomes = useCallback(() => {
     const map = mapRef.current;
     const group = domes3dRef.current.group;
@@ -2729,11 +2742,6 @@ function MapLibreFlatMapView({
       else if (zone.status === 'BLUE') color = '#3b82f6';
       else if (zone.status === 'UNDER_ATTACK') color = '#f97316';
 
-      const terrainElevation = map.queryTerrainElevation([lon, lat]);
-      const altitudeMeters = (Number.isFinite(terrainElevation) ? terrainElevation : 0) + 20;
-      const merc = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], altitudeMeters);
-      const scale = merc.meterInMercatorCoordinateUnits() * ZONE_DOME_RADIUS_METERS;
-
       const material = new THREE.MeshPhongMaterial({
         color,
         transparent: true,
@@ -2745,8 +2753,6 @@ function MapLibreFlatMapView({
         emissiveIntensity: 0.08,
       });
       const mesh = new THREE.Mesh(domes3dRef.current.geometry, material);
-      mesh.position.set(merc.x, merc.y, merc.z);
-      mesh.scale.set(scale, scale, scale);
       mesh.renderOrder = 10;
       group.add(mesh);
 
@@ -2760,10 +2766,9 @@ function MapLibreFlatMapView({
         side: THREE.BackSide,
       });
       const glowMesh = new THREE.Mesh(domes3dRef.current.geometry, glowMaterial);
-      glowMesh.position.set(merc.x, merc.y, merc.z);
-      glowMesh.scale.set(scale * 1.045, scale * 1.045, scale * 1.045);
       glowMesh.renderOrder = 11;
       group.add(glowMesh);
+      applyZoneDomePose(map, mesh, glowMesh, lon, lat);
 
       domes3dRef.current.domes.push({
         lon,
@@ -3189,7 +3194,7 @@ function MapLibreFlatMapView({
     });
 
     map.triggerRepaint();
-  }, [zones, showAto, selectedZoneId, showLogistics, logisticsMissions, logisticsFrontlineAirportIds, airportsById, showConvoys, convoys, showAirliftPlayers, airliftPlayers, tankerRoutes, disposeThreeNode]);
+  }, [zones, showAto, selectedZoneId, showLogistics, logisticsMissions, logisticsFrontlineAirportIds, airportsById, showConvoys, convoys, showAirliftPlayers, airliftPlayers, tankerRoutes, disposeThreeNode, applyZoneDomePose]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -3388,10 +3393,15 @@ function MapLibreFlatMapView({
           if (!renderer || !scene || !camera) return;
           const projectionMatrix = Array.isArray(matrix)
             ? matrix
-            : (args?.modelViewProjectionMatrix || args?.projectionMatrix || matrix);
+            : (matrix && typeof matrix.length === 'number'
+              ? matrix
+              : (args?.modelViewProjectionMatrix || args?.projectionMatrix || matrix));
+          if (!projectionMatrix || typeof projectionMatrix.length !== 'number') return;
           camera.projectionMatrix = new THREE.Matrix4().fromArray(projectionMatrix);
 
+          const mapForDomes = mapRef.current;
           domes.forEach((dome) => {
+            applyZoneDomePose(mapForDomes, dome.main, dome.glow, dome.lon, dome.lat);
             dome.main.material.opacity = dome.mainBaseOpacity;
             dome.glow.material.opacity = dome.glowBaseOpacity;
           });
@@ -3960,10 +3970,18 @@ function MapLibreFlatMapView({
           }
         });
         if (!bounds.isEmpty()) {
-          map.fitBounds(bounds, { padding: 60, duration: 0 });
+          map.fitBounds(bounds, {
+            padding: 60,
+            duration: 0,
+            pitch: map.getPitch(),
+            bearing: map.getBearing(),
+          });
         }
       }
 
+      if (map.getLayer('zone-domes-3d-layer')) {
+        map.moveLayer('zone-domes-3d-layer');
+      }
       // Keep spawn/retrieve radius above all other map layers (including zone domes).
       if (map.getLayer('spawn-radius-fill-layer')) {
         map.moveLayer('spawn-radius-fill-layer');
