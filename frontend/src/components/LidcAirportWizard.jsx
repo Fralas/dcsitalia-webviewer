@@ -157,6 +157,9 @@ export default function LidcAirportWizard({
   occupancy,
   activeTab = 'overview',
   isLogged = false,
+  variant = 'lidc',
+  onPurchase,
+  onUpdateOrder,
   onChangeTab,
   onClose,
   onLogisticsUpdated,
@@ -166,13 +169,17 @@ export default function LidcAirportWizard({
   const [purchaseError, setPurchaseError] = useState('');
   const [editingOrderId, setEditingOrderId] = useState('');
   const [orderBusyId, setOrderBusyId] = useState('');
-  const catalogAirport = getLidcAirportById(airport?.id) || airport;
+  const catalogAirport = getLidcAirportById(airport?.id) || occupancy?.airport || airport;
+  const airportLat = catalogAirport?.lat ?? catalogAirport?.coordinates?.lat;
+  const airportLon = catalogAirport?.lon ?? catalogAirport?.coordinates?.lon;
   const squadrons = Array.isArray(occupancy?.squadrons) ? occupancy.squadrons : [];
   const resources = occupancy?.resources || {};
   const logistics = occupancy?.logistics || { fuel: [] };
   const shop = Array.isArray(occupancy?.shop) ? occupancy.shop : [];
   const orders = Array.isArray(occupancy?.orders) ? occupancy.orders : [];
   const editingOrder = orders.find((order) => order.id === editingOrderId) || null;
+  const factionEconomy = variant === 'hidc' || occupancy?.economy === 'faction';
+  const showSquadrons = !factionEconomy;
   const aircraftShop = useMemo(
     () => shop.filter((item) => item.destination !== 'helicopters'),
     [shop],
@@ -182,7 +189,7 @@ export default function LidcAirportWizard({
     [shop],
   );
   const shopper = occupancy?.shopper || null;
-  const squadronCredits = Number(shopper?.credits || 0);
+  const knownCredits = Number.isFinite(Number(shopper?.credits)) ? Number(shopper.credits) : null;
 
   const shopById = useMemo(() => {
     return new Map(shop.map((item) => [item.id, item]));
@@ -209,9 +216,11 @@ export default function LidcAirportWizard({
   );
   const spendBudget = editingOrder
     ? Number(editingOrder.squadronCredits || 0) + Number(editingOrder.cost || 0)
-    : squadronCredits;
-  const remainingCredits = Math.max(0, spendBudget - cartTotal);
-  const canPurchase = isLogged && (editingOrder ? Boolean(editingOrder.canEdit) : Boolean(shopper));
+    : (knownCredits == null && factionEconomy && isLogged ? Number.POSITIVE_INFINITY : (knownCredits || 0));
+  const remainingCredits = Number.isFinite(spendBudget) ? Math.max(0, spendBudget - cartTotal) : Number.POSITIVE_INFINITY;
+  const canPurchase = factionEconomy
+    ? isLogged
+    : isLogged && (editingOrder ? Boolean(editingOrder.canEdit) : Boolean(shopper));
   const shouldShowCart = activeTab === 'logistics' && cartLines.length > 0;
   const [cartMounted, setCartMounted] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
@@ -296,8 +305,12 @@ export default function LidcAirportWizard({
         items: cartLines.map((line) => ({ itemId: line.item.id, quantity: line.quantity })),
       };
       const result = editingOrder
-        ? await api.updateLidcAirportOrder(airport.id, editingOrder.id, payload)
-        : await api.purchaseLidcAirportLogistics(airport.id, payload);
+        ? await (onUpdateOrder
+          ? onUpdateOrder(airport.id, editingOrder.id, payload)
+          : api.updateLidcAirportOrder(airport.id, editingOrder.id, payload))
+        : await (onPurchase
+          ? onPurchase(airport.id, payload)
+          : api.purchaseLidcAirportLogistics(airport.id, payload));
       setCart({});
       setEditingOrderId('');
       onLogisticsUpdated?.(result);
@@ -335,7 +348,9 @@ export default function LidcAirportWizard({
     setOrderBusyId(order.id);
     setPurchaseError('');
     try {
-      const result = await api.updateLidcAirportOrder(airport.id, order.id, { action });
+      const result = await (onUpdateOrder
+        ? onUpdateOrder(airport.id, order.id, { action })
+        : api.updateLidcAirportOrder(airport.id, order.id, { action }));
       onLogisticsUpdated?.(result);
     } catch (error) {
       setPurchaseError(error.message || t('lidc.map.airportWizard.orderActionFailed'));
@@ -352,7 +367,7 @@ export default function LidcAirportWizard({
         className="lidc-wizard-card lidc-airport-wizard-card"
         role="dialog"
         aria-modal="true"
-        aria-label={formatLidcAirportLabel(catalogAirport)}
+        aria-label={formatLidcAirportLabel(catalogAirport) || catalogAirport?.displayName || catalogAirport?.name}
       >
         <header className="lidc-airport-wizard-head">
           <div>
@@ -398,17 +413,20 @@ export default function LidcAirportWizard({
               inert={activeTab !== 'overview'}
             >
               <div className="lidc-airport-wizard-overview">
-              <section className="lidc-airport-wizard-facts">
+              <section className={`lidc-airport-wizard-facts${factionEconomy ? ' is-single' : ''}`}>
                 <article>
                   <span>{t('lidc.map.airportWizard.mgrs')}</span>
-                  <strong className="lidc-airport-wizard-mgrs">{formatMgrs(catalogAirport?.lat, catalogAirport?.lon)}</strong>
+                  <strong className="lidc-airport-wizard-mgrs">{formatMgrs(airportLat, airportLon)}</strong>
                 </article>
+                {!factionEconomy && (
                 <article>
                   <span>{t('lidc.map.occupancy.squadrons')}</span>
                   <strong>{squadrons.length}</strong>
                 </article>
+                )}
               </section>
 
+              {!factionEconomy && (
               <section className="lidc-airport-wizard-block">
                 <h3>{t('lidc.map.airportWizard.resources')}</h3>
                 <div className="lidc-airport-wizard-resource-grid">
@@ -434,6 +452,7 @@ export default function LidcAirportWizard({
                   </div>
                 </div>
               </section>
+              )}
 
               <section className="lidc-airport-wizard-block">
                 <h3>{t('lidc.map.airportWizard.orders')}</h3>
@@ -516,6 +535,7 @@ export default function LidcAirportWizard({
                 })}
               </section>
 
+              {showSquadrons && (
               <section className="lidc-airport-wizard-block">
                 <h3>{t('lidc.map.occupancy.squadrons')}</h3>
                 {squadrons.length === 0 && (
@@ -559,6 +579,7 @@ export default function LidcAirportWizard({
                   );
                 })}
               </section>
+              )}
               </div>
             </div>
 
@@ -571,13 +592,13 @@ export default function LidcAirportWizard({
               <div className="lidc-airport-wizard-logistics">
               <div className="lidc-airport-wizard-credits">
                 <Coins size={16} />
-                <span>{t('lidc.map.airportWizard.credits')}</span>
-                <strong>{shopper ? formatStock(squadronCredits) : '—'}</strong>
+                <span>{t(factionEconomy ? 'lidc.map.airportWizard.blueFactionPoints' : 'lidc.map.airportWizard.credits')}</span>
+                <strong>{knownCredits == null ? '—' : formatStock(knownCredits)}</strong>
               </div>
               {!isLogged && (
                 <p className="lidc-occupancy-panel__hint">{t('lidc.map.airportWizard.loginToBuy')}</p>
               )}
-              {isLogged && !shopper && (
+              {isLogged && !factionEconomy && !shopper && (
                 <p className="lidc-occupancy-panel__hint">{t('lidc.map.airportWizard.joinToBuy')}</p>
               )}
               {purchaseError && <InlineError message={purchaseError} />}

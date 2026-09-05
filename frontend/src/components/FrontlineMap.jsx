@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { renderToStaticMarkup } from 'react-dom/server';
 import createGlobe from 'cobe';
 import * as mgrs from 'mgrs';
@@ -13,7 +14,7 @@ import c130ModelUrl from '../assets/3D/yc-130prototype_of_c-130.glb';
 import ch47ModelUrl from '../assets/3D/ch47.glb';
 import t72ModelUrl from '../assets/3D/t90.glb';
 import kc135ModelUrl from '../assets/3D/kc-135_dcs_world.glb';
-import { Ambulance, Blend, Box, Boxes, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChessRook, Clock3, Factory, Forklift, Fuel, Hammer, MapPin, PersonStanding, Satellite, Warehouse, X } from 'lucide-react';
+import { Ambulance, Blend, Box, Boxes, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChessRook, Clock3, Factory, Forklift, Fuel, Hammer, MapPin, PersonStanding, Satellite, X } from 'lucide-react';
 import InlineError from './InlineError';
 import frontlineZones from '../config/frontlineZones.json';
 import { getDefaultTacticalMap, getTacticalMapByCampaignId } from '../config/tacticalMaps';
@@ -23,7 +24,7 @@ import airports from '../config/airports';
 import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
 import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
-import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, declineFrontlineZone, getAirliftPlayers, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getLogisticsRouteVisibility, getMissions, getServerTime, getTankerOptions, getTankerRoutes, setAirportLogisticsRoutePriority, getProductionPoints, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate, spawnMapAction, spawnTanker } from '../services/api';
+import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, declineFrontlineZone, getAirliftPlayers, getAirportOccupancy, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getLogisticsRouteVisibility, getMissions, getServerTime, getTankerOptions, getTankerRoutes, purchaseAirportLogistics, setAirportLogisticsRoutePriority, getProductionPoints, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate, spawnMapAction, spawnTanker, updateAirportOrder } from '../services/api';
 import ZoneMissionCard from './map/ZoneMissionCard';
 import LiveFeedPanel from './map/LiveFeedPanel';
 import MapFilterBar from './map/MapFilterBar';
@@ -31,7 +32,10 @@ import MapActionContextMenu from './map/MapActionContextMenu';
 import ProductionPointPanel from './map/ProductionPointPanel';
 import ProductionPointRetrieveBanner from './map/ProductionPointRetrieveBanner';
 import HidcMapAirportHoverPointer from './map/HidcMapAirportHoverPointer';
+import LidcAirportPresencePanel from './LidcAirportPresencePanel';
+import LidcAirportWizard from './LidcAirportWizard';
 import './map/AirportSpawnPanel.css';
+import './map/HidcAirportLogistics.css';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 import { CARTO_DARK_NOLABELS_TILE_URL } from '../config/cartoBasemap';
@@ -4553,6 +4557,11 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   const [selectedDcsarId, setSelectedDcsarId] = useState(null);
   const [dcsarCoordinatesFormat, setDcsarCoordinatesFormat] = useState('dms');
   const [selectedAirportId, setSelectedAirportId] = useState(null);
+  const [airportOccupancy, setAirportOccupancy] = useState(null);
+  const [airportOccupancyLoading, setAirportOccupancyLoading] = useState(false);
+  const [airportOccupancyError, setAirportOccupancyError] = useState('');
+  const [airportWizardTab, setAirportWizardTab] = useState('');
+  const [blueFactionPointsTick, setBlueFactionPointsTick] = useState(0);
   const [selectedLogisticsMission, setSelectedLogisticsMission] = useState(null);
   const [selectedContainerIds, setSelectedContainerIds] = useState([]);
   const [composingMission, setComposingMission] = useState(false);
@@ -4915,6 +4924,9 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     });
 
     const unsubscribeResult = socketService.on('web-command:result', (data) => {
+      if (Number.isFinite(Number(data?.balance))) {
+        setBlueFactionPointsTick((value) => value + 1);
+      }
       if (!data || !data.id) return;
       if (!pendingCommandIdsRef.current.has(data.id)) return;
       pendingCommandIdsRef.current.delete(data.id);
@@ -5629,6 +5641,58 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     && selectedLargeContainerCount <= 2;
 
   const selectedAirport = selectedAirportId ? airportsById.get(selectedAirportId) : null;
+  const occupancyAirport = useMemo(() => {
+    if (!selectedAirport) return null;
+    return {
+      id: selectedAirport.id,
+      name: selectedAirport.displayName || selectedAirport.name,
+      subtitle: selectedAirport.isCarrier ? 'CARRIER' : (selectedAirport.isHeliport ? 'HELIPORT' : 'AIRPORT'),
+      lat: selectedAirport.coordinates?.lat,
+      lon: selectedAirport.coordinates?.lon,
+      coordinates: selectedAirport.coordinates,
+      icao: selectedAirport.icao,
+    };
+  }, [selectedAirport]);
+
+  useEffect(() => {
+    if (!selectedAirportId) {
+      setAirportOccupancy(null);
+      setAirportOccupancyError('');
+      setAirportWizardTab('');
+      return undefined;
+    }
+
+    let cancelled = false;
+    setAirportOccupancyLoading(true);
+    setAirportOccupancyError('');
+
+    getAirportOccupancy(selectedAirportId)
+      .then((occupancy) => {
+        if (!cancelled) setAirportOccupancy(occupancy);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setAirportOccupancy(null);
+          setAirportOccupancyError(error.message || 'Failed to load airbase occupancy.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAirportOccupancyLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedAirportId, user?.id, blueFactionPointsTick]);
+
+  const handleAirportLogisticsUpdated = useCallback((result) => {
+    setAirportOccupancy((prev) => ({
+      ...(prev || {}),
+      shop: result?.shop || prev?.shop,
+      shopper: result?.shopper || prev?.shopper,
+      orders: result?.orders || prev?.orders,
+    }));
+  }, []);
 
   const spawnOptionByKeyword = useMemo(() => {
     const map = new Map();
@@ -6972,380 +7036,76 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                 </div>
               )}
 
-              {selectedAirport && (
-                <div className="absolute left-4 bottom-4 z-[1000]">
-                  <section
-                    className="airport-spawn-panel"
-                    aria-label={`${selectedAirport.displayName || selectedAirport.name} - AIRBASE`}
+              {occupancyAirport && (
+                <div className="hidc-airport-overlay">
+                  <LidcAirportPresencePanel
+                    airport={occupancyAirport}
+                    occupancy={airportOccupancy}
+                    loading={airportOccupancyLoading}
+                    error={airportOccupancyError}
+                    showSquadrons={false}
+                    orderAlertCount={Array.isArray(airportOccupancy?.orders) ? airportOccupancy.orders.length : 0}
+                    onClose={() => {
+                      setSelectedAirportId(null);
+                      setAirportWizardTab('');
+                      setSpawnMode(null);
+                      setRetrieveMode(null);
+                      setTankerMode(null);
+                    }}
+                    onOpenWizard={(tab) => setAirportWizardTab(tab === 'logistics' ? 'logistics' : 'overview')}
                   >
-                    <div className="airport-spawn-panel__header">
-                      <h2 className="airport-spawn-panel__title">
-                        {(selectedAirport.displayName || selectedAirport.name || 'AIRBASE').toUpperCase()} - AIRBASE
-                      </h2>
-                      <button
-                        type="button"
-                        className="airport-spawn-panel__close"
-                        aria-label="Close"
-                        title="Close"
-                        onClick={() => {
-                          setSelectedAirportId(null);
-                          setSpawnMode(null);
-                          setRetrieveMode(null);
-                          setTankerMode(null);
-                          setShowLogisticsComposeWindow(false);
-                          setShowLogisticsRequestWindow(false);
-                        }}
-                      >
-                        <X strokeWidth={2.5} />
-                      </button>
-                    </div>
-
-                    <div className="airport-spawn-panel__divider" />
-
-                    <div className="airport-spawn-panel__body">
-                      <div className="airport-spawn-panel__block">
-                        <div className="airport-spawn-panel__block-title">
-                          <Warehouse className="airport-spawn-panel__block-icon" strokeWidth={2} aria-hidden="true" />
-                          <span>WAREHOUSE</span>
-                        </div>
-                        <div className="airport-spawn-panel__action-row">
-                          <button
-                            type="button"
-                            className="airport-spawn-panel__action-btn"
-                            disabled={!isAuthenticated}
-                            onClick={() => {
-                              setShowLogisticsRequestWindow(false);
-                              setShowLogisticsComposeWindow(true);
-                            }}
-                          >
-                            WAREHOUSE REQUEST
-                          </button>
-                          <button
-                            type="button"
-                            className="airport-spawn-panel__action-btn"
-                            disabled={!isAuthenticated}
-                            onClick={() => {
-                              setShowLogisticsComposeWindow(false);
-                              setShowLogisticsRequestWindow(true);
-                            }}
-                          >
-                            CREATE CUSTOM REQUEST
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="airport-spawn-panel__divider airport-spawn-panel__divider--inset" />
-
-                      <div className="airport-spawn-panel__block">
-                        <div className="airport-spawn-panel__block-title">
-                          <Box className="airport-spawn-panel__block-icon" strokeWidth={2} aria-hidden="true" />
-                          <span>SPAWN ASSET</span>
-                        </div>
-
-                        {!isAuthenticated ? (
-                          <div className="airport-spawn-panel__empty">
-                            Login to spawn units and crates.
+                    <div className="airport-spawn-panel">
+                      <div className="airport-spawn-panel__body">
+                        <div className="airport-spawn-panel__block">
+                          <div className="airport-spawn-panel__block-title">
+                            <Box className="airport-spawn-panel__block-icon" strokeWidth={2} aria-hidden="true" />
+                            <span>SPAWN ASSET</span>
                           </div>
-                        ) : (
-                          <>
-                            {SPAWN_MENU_SECTIONS.map((section) => {
-                              const sectionOptions = section.keywords
-                                .map((keyword) => {
-                                  const option = spawnOptionByKeyword.get(keyword);
-                                  return option ? { keyword, option } : null;
-                                })
-                                .filter(Boolean);
-                              if (sectionOptions.length === 0) return null;
-
-                              return (
-                                <div key={section.id} className="airport-spawn-panel__spawn-section">
-                                  <p className="airport-spawn-panel__section-title">{section.title}</p>
-                                  <div className="airport-spawn-panel__pills">
-                                    {sectionOptions.map(({ keyword, option }) => {
-                                      const selected = spawnMode?.keyword === keyword && spawnMode?.type === section.spawnType;
-                                      return (
-                                        <button
-                                          key={`${section.id}-${keyword}`}
-                                          type="button"
-                                          onClick={() => handleEnterSpawnMode(selectedAirport.id, section.spawnType, option)}
-                                          className={`airport-spawn-panel__pill${selected ? ' is-selected' : ''}`}
-                                        >
-                                          {keyword}
-                                          <span className="airport-spawn-panel__pill-cost">({option.cost})</span>
-                                        </button>
-                                      );
-                                    })}
+                          {!isAuthenticated ? (
+                            <div className="airport-spawn-panel__empty">
+                              Login to spawn units and crates.
+                            </div>
+                          ) : (
+                            <>
+                              {SPAWN_MENU_SECTIONS.map((section) => {
+                                const sectionOptions = section.keywords
+                                  .map((keyword) => {
+                                    const option = spawnOptionByKeyword.get(keyword);
+                                    return option ? { keyword, option } : null;
+                                  })
+                                  .filter(Boolean);
+                                if (sectionOptions.length === 0) return null;
+                                return (
+                                  <div key={section.id} className="airport-spawn-panel__spawn-section">
+                                    <p className="airport-spawn-panel__section-title">{section.title}</p>
+                                    <div className="airport-spawn-panel__pills">
+                                      {sectionOptions.map(({ keyword, option }) => {
+                                        const selected = spawnMode?.keyword === keyword && spawnMode?.type === section.spawnType;
+                                        return (
+                                          <button
+                                            key={`${section.id}-${keyword}`}
+                                            type="button"
+                                            onClick={() => handleEnterSpawnMode(selectedAirport.id, section.spawnType, option)}
+                                            className={`airport-spawn-panel__pill${selected ? ' is-selected' : ''}`}
+                                          >
+                                            {keyword}
+                                            <span className="airport-spawn-panel__pill-cost">({option.cost})</span>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
                                   </div>
-                                </div>
-                              );
-                            })}
-
-                            {spawnMode && (
-                              <div className="airport-spawn-panel__qty">
-                                <p className="airport-spawn-panel__qty-title">
-                                  Quantity (max {SPAWN_QUANTITY_MAX})
-                                </p>
-                                <div className="airport-spawn-panel__qty-pills">
-                                  {Array.from({ length: SPAWN_QUANTITY_MAX }, (_, index) => {
-                                    const value = index + 1;
-                                    const selected = (spawnMode.quantity || 1) === value;
-                                    return (
-                                      <button
-                                        key={value}
-                                        type="button"
-                                        onClick={() => handleSetSpawnQuantity(value)}
-                                        className={`airport-spawn-panel__qty-pill${selected ? ' is-selected' : ''}`}
-                                      >
-                                        {value}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                                <p className="airport-spawn-panel__hint airport-spawn-panel__hint--spaced">
-                                  {spawnMode.quantity || 1}× {spawnMode.label} • total {(spawnMode.cost || 0) * (spawnMode.quantity || 1)} fp • {SPAWN_OFFSET_METERS} m between items
-                                </p>
-                              </div>
-                            )}
-
-                            <p className="airport-spawn-panel__hint">
-                              Select an item, choose quantity, then click inside the airport on the map.
-                            </p>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </section>
-                </div>
-              )}
-
-              {selectedAirport && showLogisticsComposeWindow && (
-                <div className="absolute inset-0 z-[2500] flex items-center justify-center">
-                  <button
-                    type="button"
-                    className="absolute inset-0 bg-black/70"
-                    onClick={() => setShowLogisticsComposeWindow(false)}
-                    aria-label="Close warehouse request window"
-                  />
-                  <div className="airport-modal">
-                    <div className="airport-modal__header">
-                      <div>
-                        <div className="airport-modal__title">WAREHOUSE REQUEST</div>
-                        <div className="airport-modal__subtitle">
-                          {selectedAirport.displayName || selectedAirport.name}
+                                );
+                              })}
+                              <p className="airport-spawn-panel__hint">
+                                Select an item, then click inside the airport on the map.
+                              </p>
+                            </>
+                          )}
                         </div>
                       </div>
-                      <div className="airport-modal__header-actions">
-                        <button
-                          type="button"
-                          onClick={handleComposeLogisticsMission}
-                          disabled={!canComposeSelectedMission || composingMission}
-                          className="airport-modal__primary-btn"
-                        >
-                          {composingMission ? 'Creating...' : 'Create Mission'}
-                        </button>
-                        <button
-                          type="button"
-                          className="airport-spawn-panel__close"
-                          aria-label="Close"
-                          onClick={() => setShowLogisticsComposeWindow(false)}
-                        >
-                          <X strokeWidth={2.5} />
-                        </button>
-                      </div>
                     </div>
-
-                    <div className="airport-modal__meta-row">
-                      <span className="airport-modal__chip">
-                        Selected: <strong>{selectedContainerIds.length}</strong>
-                      </span>
-                      <span className="airport-modal__chip">
-                        ISO: <strong>{formatIsoUnits(selectedContainersIsoTotal)}</strong>/2.5
-                      </span>
-                      <span className="airport-modal__chip">
-                        Large: <strong>{selectedLargeContainerCount}</strong>/2
-                      </span>
-                      {selectedSourceAirportId && (
-                        <span className="airport-modal__chip">
-                          Source: <strong>{airportsById.get(selectedSourceAirportId)?.displayName || selectedSourceAirportId}</strong>
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="airport-modal__search">
-                      <input
-                        type="text"
-                        value={logisticsWeaponSearch}
-                        onChange={(event) => setLogisticsWeaponSearch(event.target.value)}
-                        placeholder="Search weapon..."
-                        className="airport-modal__input"
-                      />
-                    </div>
-
-                    <div className="airport-modal__list">
-                      {filteredAirportContainerItems.length === 0 ? (
-                        <div className="airport-modal__empty">
-                          {airportContainerItems.length === 0 ? 'No pending containers for this airport.' : 'No containers match this weapon search.'}
-                        </div>
-                      ) : (
-                        <div className="airport-modal__cards">
-                          {filteredAirportContainerItems.map((containerItem) => {
-                            const isoUnits = Number(containerItem.units) || 0;
-                            const typeLabel = getIsoContainerTypeLabel(isoUnits);
-                            const selectionState = evaluateContainerSelection(containerItem);
-                            const dimmed = selectionState.disabled && !selectionState.selected;
-
-                            return (
-                              <button
-                                key={`pending-container-${containerItem.id}`}
-                                type="button"
-                                onClick={() => handleToggleContainerMission(containerItem)}
-                                disabled={selectionState.disabled && !selectionState.selected}
-                                title={selectionState.reason || ''}
-                                className={`airport-modal__card${selectionState.selected ? ' is-selected' : ''}${dimmed ? ' is-dimmed' : ''}`}
-                              >
-                                <div className="airport-modal__card-top">
-                                  <span className="airport-modal__card-badge">{typeLabel}</span>
-                                  <span className="airport-modal__card-meta">
-                                    From: {containerItem.sourceAirportName}
-                                  </span>
-                                  <span className="airport-modal__card-meta">
-                                    Mission: {containerItem.missionId}
-                                  </span>
-                                </div>
-                                <div className="airport-modal__card-body">
-                                  <div className="airport-modal__card-title">
-                                    1 container - {getWeaponDisplayName(containerItem.weaponId || 'cargo')}
-                                  </div>
-                                  <div className="airport-modal__card-line">
-                                    Content: Qty {Number(containerItem.quantityNeeded || 0)}
-                                  </div>
-                                  <div className="airport-modal__card-line">
-                                    Weight/container: {containerItem.totalWeightLbs > 0 ? `${containerItem.totalWeightLbs.toFixed(1)} lbs` : '-'}
-                                  </div>
-                                  <div className="airport-modal__card-line">
-                                    Priority: {containerItem.priority}
-                                  </div>
-                                  {selectionState.reason ? (
-                                    <div className="airport-modal__card-note">{selectionState.reason}</div>
-                                  ) : null}
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {selectedAirport && showLogisticsRequestWindow && (
-                <div className="absolute inset-0 z-[2500] flex items-center justify-center">
-                  <button
-                    type="button"
-                    className="absolute inset-0 bg-black/70"
-                    onClick={() => setShowLogisticsRequestWindow(false)}
-                    aria-label="Close custom request window"
-                  />
-                  <div className="airport-modal airport-modal--compact">
-                    <div className="airport-modal__header">
-                      <div>
-                        <div className="airport-modal__title">CREATE CUSTOM REQUEST</div>
-                        <div className="airport-modal__subtitle">
-                          {selectedAirport.displayName || selectedAirport.name}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="airport-spawn-panel__close"
-                        aria-label="Close"
-                        onClick={() => setShowLogisticsRequestWindow(false)}
-                      >
-                        <X strokeWidth={2.5} />
-                      </button>
-                    </div>
-
-                    <div className="airport-modal__hint">
-                      If an order for this weapon already exists at this airport, request is blocked.
-                    </div>
-
-                    <div className="airport-modal__field">
-                      <label className="airport-modal__label">Weapon</label>
-                      <div className="airport-modal__field-control">
-                        <input
-                          type="text"
-                          value={requestWeaponSearch}
-                          onChange={(event) => {
-                            const value = event.target.value;
-                            setRequestWeaponSearch(value);
-                            const match = selectedAirportRequestableWeapons.find((entry) => (
-                              !entry.disabled
-                              && (
-                                entry.displayName.toLowerCase() === value.trim().toLowerCase()
-                                || entry.weaponId.toLowerCase() === value.trim().toLowerCase()
-                              )
-                            ));
-                            setRequestWeaponId(match?.weaponId || '');
-                          }}
-                          placeholder="Type weapon name..."
-                          className="airport-modal__input"
-                        />
-                        {requestWeaponSearch.trim() !== '' && !requestWeaponId && requestWeaponSuggestions.length > 0 && (
-                          <div className="airport-modal__suggest">
-                            {requestWeaponSuggestions.map((weapon) => (
-                              <button
-                                key={weapon.weaponId}
-                                type="button"
-                                onClick={() => {
-                                  setRequestWeaponId(weapon.weaponId);
-                                  setRequestWeaponSearch(weapon.displayName);
-                                }}
-                                className="airport-modal__suggest-item"
-                              >
-                                {weapon.displayName} <span>({weapon.currentQty})</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      {selectedRequestWeapon?.disabled && (
-                        <div className="airport-modal__warn">This weapon already has an active order for this airport.</div>
-                      )}
-                    </div>
-
-                    <div className="airport-modal__field">
-                      <label className="airport-modal__label">Quantity</label>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={requestQuantity}
-                        onChange={(event) => setRequestQuantity(event.target.value)}
-                        className="airport-modal__input"
-                      />
-                      <div className="airport-modal__hint">
-                        ISO container size is chosen automatically (small/large) from requested quantity.
-                      </div>
-                    </div>
-
-                    <div className="airport-modal__footer">
-                      <button
-                        type="button"
-                        className="airport-modal__secondary-btn"
-                        onClick={() => setShowLogisticsRequestWindow(false)}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        className="airport-modal__primary-btn"
-                        onClick={handleCreateManualRequest}
-                        disabled={requestingOrder || !requestWeaponId || !(Number(requestQuantity) > 0) || selectedRequestWeapon?.disabled}
-                      >
-                        {requestingOrder ? 'Requesting...' : 'Request Order'}
-                      </button>
-                    </div>
-                  </div>
+                  </LidcAirportPresencePanel>
                 </div>
               )}
 
@@ -7598,6 +7358,21 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                 </div>
               </div>
             )}
+    {airportWizardTab && occupancyAirport && typeof document !== 'undefined' && createPortal(
+      <LidcAirportWizard
+        airport={occupancyAirport}
+        occupancy={{ ...(airportOccupancy || {}), economy: 'faction' }}
+        activeTab={airportWizardTab}
+        isLogged={isAuthenticated}
+        variant="hidc"
+        onPurchase={purchaseAirportLogistics}
+        onUpdateOrder={updateAirportOrder}
+        onChangeTab={setAirportWizardTab}
+        onClose={() => setAirportWizardTab('')}
+        onLogisticsUpdated={handleAirportLogisticsUpdated}
+      />,
+      document.body,
+    )}
     </section>
   );
 }

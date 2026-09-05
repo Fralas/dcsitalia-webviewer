@@ -52,6 +52,7 @@ import * as changelogTranslator from './services/changelogTranslator.js';
 import * as wikiService from './services/wiki.js';
 import * as achievementsService from './services/achievements.js';
 import * as lidcService from './services/lidcService.js';
+import * as hidcAirportLogistics from './services/hidcAirportLogistics.js';
 import { proxyCartoBasemapTile } from './services/cartoBasemapProxy.js';
 import {
   LIDC_EXPORT_FILES,
@@ -346,6 +347,7 @@ let productionPoints = [];
 // Web command bridge state
 let webCommands = []; // queued commands not yet pruned: { id, type, keyword, lat, lon, requested_by, requested_by_id, ts }
 let webCommandResultsById = new Map(); // id -> { ...result, _localTs }
+let lastBlueFactionPoints = null;
 let webCommandResultSignature = '';
 let webCommandFeedEmittedIds = new Set(); // command id -> feed already written
 let webSpawnMarkersSyncSignature = '';
@@ -1662,6 +1664,10 @@ function syncWebCommandResultsFromFile() {
       webCommandResultsById.set(id, stored);
 
       const command = webCommands.find((cmd) => cmd.id === id) || null;
+      const resultType = String(stored.type || command?.type || '');
+      if (resultType !== 'pp_retrieve' && resultType !== 'pp_upgrade' && Number.isFinite(Number(stored.balance))) {
+        lastBlueFactionPoints = Math.max(0, Math.floor(Number(stored.balance)));
+      }
       const emitType = stored.type || (command ? command.type : '');
       io.emit('web-command:result', {
         id,
@@ -2148,6 +2154,120 @@ app.post('/api/lidc/airports/:baseId/logistics/purchase', (req, res) => {
     return res.json(result);
   } catch (error) {
     const message = String(error?.message || 'Failed to purchase logistics');
+    const status = message.toLowerCase().includes('not found') ? 404 : 400;
+    return res.status(status).json({ error: message });
+  }
+});
+
+function getHidcLogisticsContext(req) {
+  const actor = getSessionActor(req);
+  return {
+    userId: actor?.id || req.session?.user?.id || '',
+    userName: actor?.name || '',
+    bluePoints: lastBlueFactionPoints,
+  };
+}
+
+function enqueueHidcLogisticsSpend(req, airportId, cost) {
+  const actor = getSessionActor(req);
+  if (!actor || !Number.isFinite(Number(cost)) || Number(cost) < 1) return;
+  const airport = getAirportById(airportId);
+  enqueueWebCommand({
+    id: randomUUID(),
+    type: 'logistics_spend',
+    production_point_id: null,
+    airport_id: airportId,
+    keyword: 'LOGISTICS',
+    lat: Number.isFinite(airport?.coordinates?.lat) ? airport.coordinates.lat : null,
+    lon: Number.isFinite(airport?.coordinates?.lon) ? airport.coordinates.lon : null,
+    quantity: Math.max(0, Math.floor(Number(cost))),
+    requested_by: actor.name,
+    requested_by_id: actor.id,
+    ts: Date.now(),
+  });
+}
+
+/**
+ * GET /api/airports/:id/occupancy
+ * HIDC airbase overview + warehouse logistics (BLUE faction points / DSCORE).
+ */
+app.get('/api/airports/:id/occupancy', (req, res) => {
+  const ctx = getHidcLogisticsContext(req);
+  const occupancy = hidcAirportLogistics.getAirportOccupancy(req.params.id, ctx.userId, ctx);
+  if (!occupancy) {
+    return res.status(404).json({ error: 'Airport not found' });
+  }
+  res.json(occupancy);
+});
+
+/**
+ * POST /api/airports/:id/logistics/purchase
+ * Create a logistics order paid with BLUE faction points.
+ */
+app.post('/api/airports/:id/logistics/purchase', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const ctx = getHidcLogisticsContext(req);
+    const result = hidcAirportLogistics.purchaseAirportLogistics({
+      baseId: req.params.id,
+      itemId: req.body?.itemId,
+      quantity: req.body?.quantity,
+      items: req.body?.items,
+      userId: ctx.userId,
+      userName: ctx.userName,
+      bluePoints: ctx.bluePoints,
+    });
+    enqueueHidcLogisticsSpend(req, req.params.id, result?.purchase?.cost);
+    return res.json(result);
+  } catch (error) {
+    const message = String(error?.message || 'Failed to purchase logistics');
+    const status = message.toLowerCase().includes('not found') ? 404 : 400;
+    return res.status(status).json({ error: message });
+  }
+});
+
+/**
+ * PATCH /api/airports/:id/logistics/orders/:orderId
+ * Accept, unaccept, complete, or edit a HIDC logistics order.
+ */
+app.patch('/api/airports/:id/logistics/orders/:orderId', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const ctx = getHidcLogisticsContext(req);
+    const action = req.body?.action;
+    const previous = hidcAirportLogistics.getAirportOccupancy(req.params.id, ctx.userId, ctx);
+    const previousOrder = (previous?.orders || []).find((entry) => entry.id === req.params.orderId);
+    const result = action
+      ? hidcAirportLogistics.updateAirportOrderStatus({
+          baseId: req.params.id,
+          orderId: req.params.orderId,
+          action,
+          userId: ctx.userId,
+          userName: ctx.userName,
+          bluePoints: ctx.bluePoints,
+        })
+      : hidcAirportLogistics.updateAirportOrder({
+          baseId: req.params.id,
+          orderId: req.params.orderId,
+          items: req.body?.items,
+          userId: ctx.userId,
+          userName: ctx.userName,
+          bluePoints: ctx.bluePoints,
+        });
+    if (!action) {
+      const nextOrder = (result?.orders || []).find((entry) => entry.id === req.params.orderId);
+      const extraCost = Math.max(0, Number(nextOrder?.cost || 0) - Number(previousOrder?.cost || 0));
+      enqueueHidcLogisticsSpend(req, req.params.id, extraCost);
+    }
+    return res.json(result);
+  } catch (error) {
+    const message = String(error?.message || 'Failed to update logistics order');
     const status = message.toLowerCase().includes('not found') ? 404 : 400;
     return res.status(status).json({ error: message });
   }

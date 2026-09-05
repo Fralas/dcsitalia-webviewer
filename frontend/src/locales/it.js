@@ -350,6 +350,7 @@ export default {
         coordinates: 'Coordinate',
         mgrs: 'MGRS',
         credits: 'Crediti',
+        blueFactionPoints: 'Punti fazione BLUE',
         container: 'Container',
         crate: 'Cassa',
         shopAircraft: 'Preset aerei',

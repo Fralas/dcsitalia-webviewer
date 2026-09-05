@@ -713,6 +713,28 @@ export async function getLidcSquadrons() {
 /**
  * Squadrons and airframes currently present at a LIDC Afghanistan airbase
  */
+export async function getAirportOccupancy(airportId) {
+  return fetchAPI(`/airports/${encodeURIComponent(airportId)}/occupancy`, {
+    credentials: 'include',
+  });
+}
+
+export async function purchaseAirportLogistics(airportId, payload) {
+  return fetchAPI(`/airports/${encodeURIComponent(airportId)}/logistics/purchase`, {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+    credentials: 'include',
+  });
+}
+
+export async function updateAirportOrder(airportId, orderId, payload) {
+  return fetchAPI(`/airports/${encodeURIComponent(airportId)}/logistics/orders/${encodeURIComponent(orderId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload || {}),
+    credentials: 'include',
+  });
+}
+
 export async function getLidcAirportOccupancy(baseId) {
   return fetchAPI(`/lidc/airports/${encodeURIComponent(baseId)}/occupancy`, {
     credentials: 'include',

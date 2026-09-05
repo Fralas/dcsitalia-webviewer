@@ -17,6 +17,7 @@ export const DOC = Object.freeze({
   LIDC_UCID_LINKS: 'lidc.ucid-links',
   LIDC_LINK_CODES: 'lidc.link-codes',
   LIDC_BASE_LOGISTICS: 'lidc.base-logistics',
+  HIDC_BASE_LOGISTICS: 'hidc.base-logistics',
   LIDC_WAREHOUSE_OPS: 'lidc.warehouse-ops',
   ATC_BOARD: 'atc.board',
   ATC_HISTORY: 'atc.history',

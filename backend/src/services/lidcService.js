@@ -2763,6 +2763,17 @@ export function applyAirframeStateFromDcs(incomingAirframes = []) {
 
 ensureStorage();
 
+export {
+  listLogisticsShop,
+  createDefaultBaseLogistics,
+  summarizeLogistics,
+  buildShopPurchaseLines,
+  normalizeBaseOrders,
+  normalizeLogisticsStock,
+  LOGISTICS_FUEL_CATALOG,
+  LOGISTICS_ARMAMENT_CATALOG,
+};
+
 export default {
   DECK_CATEGORIES,
   LIDC_MEMBER_ROLES,

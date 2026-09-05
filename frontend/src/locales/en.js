@@ -350,6 +350,7 @@ export default {
         coordinates: 'Coordinates',
         mgrs: 'MGRS',
         credits: 'Credits',
+        blueFactionPoints: 'BLUE faction points',
         container: 'Container',
         crate: 'Crate',
         shopAircraft: 'Aircraft presets',

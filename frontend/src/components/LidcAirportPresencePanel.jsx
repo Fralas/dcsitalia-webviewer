@@ -42,10 +42,12 @@ export default function LidcAirportPresencePanel({
   error = '',
   orderAlertCount = 0,
   fuelAlertCount = 0,
+  showSquadrons = true,
   onClose,
   onOpenWizard,
+  children = null,
 }) {
-  const squadrons = Array.isArray(occupancy?.squadrons) ? occupancy.squadrons : [];
+  const squadrons = showSquadrons && Array.isArray(occupancy?.squadrons) ? occupancy.squadrons : [];
   const occupancyMatches = occupancy?.airport?.id === airport?.id;
   const orderCount = occupancyMatches && Array.isArray(occupancy?.orders)
     ? occupancy.orders.length
@@ -107,9 +109,10 @@ export default function LidcAirportPresencePanel({
         {!loading && error && (
           <InlineError message={error} />
         )}
-        {!loading && !error && squadrons.length === 0 && (
+        {!loading && !error && squadrons.length === 0 && !children && (
           <p className="lidc-occupancy-panel__hint">{t('lidc.map.occupancy.empty')}</p>
         )}
+        {children}
         {!loading && !error && squadrons.map((squadron) => (
           <button
             key={squadron.id}

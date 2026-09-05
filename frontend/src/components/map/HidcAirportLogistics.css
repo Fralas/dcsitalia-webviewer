@@ -1,0 +1,196 @@
+.hidc-airport-overlay {
+  --lidc-primary: #ffffff;
+  --lidc-on-primary: #121212;
+  --lidc-ink: #ffffff;
+  --lidc-body: #dadbdf;
+  --lidc-mute: #7d8187;
+  --lidc-hairline: #4e4e4e;
+  --lidc-canvas: #0e0e0e;
+  --lidc-canvas-soft: #1b1b1b;
+  --lidc-accent-gold: #ffbb00;
+  --lidc-accent-orange: #ff6b01;
+  --lidc-font: "Inter", "Aptos", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  --lidc-pill: 9999px;
+  --lidc-radius: 25px;
+  --lidc-row-radius: 15px;
+  --lidc-shadow: 0 22px 60px rgba(0, 0, 0, 0.55);
+
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 1000;
+  pointer-events: none;
+  font-family: var(--lidc-font);
+  color: var(--lidc-ink);
+}
+
+.hidc-airport-overlay .lidc-occupancy-panel {
+  pointer-events: auto;
+  margin: 0;
+  width: min(360px, calc(100vw - 32px));
+  max-height: min(62vh, 560px);
+}
+
+.lidc-occupancy-panel {
+  --lidc-ink: #ffffff;
+  --lidc-body: #dadbdf;
+  --lidc-mute: #7d8187;
+  --lidc-accent-gold: #ffbb00;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(18, 18, 18, 0.94) 0%, rgba(10, 10, 10, 0.9) 100%);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.lidc-occupancy-panel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 14px 8px;
+}
+
+.lidc-occupancy-panel__type {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: #E32C2C;
+  text-transform: uppercase;
+}
+
+.lidc-occupancy-panel__name {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.lidc-occupancy-panel__close {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lidc-mute);
+  cursor: pointer;
+}
+
+.lidc-occupancy-panel__close:hover {
+  color: var(--lidc-ink);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.lidc-occupancy-panel__menus {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 8px 12px 10px;
+  overflow: visible;
+}
+
+.lidc-occupancy-menu {
+  position: relative;
+  min-height: 34px;
+  max-height: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--lidc-ink);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  overflow: visible;
+}
+
+.lidc-occupancy-menu:hover {
+  color: var(--lidc-accent-gold);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.lidc-occupancy-menu__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ff3b30;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  box-shadow: 0 0 0 1.5px #0e0e0e;
+}
+
+.lidc-occupancy-panel__body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lidc-occupancy-panel__hint {
+  margin: 0;
+  padding: 10px 4px 6px;
+  color: var(--lidc-mute);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.lidc-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--lidc-body);
+  font-size: 12px;
+}
+
+.hidc-airport-overlay .airport-spawn-panel {
+  width: 100%;
+  max-width: none;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.hidc-airport-overlay .airport-spawn-panel__header,
+.hidc-airport-overlay .airport-spawn-panel__divider {
+  display: none;
+}
+
+.hidc-airport-overlay .airport-spawn-panel__body {
+  padding: 0;
+}
+
+.hidc-airport-overlay .spin {
+  animation: hidc-lidc-spin 0.9s linear infinite;
+}
+
+@keyframes hidc-lidc-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

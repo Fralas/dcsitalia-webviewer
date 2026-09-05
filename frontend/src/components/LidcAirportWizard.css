@@ -1,3 +1,119 @@
+.lidc-wizard-root {
+  --lidc-primary: #ffffff;
+  --lidc-on-primary: #121212;
+  --lidc-ink: #ffffff;
+  --lidc-body: #dadbdf;
+  --lidc-mute: #7d8187;
+  --lidc-hairline: #4e4e4e;
+  --lidc-canvas: #0e0e0e;
+  --lidc-canvas-soft: #1b1b1b;
+  --lidc-canvas-card: #0e0e0e;
+  --lidc-accent-gold: #ffbb00;
+  --lidc-accent-orange: #ff6b01;
+  --lidc-font: "Inter", "Aptos", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  --lidc-pill: 9999px;
+  --lidc-radius: 25px;
+  --lidc-row-radius: 15px;
+  --lidc-shadow: 0 22px 60px rgba(0, 0, 0, 0.55);
+
+  position: fixed;
+  inset: 0;
+  z-index: 6000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(12px, 1.2vw, 28px);
+  font-family: var(--lidc-font);
+  color: var(--lidc-ink);
+  isolation: isolate;
+}
+
+.lidc-wizard-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.lidc-wizard-card {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+  box-sizing: border-box;
+  border: 1px solid var(--lidc-hairline);
+  border-radius: var(--lidc-radius);
+  background: var(--lidc-canvas);
+  box-shadow: var(--lidc-shadow);
+  display: grid;
+  gap: clamp(10px, 0.65vw, 14px);
+}
+
+.lidc-wizard-close {
+  width: clamp(40px, 2vw, 48px);
+  height: clamp(40px, 2vw, 48px);
+  flex-shrink: 0;
+  border: 2px solid var(--lidc-hairline);
+  border-radius: var(--lidc-row-radius);
+  background: var(--lidc-canvas-soft);
+  color: var(--lidc-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.lidc-wizard-close:hover {
+  border-color: rgba(255, 255, 255, 0.44);
+  background: #242424;
+}
+
+.lidc-wizard-root .lidc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: clamp(44px, 2.2vw, 52px);
+  padding: 0 clamp(16px, 1vw, 24px);
+  border-radius: clamp(14px, 0.625vw, 24px);
+  border: 2px solid var(--lidc-hairline);
+  background: transparent;
+  color: var(--lidc-ink);
+  font-family: var(--lidc-font);
+  font-size: clamp(12px, 0.52vw, 14px);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lidc-wizard-root .lidc-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.lidc-wizard-root .lidc-btn-outline {
+  background: var(--lidc-canvas-soft);
+}
+
+.lidc-wizard-root .lidc-btn-primary {
+  background: var(--lidc-accent-orange);
+  border-color: var(--lidc-accent-orange);
+  color: var(--lidc-on-primary);
+}
+
+.lidc-wizard-root .lidc-btn-block {
+  width: 100%;
+}
+
+.lidc-wizard-root .spin {
+  animation: lidc-airport-wizard-spin 0.9s linear infinite;
+}
+
+@keyframes lidc-airport-wizard-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .lidc-airport-wizard-shell {
   position: relative;
   z-index: 1;
@@ -323,6 +439,10 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.lidc-airport-wizard-facts.is-single {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .lidc-airport-wizard-facts article {
