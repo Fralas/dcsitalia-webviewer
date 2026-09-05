@@ -129,6 +129,13 @@ export function getAirportOccupancy(baseId, actorUserId = '', options = {}) {
   };
 }
 
+export function quoteAirportLogisticsItems({ itemId, quantity, items }) {
+  const rawLines = Array.isArray(items) && items.length > 0
+    ? items
+    : [{ itemId, quantity: quantity || 1 }];
+  return buildShopPurchaseLines(rawLines);
+}
+
 export function purchaseAirportLogistics({
   baseId,
   itemId,
@@ -137,6 +144,7 @@ export function purchaseAirportLogistics({
   userId,
   userName,
   bluePoints,
+  skipBalanceCheck = false,
 }) {
   const actorId = sanitizeText(userId, 80);
   if (!actorId) {
@@ -152,7 +160,7 @@ export function purchaseAirportLogistics({
     ? items
     : [{ itemId, quantity: quantity || 1 }];
   const { purchaseLines, totalCost } = buildShopPurchaseLines(rawLines);
-  assertBluePoints(bluePoints, totalCost);
+  if (!skipBalanceCheck) assertBluePoints(bluePoints, totalCost);
 
   const logistics = getOrCreateBaseLogistics(airport.id);
   const displayName = sanitizeText(userName, 120) || actorId;
@@ -252,7 +260,15 @@ export function updateAirportOrderStatus({ baseId, orderId, action, userId, user
   };
 }
 
-export function updateAirportOrder({ baseId, orderId, items, userId, userName, bluePoints }) {
+export function updateAirportOrder({
+  baseId,
+  orderId,
+  items,
+  userId,
+  userName,
+  bluePoints,
+  skipBalanceCheck = false,
+}) {
   const actorId = sanitizeText(userId, 80);
   if (!actorId) {
     throw new Error('Authentication required');
@@ -278,7 +294,7 @@ export function updateAirportOrder({ baseId, orderId, items, userId, userName, b
   }
 
   const extraCost = Math.max(0, totalCost - Number(order.cost || 0));
-  assertBluePoints(bluePoints, extraCost);
+  if (!skipBalanceCheck) assertBluePoints(bluePoints, extraCost);
 
   orders[orderIndex] = {
     ...order,

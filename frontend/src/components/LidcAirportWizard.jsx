@@ -217,7 +217,7 @@ export default function LidcAirportWizard({
   );
   const spendBudget = editingOrder
     ? Number(editingOrder.squadronCredits || 0) + Number(editingOrder.cost || 0)
-    : (knownCredits == null && factionEconomy && isLogged ? Number.POSITIVE_INFINITY : (knownCredits || 0));
+    : (knownCredits == null ? 0 : knownCredits);
   const remainingCredits = Number.isFinite(spendBudget) ? Math.max(0, spendBudget - cartTotal) : Number.POSITIVE_INFINITY;
   const canPurchase = factionEconomy
     ? isLogged

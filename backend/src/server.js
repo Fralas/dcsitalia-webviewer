@@ -53,6 +53,7 @@ import * as wikiService from './services/wiki.js';
 import * as achievementsService from './services/achievements.js';
 import * as lidcService from './services/lidcService.js';
 import * as hidcAirportLogistics from './services/hidcAirportLogistics.js';
+import { createDscoreFactionPoints } from './services/dscoreFactionPoints.js';
 import { proxyCartoBasemapTile } from './services/cartoBasemapProxy.js';
 import {
   LIDC_EXPORT_FILES,
@@ -104,6 +105,12 @@ const io = new Server(httpServer, {
     methods: ['GET', 'POST'],
     credentials: true
   }
+});
+
+const dscoreFactionPoints = createDscoreFactionPoints({
+  onChange: (bluePoints) => {
+    io.emit('dscore:updated', { bluePoints });
+  },
 });
 
 const PORT = process.env.PORT || 3001;
@@ -347,7 +354,6 @@ let productionPoints = [];
 // Web command bridge state
 let webCommands = []; // queued commands not yet pruned: { id, type, keyword, lat, lon, requested_by, requested_by_id, ts }
 let webCommandResultsById = new Map(); // id -> { ...result, _localTs }
-let lastBlueFactionPoints = null;
 let webCommandResultSignature = '';
 let webCommandFeedEmittedIds = new Set(); // command id -> feed already written
 let webSpawnMarkersSyncSignature = '';
@@ -1664,10 +1670,6 @@ function syncWebCommandResultsFromFile() {
       webCommandResultsById.set(id, stored);
 
       const command = webCommands.find((cmd) => cmd.id === id) || null;
-      const resultType = String(stored.type || command?.type || '');
-      if (resultType !== 'pp_retrieve' && resultType !== 'pp_upgrade' && Number.isFinite(Number(stored.balance))) {
-        lastBlueFactionPoints = Math.max(0, Math.floor(Number(stored.balance)));
-      }
       const emitType = stored.type || (command ? command.type : '');
       io.emit('web-command:result', {
         id,
@@ -2164,27 +2166,8 @@ function getHidcLogisticsContext(req) {
   return {
     userId: actor?.id || req.session?.user?.id || '',
     userName: actor?.name || '',
-    bluePoints: lastBlueFactionPoints,
+    bluePoints: dscoreFactionPoints.readBluePoints(),
   };
-}
-
-function enqueueHidcLogisticsSpend(req, airportId, cost) {
-  const actor = getSessionActor(req);
-  if (!actor || !Number.isFinite(Number(cost)) || Number(cost) < 1) return;
-  const airport = getAirportById(airportId);
-  enqueueWebCommand({
-    id: randomUUID(),
-    type: 'logistics_spend',
-    production_point_id: null,
-    airport_id: airportId,
-    keyword: 'LOGISTICS',
-    lat: Number.isFinite(airport?.coordinates?.lat) ? airport.coordinates.lat : null,
-    lon: Number.isFinite(airport?.coordinates?.lon) ? airport.coordinates.lon : null,
-    quantity: Math.max(0, Math.floor(Number(cost))),
-    requested_by: actor.name,
-    requested_by_id: actor.id,
-    ts: Date.now(),
-  });
 }
 
 /**
@@ -2204,23 +2187,48 @@ app.get('/api/airports/:id/occupancy', (req, res) => {
  * POST /api/airports/:id/logistics/purchase
  * Create a logistics order paid with BLUE faction points.
  */
-app.post('/api/airports/:id/logistics/purchase', (req, res) => {
+app.post('/api/airports/:id/logistics/purchase', async (req, res) => {
   if (!req.session.user?.id) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
   try {
-    const ctx = getHidcLogisticsContext(req);
-    const result = hidcAirportLogistics.purchaseAirportLogistics({
-      baseId: req.params.id,
-      itemId: req.body?.itemId,
-      quantity: req.body?.quantity,
-      items: req.body?.items,
-      userId: ctx.userId,
-      userName: ctx.userName,
-      bluePoints: ctx.bluePoints,
+    const actor = getSessionActor(req);
+    const result = await dscoreFactionPoints.transact(async ({ spend, credit, read }) => {
+      const { totalCost } = hidcAirportLogistics.quoteAirportLogisticsItems({
+        itemId: req.body?.itemId,
+        quantity: req.body?.quantity,
+        items: req.body?.items,
+      });
+      const cost = Math.max(0, Math.floor(Number(totalCost) || 0));
+      const nextBlue = cost > 0 ? await spend(cost) : read();
+      try {
+        const created = hidcAirportLogistics.purchaseAirportLogistics({
+          baseId: req.params.id,
+          itemId: req.body?.itemId,
+          quantity: req.body?.quantity,
+          items: req.body?.items,
+          userId: actor?.id || req.session.user.id,
+          userName: actor?.name || '',
+          bluePoints: nextBlue,
+          skipBalanceCheck: true,
+        });
+        return {
+          ...created,
+          shopper: {
+            ...(created.shopper || {}),
+            credits: nextBlue,
+          },
+          orders: (created.orders || []).map((order) => ({
+            ...order,
+            squadronCredits: nextBlue,
+          })),
+        };
+      } catch (error) {
+        if (cost > 0) await credit(cost);
+        throw error;
+      }
     });
-    enqueueHidcLogisticsSpend(req, req.params.id, result?.purchase?.cost);
     return res.json(result);
   } catch (error) {
     const message = String(error?.message || 'Failed to purchase logistics');
@@ -2233,38 +2241,62 @@ app.post('/api/airports/:id/logistics/purchase', (req, res) => {
  * PATCH /api/airports/:id/logistics/orders/:orderId
  * Accept, unaccept, complete, or edit a HIDC logistics order.
  */
-app.patch('/api/airports/:id/logistics/orders/:orderId', (req, res) => {
+app.patch('/api/airports/:id/logistics/orders/:orderId', async (req, res) => {
   if (!req.session.user?.id) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
   try {
-    const ctx = getHidcLogisticsContext(req);
+    const actor = getSessionActor(req);
     const action = req.body?.action;
-    const previous = hidcAirportLogistics.getAirportOccupancy(req.params.id, ctx.userId, ctx);
-    const previousOrder = (previous?.orders || []).find((entry) => entry.id === req.params.orderId);
-    const result = action
-      ? hidcAirportLogistics.updateAirportOrderStatus({
+    const result = await dscoreFactionPoints.transact(async ({ spend, credit, read }) => {
+      const userId = actor?.id || req.session.user.id;
+      const userName = actor?.name || '';
+      const bluePoints = read();
+      if (action) {
+        return hidcAirportLogistics.updateAirportOrderStatus({
           baseId: req.params.id,
           orderId: req.params.orderId,
           action,
-          userId: ctx.userId,
-          userName: ctx.userName,
-          bluePoints: ctx.bluePoints,
-        })
-      : hidcAirportLogistics.updateAirportOrder({
+          userId,
+          userName,
+          bluePoints,
+        });
+      }
+
+      const previous = hidcAirportLogistics.getAirportOccupancy(req.params.id, userId, { bluePoints, actorName: userName });
+      const previousOrder = (previous?.orders || []).find((entry) => entry.id === req.params.orderId);
+      const { totalCost } = hidcAirportLogistics.quoteAirportLogisticsItems({ items: req.body?.items });
+      const extraCost = Math.max(0, Number(totalCost || 0) - Number(previousOrder?.cost || 0));
+      const refund = Math.max(0, Number(previousOrder?.cost || 0) - Number(totalCost || 0));
+      if (extraCost > 0) await spend(extraCost);
+      try {
+        const updated = hidcAirportLogistics.updateAirportOrder({
           baseId: req.params.id,
           orderId: req.params.orderId,
           items: req.body?.items,
-          userId: ctx.userId,
-          userName: ctx.userName,
-          bluePoints: ctx.bluePoints,
+          userId,
+          userName,
+          bluePoints: read(),
+          skipBalanceCheck: true,
         });
-    if (!action) {
-      const nextOrder = (result?.orders || []).find((entry) => entry.id === req.params.orderId);
-      const extraCost = Math.max(0, Number(nextOrder?.cost || 0) - Number(previousOrder?.cost || 0));
-      enqueueHidcLogisticsSpend(req, req.params.id, extraCost);
-    }
+        const nextBlue = refund > 0 ? await credit(refund) : read();
+        return {
+          ...updated,
+          shopper: {
+            ...(updated.shopper || {}),
+            credits: nextBlue,
+          },
+          orders: (updated.orders || []).map((order) => ({
+            ...order,
+            squadronCredits: nextBlue,
+          })),
+        };
+      } catch (error) {
+        if (extraCost > 0) await credit(extraCost);
+        throw error;
+      }
+    });
     return res.json(result);
   } catch (error) {
     const message = String(error?.message || 'Failed to update logistics order');
@@ -5767,6 +5799,11 @@ setInterval(() => {
   syncWebCommandResultsFromFile();
 }, 2000);
 
+// Poll DSCORE faction score file (same source as the in-game score query)
+setInterval(() => {
+  dscoreFactionPoints.syncFromFile();
+}, 2000);
+
 // Poll tracked crate positions exported by DMAS
 setInterval(() => {
   syncWebSpawnMarkersFromFile();
@@ -5835,6 +5872,7 @@ syncAirliftPlayersFromFile();
 bootstrapWebCommandFeedDedup();
 loadWebCommandsQueue();
 syncProductionPointsFromFile();
+dscoreFactionPoints.syncFromFile();
 syncWebCommandResultsFromFile();
 syncWebSpawnMarkersFromFile();
 syncTankerRoutesFromFile();

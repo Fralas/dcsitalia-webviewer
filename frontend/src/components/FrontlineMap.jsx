@@ -5012,6 +5012,12 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       });
     });
 
+    const unsubscribeDscore = socketService.on('dscore:updated', (data) => {
+      if (Number.isFinite(Number(data?.bluePoints))) {
+        setBlueFactionPointsTick((value) => value + 1);
+      }
+    });
+
     return () => {
       unsubscribePp && unsubscribePp();
       unsubscribeMarkers && unsubscribeMarkers();
@@ -5019,6 +5025,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       unsubscribeDbuildPlacements && unsubscribeDbuildPlacements();
       unsubscribeDbuildSites && unsubscribeDbuildSites();
       unsubscribeResult && unsubscribeResult();
+      unsubscribeDscore && unsubscribeDscore();
       if (commandToastTimerRef.current) {
         clearTimeout(commandToastTimerRef.current);
       }
