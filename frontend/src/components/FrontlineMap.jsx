@@ -797,6 +797,22 @@ function getAirportMarkerIcon(coalition = 'neutral') {
   return airportMarkerIconCache.get(key);
 }
 
+function getMapLibreCustomLayerMatrix(matrix, options) {
+  if (matrix && typeof matrix.length === 'number' && matrix.length >= 16) {
+    return matrix;
+  }
+  if (options?.modelViewProjectionMatrix && options.modelViewProjectionMatrix.length >= 16) {
+    return options.modelViewProjectionMatrix;
+  }
+  if (matrix?.defaultProjectionData?.mainMatrix) {
+    return matrix.defaultProjectionData.mainMatrix;
+  }
+  if (options?.defaultProjectionData?.mainMatrix) {
+    return options.defaultProjectionData.mainMatrix;
+  }
+  return null;
+}
+
 function rememberHoveredAirport(current, nearest) {
   if (!nearest) return current ? null : current;
   if (
@@ -1456,6 +1472,23 @@ function isProductionPointZone(zone, productionPoints = []) {
   );
   if (candidates.some((value) => ppIds.has(value))) return true;
   return candidates.some((value) => /^PP[_\s-]/i.test(value));
+}
+
+function normalizeZoneCoordinates(zone, fallback = null) {
+  const lat = Number(zone?.coordinates?.lat ?? zone?.lat ?? fallback?.lat);
+  const lon = Number(zone?.coordinates?.lon ?? zone?.lon ?? zone?.lng ?? zone?.coordinates?.lng ?? fallback?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  return { lat, lon };
+}
+
+function applyIncomingFrontlineZones(incoming, previous) {
+  if (!Array.isArray(incoming) || incoming.length === 0) return previous;
+  const previousById = new Map((Array.isArray(previous) ? previous : []).map((zone) => [zone?.id, zone]));
+  return incoming.map((zone) => {
+    const fallback = previousById.get(zone?.id)?.coordinates || null;
+    const coordinates = normalizeZoneCoordinates(zone, fallback);
+    return coordinates ? { ...zone, coordinates } : zone;
+  });
 }
 
 function buildZoneCoordinatesByName(zones = []) {
@@ -2243,7 +2276,6 @@ function MapLibreFlatMapView({
     ? onTankerPlace
     : (spawnPlacementActive ? onSpawnPlace : onRetrievePlace);
   const ZONE_DOME_RADIUS_METERS = 3000;
-  const ZONE_DOME_TERRAIN_CLEARANCE_M = 80;
   const LOGISTICS_ROUTE_RADIUS_METERS = 120;
   const LOGISTICS_C130_MODEL_SIZE_METERS = 110;
   const LOGISTICS_CH47_MODEL_SIZE_METERS = 92;
@@ -2259,6 +2291,7 @@ function MapLibreFlatMapView({
   const effectiveMaxZoom = mapMaxZoom || MAP_ZOOM_DEFAULT_MAX;
   const containerRef = useRef(null);
   const mapRef = useRef(null);
+  const domesOverlayRef = useRef(null);
   const [mapInstance, setMapInstance] = useState(null);
   const [hoveredAirport, setHoveredAirport] = useState(null);
   const dcsarByIdRef = useRef(new Map());
@@ -2695,14 +2728,14 @@ function MapLibreFlatMapView({
 
   const applyZoneDomePose = useCallback((map, mesh, glowMesh, lon, lat) => {
     if (!map || !mesh || !glowMesh) return;
-    const terrainElevation = map.queryTerrainElevation([lon, lat], { exaggerated: true });
-    const altitudeMeters = (Number.isFinite(terrainElevation) ? terrainElevation : 0) + ZONE_DOME_TERRAIN_CLEARANCE_M;
-    const merc = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], altitudeMeters);
+    const merc = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], 0);
     const scale = merc.meterInMercatorCoordinateUnits() * ZONE_DOME_RADIUS_METERS;
     mesh.position.set(merc.x, merc.y, merc.z);
     mesh.scale.set(scale, scale, scale);
+    mesh.frustumCulled = false;
     glowMesh.position.set(merc.x, merc.y, merc.z);
     glowMesh.scale.set(scale * 1.045, scale * 1.045, scale * 1.045);
+    glowMesh.frustumCulled = false;
   }, []);
 
   const rebuildThreeDomes = useCallback(() => {
@@ -2710,15 +2743,30 @@ function MapLibreFlatMapView({
     const group = domes3dRef.current.group;
     if (!map || !group) return;
 
-    while (group.children.length > 0) {
-      const child = group.children.pop();
-      disposeThreeNode(child);
-    }
-    domes3dRef.current.domes = [];
-    domes3dRef.current.routes = [];
+    const nextGroup = new THREE.Group();
+    const nextDomes = [];
+    const nextRoutes = [];
+    const discardNext = () => {
+      while (nextGroup.children.length > 0) {
+        disposeThreeNode(nextGroup.children.pop());
+      }
+    };
+    const commitNext = () => {
+      while (group.children.length > 0) {
+        disposeThreeNode(group.children.pop());
+      }
+      while (nextGroup.children.length > 0) {
+        group.add(nextGroup.children[0]);
+      }
+      domes3dRef.current.domes = nextDomes;
+      domes3dRef.current.routes = nextRoutes;
+      map.triggerRepaint();
+    };
+
+    try {
 
     if (!showAto && !showLogistics && !showConvoys && !showAirliftPlayers && !(tankerRoutes || []).length) {
-      map.triggerRepaint();
+      commitNext();
       return;
     }
 
@@ -2746,31 +2794,31 @@ function MapLibreFlatMapView({
         color,
         transparent: true,
         opacity: isSelected ? 0.55 : 0.42,
-        depthTest: true,
-        depthWrite: true,
+        depthTest: false,
+        depthWrite: false,
         side: THREE.DoubleSide,
         emissive: new THREE.Color(color),
         emissiveIntensity: 0.08,
       });
       const mesh = new THREE.Mesh(domes3dRef.current.geometry, material);
       mesh.renderOrder = 10;
-      group.add(mesh);
+      nextGroup.add(mesh);
 
       const glowMaterial = new THREE.MeshBasicMaterial({
         color,
         transparent: true,
         opacity: isSelected ? 0.28 : 0.2,
         blending: THREE.AdditiveBlending,
-        depthTest: true,
+        depthTest: false,
         depthWrite: false,
         side: THREE.BackSide,
       });
       const glowMesh = new THREE.Mesh(domes3dRef.current.geometry, glowMaterial);
       glowMesh.renderOrder = 11;
-      group.add(glowMesh);
+      nextGroup.add(glowMesh);
       applyZoneDomePose(map, mesh, glowMesh, lon, lat);
 
-      domes3dRef.current.domes.push({
+      nextDomes.push({
         lon,
         lat,
         isSelected,
@@ -2850,7 +2898,7 @@ function MapLibreFlatMapView({
         const routeMesh = new THREE.Mesh(tubeGeometry, routeMaterial);
         routeMesh.userData.disposeGeometry = true;
         routeMesh.renderOrder = 9;
-        group.add(routeMesh);
+        nextGroup.add(routeMesh);
 
         const useCh47 = routeUsesCh47;
         const selectedTemplate = useCh47
@@ -2931,7 +2979,7 @@ function MapLibreFlatMapView({
             }
           });
 
-          group.add(planeRoot);
+          nextGroup.add(planeRoot);
         }
       });
     }
@@ -2991,7 +3039,7 @@ function MapLibreFlatMapView({
         });
 
         tankWrapper.add(tankRoot);
-        group.add(tankWrapper);
+        nextGroup.add(tankWrapper);
       });
     }
 
@@ -3069,7 +3117,7 @@ function MapLibreFlatMapView({
           }
         });
 
-        group.add(modelRoot);
+        nextGroup.add(modelRoot);
       });
     }
 
@@ -3112,10 +3160,10 @@ function MapLibreFlatMapView({
       const routeMesh = new THREE.Mesh(tubeGeometry, routeMaterial);
       routeMesh.userData.disposeGeometry = true;
       routeMesh.renderOrder = 9;
-      group.add(routeMesh);
+      nextGroup.add(routeMesh);
 
-      addTankerRouteEndpointCircle(group, map, wp1.lon, wp1.lat, altMeters);
-      addTankerRouteEndpointCircle(group, map, wp2.lon, wp2.lat, altMeters);
+      addTankerRouteEndpointCircle(nextGroup, map, wp1.lon, wp1.lat, altMeters);
+      addTankerRouteEndpointCircle(nextGroup, map, wp2.lon, wp2.lat, altMeters);
 
       const kc135Template = domes3dRef.current.kc135Template || domes3dRef.current.c130Template;
       if (kc135Template) {
@@ -3189,11 +3237,15 @@ function MapLibreFlatMapView({
           }
         });
 
-        group.add(planeRoot);
+        nextGroup.add(planeRoot);
       }
     });
 
-    map.triggerRepaint();
+    commitNext();
+    } catch (error) {
+      console.error('Failed to rebuild 3D map overlays:', error);
+      discardNext();
+    }
   }, [zones, showAto, selectedZoneId, showLogistics, logisticsMissions, logisticsFrontlineAirportIds, airportsById, showConvoys, convoys, showAirliftPlayers, airliftPlayers, tankerRoutes, disposeThreeNode, applyZoneDomePose]);
 
   useEffect(() => {
@@ -3253,12 +3305,6 @@ function MapLibreFlatMapView({
         className: 'frontline-hover-popup',
         maxWidth: '180px',
       });
-      // Enable real 3D terrain after style load; keep it resilient if terrain is unavailable.
-      try {
-        map.setTerrain({ source: 'terrainDem', exaggeration: 1.0 });
-      } catch (error) {
-        console.warn('Terrain could not be enabled, continuing without 3D terrain:', error);
-      }
 
       const showHoverPopup = (lngLat, html) => {
         if (!popupRef.current || !html) return;
@@ -3301,119 +3347,126 @@ function MapLibreFlatMapView({
       addGeoSource('airports-src', fcAirports);
       addGeoSource('production-points-src', fcProductionPoints);
 
-      const domeLayer = {
-        id: 'zone-domes-3d-layer',
-        type: 'custom',
-        renderingMode: '3d',
-        onAdd: (_map, gl) => {
-          const scene = new THREE.Scene();
-          const camera = new THREE.Camera();
-          const renderer = new THREE.WebGLRenderer({
-            canvas: _map.getCanvas(),
-            context: gl,
-            antialias: true,
-          });
-          renderer.autoClear = false;
+      const initThreeOverlay = () => {
+        const overlay = domesOverlayRef.current;
+        if (!overlay || domes3dRef.current.renderer) return;
 
-          const group = new THREE.Group();
-          scene.add(group);
+        const scene = new THREE.Scene();
+        const camera = new THREE.Camera();
+        const renderer = new THREE.WebGLRenderer({
+          canvas: overlay,
+          antialias: true,
+          alpha: true,
+        });
+        renderer.setClearColor(0x000000, 0);
+        renderer.autoClear = true;
+        renderer.setPixelRatio(window.devicePixelRatio || 1);
+        renderer.setSize(overlay.clientWidth || 1, overlay.clientHeight || 1, false);
 
-          scene.add(new THREE.AmbientLight('#ffffff', 1.0));
-          const dirLight = new THREE.DirectionalLight('#ffffff', 1.25);
-          dirLight.position.set(0, -70, 120);
-          scene.add(dirLight);
+        const group = new THREE.Group();
+        scene.add(group);
+        scene.add(new THREE.AmbientLight('#ffffff', 1.0));
+        const dirLight = new THREE.DirectionalLight('#ffffff', 1.25);
+        dirLight.position.set(0, -70, 120);
+        scene.add(dirLight);
 
-          domes3dRef.current.scene = scene;
-          domes3dRef.current.camera = camera;
-          domes3dRef.current.renderer = renderer;
-          domes3dRef.current.group = group;
+        domes3dRef.current.scene = scene;
+        domes3dRef.current.camera = camera;
+        domes3dRef.current.renderer = renderer;
+        domes3dRef.current.group = group;
 
-          if (!domes3dRef.current.planeLoaderPromise) {
-            const loader = new GLTFLoader();
-            const prepareTemplate = (gltfScene) => {
-              const template = gltfScene?.scene;
-              if (!template) return null;
-              template.traverse((child) => {
-                if (child?.isMesh) {
-                  child.frustumCulled = false;
-                }
-              });
-              return template;
-            };
-
-            domes3dRef.current.planeLoaderPromise = Promise.allSettled([
-              loader.loadAsync(c130ModelUrl),
-              loader.loadAsync(ch47ModelUrl),
-              loader.loadAsync(t72ModelUrl),
-              loader.loadAsync(kc135ModelUrl),
-            ])
-              .then((results) => {
-                const c130Result = results[0];
-                const ch47Result = results[1];
-                const t72Result = results[2];
-                const kc135Result = results[3];
-                if (c130Result.status === 'fulfilled') {
-                  domes3dRef.current.c130Template = prepareTemplate(c130Result.value);
-                } else {
-                  console.error('Failed to load C130 model:', c130Result.reason);
-                }
-                if (ch47Result.status === 'fulfilled') {
-                  domes3dRef.current.ch47Template = prepareTemplate(ch47Result.value);
-                } else {
-                  console.error('Failed to load CH47 model:', ch47Result.reason);
-                }
-                if (t72Result.status === 'fulfilled') {
-                  domes3dRef.current.convoyTemplate = prepareTemplate(t72Result.value);
-                } else {
-                  console.error('Failed to load T72 model:', t72Result.reason);
-                }
-                if (kc135Result.status === 'fulfilled') {
-                  domes3dRef.current.kc135Template = prepareTemplate(kc135Result.value);
-                } else {
-                  console.error('Failed to load KC-135 model:', kc135Result.reason);
-                }
-                rebuildThreeDomes();
-                map.triggerRepaint();
-              })
-              .catch((error) => {
-                console.error('Failed to load aircraft models:', error);
-              });
-          } else if (
-            domes3dRef.current.c130Template
-            || domes3dRef.current.ch47Template
-            || domes3dRef.current.convoyTemplate
-            || domes3dRef.current.kc135Template
-          ) {
-            rebuildThreeDomes();
-            map.triggerRepaint();
+        const paintThreeOverlay = () => {
+          const overlayCanvas = domesOverlayRef.current;
+          if (!overlayCanvas || !mapRef.current) return;
+          const width = overlayCanvas.clientWidth;
+          const height = overlayCanvas.clientHeight;
+          if (!width || !height) return;
+          if (overlayCanvas.width !== Math.round(width * (window.devicePixelRatio || 1))
+            || overlayCanvas.height !== Math.round(height * (window.devicePixelRatio || 1))) {
+            renderer.setPixelRatio(window.devicePixelRatio || 1);
+            renderer.setSize(width, height, false);
           }
-        },
-        render: (_gl, matrix, args) => {
-          const { renderer, scene, camera, domes } = domes3dRef.current;
-          if (!renderer || !scene || !camera) return;
-          const projectionMatrix = Array.isArray(matrix)
-            ? matrix
-            : (matrix && typeof matrix.length === 'number'
-              ? matrix
-              : (args?.modelViewProjectionMatrix || args?.projectionMatrix || matrix));
-          if (!projectionMatrix || typeof projectionMatrix.length !== 'number') return;
-          camera.projectionMatrix = new THREE.Matrix4().fromArray(projectionMatrix);
 
-          const mapForDomes = mapRef.current;
-          domes.forEach((dome) => {
-            applyZoneDomePose(mapForDomes, dome.main, dome.glow, dome.lon, dome.lat);
+          let matrix = null;
+          try {
+            matrix = map.transform?.customLayerMatrix?.() || map.transform?.mercatorMatrix || null;
+          } catch (_) {
+            matrix = null;
+          }
+          if (!matrix || matrix.length < 16) return;
+          camera.projectionMatrix = new THREE.Matrix4().fromArray(matrix);
+          const inverse = camera.projectionMatrixInverse.copy(camera.projectionMatrix);
+          if (typeof inverse.invert === 'function') {
+            inverse.invert();
+          }
+
+          (domes3dRef.current.domes || []).forEach((dome) => {
+            applyZoneDomePose(map, dome.main, dome.glow, dome.lon, dome.lat);
             dome.main.material.opacity = dome.mainBaseOpacity;
             dome.glow.material.opacity = dome.glowBaseOpacity;
           });
 
-          renderer.resetState();
           renderer.render(scene, camera);
-          // Allow later MapLibre fill/line layers (e.g. spawn radius) to draw above 3D domes.
-          _gl.clear(_gl.DEPTH_BUFFER_BIT);
-        },
+        };
+
+        map.on('render', paintThreeOverlay);
+        domes3dRef.current.paintThreeOverlay = paintThreeOverlay;
+
+        if (!domes3dRef.current.planeLoaderPromise) {
+          const loader = new GLTFLoader();
+          const prepareTemplate = (gltfScene) => {
+            const template = gltfScene?.scene;
+            if (!template) return null;
+            template.traverse((child) => {
+              if (child?.isMesh) {
+                child.frustumCulled = false;
+              }
+            });
+            return template;
+          };
+
+          domes3dRef.current.planeLoaderPromise = Promise.allSettled([
+            loader.loadAsync(c130ModelUrl),
+            loader.loadAsync(ch47ModelUrl),
+            loader.loadAsync(t72ModelUrl),
+            loader.loadAsync(kc135ModelUrl),
+          ])
+            .then((results) => {
+              const c130Result = results[0];
+              const ch47Result = results[1];
+              const t72Result = results[2];
+              const kc135Result = results[3];
+              if (c130Result.status === 'fulfilled') {
+                domes3dRef.current.c130Template = prepareTemplate(c130Result.value);
+              } else {
+                console.error('Failed to load C130 model:', c130Result.reason);
+              }
+              if (ch47Result.status === 'fulfilled') {
+                domes3dRef.current.ch47Template = prepareTemplate(ch47Result.value);
+              } else {
+                console.error('Failed to load CH47 model:', ch47Result.reason);
+              }
+              if (t72Result.status === 'fulfilled') {
+                domes3dRef.current.convoyTemplate = prepareTemplate(t72Result.value);
+              } else {
+                console.error('Failed to load T72 model:', t72Result.reason);
+              }
+              if (kc135Result.status === 'fulfilled') {
+                domes3dRef.current.kc135Template = prepareTemplate(kc135Result.value);
+              } else {
+                console.error('Failed to load KC-135 model:', kc135Result.reason);
+              }
+              rebuildThreeDomes();
+              map.triggerRepaint();
+            })
+            .catch((error) => {
+              console.error('Failed to load aircraft models:', error);
+            });
+        }
+
+        rebuildThreeDomes();
+        map.triggerRepaint();
       };
-      map.addLayer(domeLayer);
-      rebuildThreeDomes();
 
       map.addLayer({
         id: 'grid-layer',
@@ -3979,9 +4032,21 @@ function MapLibreFlatMapView({
         }
       }
 
-      if (map.getLayer('zone-domes-3d-layer')) {
-        map.moveLayer('zone-domes-3d-layer');
-      }
+      initThreeOverlay();
+      rebuildThreeDomes();
+
+      map.once('idle', () => {
+        try {
+          if (!map.getTerrain()) {
+            map.setTerrain({ source: 'terrainDem', exaggeration: 1.0 });
+          }
+        } catch (error) {
+          console.warn('Terrain could not be enabled, continuing without 3D terrain:', error);
+        }
+        rebuildThreeDomes();
+        map.triggerRepaint();
+      });
+
       // Keep spawn/retrieve radius above all other map layers (including zone domes).
       if (map.getLayer('spawn-radius-fill-layer')) {
         map.moveLayer('spawn-radius-fill-layer');
@@ -4000,6 +4065,10 @@ function MapLibreFlatMapView({
 
     return () => {
       logMapDebug('map-unmount');
+      if (domes3dRef.current.paintThreeOverlay && mapRef.current) {
+        mapRef.current.off('render', domes3dRef.current.paintThreeOverlay);
+        domes3dRef.current.paintThreeOverlay = null;
+      }
       if (domes3dRef.current.group) {
         while (domes3dRef.current.group.children.length > 0) {
           const child = domes3dRef.current.group.children.pop();
@@ -4429,7 +4498,11 @@ function MapLibreFlatMapView({
 
   return (
     <div className="relative h-full w-full">
-      <div ref={containerRef} className="h-full w-full" />
+      <div ref={containerRef} className="absolute inset-0 z-0 h-full w-full" />
+      <canvas
+        ref={domesOverlayRef}
+        className="pointer-events-none absolute inset-0 z-[6] h-full w-full"
+      />
       <HidcMapAirportHoverPointer map={mapInstance} airport={hoveredAirport} />
     </div>
   );
@@ -4614,7 +4687,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
         if (zonesResult.status === 'fulfilled') {
           const nextZones = zonesResult.value?.zones || zonesResult.value;
           if (Array.isArray(nextZones)) {
-            setZones(nextZones);
+            setZones((previous) => applyIncomingFrontlineZones(nextZones, previous));
           }
         } else {
           console.error('Failed to load frontline zones:', zonesResult.reason);
@@ -4682,7 +4755,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     const unsubscribe = socketService.on('frontline:updated', (data) => {
       const nextZones = data?.zones || data;
       if (Array.isArray(nextZones)) {
-        setZones(nextZones);
+        setZones((previous) => applyIncomingFrontlineZones(nextZones, previous));
       }
     });
 
@@ -5899,12 +5972,12 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     try {
       const payload = await declineFrontlineZone(zone.id, currentUserName);
       if (Array.isArray(payload?.zones)) {
-        setZones(payload.zones);
+        setZones((previous) => applyIncomingFrontlineZones(payload.zones, previous));
       } else {
         const refreshed = await getFrontlineZones();
         const fetchedZones = refreshed?.zones || refreshed;
         if (Array.isArray(fetchedZones)) {
-          setZones(fetchedZones);
+          setZones((previous) => applyIncomingFrontlineZones(fetchedZones, previous));
         }
       }
     } catch (error) {
@@ -5928,12 +6001,12 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     try {
       const payload = await acceptFrontlineZone(zone.id, currentUserName);
       if (Array.isArray(payload?.zones)) {
-        setZones(payload.zones);
+        setZones((previous) => applyIncomingFrontlineZones(payload.zones, previous));
       } else {
         const refreshed = await getFrontlineZones();
         const fetchedZones = refreshed?.zones || refreshed;
         if (Array.isArray(fetchedZones)) {
-          setZones(fetchedZones);
+          setZones((previous) => applyIncomingFrontlineZones(fetchedZones, previous));
         }
       }
     } catch (error) {
@@ -6426,7 +6499,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                 <div className="absolute inset-0">
                   {isMapLibreEngine ? (
                     <MapLibreFlatMapView
-                      zones={zonesForMap}
+                      zones={filteredZones}
                       airportsData={allMapAirports}
                       logisticsMissions={routeVisibleLogisticsMissions}
                       logisticsFrontlineAirportIds={logisticsFrontlineAirportIds}
