@@ -537,7 +537,7 @@ const SPAWN_QUANTITY_MAX = 5;
 const SPAWN_OFFSET_METERS = 2;
 const SPAWN_OFFSET_BEARING_DEG = 90;
 const MAP_ZOOM_DEFAULT_MAX = 14;
-const MAP_ZOOM_AIRPORT_MAX = 18;
+const MAP_ZOOM_AIRPORT_MAX = 16;
 const MAP_ZOOM_SPAWN_MAX = MAP_ZOOM_AIRPORT_MAX;
 const MAP_ICON_PP_SIZE = 26;
 const MAP_ICON_PP_FRAME = 36;
@@ -1990,7 +1990,7 @@ function FlatMapView({
             || String(focusTargetKey || '').startsWith('airport:')
             || String(focusTargetKey || '').startsWith('spawn:')
             || String(focusTargetKey || '').startsWith('retrieve:')
-              ? 15
+              ? 14
               : undefined
           }
         />
@@ -4689,7 +4689,7 @@ function MapLibreFlatMapView({
     );
     const currentZoom = map.getZoom();
     const focusZoom = airportLikeFocus
-      ? Math.min(effectiveMaxZoom, 15)
+      ? Math.min(effectiveMaxZoom, 14)
       : Math.min(effectiveMaxZoom, currentZoom + 0.35);
     const duration = mapFocusAnimationMs(currentZoom, focusZoom);
 
