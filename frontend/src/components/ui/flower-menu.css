@@ -56,7 +56,15 @@
   overflow: visible;
   white-space: nowrap;
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
-  transition: color 160ms ease;
+  opacity: 0;
+  visibility: hidden;
+  transition: none;
+}
+
+.flower-menu.is-open .flower-menu__label {
+  opacity: 1;
+  visibility: visible;
+  transition: color 160ms ease, opacity 140ms ease 70ms;
 }
 
 .flower-menu__petal:hover .flower-menu__label {

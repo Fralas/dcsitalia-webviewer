@@ -226,7 +226,7 @@ export function FlowerMenu({
 
   return (
     <nav
-      className={cn('flower-menu relative overflow-visible', className)}
+      className={cn('flower-menu relative overflow-visible', isOpen && 'is-open', className)}
       style={{
         width: menuSpan,
         height: menuSpan,
