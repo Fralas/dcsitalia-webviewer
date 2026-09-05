@@ -109,7 +109,7 @@ export default function LidcAirportPresencePanel({
         {!loading && error && (
           <InlineError message={error} />
         )}
-        {!loading && !error && squadrons.length === 0 && !children && (
+        {!loading && !error && showSquadrons && squadrons.length === 0 && !children && (
           <p className="lidc-occupancy-panel__hint">{t('lidc.map.occupancy.empty')}</p>
         )}
         {children}

@@ -7053,59 +7053,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       setTankerMode(null);
                     }}
                     onOpenWizard={(tab) => setAirportWizardTab(tab === 'logistics' ? 'logistics' : 'overview')}
-                  >
-                    <div className="airport-spawn-panel">
-                      <div className="airport-spawn-panel__body">
-                        <div className="airport-spawn-panel__block">
-                          <div className="airport-spawn-panel__block-title">
-                            <Box className="airport-spawn-panel__block-icon" strokeWidth={2} aria-hidden="true" />
-                            <span>SPAWN ASSET</span>
-                          </div>
-                          {!isAuthenticated ? (
-                            <div className="airport-spawn-panel__empty">
-                              Login to spawn units and crates.
-                            </div>
-                          ) : (
-                            <>
-                              {SPAWN_MENU_SECTIONS.map((section) => {
-                                const sectionOptions = section.keywords
-                                  .map((keyword) => {
-                                    const option = spawnOptionByKeyword.get(keyword);
-                                    return option ? { keyword, option } : null;
-                                  })
-                                  .filter(Boolean);
-                                if (sectionOptions.length === 0) return null;
-                                return (
-                                  <div key={section.id} className="airport-spawn-panel__spawn-section">
-                                    <p className="airport-spawn-panel__section-title">{section.title}</p>
-                                    <div className="airport-spawn-panel__pills">
-                                      {sectionOptions.map(({ keyword, option }) => {
-                                        const selected = spawnMode?.keyword === keyword && spawnMode?.type === section.spawnType;
-                                        return (
-                                          <button
-                                            key={`${section.id}-${keyword}`}
-                                            type="button"
-                                            onClick={() => handleEnterSpawnMode(selectedAirport.id, section.spawnType, option)}
-                                            className={`airport-spawn-panel__pill${selected ? ' is-selected' : ''}`}
-                                          >
-                                            {keyword}
-                                            <span className="airport-spawn-panel__pill-cost">({option.cost})</span>
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                              <p className="airport-spawn-panel__hint">
-                                Select an item, then click inside the airport on the map.
-                              </p>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </LidcAirportPresencePanel>
+                  />
                 </div>
               )}
 
@@ -7370,6 +7318,64 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
         onChangeTab={setAirportWizardTab}
         onClose={() => setAirportWizardTab('')}
         onLogisticsUpdated={handleAirportLogisticsUpdated}
+        overviewExtra={(
+          <section className="lidc-airport-wizard-block">
+            <div className="airport-spawn-panel">
+              <div className="airport-spawn-panel__body">
+                <div className="airport-spawn-panel__block">
+                  <div className="airport-spawn-panel__block-title">
+                    <Box className="airport-spawn-panel__block-icon" strokeWidth={2} aria-hidden="true" />
+                    <span>SPAWN ASSET</span>
+                  </div>
+                  {!isAuthenticated ? (
+                    <div className="airport-spawn-panel__empty">
+                      Login to spawn units and crates.
+                    </div>
+                  ) : (
+                    <>
+                      {SPAWN_MENU_SECTIONS.map((section) => {
+                        const sectionOptions = section.keywords
+                          .map((keyword) => {
+                            const option = spawnOptionByKeyword.get(keyword);
+                            return option ? { keyword, option } : null;
+                          })
+                          .filter(Boolean);
+                        if (sectionOptions.length === 0) return null;
+                        return (
+                          <div key={section.id} className="airport-spawn-panel__spawn-section">
+                            <p className="airport-spawn-panel__section-title">{section.title}</p>
+                            <div className="airport-spawn-panel__pills">
+                              {sectionOptions.map(({ keyword, option }) => {
+                                const selected = spawnMode?.keyword === keyword && spawnMode?.type === section.spawnType;
+                                return (
+                                  <button
+                                    key={`${section.id}-${keyword}`}
+                                    type="button"
+                                    onClick={() => {
+                                      handleEnterSpawnMode(selectedAirport.id, section.spawnType, option);
+                                      setAirportWizardTab('');
+                                    }}
+                                    className={`airport-spawn-panel__pill${selected ? ' is-selected' : ''}`}
+                                  >
+                                    {keyword}
+                                    <span className="airport-spawn-panel__pill-cost">({option.cost})</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <p className="airport-spawn-panel__hint">
+                        Select an item, then click inside the airport on the map.
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
       />,
       document.body,
     )}

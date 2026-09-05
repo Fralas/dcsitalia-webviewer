@@ -445,6 +445,24 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
+.lidc-airport-wizard-overview .airport-spawn-panel {
+  width: 100%;
+  max-width: none;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.lidc-airport-wizard-overview .airport-spawn-panel__header,
+.lidc-airport-wizard-overview .airport-spawn-panel__divider {
+  display: none;
+}
+
+.lidc-airport-wizard-overview .airport-spawn-panel__body {
+  padding: 0;
+}
+
 .lidc-airport-wizard-facts article {
   padding: 12px 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);

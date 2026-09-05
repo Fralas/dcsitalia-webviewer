@@ -163,6 +163,7 @@ export default function LidcAirportWizard({
   onChangeTab,
   onClose,
   onLogisticsUpdated,
+  overviewExtra = null,
 }) {
   const [cart, setCart] = useState({});
   const [confirming, setConfirming] = useState(false);
@@ -534,6 +535,8 @@ export default function LidcAirportWizard({
                   );
                 })}
               </section>
+
+              {overviewExtra}
 
               {showSquadrons && (
               <section className="lidc-airport-wizard-block">
