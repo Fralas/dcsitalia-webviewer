@@ -150,52 +150,84 @@
 }
 
 .map-ops-section__aircraft {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
   border: 0;
   border-radius: var(--ops-pill);
   background: var(--ops-fill);
   overflow: hidden;
-  gap: 0;
-  width: 64px;
-  flex: 0 0 64px;
+  gap: 4px;
+  width: 80px;
+  flex: 0 0 80px;
+  height: 34px;
+}
+
+.map-ops-section__aircraft-glider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: calc((100% - 4px) / 2);
+  border-radius: var(--ops-pill);
+  background: var(--ops-gold);
+  pointer-events: none;
+  transition: transform 480ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.map-ops-section__aircraft-glider.is-heli {
+  transform: translateX(calc(100% + 4px));
 }
 
 .map-ops-section__aircraft-btn {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 1 1 0;
   min-width: 0;
-  width: 32px;
   min-height: 34px;
   height: 34px;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--ops-pill);
   background: transparent;
-  color: #ffffff;
+  color: var(--ops-mute);
   cursor: pointer;
   padding: 0;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.map-ops-section__aircraft-btn:first-child {
-  border-right: 1px solid var(--ops-hairline);
+  transition: color 280ms ease;
 }
 
 .map-ops-section__aircraft-btn svg {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
 }
 
-.map-ops-section__aircraft-btn.is-active,
+.map-ops-section__aircraft-btn.is-active {
+  background: transparent;
+  color: #121212;
+}
+
 .map-ops-section__pill.is-active {
   background: var(--ops-fill-active);
   color: #ffffff;
 }
 
-.map-ops-section__aircraft-btn:hover:not(.is-active),
+.map-ops-section__aircraft-btn:hover:not(.is-active) {
+  background: transparent;
+  color: var(--ops-gold);
+}
+
 .map-ops-section__pill:hover:not(.is-active) {
   background: var(--ops-fill-hover);
   color: var(--ops-gold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-ops-section__aircraft-glider,
+  .map-ops-section__aircraft-btn {
+    transition: none;
+  }
 }
 
 .map-ops-section__reset:hover {

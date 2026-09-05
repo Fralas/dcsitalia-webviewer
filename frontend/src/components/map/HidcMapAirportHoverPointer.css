@@ -46,13 +46,18 @@
   text-transform: uppercase;
   white-space: nowrap;
   overflow: visible;
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.65);
+  -webkit-text-stroke: 0.8px #000;
+  paint-order: stroke fill;
+  text-shadow:
+    -0.5px -0.5px 0 #000,
+    0.5px -0.5px 0 #000,
+    -0.5px 0.5px 0 #000,
+    0.5px 0.5px 0 #000;
   animation: hidc-airport-arm-label 0.28s ease-out 0.06s both;
 }
 
 .hidc-airport-pointer__label--blue {
   color: #93c5fd;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9), 0 0 10px rgba(59, 130, 246, 0.45);
 }
 
 .hidc-airport-pointer__label--red {
@@ -72,6 +77,13 @@
   line-height: 1;
   opacity: 0.92;
   text-transform: none;
+  -webkit-text-stroke: 0.65px #000;
+  paint-order: stroke fill;
+  text-shadow:
+    -0.45px -0.45px 0 #000,
+    0.45px -0.45px 0 #000,
+    -0.45px 0.45px 0 #000,
+    0.45px 0.45px 0 #000;
 }
 
 @keyframes hidc-airport-arm-extend {

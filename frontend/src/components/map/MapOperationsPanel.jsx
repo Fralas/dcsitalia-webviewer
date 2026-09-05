@@ -900,9 +900,19 @@ export default function MapOperationsPanel({
           </div>
         ) : activeTab === 'mission' ? (
           <div className="map-ops-section__toolbar-cluster">
-            <div className="map-ops-section__aircraft">
+            <div
+              className={`map-ops-section__aircraft${aircraftMode === 'heli' ? ' is-heli' : ''}`}
+              role="radiogroup"
+              aria-label={t('map.rightPanel.ops.aircraft')}
+            >
+              <span
+                className={`map-ops-section__aircraft-glider${aircraftMode === 'heli' ? ' is-heli' : ''}`}
+                aria-hidden="true"
+              />
               <button
                 type="button"
+                role="radio"
+                aria-checked={aircraftMode === 'plane'}
                 className={`map-ops-section__aircraft-btn${aircraftMode === 'plane' ? ' is-active' : ''}`}
                 onClick={() => setAircraftMode('plane')}
                 aria-label={t('map.rightPanel.ops.fixedWing')}
@@ -911,6 +921,8 @@ export default function MapOperationsPanel({
               </button>
               <button
                 type="button"
+                role="radio"
+                aria-checked={aircraftMode === 'heli'}
                 className={`map-ops-section__aircraft-btn${aircraftMode === 'heli' ? ' is-active' : ''}`}
                 onClick={() => setAircraftMode('heli')}
                 aria-label={t('map.rightPanel.ops.rotaryWing')}
