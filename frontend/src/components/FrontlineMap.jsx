@@ -194,6 +194,29 @@ function getZoneNumber(zone) {
   return match ? match[0] : source || 'Unknown';
 }
 
+const KM_PER_NM = 1.852;
+const AIRPORT_ZONE_MEMBERSHIP_NM = 6 / KM_PER_NM;
+
+function findNearestZoneForPoint(lat, lon, zones, maxNm = AIRPORT_ZONE_MEMBERSHIP_NM) {
+  const pointLat = Number(lat);
+  const pointLon = Number(lon);
+  if (!Number.isFinite(pointLat) || !Number.isFinite(pointLon)) return null;
+
+  let nearest = null;
+  let nearestNm = maxNm;
+  (zones || []).forEach((zone) => {
+    const zoneLat = Number(zone?.coordinates?.lat);
+    const zoneLon = Number(zone?.coordinates?.lon);
+    if (!Number.isFinite(zoneLat) || !Number.isFinite(zoneLon)) return;
+    const distanceNm = haversineNm(pointLat, pointLon, zoneLat, zoneLon);
+    if (distanceNm <= nearestNm) {
+      nearestNm = distanceNm;
+      nearest = zone;
+    }
+  });
+  return nearest;
+}
+
 function formatDms(value, positiveLabel, negativeLabel) {
   if (!Number.isFinite(value)) return '-';
   const abs = Math.abs(value);
@@ -821,6 +844,7 @@ function rememberHoveredAirport(current, nearest) {
     && current.lat === nearest.lat
     && current.name === nearest.name
     && current.coalition === nearest.coalition
+    && current.zoneNumber === nearest.zoneNumber
   ) {
     return current;
   }
@@ -845,6 +869,7 @@ function pickNearestAirportHover(projectPoint, airports, cursor, hitPx = AIRPORT
         lat,
         name: airport.displayName || airport.name || airport.id,
         coalition: airport.coalition === 'blue' || airport.coalition === 'red' ? airport.coalition : 'neutral',
+        zoneNumber: airport.zoneNumber ? String(airport.zoneNumber) : '',
       };
     }
   });
@@ -2275,7 +2300,8 @@ function MapLibreFlatMapView({
   const onPlacementPlace = tankerPlacementActive
     ? onTankerPlace
     : (spawnPlacementActive ? onSpawnPlace : onRetrievePlace);
-  const ZONE_DOME_RADIUS_METERS = 3000;
+  const ZONE_DOME_RADIUS_METERS = 1000;
+  const ZONE_DOME_HEIGHT_RATIO = 0.28;
   const LOGISTICS_ROUTE_RADIUS_METERS = 120;
   const LOGISTICS_C130_MODEL_SIZE_METERS = 110;
   const LOGISTICS_CH47_MODEL_SIZE_METERS = 92;
@@ -2730,11 +2756,12 @@ function MapLibreFlatMapView({
     if (!map || !mesh || !glowMesh) return;
     const merc = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], 0);
     const scale = merc.meterInMercatorCoordinateUnits() * ZONE_DOME_RADIUS_METERS;
+    const heightScale = scale * ZONE_DOME_HEIGHT_RATIO;
     mesh.position.set(merc.x, merc.y, merc.z);
-    mesh.scale.set(scale, scale, scale);
+    mesh.scale.set(scale, scale, heightScale);
     mesh.frustumCulled = false;
     glowMesh.position.set(merc.x, merc.y, merc.z);
-    glowMesh.scale.set(scale * 1.045, scale * 1.045, scale * 1.045);
+    glowMesh.scale.set(scale * 1.045, scale * 1.045, heightScale * 1.045);
     glowMesh.frustumCulled = false;
   }, []);
 
@@ -5146,6 +5173,34 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       }));
   }, [airportsData, airportCatalog, airbaseStatus]);
 
+  const airportsForMap = useMemo(() => (
+    allMapAirports.map((airport) => {
+      const overlayZone = findNearestZoneForPoint(
+        airport.coordinates.lat,
+        airport.coordinates.lon,
+        validZones,
+      );
+      return {
+        ...airport,
+        coalition: overlayZone?.status === 'RED' ? 'red' : airport.coalition,
+        zoneNumber: overlayZone ? getZoneNumber(overlayZone) : '',
+      };
+    })
+  ), [allMapAirports, validZones]);
+
+  const zoneIdsWithAssignedAirports = useMemo(() => {
+    const ids = new Set();
+    allMapAirports.forEach((airport) => {
+      const assigned = findNearestZoneForPoint(
+        airport.coordinates.lat,
+        airport.coordinates.lon,
+        validZones,
+      );
+      if (assigned?.id) ids.add(assigned.id);
+    });
+    return ids;
+  }, [allMapAirports, validZones]);
+
   const validAirports = useMemo(
     () => allMapAirports.filter((airport) => isAirportActiveOnMap(airport, airbaseStatus)),
     [allMapAirports, airbaseStatus]
@@ -5342,9 +5397,16 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   }, [validZones, combatMissionByZone, filters]);
 
   const zonesForMap = useMemo(() => {
-    if (!filters.showProductionPoints) return filteredZones;
-    return filteredZones.filter((zone) => !isProductionPointZone(zone, productionPoints));
-  }, [filteredZones, filters.showProductionPoints, productionPoints]);
+    const withoutProductionOverlap = !filters.showProductionPoints
+      ? filteredZones
+      : filteredZones.filter((zone) => !isProductionPointZone(zone, productionPoints));
+    return withoutProductionOverlap.filter((zone) => !zoneIdsWithAssignedAirports.has(zone.id));
+  }, [filteredZones, filters.showProductionPoints, productionPoints, zoneIdsWithAssignedAirports]);
+
+  const atoZonesForMap = useMemo(
+    () => filteredZones.filter((zone) => !zoneIdsWithAssignedAirports.has(zone.id)),
+    [filteredZones, zoneIdsWithAssignedAirports]
+  );
 
   const filteredLogisticsMissions = useMemo(() => {
     return logisticsMissions.filter((mission) => {
@@ -6499,8 +6561,8 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                 <div className="absolute inset-0">
                   {isMapLibreEngine ? (
                     <MapLibreFlatMapView
-                      zones={filteredZones}
-                      airportsData={allMapAirports}
+                      zones={atoZonesForMap}
+                      airportsData={airportsForMap}
                       logisticsMissions={routeVisibleLogisticsMissions}
                       logisticsFrontlineAirportIds={logisticsFrontlineAirportIds}
                       gridConnections={gridConnections}
@@ -6550,7 +6612,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                   ) : (
                     <FlatMapView
                       zones={zonesForMap}
-                      airportsData={allMapAirports}
+                      airportsData={airportsForMap}
                       logisticsMissions={routeVisibleLogisticsMissions}
                       gridConnections={gridConnections}
                       convoys={convoyRenderData}
