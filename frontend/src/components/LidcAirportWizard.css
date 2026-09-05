@@ -804,6 +804,21 @@
   background: rgba(232, 197, 106, 0.06);
 }
 
+.lidc-airport-wizard-shop-card.is-selected {
+  border-color: rgba(232, 197, 106, 0.7);
+  background: rgba(232, 197, 106, 0.1);
+}
+
+.lidc-airport-wizard-shop-card__fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(120px, 78%);
+  height: 86px;
+  margin: 22px 0 4px;
+  color: var(--lidc-mute);
+}
+
 .lidc-airport-wizard-shop-card__transport {
   position: absolute;
   top: 8px;

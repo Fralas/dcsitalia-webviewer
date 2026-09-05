@@ -14,7 +14,7 @@ import c130ModelUrl from '../assets/3D/yc-130prototype_of_c-130.glb';
 import ch47ModelUrl from '../assets/3D/ch47.glb';
 import t72ModelUrl from '../assets/3D/t90.glb';
 import kc135ModelUrl from '../assets/3D/kc-135_dcs_world.glb';
-import { Ambulance, Blend, Box, Boxes, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChessRook, Clock3, Factory, Forklift, Fuel, Hammer, MapPin, PersonStanding, Satellite, X } from 'lucide-react';
+import { Ambulance, Blend, Box, Boxes, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChessRook, Clock3, Coins, Factory, Forklift, Fuel, Hammer, Helicopter, MapPin, PersonStanding, Radio, Satellite, X } from 'lucide-react';
 import InlineError from './InlineError';
 import frontlineZones from '../config/frontlineZones.json';
 import { getDefaultTacticalMap, getTacticalMapByCampaignId } from '../config/tacticalMaps';
@@ -38,6 +38,8 @@ import LidcAirportWizard from './LidcAirportWizard';
 import './map/AirportSpawnPanel.css';
 import './map/HidcAirportLogistics.css';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
+import { getHidcSpawnImageUrl } from '../utils/hidcSpawnImages';
+import { t } from '../utils/locale';
 import { useUser } from '../contexts/UserContext';
 import { CARTO_DARK_NOLABELS_TILE_URL } from '../config/cartoBasemap';
 
@@ -637,23 +639,60 @@ function buildTankerRouteFeatures(routes) {
 const SPAWN_MENU_SECTIONS = [
   {
     id: 'infantry',
-    title: 'INFANTRY TO EMBARK',
+    titleKey: 'lidc.map.airportWizard.spawn.infantry',
+    kindKey: 'lidc.map.airportWizard.spawn.kindInfantry',
     spawnType: 'inf_spawn',
     keywords: ['MANPAD', 'SCOUT'],
   },
   {
     id: 'build',
-    title: 'SPAWN CRATE FOR BUILD ASSET',
+    titleKey: 'lidc.map.airportWizard.spawn.buildCrates',
+    kindKey: 'lidc.map.airportWizard.spawn.kindCrate',
     spawnType: 'crate_spawn',
-    keywords: ['AMMO', 'FUEL', 'BUILD', 'PPBUILD'],
+    keywords: ['AMMO', 'FUEL', 'BUILD'],
   },
   {
     id: 'deployables',
-    title: 'SPAWN CRATE TO DEPLOYABLES VEHICLE',
+    titleKey: 'lidc.map.airportWizard.spawn.deployables',
+    kindKey: 'lidc.map.airportWizard.spawn.kindCrate',
     spawnType: 'crate_spawn',
     keywords: ['HMMWV', 'TOW', 'L118', 'TACAN'],
   },
 ];
+
+function SpawnAssetCard({ keyword, option, kindKey, spawnType, selected, onSelect, language = 'en' }) {
+  const imageUrl = getHidcSpawnImageUrl(keyword);
+  const blurb = t(`lidc.map.airportWizard.spawn.${keyword}`);
+  const kind = t(kindKey);
+  const cost = Number(option?.cost) || 0;
+
+  return (
+    <button
+      type="button"
+      className={`lidc-airport-wizard-shop-card${selected ? ' is-selected' : ''}`}
+      title={blurb || keyword}
+      onClick={onSelect}
+    >
+      <span className="lidc-airport-wizard-shop-card__transport" aria-hidden="true">
+        {spawnType === 'inf_spawn' ? <PersonStanding size={14} /> : <Helicopter size={14} />}
+      </span>
+      {imageUrl ? (
+        <img src={imageUrl} alt="" draggable={false} />
+      ) : (
+        <span className="lidc-airport-wizard-shop-card__fallback" aria-hidden="true">
+          <Radio size={36} />
+        </span>
+      )}
+      <strong>{option?.label || keyword}</strong>
+      <em>{kind}</em>
+      <p>{blurb}</p>
+      <span className="lidc-airport-wizard-shop-card__cost">
+        <Coins size={14} />
+        {cost.toLocaleString(language === 'it' ? 'it-IT' : 'en-US')}
+      </span>
+    </button>
+  );
+}
 
 function haversineNm(lat1, lon1, lat2, lon2) {
   const toRad = (deg) => (deg * Math.PI) / 180;
@@ -7537,62 +7576,47 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
         onClose={() => setAirportWizardTab('')}
         onLogisticsUpdated={handleAirportLogisticsUpdated}
         overviewExtra={(
-          <section className="lidc-airport-wizard-block">
-            <div className="airport-spawn-panel">
-              <div className="airport-spawn-panel__body">
-                <div className="airport-spawn-panel__block">
-                  <div className="airport-spawn-panel__block-title">
-                    <Box className="airport-spawn-panel__block-icon" strokeWidth={2} aria-hidden="true" />
-                    <span>SPAWN ASSET</span>
-                  </div>
-                  {!isAuthenticated ? (
-                    <div className="airport-spawn-panel__empty">
-                      Login to spawn units and crates.
-                    </div>
-                  ) : (
-                    <>
-                      {SPAWN_MENU_SECTIONS.map((section) => {
-                        const sectionOptions = section.keywords
-                          .map((keyword) => {
-                            const option = spawnOptionByKeyword.get(keyword);
-                            return option ? { keyword, option } : null;
-                          })
-                          .filter(Boolean);
-                        if (sectionOptions.length === 0) return null;
-                        return (
-                          <div key={section.id} className="airport-spawn-panel__spawn-section">
-                            <p className="airport-spawn-panel__section-title">{section.title}</p>
-                            <div className="airport-spawn-panel__pills">
-                              {sectionOptions.map(({ keyword, option }) => {
-                                const selected = spawnMode?.keyword === keyword && spawnMode?.type === section.spawnType;
-                                return (
-                                  <button
-                                    key={`${section.id}-${keyword}`}
-                                    type="button"
-                                    onClick={() => {
-                                      handleEnterSpawnMode(selectedAirport.id, section.spawnType, option);
-                                      setAirportWizardTab('');
-                                    }}
-                                    className={`airport-spawn-panel__pill${selected ? ' is-selected' : ''}`}
-                                  >
-                                    {keyword}
-                                    <span className="airport-spawn-panel__pill-cost">({option.cost})</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      <p className="airport-spawn-panel__hint">
-                        Select an item, then click inside the airport on the map.
-                      </p>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </section>
+          <>
+            {!isAuthenticated ? (
+              <section className="lidc-airport-wizard-block">
+                <p className="lidc-occupancy-panel__hint">{t('lidc.map.airportWizard.spawn.login')}</p>
+              </section>
+            ) : (
+              <>
+                {SPAWN_MENU_SECTIONS.map((section) => {
+                  const sectionOptions = section.keywords
+                    .map((keyword) => {
+                      const option = spawnOptionByKeyword.get(keyword);
+                      return option ? { keyword, option } : null;
+                    })
+                    .filter(Boolean);
+                  if (sectionOptions.length === 0) return null;
+                  return (
+                    <section key={section.id} className="lidc-airport-wizard-block">
+                      <h3>{t(section.titleKey)}</h3>
+                      <div className="lidc-airport-wizard-shop">
+                        {sectionOptions.map(({ keyword, option }) => (
+                          <SpawnAssetCard
+                            key={`${section.id}-${keyword}`}
+                            keyword={keyword}
+                            option={option}
+                            kindKey={section.kindKey}
+                            spawnType={section.spawnType}
+                            language={language}
+                            selected={spawnMode?.keyword === keyword && spawnMode?.type === section.spawnType}
+                            onSelect={() => {
+                              handleEnterSpawnMode(selectedAirport.id, section.spawnType, option);
+                              setAirportWizardTab('');
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })}
+              </>
+            )}
+          </>
         )}
       />,
       document.body,

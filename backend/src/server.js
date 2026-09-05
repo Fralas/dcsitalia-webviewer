@@ -165,7 +165,6 @@ const WEB_CRATE_OPTIONS = [
   { keyword: 'AMMO', label: 'AMMO', cost: 5, group: 'build' },
   { keyword: 'FUEL', label: 'FUEL', cost: 5, group: 'build' },
   { keyword: 'BUILD', label: 'BUILD', cost: 5, group: 'build' },
-  { keyword: 'PPBUILD', label: 'PPBUILD', cost: 20, group: 'build' },
   { keyword: 'HMMWV', label: 'HMMWV', cost: 40, group: 'deployables' },
   { keyword: 'TOW', label: 'TOW', cost: 45, group: 'deployables' },
   { keyword: 'L118', label: 'L118', cost: 30, group: 'deployables' },
