@@ -89,6 +89,72 @@ const BASEMAP_CONFIG = {
   },
 };
 
+const MAP_VIEW_PREFS_STORAGE_KEY = 'dcsitalia.mapViewPrefs';
+
+const DEFAULT_MAP_FILTERS = {
+  control: 'all',
+  atoMissionStatus: 'all',
+  logisticsStatus: 'all',
+  priority: 'all',
+  task: 'all',
+  activity: 'all',
+  showAto: true,
+  showLogistics: true,
+  showAirports: true,
+  showConvoys: true,
+  showAirliftPlayers: true,
+  showDcsar: true,
+  showProductionPoints: true,
+};
+
+function readStoredMapViewPrefs() {
+  if (typeof window === 'undefined' || !window.localStorage) return null;
+  try {
+    const raw = window.localStorage.getItem(MAP_VIEW_PREFS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function mergeMapFilters(storedFilters) {
+  const next = { ...DEFAULT_MAP_FILTERS };
+  if (!storedFilters || typeof storedFilters !== 'object') return next;
+  Object.keys(DEFAULT_MAP_FILTERS).forEach((key) => {
+    if (key.startsWith('show')) {
+      if (typeof storedFilters[key] === 'boolean') next[key] = storedFilters[key];
+      return;
+    }
+    if (typeof storedFilters[key] === 'string' && storedFilters[key]) {
+      next[key] = storedFilters[key];
+    }
+  });
+  return next;
+}
+
+function mergeBasemapMode(storedMode) {
+  return storedMode === BASEMAP_MODE_DARK ? BASEMAP_MODE_DARK : BASEMAP_MODE_SATELLITE;
+}
+
+function getInitialMapViewPrefs() {
+  const stored = readStoredMapViewPrefs();
+  return {
+    filters: mergeMapFilters(stored?.filters),
+    basemapMode: mergeBasemapMode(stored?.basemapMode),
+  };
+}
+
+function persistMapViewPrefs(filters, basemapMode) {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    window.localStorage.setItem(MAP_VIEW_PREFS_STORAGE_KEY, JSON.stringify({ filters, basemapMode }));
+  } catch {
+    // Ignore quota / private-mode failures.
+  }
+}
+
 function getZoneColor(status) {
   switch (status) {
     case 'NEUTRAL':
@@ -4593,27 +4659,14 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   const [opsLogisticAirportFocus, setOpsLogisticAirportFocus] = useState(null);
   const [zoneStatusMeta, setZoneStatusMeta] = useState({});
   const [mapMode, setMapMode] = useState(startInTacticalMode);
-  const [basemapMode, setBasemapMode] = useState(BASEMAP_MODE_DARK);
+  const [mapViewSeed] = useState(getInitialMapViewPrefs);
+  const [basemapMode, setBasemapMode] = useState(mapViewSeed.basemapMode);
   const [forcedGlobeScale, setForcedGlobeScale] = useState(null);
   const [launchTargetUtcMs, setLaunchTargetUtcMs] = useState(LAUNCH_TARGET_UTC_MS);
   const [serverClockBase, setServerClockBase] = useState(null);
   const [countdownTick, setCountdownTick] = useState(0);
   const [scrambleTick, setScrambleTick] = useState(0);
-  const [filters, setFilters] = useState({
-    control: 'all',
-    atoMissionStatus: 'all',
-    logisticsStatus: 'all',
-    priority: 'all',
-    task: 'all',
-    activity: 'all',
-    showAto: true,
-    showLogistics: true,
-    showAirports: true,
-    showConvoys: false,
-    showAirliftPlayers: false,
-    showDcsar: true,
-    showProductionPoints: true,
-  });
+  const [filters, setFilters] = useState(mapViewSeed.filters);
   const mapModeRef = useRef(startInTacticalMode);
 
   useEffect(() => {
@@ -4701,18 +4754,8 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   }, []);
 
   useEffect(() => {
-    if (isMapLibreEngine) {
-      setFilters((current) => ({
-        ...current,
-        showAto: true,
-        showLogistics: true,
-        showAirports: true,
-        showConvoys: false,
-        showAirliftPlayers: false,
-        showDcsar: true,
-      }));
-    }
-  }, [isMapLibreEngine]);
+    persistMapViewPrefs(filters, basemapMode);
+  }, [filters, basemapMode]);
 
   useEffect(() => {
     let isMounted = true;
