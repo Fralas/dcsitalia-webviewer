@@ -1,0 +1,42 @@
+.hidc-zone-numbers {
+  position: absolute;
+  inset: 0;
+  z-index: 840;
+  pointer-events: none !important;
+}
+
+.hidc-zone-numbers__label {
+  position: absolute;
+  box-sizing: border-box;
+  transform: translate(-50%, -100%);
+  padding: 0 0 2px;
+  color: rgba(255, 255, 255, 0.95);
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  white-space: nowrap;
+  -webkit-text-stroke: 0.55px #000;
+  paint-order: stroke fill;
+  text-shadow:
+    -0.35px -0.35px 0 #000,
+    0.35px -0.35px 0 #000,
+    -0.35px 0.35px 0 #000,
+    0.35px 0.35px 0 #000;
+}
+
+.hidc-zone-numbers__label--blue {
+  color: #93c5fd;
+}
+
+.hidc-zone-numbers__label--red {
+  color: #ef4444;
+}
+
+.hidc-zone-numbers__label--attack {
+  color: #f97316;
+}
+
+.hidc-zone-numbers__label--selected {
+  color: #ffbb00;
+}

@@ -32,6 +32,7 @@ import MapActionContextMenu from './map/MapActionContextMenu';
 import ProductionPointPanel from './map/ProductionPointPanel';
 import ProductionPointRetrieveBanner from './map/ProductionPointRetrieveBanner';
 import HidcMapAirportHoverPointer from './map/HidcMapAirportHoverPointer';
+import HidcMapZoneNumberLabels from './map/HidcMapZoneNumberLabels';
 import LidcAirportPresencePanel from './LidcAirportPresencePanel';
 import LidcAirportWizard from './LidcAirportWizard';
 import './map/AirportSpawnPanel.css';
@@ -2313,6 +2314,13 @@ function FlatMapView({
         <FlatMapSpawnClickHandler active={placementActive} onPlace={onPlacementPlace} />
       </MapContainer>
       <HidcMapAirportHoverPointer map={leafletMap} airport={hoveredAirport} engine="leaflet" />
+      <HidcMapZoneNumberLabels
+        map={leafletMap}
+        engine="leaflet"
+        zones={zones}
+        visible={showAto}
+        selectedZoneId={selectedZoneId}
+      />
     </div>
   );
 }
@@ -2654,6 +2662,7 @@ function MapLibreFlatMapView({
         properties: {
           id: zone.id || '',
           name: zone.name || zone.id || '',
+          number: getZoneNumber(zone),
           status: zone.status || 'UNKNOWN',
           selected: zone.id === selectedZoneId ? 1 : 0,
           accepted: isAccepted ? 1 : 0,
@@ -3705,7 +3714,18 @@ function MapLibreFlatMapView({
         type: 'circle',
         source: 'zones-src',
         paint: {
-          'circle-radius': 18,
+          'circle-radius': [
+            'interpolate',
+            ['exponential', 2],
+            ['zoom'],
+            7, 12,
+            10, 18,
+            12, 36,
+            14, 72,
+            16, 140,
+          ],
+          'circle-pitch-alignment': 'map',
+          'circle-pitch-scale': 'map',
           'circle-color': '#000000',
           'circle-opacity': 0.001,
         },
@@ -3980,8 +4000,12 @@ function MapLibreFlatMapView({
         const feature = event?.features?.[0];
         const zoneId = feature?.properties?.id;
         if (onZoneHover) onZoneHover(zoneId || null);
-        const name = feature?.properties?.name || zoneId || 'Zone';
-        showHoverPopup(event.lngLat, `<div style="font-size:11px;font-weight:600;">${name}</div>`);
+        if (map.getZoom() >= 11) {
+          hideHoverPopup();
+          return;
+        }
+        const number = feature?.properties?.number || feature?.properties?.name || zoneId || 'Zone';
+        showHoverPopup(event.lngLat, `<div style="font-size:12px;font-weight:700;">${number}</div>`);
       });
       map.on('mouseleave', 'zones-hit-layer', () => {
         map.getCanvas().style.cursor = '';
@@ -4605,6 +4629,12 @@ function MapLibreFlatMapView({
         className="pointer-events-none absolute inset-0 z-[6] h-full w-full"
       />
       <HidcMapAirportHoverPointer map={mapInstance} airport={hoveredAirport} />
+      <HidcMapZoneNumberLabels
+        map={mapInstance}
+        zones={zones}
+        visible={showAto}
+        selectedZoneId={selectedZoneId}
+      />
     </div>
   );
 }
