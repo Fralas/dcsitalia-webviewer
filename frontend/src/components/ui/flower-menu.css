@@ -1,0 +1,64 @@
+.flower-menu {
+  --fm-fill: rgba(18, 18, 18, 0.94);
+  --fm-border: rgba(255, 255, 255, 0.16);
+  --fm-icon: #ededed;
+  --fm-center: #ff8c00;
+  --fm-mute: #9a9a9a;
+  --fm-accent: #ff8c00;
+  --fm-duration: 280ms;
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  filter: drop-shadow(0 18px 40px rgba(0, 0, 0, 0.45));
+}
+
+.flower-menu__hub,
+.flower-menu__petal-icon {
+  box-sizing: border-box;
+  border: 1px solid var(--fm-border);
+  background: linear-gradient(180deg, rgba(30, 30, 30, 0.96) 0%, rgba(15, 15, 15, 0.92) 100%);
+  color: var(--fm-icon);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition:
+    border-color var(--fm-duration) ease,
+    color var(--fm-duration) ease,
+    transform 200ms ease,
+    background 160ms ease;
+}
+
+.flower-menu__petal:hover .flower-menu__petal-icon {
+  transform: scale(1.06);
+}
+
+.flower-menu__hub {
+  color: var(--fm-center);
+}
+
+.flower-menu__hub:hover,
+.flower-menu__petal:hover .flower-menu__petal-icon {
+  border-color: var(--fm-accent);
+  color: var(--fm-accent);
+}
+
+.flower-menu__petal-icon {
+  color: var(--fm-icon);
+}
+
+.flower-menu__label {
+  max-width: 118px;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1.15;
+  text-align: center;
+  text-transform: uppercase;
+  overflow: visible;
+  white-space: nowrap;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
+  transition: color 160ms ease;
+}
+
+.flower-menu__petal:hover .flower-menu__label {
+  color: var(--fm-accent);
+}

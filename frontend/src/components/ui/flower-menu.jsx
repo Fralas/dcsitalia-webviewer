@@ -1,8 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
+import './flower-menu.css';
 
-const DEFAULT_LABEL_MAX_LENGTH = 11;
-const FLOWER_MENU_LABEL_FONT_SIZE = 9;
+const DEFAULT_LABEL_MAX_LENGTH = 13;
 
 function truncateMenuLabel(label = '', maxLength = DEFAULT_LABEL_MAX_LENGTH) {
   const text = String(label || '').trim().toUpperCase();
@@ -12,7 +12,7 @@ function truncateMenuLabel(label = '', maxLength = DEFAULT_LABEL_MAX_LENGTH) {
 }
 
 function getFlowerLayout({ togglerSize, itemCount, petalOffset, hasLabels = true }) {
-  const labelExtra = hasLabels ? 16 : 0;
+  const labelExtra = hasLabels ? 22 : 0;
   let densityScale = 1;
   if (itemCount > 7) densityScale = 0.76;
   else if (itemCount > 5) densityScale = 0.88;
@@ -31,10 +31,6 @@ const MenuToggler = ({
   togglerId,
   isOpen,
   onChange,
-  backgroundColor,
-  borderColor,
-  iconColor,
-  centerIconColor,
   animationDuration,
   togglerSize,
   iconSize,
@@ -45,10 +41,6 @@ const MenuToggler = ({
   const lineWidth = iconSize * 0.8;
   const lineSpacing = iconSize * 0.25;
   const hubStyle = {
-    backgroundColor,
-    borderColor: borderColor || backgroundColor,
-    color: centerIconColor || iconColor,
-    transitionDuration: `${animationDuration}ms`,
     width: togglerSize,
     height: togglerSize,
   };
@@ -72,7 +64,7 @@ const MenuToggler = ({
             event.stopPropagation();
             centerOnClick();
           }}
-          className="absolute inset-0 z-20 m-auto flex cursor-pointer items-center justify-center rounded-full border transition-all"
+          className="flower-menu__hub absolute inset-0 z-20 m-auto flex cursor-pointer items-center justify-center rounded-full"
           style={hubStyle}
           aria-label="Back"
         >
@@ -83,7 +75,7 @@ const MenuToggler = ({
       ) : (
         <label
           htmlFor={togglerId}
-          className="absolute inset-0 z-20 m-auto flex cursor-pointer items-center justify-center rounded-full border transition-all"
+          className="flower-menu__hub absolute inset-0 z-20 m-auto flex cursor-pointer items-center justify-center rounded-full"
           style={hubStyle}
         >
           {CenterIcon ? (
@@ -123,14 +115,10 @@ const FlowerMenuItem = ({
   item,
   index,
   isOpen,
-  iconColor,
-  backgroundColor,
-  borderColor,
   animationDuration,
   itemCount,
   itemSize,
   iconSize,
-  petalOffset,
   labelMaxLength,
   effectivePetalOffset,
 }) => {
@@ -161,26 +149,20 @@ const FlowerMenuItem = ({
           item.onClick?.(event);
         }}
         className={cn(
-          'group flex w-full flex-col items-center justify-center gap-1 border-0 bg-transparent p-0 opacity-100 transition-all duration-100 hover:brightness-125',
+          'flower-menu__petal flex w-full flex-col items-center justify-center gap-1 border-0 bg-transparent p-0',
           {
             'pointer-events-auto': isOpen,
             'pointer-events-none': !isOpen,
           }
         )}
         style={{
-          color: iconColor,
           transform: `rotate(-${(360 / itemCount) * index}deg)`,
           transitionDuration: `${animationDuration}ms`,
         }}
       >
         <span
-          className="flex items-center justify-center rounded-full border transition-transform duration-200 group-hover:scale-110"
-          style={{
-            backgroundColor,
-            borderColor: borderColor || backgroundColor,
-            width: itemSize,
-            height: itemSize,
-          }}
+          className="flower-menu__petal-icon flex items-center justify-center rounded-full"
+          style={{ width: itemSize, height: itemSize }}
         >
           <Icon
             style={{ width: iconSize, height: iconSize }}
@@ -188,10 +170,7 @@ const FlowerMenuItem = ({
           />
         </span>
         {displayLabel ? (
-          <span
-            className="max-w-[72px] truncate text-center font-semibold uppercase leading-none tracking-[0.06em] text-white/78 transition-opacity duration-150 group-hover:opacity-0"
-            style={{ fontSize: FLOWER_MENU_LABEL_FONT_SIZE }}
-          >
+          <span className="flower-menu__label">
             {displayLabel}
           </span>
         ) : null}
@@ -202,11 +181,11 @@ const FlowerMenuItem = ({
 
 export function FlowerMenu({
   menuItems,
-  iconColor = 'white',
-  centerIconColor = null,
-  backgroundColor = 'rgba(255, 255, 255, 0.2)',
-  borderColor = null,
-  animationDuration = 500,
+  iconColor = '#EDEDED',
+  centerIconColor = '#FF8C00',
+  backgroundColor = 'rgba(18, 18, 18, 0.94)',
+  borderColor = 'rgba(255, 255, 255, 0.16)',
+  animationDuration = 280,
   togglerSize = 40,
   petalOffset = 30,
   labelMaxLength = DEFAULT_LABEL_MAX_LENGTH,
@@ -247,18 +226,23 @@ export function FlowerMenu({
 
   return (
     <nav
-      className={cn('relative overflow-visible', className)}
-      style={{ width: menuSpan, height: menuSpan, minHeight: menuSpan }}
+      className={cn('flower-menu relative overflow-visible', className)}
+      style={{
+        width: menuSpan,
+        height: menuSpan,
+        minHeight: menuSpan,
+        '--fm-fill': backgroundColor,
+        '--fm-border': borderColor,
+        '--fm-icon': iconColor,
+        '--fm-center': centerIconColor || iconColor,
+        '--fm-duration': `${animationDuration}ms`,
+      }}
       aria-label="Radial action menu"
     >
       <MenuToggler
         togglerId={togglerId}
         isOpen={isOpen}
         onChange={handleToggle}
-        backgroundColor={backgroundColor}
-        borderColor={borderColor}
-        iconColor={iconColor}
-        centerIconColor={centerIconColor}
         animationDuration={animationDuration}
         togglerSize={togglerSize}
         iconSize={iconSize}
@@ -272,14 +256,10 @@ export function FlowerMenu({
             item={item}
             index={index}
             isOpen={isOpen}
-            iconColor={iconColor}
-            backgroundColor={backgroundColor}
-            borderColor={borderColor}
             animationDuration={animationDuration}
             itemCount={itemCount}
             itemSize={itemSize}
             iconSize={iconSize}
-            petalOffset={petalOffset}
             effectivePetalOffset={effectivePetalOffset}
             labelMaxLength={labelMaxLength}
           />
@@ -288,4 +268,5 @@ export function FlowerMenu({
     </nav>
   );
 }
+
 export const Component = FlowerMenu;

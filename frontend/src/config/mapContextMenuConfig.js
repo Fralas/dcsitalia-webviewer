@@ -21,7 +21,7 @@ export const MAP_CONTEXT_MENU_ROOT = {
         },
         {
           id: 'construction',
-          label: 'CONSTRUCTION',
+          label: 'CONSTRUCT',
           icon: 'factory',
           children: [
             { id: 'farp', label: 'FARP', cost: 40, icon: 'plane-landing', action: { type: 'dbuild', buildType: 'farp' } },
@@ -60,7 +60,7 @@ export const MAP_CONTEXT_MENU_ROOT = {
     },
     {
       id: 'ground-asset',
-      label: 'GROUND ASSET',
+      label: 'GROUND',
       icon: 'tank',
       children: [
         {
@@ -95,7 +95,7 @@ export const MAP_CONTEXT_MENU_ROOT = {
         },
         {
           id: 'air-defence',
-          label: 'AIR DEFENCE',
+          label: 'AIR DEF',
           icon: 'shield',
           children: [
             { id: 'gepard', label: 'GEPARD', cost: 30, icon: 'shield', action: { type: 'ground-asset', keyword: 'GEPARD' } },
@@ -126,7 +126,7 @@ export const MAP_CONTEXT_MENU_ROOT = {
     },
     {
       id: 'logi-supply',
-      label: 'LOGI & SUPPLY',
+      label: 'LOGISTICS',
       icon: 'truck',
       children: [
         {
@@ -143,7 +143,7 @@ export const MAP_CONTEXT_MENU_ROOT = {
           label: 'SUPPLY',
           icon: 'boxes',
           children: [
-            { id: 'helisupply', label: 'HELISUPPLY', icon: 'boxes', action: { type: 'logi-supply', keyword: 'HELISUPPLY' } },
+            { id: 'helisupply', label: 'HELI SUPPLY', icon: 'boxes', action: { type: 'logi-supply', keyword: 'HELISUPPLY' } },
             { id: 'supply', label: 'SUPPLY', icon: 'boxes', action: { type: 'logi-supply', keyword: 'SUPPLY' } },
           ],
         },

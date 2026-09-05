@@ -119,16 +119,12 @@ export default function MapActionContextMenu({
         centerIcon={centerIcon}
         centerOnClick={atRoot ? null : handleBack}
         onClose={atRoot ? onClose : null}
-        closeDelay={200}
-        togglerSize={36}
+        closeDelay={180}
+        togglerSize={34}
         petalOffset={28}
-        labelMaxLength={11}
-        animationDuration={380}
-        iconColor="#ffffff"
-        centerIconColor={atRoot ? '#FF8C00' : '#ffffff'}
-        backgroundColor="#575757"
-        borderColor="#575757"
-        className="drop-shadow-[0_10px_26px_rgba(0,0,0,0.5)]"
+        labelMaxLength={13}
+        animationDuration={280}
+        centerIconColor={atRoot ? '#FF8C00' : '#EDEDED'}
       />
     </div>
   );
