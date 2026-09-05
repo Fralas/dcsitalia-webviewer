@@ -278,6 +278,7 @@ export function createMission(paramsOrAirportId, weaponId, quantityNeeded, curre
     priority: params.priority || null,
     status: 'pending',
     recommended_aircraft: params.recommendedAircraft || 'airplane', // 'helicopter', 'airplane', or 'airdrop'
+    origin: params.origin === 'user' ? 'user' : 'system',
     created_at: createdAt,
     expires_at: expiresAt,
     accepted_at: null,

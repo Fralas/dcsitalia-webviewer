@@ -246,12 +246,6 @@ function parseRadiusDigits(rawValue) {
   return Math.min(9999, Math.max(1, Number(digits)));
 }
 
-function parseWeightDigits(rawValue) {
-  const digits = String(rawValue).replace(/\D/g, '').slice(0, 6);
-  if (digits === '') return '';
-  return Math.min(999999, Math.max(0, Number(digits)));
-}
-
 function parseStockDigits(rawValue) {
   const digits = String(rawValue).replace(/\D/g, '').slice(0, 2);
   if (digits === '') return '';
@@ -331,7 +325,6 @@ export default function MapOperationsPanel({
   const [logisticRangeNm, setLogisticRangeNm] = useState(100);
   const [logisticDistanceMode, setLogisticDistanceMode] = useState('range');
   const [logisticAircraft, setLogisticAircraft] = useState(LOGISTIC_AIRCRAFT[0]);
-  const [logisticWeight, setLogisticWeight] = useState('');
 
   const [productionDepartureAirportId, setProductionDepartureAirportId] = useState('');
   const [productionArrivalZoneId, setProductionArrivalZoneId] = useState('');
@@ -688,7 +681,6 @@ export default function MapOperationsPanel({
       setLogisticRangeNm(100);
       setLogisticDistanceMode('range');
       setLogisticAircraft(LOGISTIC_AIRCRAFT[0]);
-      setLogisticWeight('');
       return;
     }
 
@@ -796,7 +788,6 @@ export default function MapOperationsPanel({
         )}
 
         {activeTab === 'logistic' && (
-          <>
             <OpsSelect
               id="logistic-aircraft"
               openSelectId={openSelectId}
@@ -808,27 +799,6 @@ export default function MapOperationsPanel({
               ariaLabel={t('map.rightPanel.ops.aircraft')}
               options={LOGISTIC_AIRCRAFT.map((aircraft) => ({ value: aircraft, label: aircraft }))}
             />
-
-            <div
-              className="map-ops-section__weight-wrap"
-              onClick={(event) => {
-                const input = event.currentTarget.querySelector('input');
-                if (input && event.target !== input) input.focus();
-              }}
-            >
-              <input
-                type="number"
-                min={0}
-                max={999999}
-                step={1}
-                className="map-ops-section__weight"
-                value={logisticWeight}
-                onChange={(event) => setLogisticWeight(parseWeightDigits(event.target.value))}
-                aria-label={t('map.rightPanel.ops.weight')}
-              />
-              <span className="map-ops-section__weight-suffix">KG</span>
-            </div>
-          </>
         )}
 
         {activeTab === 'production' && (
@@ -1100,7 +1070,9 @@ export default function MapOperationsPanel({
         )}
       </div>
         {activeTab === 'mission' && (
-          <div className="map-ops-section__task-filters" role="group" aria-label={t('map.rightPanel.ops.tabs.mission')}>
+          <>
+            <div className="map-ops-section__mission-split" aria-hidden="true" />
+            <div className="map-ops-section__task-filters" role="group" aria-label={t('map.rightPanel.ops.tabs.mission')}>
             {missionTasks.map((task) => (
               <button
                 key={task}
@@ -1112,6 +1084,7 @@ export default function MapOperationsPanel({
               </button>
             ))}
           </div>
+          </>
         )}
       </div>
     </section>

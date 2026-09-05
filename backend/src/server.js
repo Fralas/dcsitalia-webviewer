@@ -1821,19 +1821,19 @@ function processData(data) {
     if (airportData.data && airportData.data.weapons) {
       historicalData.saveSnapshot(airportId, airportData.data);
 
-      // Check and generate missions (with donor selection)
-      const newMissions = missionGenerator.checkAndGenerateMissions(
-        airportId,
-        airportData.data.weapons,
-        airportDataMap // Pass all airports data for donor selection
-      );
+      if (missionGenerator.AUTO_LOGISTICS_MISSIONS_ENABLED) {
+        const newMissions = missionGenerator.checkAndGenerateMissions(
+          airportId,
+          airportData.data.weapons,
+          airportDataMap
+        );
 
-      if (newMissions.length > 0) {
-        console.log(`🚨 Generated ${newMissions.length} new missions for ${airportData.name}`);
-        // Broadcast new missions to all clients
-        io.emit('missions:updated', {
-          missions: historicalData.getActiveMissions()
-        });
+        if (newMissions.length > 0) {
+          console.log(`🚨 Generated ${newMissions.length} new missions for ${airportData.name}`);
+          io.emit('missions:updated', {
+            missions: historicalData.getActiveMissions()
+          });
+        }
       }
     }
   });
@@ -5051,6 +5051,7 @@ app.post('/api/airports/:id/create-order', (req, res) => {
     }],
     priority,
     expiryHours: 24,
+    origin: 'user',
   });
   if (!orderId) {
     return res.status(400).json({ error: 'Carrier source routes are limited to 50 km' });
@@ -5248,6 +5249,7 @@ app.post('/api/airports/:id/compose-mission', (req, res) => {
       totalIsoUnits: remainderIso,
       priority: baseMission.priority || 'medium',
       expiryHours: 24,
+      origin: baseMission.origin === 'user' ? 'user' : 'system',
     });
   });
 
@@ -5261,6 +5263,7 @@ app.post('/api/airports/:id/compose-mission', (req, res) => {
     totalIsoUnits,
     priority: bestPriority,
     expiryHours: 24,
+    origin: 'user',
   });
   if (!missionId) {
     return res.status(400).json({ error: 'Carrier source routes are limited to 50 km' });
@@ -5302,6 +5305,16 @@ app.post('/api/airports/:id/compose-mission', (req, res) => {
  * POST /api/debug/generate-orders - Force generation of orders for all airports (requires authentication)
  */
 app.post('/api/debug/generate-orders', authenticateToken, requireAdmin, (req, res) => {
+  if (!missionGenerator.AUTO_LOGISTICS_MISSIONS_ENABLED) {
+    return res.json({
+      success: true,
+      skipped: true,
+      reason: 'Auto logistics mission generation is disabled',
+      totalGenerated: 0,
+      results: [],
+    });
+  }
+
   console.log('🔧 DEBUG: Force generating orders for all airports...');
 
   const results = [];

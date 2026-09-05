@@ -400,6 +400,10 @@ function getWeaponDisplayName(weaponId = '') {
   return weaponId.replace(/^weapons\.(missiles|bombs|nurs|containers|droptanks|torpedoes|adapters)\./, '');
 }
 
+function isUserCreatedLogisticsMission(mission) {
+  return String(mission?.origin || '').toLowerCase() === 'user';
+}
+
 function getMissionOrders(mission) {
   if (Array.isArray(mission?.orders) && mission.orders.length > 0) {
     return mission.orders;
@@ -5465,6 +5469,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
 
   const filteredLogisticsMissions = useMemo(() => {
     return logisticsMissions.filter((mission) => {
+      if (!isUserCreatedLogisticsMission(mission)) return false;
       if (!mission?.airport_id || !mission?.source_airport_id) return false;
       if (mission.status !== 'pending' && mission.status !== 'accepted') return false;
       if (filters.logisticsStatus !== 'all' && mission.status !== filters.logisticsStatus) return false;

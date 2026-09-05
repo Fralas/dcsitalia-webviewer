@@ -185,10 +185,18 @@
 
 .map-ops-section__results--mission {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 58px;
+  grid-template-columns: minmax(0, 1fr) 1px 58px;
   align-items: stretch;
   gap: 8px;
   height: auto;
+}
+
+.map-ops-section__mission-split {
+  width: 1px;
+  align-self: stretch;
+  margin: 10px 0;
+  background: #4e4e4e;
+  pointer-events: none;
 }
 
 .map-ops-section__task-filters {

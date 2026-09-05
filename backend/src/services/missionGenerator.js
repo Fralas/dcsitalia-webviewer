@@ -22,6 +22,9 @@ const MAX_CARRIER_SOURCE_DISTANCE_KM = 50;
 const KM_PER_NM = 1.852;
 const MAX_CARRIER_SOURCE_DISTANCE_NM = MAX_CARRIER_SOURCE_DISTANCE_KM / KM_PER_NM;
 
+/** Keep generator code, but skip all auto-creation work while this is false. */
+export const AUTO_LOGISTICS_MISSIONS_ENABLED = false;
+
 function getPriorityRank(priority) {
   return PRIORITY_RANK[priority] ?? PRIORITY_RANK.ok;
 }
@@ -34,6 +37,9 @@ function getPriorityRank(priority) {
  * @returns {Array} Array of generated mission IDs
  */
 export function checkAndGenerateMissions(recipientAirportId, recipientWeapons, allAirportsData = {}) {
+  if (!AUTO_LOGISTICS_MISSIONS_ENABLED) {
+    return [];
+  }
   const recipientAirport = getAirportById(recipientAirportId);
 
   // Never generate logistics missions to main base or carrier destinations
@@ -180,6 +186,7 @@ export function checkAndGenerateMissions(recipientAirportId, recipientWeapons, a
           totalIsoUnits: Number(chunkOrder.iso_units) || 0,
           priority: chunkOrder.priority || order.priority || 'medium',
           expiryHours: missionRules.mission.missionExpiry,
+          origin: 'system',
         };
         const missionId = historicalData.createMission(mission);
         if (!missionId) {
@@ -356,6 +363,7 @@ export function getMissionPriority(currentQuantity) {
 }
 
 export default {
+  AUTO_LOGISTICS_MISSIONS_ENABLED,
   checkAndGenerateMissions,
   findBestSourceAirport,
   getWeaponDisplayName,
