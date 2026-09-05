@@ -74,11 +74,17 @@ data/lidc/squadrons.json
 data/lidc/ucid-links.json
 data/lidc/link-codes.json
 data/lidc/warehouse-ops.json
+data/lidc/base-logistics.json
 backend/data/lidc/discord-users.json
 backend/data/lidc/squadrons.json
 backend/data/lidc/ucid-links.json
 backend/data/lidc/link-codes.json
 backend/data/lidc/warehouse-ops.json
+backend/data/lidc/base-logistics.json
+
+# HIDC/LIDC logistics orders (web export for DCORE, not for git)
+Export_WebLogistics_Orders.json
+backend/data/dscore/Export_WebLogistics_Orders.json
 
 # Achievement catalog, awards, and per-user progress
 data/achievements/
