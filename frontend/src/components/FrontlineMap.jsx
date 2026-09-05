@@ -48,6 +48,19 @@ const LOGISTICS_ROUTE_TOGGLE_ROLE_ID = '1447684923518484500';
 const BASEMAP_MODE_DARK = 'dark';
 const BASEMAP_MODE_SATELLITE = 'satellite';
 const MAPLIBRE_FOCUS_Y_OFFSET_PX = 132;
+const MAP_FOCUS_ANIMATION_MS = 2200;
+const MAP_FOCUS_ANIMATION_MIN_MS = 1600;
+const MAP_FOCUS_ANIMATION_MAX_MS = 2800;
+
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - (((-2 * t) + 2) ** 3) / 2;
+}
+
+function mapFocusAnimationMs(fromZoom, toZoom) {
+  const delta = Math.abs(Number(toZoom) - Number(fromZoom));
+  if (!Number.isFinite(delta)) return MAP_FOCUS_ANIMATION_MS;
+  return Math.round(Math.min(MAP_FOCUS_ANIMATION_MAX_MS, MAP_FOCUS_ANIMATION_MIN_MS + (delta * 220)));
+}
 const MAPLIBRE_DCSAR_ICON_PENDING_IMAGE_ID = 'dcsar-person-icon-pending';
 const MAPLIBRE_DCSAR_ICON_ACCEPTED_IMAGE_ID = 'dcsar-person-icon-accepted';
 const MAPLIBRE_DCSAR_ICON_SIZE = ['interpolate', ['linear'], ['zoom'], 5, 1.15, 8, 1.55, 10, 1.9];
@@ -1421,9 +1434,10 @@ function FlatMapFocus({ center, targetZoom }) {
   useEffect(() => {
     if (!center) return;
     const zoom = Math.max(map.getZoom(), targetZoom || 8);
-    map.setView([center.lat, center.lon], zoom, {
+    map.flyTo([center.lat, center.lon], zoom, {
       animate: true,
-      duration: 0.7,
+      duration: mapFocusAnimationMs(map.getZoom(), zoom) / 1000,
+      easeLinearity: 0.12,
     });
   }, [center, map, targetZoom]);
 
@@ -4646,7 +4660,6 @@ function MapLibreFlatMapView({
     const map = mapRef.current;
     if (!map || !focusCoordinates || !focusTargetKey) return;
     if (Date.now() < userCameraLockUntilRef.current) return;
-    if (map.isMoving()) return;
 
     const nextLat = Number(focusCoordinates.lat);
     const nextLon = Number(focusCoordinates.lon);
@@ -4662,7 +4675,7 @@ function MapLibreFlatMapView({
       return;
     }
     lastAutoFocusRef.current = { lat: nextLat, lon: nextLon, key: focusTargetKey };
-    logMapDebug('autofocus-easeTo', {
+    logMapDebug('autofocus-flyTo', {
       focusTargetKey,
       target: { lon: nextLon, lat: nextLat },
       currentZoom: Number(map.getZoom().toFixed(3)),
@@ -4674,16 +4687,21 @@ function MapLibreFlatMapView({
       || focusKey.startsWith('airport:')
       || focusKey.startsWith('retrieve:')
     );
+    const currentZoom = map.getZoom();
     const focusZoom = airportLikeFocus
       ? Math.min(effectiveMaxZoom, 15)
-      : Math.min(effectiveMaxZoom, map.getZoom() + 0.35);
+      : Math.min(effectiveMaxZoom, currentZoom + 0.35);
+    const duration = mapFocusAnimationMs(currentZoom, focusZoom);
 
-    map.easeTo({
+    if (map.isMoving()) map.stop();
+    map.flyTo({
       center: [nextLon, nextLat],
       offset: [0, MAPLIBRE_FOCUS_Y_OFFSET_PX],
       zoom: focusZoom,
-      duration: 950,
-      easing: (t) => t * (2 - t),
+      duration,
+      curve: 1.35,
+      essential: true,
+      easing: easeInOutCubic,
     });
   }, [focusTargetKey, focusCoordinates, effectiveMaxZoom, logMapDebug]);
 
