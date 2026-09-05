@@ -1806,6 +1806,7 @@ function FlatMapView({
   airliftPlayers,
   dcsarPoints,
   selectedZoneId,
+  hoveredZoneId = null,
   onZoneSelect,
   focusCoordinates,
   onZoomChange,
@@ -2160,11 +2161,7 @@ function FlatMapView({
                 mouseover: () => onZoneHover(zone.id),
                 mouseout: () => onZoneHover(null),
               }}
-            >
-              <Tooltip direction="top" offset={[0, -4]} opacity={0.95}>
-                {zone.name || zone.zone_name || zone.id}
-              </Tooltip>
-            </CircleMarker>
+            />
           );
 
           return layers;
@@ -2320,6 +2317,7 @@ function FlatMapView({
         zones={zones}
         visible={showAto}
         selectedZoneId={selectedZoneId}
+        hoveredZoneId={hoveredZoneId}
       />
     </div>
   );
@@ -2335,6 +2333,7 @@ function MapLibreFlatMapView({
   airliftPlayers,
   dcsarPoints,
   selectedZoneId,
+  hoveredZoneId = null,
   onZoneSelect,
   focusCoordinates,
   onZoomChange,
@@ -4000,17 +3999,10 @@ function MapLibreFlatMapView({
         const feature = event?.features?.[0];
         const zoneId = feature?.properties?.id;
         if (onZoneHover) onZoneHover(zoneId || null);
-        if (map.getZoom() >= 11) {
-          hideHoverPopup();
-          return;
-        }
-        const number = feature?.properties?.number || feature?.properties?.name || zoneId || 'Zone';
-        showHoverPopup(event.lngLat, `<div style="font-size:12px;font-weight:700;">${number}</div>`);
       });
       map.on('mouseleave', 'zones-hit-layer', () => {
         map.getCanvas().style.cursor = '';
         if (onZoneHover) onZoneHover(null);
-        hideHoverPopup();
       });
 
       map.on('click', 'airports-hit-layer', (event) => {
@@ -4634,6 +4626,7 @@ function MapLibreFlatMapView({
         zones={zones}
         visible={showAto}
         selectedZoneId={selectedZoneId}
+        hoveredZoneId={hoveredZoneId}
       />
     </div>
   );
@@ -6712,6 +6705,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       airliftPlayers={airliftPlayerRenderData}
                       dcsarPoints={dcsarPointsWithNearest}
                       selectedZoneId={selectedZoneId}
+                      hoveredZoneId={hoveredZoneId}
                       onZoneSelect={setSelectedZoneId}
                       focusCoordinates={tacticalFocusCoordinates}
                       onZoomChange={handleFlatMapZoomChange}
@@ -6761,6 +6755,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       airliftPlayers={airliftPlayerRenderData}
                       dcsarPoints={dcsarPointsWithNearest}
                       selectedZoneId={selectedZoneId}
+                      hoveredZoneId={hoveredZoneId}
                       onZoneSelect={setSelectedZoneId}
                       focusCoordinates={tacticalFocusCoordinates}
                       onZoomChange={handleFlatMapZoomChange}

@@ -63,16 +63,23 @@ function subscribeMapView(map, engine, onChange) {
   };
 }
 
-function buildFrames(map, engine, zones, selectedZoneId) {
+function buildFrames(map, engine, zones, selectedZoneId, hoveredZoneId) {
   const zoom = map.getZoom();
-  if (zoom < ZONE_NUMBER_MIN_ZOOM) return [];
+  const showAll = zoom >= ZONE_NUMBER_MIN_ZOOM;
+  const visibleZones = showAll
+    ? (zones || [])
+    : (zones || []).filter((zone) => hoveredZoneId && zone.id === hoveredZoneId);
+
+  if (visibleZones.length === 0) return [];
 
   const { width, height } = getMapSize(map, engine);
   if (!width || !height) return [];
 
-  const fontSize = 11 + Math.min(5, Math.max(0, zoom - ZONE_NUMBER_MIN_ZOOM) * 1.2);
+  const fontSize = showAll
+    ? 11 + Math.min(5, Math.max(0, zoom - ZONE_NUMBER_MIN_ZOOM) * 1.2)
+    : 13;
 
-  return (zones || []).flatMap((zone) => {
+  return visibleZones.flatMap((zone) => {
     const lat = Number(zone?.coordinates?.lat);
     const lon = Number(zone?.coordinates?.lon);
     const number = getZoneNumber(zone);
@@ -104,6 +111,7 @@ export default function HidcMapZoneNumberLabels({
   zones,
   visible = true,
   selectedZoneId = null,
+  hoveredZoneId = null,
   engine = 'maplibre',
 }) {
   const [frames, setFrames] = useState([]);
@@ -115,12 +123,12 @@ export default function HidcMapZoneNumberLabels({
     }
 
     const sync = () => {
-      setFrames(buildFrames(map, engine, zones, selectedZoneId));
+      setFrames(buildFrames(map, engine, zones, selectedZoneId, hoveredZoneId));
     };
 
     sync();
     return subscribeMapView(map, engine, sync);
-  }, [map, engine, zones, visible, selectedZoneId]);
+  }, [map, engine, zones, visible, selectedZoneId, hoveredZoneId]);
 
   if (!visible || frames.length === 0) return null;
 
