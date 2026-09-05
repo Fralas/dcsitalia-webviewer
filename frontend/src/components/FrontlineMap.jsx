@@ -13,12 +13,12 @@ import c130ModelUrl from '../assets/3D/yc-130prototype_of_c-130.glb';
 import ch47ModelUrl from '../assets/3D/ch47.glb';
 import t72ModelUrl from '../assets/3D/t90.glb';
 import kc135ModelUrl from '../assets/3D/kc-135_dcs_world.glb';
-import { Ambulance, Anchor, Blend, Box, Boxes, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChessRook, Clock3, Factory, Forklift, Fuel, Hammer, MapPin, PersonStanding, Satellite, TowerControl, Warehouse, X } from 'lucide-react';
+import { Ambulance, Blend, Box, Boxes, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChessRook, Clock3, Factory, Forklift, Fuel, Hammer, MapPin, PersonStanding, Satellite, Warehouse, X } from 'lucide-react';
 import InlineError from './InlineError';
 import frontlineZones from '../config/frontlineZones.json';
 import { getDefaultTacticalMap, getTacticalMapByCampaignId } from '../config/tacticalMaps';
 import { buildZoneConnections, getNeighborZoneIds, normalizeZoneId } from '../config/zoneConfini';
-import { isAirportActiveOnMap } from '../utils/airportStatus';
+import { getAirportCoalition, isAirportActiveOnMap } from '../utils/airportStatus';
 import airports from '../config/airports';
 import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
 import tankIcon from '../assets/tank-icon.svg';
@@ -36,7 +36,7 @@ import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { useUser } from '../contexts/UserContext';
 import { CARTO_DARK_NOLABELS_TILE_URL } from '../config/cartoBasemap';
 
-const MAP_ENGINE = String(import.meta.env.VITE_MAP_ENGINE || 'leaflet').trim().toLowerCase();
+const MAP_ENGINE = String(import.meta.env.VITE_MAP_ENGINE || 'maplibre').trim().toLowerCase();
 const LOGISTICS_ROUTE_TOGGLE_ROLE_ID = '1447684923518484500';
 const BASEMAP_MODE_DARK = 'dark';
 const BASEMAP_MODE_SATELLITE = 'satellite';
@@ -44,9 +44,15 @@ const MAPLIBRE_FOCUS_Y_OFFSET_PX = 132;
 const MAPLIBRE_DCSAR_ICON_PENDING_IMAGE_ID = 'dcsar-person-icon-pending';
 const MAPLIBRE_DCSAR_ICON_ACCEPTED_IMAGE_ID = 'dcsar-person-icon-accepted';
 const MAPLIBRE_DCSAR_ICON_SIZE = ['interpolate', ['linear'], ['zoom'], 5, 1.15, 8, 1.55, 10, 1.9];
-const MAPLIBRE_AIRPORT_ICON_TOWER_BLUE_IMAGE_ID = 'airport-tower-icon-blue';
-const MAPLIBRE_AIRPORT_ICON_TOWER_GREEN_IMAGE_ID = 'airport-tower-icon-green';
-const MAPLIBRE_AIRPORT_ICON_ANCHOR_IMAGE_ID = 'airport-anchor-icon';
+const MAPLIBRE_AIRPORT_DOT_RADIUS = [
+  'interpolate',
+  ['linear'],
+  ['zoom'],
+  4, 3.2,
+  6, 4.2,
+  8, 5,
+  10, 5.4,
+];
 const MAPLIBRE_DBUILD_HAMMER_WHITE_IMAGE_ID = 'dbuild-hammer-white';
 const MAPLIBRE_DBUILD_HAMMER_GREEN_IMAGE_ID = 'dbuild-hammer-green';
 const MAPLIBRE_DBUILD_ROOK_BLUE_IMAGE_ID = 'dbuild-rook-blue';
@@ -57,22 +63,6 @@ const MAPLIBRE_PP_FACTORY_BLUE_IMAGE_ID = 'pp-factory-blue';
 const MAPLIBRE_PP_FACTORY_RED_IMAGE_ID = 'pp-factory-red';
 const CRATE_CLUSTER_RADIUS_M = 20;
 const DBUILD_SITE_MATCH_RADIUS_M = 150;
-const MAPLIBRE_AIRPORT_ICON_SIZE = [
-  'interpolate',
-  ['linear'],
-  ['zoom'],
-  4, 0.32,
-  5, 0.40,
-  6, 0.52,
-  8, 0.88,
-  10, 1.12,
-];
-const MAPLIBRE_AIRPORT_GLOW_RADIUS = [
-  'case',
-  ['==', ['get', 'main'], 1],
-  ['interpolate', ['linear'], ['zoom'], 4, 4, 6, 6, 8, 9, 10, 11],
-  ['interpolate', ['linear'], ['zoom'], 4, 3.2, 6, 5, 8, 7.5, 10, 9],
-];
 
 function isDesktopGlobeDevice() {
   if (typeof window === 'undefined') return true;
@@ -782,37 +772,67 @@ function createDcsarIcon(color = '#f8fafc') {
   });
 }
 
-function createAirportMarkerIcon(isMainBase = false, isCarrier = false) {
-  const frameSize = isMainBase ? 30 : 27;
-  const iconSize = isMainBase ? 19 : 17;
-  const color = isMainBase ? '#22c55e' : '#3b82f6';
-  const IconComponent = isCarrier ? Anchor : TowerControl;
+function createAirportMarkerIcon(coalition = 'neutral') {
+  const hitSize = 18;
   const html = renderToStaticMarkup(
-    <div
-      className="airport-marker-icon__inner"
-      style={{
-        width: `${frameSize}px`,
-        height: `${frameSize}px`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        pointerEvents: 'none',
-        borderRadius: '999px',
-        background: 'rgba(15, 23, 42, 0.78)',
-        border: '1px solid rgba(148, 163, 184, 0.7)',
-        boxShadow: `0 0 0 1px rgba(30, 41, 59, 0.9), 0 0 8px ${isMainBase ? 'rgba(34, 197, 94, 0.4)' : 'rgba(59, 130, 246, 0.35)'}`,
-      }}
-    >
-      <IconComponent size={iconSize} color={color} strokeWidth={2.25} />
-    </div>
+    <div className={`airport-marker-icon__inner airport-marker-icon__inner--${coalition}`} />
   );
 
   return divIcon({
     html,
     className: 'airport-marker-icon',
-    iconSize: [frameSize, frameSize],
-    iconAnchor: [frameSize / 2, frameSize / 2],
+    iconSize: [hitSize, hitSize],
+    iconAnchor: [hitSize / 2, hitSize / 2],
   });
+}
+
+const AIRPORT_HOVER_HIT_PX = 40;
+const airportMarkerIconCache = new Map();
+
+function getAirportMarkerIcon(coalition = 'neutral') {
+  const key = coalition === 'blue' || coalition === 'red' ? coalition : 'neutral';
+  if (!airportMarkerIconCache.has(key)) {
+    airportMarkerIconCache.set(key, createAirportMarkerIcon(key));
+  }
+  return airportMarkerIconCache.get(key);
+}
+
+function rememberHoveredAirport(current, nearest) {
+  if (!nearest) return current ? null : current;
+  if (
+    current
+    && current.lon === nearest.lon
+    && current.lat === nearest.lat
+    && current.name === nearest.name
+    && current.coalition === nearest.coalition
+  ) {
+    return current;
+  }
+  return nearest;
+}
+
+function pickNearestAirportHover(projectPoint, airports, cursor, hitPx = AIRPORT_HOVER_HIT_PX) {
+  if (!cursor || !Number.isFinite(cursor.x) || !Number.isFinite(cursor.y)) return null;
+  let nearest = null;
+  let nearestDist = hitPx;
+  airports.forEach((airport) => {
+    const lat = airport.coordinates?.lat;
+    const lon = airport.coordinates?.lon;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    const point = projectPoint(lon, lat);
+    if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
+    const dist = Math.hypot(cursor.x - point.x, cursor.y - point.y);
+    if (dist < nearestDist) {
+      nearestDist = dist;
+      nearest = {
+        lon,
+        lat,
+        name: airport.displayName || airport.name || airport.id,
+        coalition: airport.coalition === 'blue' || airport.coalition === 'red' ? airport.coalition : 'neutral',
+      };
+    }
+  });
+  return nearest;
 }
 
 function buildDcsarPersonSvgMarkup(color = '#f8fafc') {
@@ -845,35 +865,6 @@ async function ensureMapLibreDcsarIconImages(map) {
   for (const def of defs) {
     if (map.hasImage(def.id)) continue;
     const svg = buildDcsarPersonSvgMarkup(def.color);
-    const image = await loadSvgAsImage(svg);
-    map.addImage(def.id, image, { pixelRatio: 2 });
-  }
-}
-
-function buildAirportSvgMarkup(icon = 'tower', color = '#3b82f6') {
-  const IconComponent = icon === 'anchor' ? Anchor : TowerControl;
-  return renderToStaticMarkup(
-    <IconComponent
-      size={30}
-      color={color}
-      strokeWidth={2.3}
-      style={{
-        filter: 'drop-shadow(0 0 2px rgba(15,23,42,0.9))',
-      }}
-    />
-  );
-}
-
-async function ensureMapLibreAirportIconImages(map) {
-  const defs = [
-    { id: MAPLIBRE_AIRPORT_ICON_TOWER_BLUE_IMAGE_ID, icon: 'tower', color: '#3b82f6' },
-    { id: MAPLIBRE_AIRPORT_ICON_TOWER_GREEN_IMAGE_ID, icon: 'tower', color: '#22c55e' },
-    { id: MAPLIBRE_AIRPORT_ICON_ANCHOR_IMAGE_ID, icon: 'anchor', color: '#3b82f6' },
-  ];
-
-  for (const def of defs) {
-    if (map.hasImage(def.id)) continue;
-    const svg = buildAirportSvgMarkup(def.icon, def.color);
     const image = await loadSvgAsImage(svg);
     map.addImage(def.id, image, { pixelRatio: 2 });
   }
@@ -1285,15 +1276,12 @@ function airportIconScaleFromZoom(zoom) {
 
 function applyMapLibreAirportIconSize(map) {
   if (!map?.getLayer?.('airports-core-layer')) return;
-  const scale = airportIconScaleFromZoom(map.getZoom());
-  map.setLayoutProperty('airports-core-layer', 'icon-size', Number((scale * 1.12).toFixed(3)));
-  if (map.getLayer('airports-glow-layer')) {
-    map.setPaintProperty('airports-glow-layer', 'circle-radius', Number((3 + scale * 8).toFixed(2)));
-  }
+  const scale = Math.max(0.7, airportIconScaleFromZoom(map.getZoom()));
+  map.setPaintProperty('airports-core-layer', 'circle-radius', Number((5 * scale).toFixed(2)));
 }
 
 function applyLeafletAirportIconScale(map) {
-  const scale = airportIconScaleFromZoom(map.getZoom());
+  const scale = Math.max(0.7, airportIconScaleFromZoom(map.getZoom()));
   const container = map.getContainer();
   container.style.setProperty('--hidc-airport-icon-scale', String(scale));
   container.querySelectorAll('.airport-marker-icon__inner').forEach((el) => {
@@ -1748,43 +1736,32 @@ function FlatMapView({
 
   useEffect(() => {
     if (!leafletMap) return undefined;
+    const container = leafletMap.getContainer();
 
-    const onMouseMove = (event) => {
+    const onMouseMove = (domEvent) => {
       if (!showAirports) {
         setHoveredAirport((current) => (current ? null : current));
         return;
       }
-      const cursor = event.containerPoint;
-      if (!cursor) return;
-      let nearest = null;
-      let nearestDist = 28;
-      airportsData.forEach((airport) => {
-        const lat = airport.coordinates?.lat;
-        const lon = airport.coordinates?.lon;
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-        const point = leafletMap.latLngToContainerPoint([lat, lon]);
-        const dist = cursor.distanceTo(point);
-        if (dist < nearestDist) {
-          nearestDist = dist;
-          nearest = {
-            lon,
-            lat,
-            name: airport.displayName || airport.name || airport.id,
-          };
-        }
-      });
-      setHoveredAirport((current) => {
-        if (!nearest) return current ? null : current;
-        if (current && current.lon === nearest.lon && current.lat === nearest.lat && current.name === nearest.name) {
-          return current;
-        }
-        return nearest;
-      });
+      const cursor = leafletMap.mouseEventToContainerPoint(domEvent);
+      const nearest = pickNearestAirportHover(
+        (lon, lat) => leafletMap.latLngToContainerPoint([lat, lon]),
+        airportsData,
+        cursor,
+      );
+      setHoveredAirport((current) => rememberHoveredAirport(current, nearest));
     };
 
-    leafletMap.on('mousemove', onMouseMove);
+    const onMouseLeave = (domEvent) => {
+      if (domEvent.relatedTarget && container.contains(domEvent.relatedTarget)) return;
+      setHoveredAirport((current) => (current ? null : current));
+    };
+
+    container.addEventListener('mousemove', onMouseMove);
+    container.addEventListener('mouseleave', onMouseLeave);
     return () => {
-      leafletMap.off('mousemove', onMouseMove);
+      container.removeEventListener('mousemove', onMouseMove);
+      container.removeEventListener('mouseleave', onMouseLeave);
     };
   }, [leafletMap, airportsData, showAirports]);
 
@@ -2064,7 +2041,7 @@ function FlatMapView({
           <Marker
             key={`airport-marker-${airport.id}`}
             position={[airport.coordinates.lat, airport.coordinates.lon]}
-            icon={createAirportMarkerIcon(Boolean(airport.isMainBase), Boolean(airport.isCarrier))}
+            icon={getAirportMarkerIcon(airport.coalition)}
             eventHandlers={{
               click: () => onAirportClick && onAirportClick(airport.id),
             }}
@@ -2566,6 +2543,7 @@ function MapLibreFlatMapView({
           name: airport.displayName || airport.name || airport.id || '',
           main: airport.isMainBase ? 1 : 0,
           carrier: airport.isCarrier ? 1 : 0,
+          coalition: airport.coalition || 'neutral',
         },
       }];
     }),
@@ -3225,7 +3203,7 @@ function MapLibreFlatMapView({
       zoom: initialCamera ? initialCamera.zoom : 7,
       minZoom: MIN_SAFE_ZOOM,
       maxZoom: effectiveMaxZoom,
-      pitch: initialCamera ? initialCamera.pitch : 0,
+      pitch: initialCamera ? initialCamera.pitch : 48,
       bearing: initialCamera ? initialCamera.bearing : 0,
       minPitch: MIN_PITCH,
       maxPitch: MAX_PITCH,
@@ -3295,11 +3273,6 @@ function MapLibreFlatMapView({
         await ensureMapLibreDcsarIconImages(map);
       } catch (error) {
         console.error('Failed to initialize DCSAR icon images:', error);
-      }
-      try {
-        await ensureMapLibreAirportIconImages(map);
-      } catch (error) {
-        console.error('Failed to initialize airport icon image:', error);
       }
       try {
         await ensureMapLibreDbuildAndCrateIconImages(map);
@@ -3575,32 +3548,38 @@ function MapLibreFlatMapView({
       });
 
       map.addLayer({
-        id: 'airports-glow-layer',
+        id: 'airports-hit-layer',
         type: 'circle',
         source: 'airports-src',
         paint: {
-          'circle-radius': MAPLIBRE_AIRPORT_GLOW_RADIUS,
-          'circle-color': ['case', ['==', ['get', 'main'], 1], '#22c55e', '#60a5fa'],
-          'circle-opacity': 0.16,
+          'circle-radius': 14,
+          'circle-color': '#000000',
+          'circle-opacity': 0.001,
         },
       });
 
       map.addLayer({
         id: 'airports-core-layer',
-        type: 'symbol',
+        type: 'circle',
         source: 'airports-src',
-        layout: {
-          'icon-image': [
-            'case',
-            ['==', ['get', 'carrier'], 1], MAPLIBRE_AIRPORT_ICON_ANCHOR_IMAGE_ID,
-            ['==', ['get', 'main'], 1], MAPLIBRE_AIRPORT_ICON_TOWER_GREEN_IMAGE_ID,
-            MAPLIBRE_AIRPORT_ICON_TOWER_BLUE_IMAGE_ID,
+        paint: {
+          'circle-radius': MAPLIBRE_AIRPORT_DOT_RADIUS,
+          'circle-color': [
+            'match',
+            ['get', 'coalition'],
+            'blue', '#2563eb',
+            'red', '#ef4444',
+            'rgba(255, 255, 255, 0.95)',
           ],
-          'icon-size': MAPLIBRE_AIRPORT_ICON_SIZE,
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          'icon-pitch-alignment': 'viewport',
-          'icon-rotation-alignment': 'viewport',
+          'circle-stroke-width': 1.2,
+          'circle-stroke-color': [
+            'match',
+            ['get', 'coalition'],
+            'blue', 'rgba(37, 99, 235, 0.55)',
+            'red', 'rgba(239, 68, 68, 0.5)',
+            'rgba(255, 255, 255, 0.4)',
+          ],
+          'circle-opacity': 1,
         },
       });
       applyMapLibreAirportIconSize(map);
@@ -3846,36 +3825,10 @@ function MapLibreFlatMapView({
         hideHoverPopup();
       });
 
-      map.on('click', 'airports-core-layer', (event) => {
+      map.on('click', 'airports-hit-layer', (event) => {
         const feature = event?.features?.[0];
         const airportId = feature?.properties?.id;
         if (airportId && onAirportClick) onAirportClick(airportId);
-      });
-      map.on('mousemove', (event) => {
-        if (!map.getLayer('airports-core-layer')) {
-          setHoveredAirport((current) => (current ? null : current));
-          return;
-        }
-        const hoverLayers = ['airports-core-layer'];
-        if (map.getLayer('airports-glow-layer')) hoverLayers.push('airports-glow-layer');
-        const features = map.queryRenderedFeatures(event.point, { layers: hoverLayers });
-        if (!features.length) {
-          setHoveredAirport((current) => (current ? null : current));
-          return;
-        }
-        const feature = features[0];
-        const coords = feature?.geometry?.coordinates;
-        const lon = Number(coords?.[0]);
-        const lat = Number(coords?.[1]);
-        const airportName = String(feature?.properties?.name || feature?.properties?.id || 'Airport');
-        if (!Number.isFinite(lon) || !Number.isFinite(lat)) return;
-        map.getCanvas().style.cursor = 'pointer';
-        setHoveredAirport((current) => {
-          if (current && current.lon === lon && current.lat === lat && current.name === airportName) {
-            return current;
-          }
-          return { lon, lat, name: airportName };
-        });
       });
 
       map.on('click', 'convoy-points-hit-layer', (event) => {
@@ -4119,6 +4072,37 @@ function MapLibreFlatMapView({
   useEffect(() => {
     if (!showAirports) setHoveredAirport(null);
   }, [showAirports]);
+
+  useEffect(() => {
+    if (!mapInstance) return undefined;
+
+    const onMouseMove = (event) => {
+      if (!showAirports) {
+        setHoveredAirport((current) => (current ? null : current));
+        return;
+      }
+      const nearest = pickNearestAirportHover(
+        (lon, lat) => mapInstance.project([lon, lat]),
+        airportsData,
+        event.point,
+      );
+      if (nearest) {
+        mapInstance.getCanvas().style.cursor = 'pointer';
+      }
+      setHoveredAirport((current) => rememberHoveredAirport(current, nearest));
+    };
+
+    const onMouseLeave = () => {
+      setHoveredAirport((current) => (current ? null : current));
+    };
+
+    mapInstance.on('mousemove', onMouseMove);
+    mapInstance.getCanvas().addEventListener('mouseleave', onMouseLeave);
+    return () => {
+      mapInstance.off('mousemove', onMouseMove);
+      mapInstance.getCanvas().removeEventListener('mouseleave', onMouseLeave);
+    };
+  }, [mapInstance, airportsData, showAirports]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -5028,7 +5012,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     [productionPoints, zoneCoordinatesByName]
   );
 
-  const validAirports = useMemo(() => {
+  const allMapAirports = useMemo(() => {
     const runtimeById = new Map();
     if (Array.isArray(airportsData)) {
       airportsData.forEach((airport) => {
@@ -5064,8 +5048,17 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     );
 
     return [...mergedAirports, ...extraRuntimeAirports]
-      .filter((airport) => isAirportActiveOnMap(airport, airbaseStatus));
+      .filter((airport) => Number.isFinite(airport?.coordinates?.lat) && Number.isFinite(airport?.coordinates?.lon))
+      .map((airport) => ({
+        ...airport,
+        coalition: getAirportCoalition(airport, airbaseStatus),
+      }));
   }, [airportsData, airportCatalog, airbaseStatus]);
+
+  const validAirports = useMemo(
+    () => allMapAirports.filter((airport) => isAirportActiveOnMap(airport, airbaseStatus)),
+    [allMapAirports, airbaseStatus]
+  );
 
   const combatMissionByZone = useMemo(() => {
     const map = new Map();
@@ -5295,7 +5288,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       lon: zone.coordinates.lon,
       size: zone.id === selectedZoneId ? 0.14 : zone.isActive ? 0.1 : 0.07,
     })) : [];
-    const airportPoints = filters.showAirports ? validAirports.map((airport) => ({
+    const airportPoints = filters.showAirports ? allMapAirports.map((airport) => ({
       lat: airport.coordinates.lat,
       lon: airport.coordinates.lon,
       size: airport.isMainBase ? 0.11 : 0.08,
@@ -5311,7 +5304,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       })
       : [];
     return [...zonePoints, ...airportPoints, ...productionPointMarkers];
-  }, [zonesForMap, validAirports, productionPointsForMap, selectedZoneId, selectedProductionPointId, filters.showAto, filters.showAirports, filters.showProductionPoints]);
+  }, [zonesForMap, allMapAirports, productionPointsForMap, selectedZoneId, selectedProductionPointId, filters.showAto, filters.showAirports, filters.showProductionPoints]);
 
   const zoneTheaterCenter = useMemo(() => {
     if (validZones.length === 0) return null;
@@ -6416,7 +6409,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                   {isMapLibreEngine ? (
                     <MapLibreFlatMapView
                       zones={zonesForMap}
-                      airportsData={validAirports}
+                      airportsData={allMapAirports}
                       logisticsMissions={routeVisibleLogisticsMissions}
                       logisticsFrontlineAirportIds={logisticsFrontlineAirportIds}
                       gridConnections={gridConnections}
@@ -6466,7 +6459,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                   ) : (
                     <FlatMapView
                       zones={zonesForMap}
-                      airportsData={validAirports}
+                      airportsData={allMapAirports}
                       logisticsMissions={routeVisibleLogisticsMissions}
                       gridConnections={gridConnections}
                       convoys={convoyRenderData}

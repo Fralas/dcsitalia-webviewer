@@ -44,6 +44,15 @@ function collectAirportStatusAliases(airport) {
   return aliases;
 }
 
+function isCoalitionActiveValue(statusValue) {
+  if (statusValue === true || statusValue === 1) return true;
+  if (statusValue === false || statusValue === 0) return false;
+  const state = String(statusValue || '').trim().toLowerCase();
+  if (state === 'blue' || state === 'true') return true;
+  if (state === 'red' || state === 'neutral' || state === 'false') return false;
+  return true;
+}
+
 function lookupAirbaseStatusValue(airport) {
   for (const alias of collectAirportStatusAliases(airport)) {
     if (Object.prototype.hasOwnProperty.call(airbaseStatus, alias)) {
@@ -113,7 +122,7 @@ export function isAirportActive(airport) {
 
   const statusValue = lookupAirbaseStatusValue(airport);
   if (statusValue !== undefined) {
-    return statusValue !== false;
+    return isCoalitionActiveValue(statusValue);
   }
 
   return true;

@@ -1,13 +1,12 @@
 .hidc-airport-pointer {
   position: absolute;
   inset: 0;
-  z-index: 4;
+  z-index: 850;
 }
 
 .hidc-airport-pointer,
 .hidc-airport-pointer__svg,
 .hidc-airport-pointer__line,
-.hidc-airport-pointer__dot,
 .hidc-airport-pointer__label {
   pointer-events: none !important;
 }
@@ -23,29 +22,58 @@
 
 .hidc-airport-pointer__line {
   fill: none;
-  stroke: #4e4e4e;
+  stroke: rgba(255, 255, 255, 0.92);
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.hidc-airport-pointer__dot {
-  fill: #0e0e0e;
-  stroke: #4e4e4e;
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.45));
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: hidc-airport-arm-extend 0.32s ease-out forwards;
 }
 
 .hidc-airport-pointer__label {
   position: absolute;
   box-sizing: border-box;
+  width: max-content;
+  max-width: none;
   transform: translate(0, -100%);
   padding: 0 0 3px;
-  color: #ffffff;
+  color: rgba(255, 255, 255, 0.95);
   font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
   font-weight: 700;
   letter-spacing: 0.08em;
   line-height: 1.15;
   text-transform: uppercase;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
+  overflow: visible;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.65);
+  animation: hidc-airport-arm-label 0.28s ease-out 0.06s both;
+}
+
+.hidc-airport-pointer__label--blue {
+  color: #93c5fd;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9), 0 0 10px rgba(59, 130, 246, 0.45);
+}
+
+.hidc-airport-pointer__label--red {
+  color: #ef4444;
+}
+
+.hidc-airport-pointer__label--neutral {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+@keyframes hidc-airport-arm-extend {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes hidc-airport-arm-label {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }

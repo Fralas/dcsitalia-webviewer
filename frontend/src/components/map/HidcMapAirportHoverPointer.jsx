@@ -3,7 +3,6 @@ import './HidcMapAirportHoverPointer.css';
 
 const BASE_OUTWARD_PX = 44;
 const BASE_LABEL_GAP_PX = 2;
-const BASE_DOT_RADIUS = 4;
 const BASE_NAME_FONT_PX = 12;
 const POINTER_REFERENCE_ZOOM = 8;
 
@@ -12,9 +11,21 @@ function getPointerScale(zoom) {
   return Math.max(0.55, Math.min(1.12, scaled));
 }
 
-function underlineWidthForName(name, scale) {
-  const base = Math.min(168, Math.max(56, String(name || '').length * 8.1));
-  return base * scale;
+function measureNameWidth(name, fontSizePx) {
+  const text = String(name || '').toUpperCase();
+  if (!text) return 56;
+
+  if (typeof document === 'undefined') {
+    return Math.max(56, text.length * fontSizePx * 0.74);
+  }
+
+  if (!measureNameWidth.canvas) {
+    measureNameWidth.canvas = document.createElement('canvas');
+  }
+  const ctx = measureNameWidth.canvas.getContext('2d');
+  ctx.font = `700 ${fontSizePx}px Inter, ui-sans-serif, system-ui, sans-serif`;
+  const letterSpacing = fontSizePx * 0.08;
+  return Math.max(56, ctx.measureText(text).width + Math.max(0, text.length - 1) * letterSpacing);
 }
 
 function buildPointerPath(side, anchor, elbow, underlineStart, underlineEnd) {
@@ -67,7 +78,8 @@ function buildPointerFrame(map, engine, airport) {
     y: anchor.y - (1 / stemLen) * outwardPx,
   };
 
-  const underlineWidth = underlineWidthForName(airport.name, scale);
+  const nameFontSize = BASE_NAME_FONT_PX * scale;
+  const underlineWidth = measureNameWidth(airport.name, nameFontSize);
   let underlineStart;
   let underlineEnd;
 
@@ -81,19 +93,19 @@ function buildPointerFrame(map, engine, airport) {
 
   return {
     name: airport.name,
+    coalition: airport.coalition === 'blue' || airport.coalition === 'red' ? airport.coalition : 'neutral',
     anchor,
     label: { ...underlineStart },
     labelWidth: underlineWidth,
-    dotRadius: BASE_DOT_RADIUS * scale,
-    strokeWidth: Math.max(1.4, 2.2 * scale),
-    nameFontSize: BASE_NAME_FONT_PX * scale,
+    strokeWidth: Math.max(1.6, 2.5 * scale),
+    nameFontSize,
     pathD: buildPointerPath(side, anchor, elbow, underlineStart, underlineEnd),
   };
 }
 
 export default function HidcMapAirportHoverPointer({ map, airport, engine = 'maplibre' }) {
   const [frame, setFrame] = useState(null);
-  const airportKey = airport ? `${airport.lon}:${airport.lat}:${airport.name}` : '';
+  const airportKey = airport ? `${airport.lon}:${airport.lat}:${airport.name}:${airport.coalition || 'neutral'}` : '';
 
   useEffect(() => {
     if (!map || !airport) {
@@ -115,24 +127,19 @@ export default function HidcMapAirportHoverPointer({ map, airport, engine = 'map
     <div className="hidc-airport-pointer" aria-hidden="true">
       <svg className="hidc-airport-pointer__svg">
         <path
+          key={airportKey}
           className="hidc-airport-pointer__line"
           d={frame.pathD}
+          pathLength="1"
           strokeWidth={frame.strokeWidth}
-        />
-        <circle
-          className="hidc-airport-pointer__dot"
-          cx={frame.anchor.x}
-          cy={frame.anchor.y}
-          r={frame.dotRadius}
-          strokeWidth={Math.max(1, frame.strokeWidth * 0.55)}
         />
       </svg>
       <div
-        className="hidc-airport-pointer__label"
+        key={`${airportKey}-label`}
+        className={`hidc-airport-pointer__label hidc-airport-pointer__label--${frame.coalition || 'neutral'}`}
         style={{
           left: `${frame.label.x}px`,
           top: `${frame.label.y}px`,
-          width: `${frame.labelWidth}px`,
           fontSize: `${frame.nameFontSize}px`,
         }}
       >

@@ -132,12 +132,32 @@ code {
 .airport-marker-icon {
   background: transparent !important;
   border: 0 !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
 }
 
 .airport-marker-icon__inner {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
   transform: scale(var(--hidc-airport-icon-scale, 1));
   transform-origin: 50% 50%;
-  will-change: transform;
+}
+
+.airport-marker-icon__inner--neutral {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 3px rgba(255, 255, 255, 0.5);
+}
+
+.airport-marker-icon__inner--blue {
+  background: #2563eb;
+  box-shadow: 0 0 3px rgba(37, 99, 235, 0.75);
+}
+
+.airport-marker-icon__inner--red {
+  background: #ef4444;
+  box-shadow: 0 0 3px rgba(239, 68, 68, 0.7);
 }
 
 /* MapLibre hover popups (zones/airports/routes): compact dark theme */
