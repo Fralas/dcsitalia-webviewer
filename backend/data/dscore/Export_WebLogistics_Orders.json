@@ -1,98 +1,6 @@
 {
   "orders": [
     {
-      "code": "WAV3HC",
-      "id": "order_1788623335479_30b9a6",
-      "status": "pending",
-      "airport_id": "nevatim",
-      "airport_name": "Nevatim",
-      "icao": "LLNV",
-      "lat": 31.208236,
-      "lon": 35.011616,
-      "cost": 7200,
-      "created_at": 1788623335480,
-      "created_by": "Fralas",
-      "created_by_id": "675706661570347041",
-      "accepted_at": 0,
-      "accepted_by_id": "",
-      "items": [
-        {
-          "item_id": "CONT-AIR-01",
-          "name": "GEN",
-          "kind": "container",
-          "destination": "aircraft",
-          "quantity": 1,
-          "cost": 2400,
-          "contents": [
-            {
-              "label": "Mk-82",
-              "quantity": 30
-            },
-            {
-              "label": "Mk-84",
-              "quantity": 10
-            },
-            {
-              "label": "AIM-120C",
-              "quantity": 20
-            },
-            {
-              "label": "AIM-9X",
-              "quantity": 20
-            }
-          ]
-        },
-        {
-          "item_id": "CONT-AIR-02",
-          "name": "STRIKE",
-          "kind": "container",
-          "destination": "aircraft",
-          "quantity": 1,
-          "cost": 2400,
-          "contents": [
-            {
-              "label": "Mk-82",
-              "quantity": 40
-            },
-            {
-              "label": "Mk-83",
-              "quantity": 20
-            },
-            {
-              "label": "AGM-65D",
-              "quantity": 20
-            }
-          ]
-        },
-        {
-          "item_id": "CONT-AIR-03",
-          "name": "SEAD",
-          "kind": "container",
-          "destination": "aircraft",
-          "quantity": 1,
-          "cost": 2400,
-          "contents": [
-            {
-              "label": "AGM-88C",
-              "quantity": 20
-            },
-            {
-              "label": "AGM-65G",
-              "quantity": 20
-            },
-            {
-              "label": "AIM-120C",
-              "quantity": 20
-            },
-            {
-              "label": "AIM-9M",
-              "quantity": 20
-            }
-          ]
-        }
-      ]
-    },
-    {
       "code": "B5ZPEB",
       "id": "order_1788614144693_05a96a",
       "status": "pending",
@@ -185,5 +93,5 @@
       ]
     }
   ],
-  "updatedAt": 1788627505072
+  "updatedAt": 1788628243670
 }

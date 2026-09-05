@@ -221,13 +221,10 @@ export default function LidcAirportWizard({
   const remainingCredits = factionEconomy
     ? Number.POSITIVE_INFINITY
     : (Number.isFinite(spendBudget) ? Math.max(0, spendBudget - cartTotal) : 0);
-  const previewRemaining = factionEconomy && knownCredits != null
-    ? knownCredits - cartTotal
-    : null;
   const canPurchase = factionEconomy
     ? isLogged
     : isLogged && (editingOrder ? Boolean(editingOrder.canEdit) : Boolean(shopper));
-  const shouldShowCart = activeTab === 'logistics' && cartLines.length > 0;
+  const shouldShowCart = activeTab === 'logistics' && (cartLines.length > 0 || Boolean(editingOrder));
   const [cartMounted, setCartMounted] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const cartLinesSnapshot = useRef([]);
@@ -236,9 +233,12 @@ export default function LidcAirportWizard({
     cartLinesSnapshot.current = cartLines;
   }
 
-  const visibleCartLines = cartLines.length > 0 ? cartLines : cartLinesSnapshot.current;
+  const visibleCartLines = cartLines.length > 0
+    ? cartLines
+    : (editingOrder ? [] : cartLinesSnapshot.current);
   const visibleCartTotal = visibleCartLines.reduce((sum, line) => sum + line.cost, 0);
   const visibleCartCount = visibleCartLines.length;
+  const editingEmptyCart = Boolean(editingOrder) && cartLines.length === 0;
 
   useEffect(() => {
     if (shouldShowCart) {
@@ -353,6 +353,25 @@ export default function LidcAirportWizard({
     setCart({});
     setPurchaseError('');
     onChangeTab?.('overview');
+  }
+
+  async function cancelEditingOrder() {
+    if (!canPurchase || !airport?.id || !editingOrder?.id) return;
+    setConfirming(true);
+    setPurchaseError('');
+    try {
+      const result = await (onUpdateOrder
+        ? onUpdateOrder(airport.id, editingOrder.id, { action: 'cancel' })
+        : api.updateLidcAirportOrder(airport.id, editingOrder.id, { action: 'cancel' }));
+      setCart({});
+      setEditingOrderId('');
+      onLogisticsUpdated?.(result);
+      onChangeTab?.('overview');
+    } catch (error) {
+      setPurchaseError(error.message || t('lidc.map.airportWizard.orderActionFailed'));
+    } finally {
+      setConfirming(false);
+    }
   }
 
   async function runOrderAction(order, action) {
@@ -621,12 +640,6 @@ export default function LidcAirportWizard({
                 <span>{t(factionEconomy ? 'lidc.map.airportWizard.blueFactionPoints' : 'lidc.map.airportWizard.credits')}</span>
                 <strong>{knownCredits == null ? '—' : formatStock(knownCredits)}</strong>
               </div>
-              {factionEconomy && cartTotal > 0 && (
-                <div className={`lidc-airport-wizard-credits is-preview${previewRemaining != null && previewRemaining < 0 ? ' is-negative' : ''}`}>
-                  <span>{t('lidc.map.airportWizard.pointsPreview')}</span>
-                  <strong>{previewRemaining == null ? '—' : formatStock(previewRemaining)}</strong>
-                </div>
-              )}
               {!isLogged && (
                 <p className="lidc-occupancy-panel__hint">{t('lidc.map.airportWizard.loginToBuy')}</p>
               )}
@@ -683,7 +696,9 @@ export default function LidcAirportWizard({
             <strong>{visibleCartCount}</strong>
           </header>
           <div className="lidc-airport-wizard-cart__body">
-            {visibleCartLines.map((line) => (
+            {visibleCartLines.length === 0 ? (
+              <p className="lidc-occupancy-panel__hint">{t('lidc.map.airportWizard.cartEmpty')}</p>
+            ) : visibleCartLines.map((line) => (
               <article key={line.item.id} className="lidc-airport-wizard-cart__line">
                 <img src={shopImageFor(line.item)} alt="" draggable={false} />
                 <div>
@@ -718,15 +733,27 @@ export default function LidcAirportWizard({
               <span>{t('lidc.map.airportWizard.cartTotal')}</span>
               <strong>{formatStock(cartLines.length > 0 ? cartTotal : visibleCartTotal)}</strong>
             </div>
-            <button
-              type="button"
-              className="lidc-btn lidc-btn-primary lidc-btn-block"
-              disabled={!canPurchase || confirming || cartLines.length === 0 || (!factionEconomy && cartTotal > spendBudget)}
-              onClick={confirmOrder}
-            >
-              {confirming ? <Loader2 size={14} className="spin" /> : null}
-              {t(editingOrder ? 'lidc.map.airportWizard.saveOrder' : 'lidc.map.airportWizard.confirmOrder')}
-            </button>
+            {editingEmptyCart ? (
+              <button
+                type="button"
+                className="lidc-btn lidc-btn-primary lidc-btn-block"
+                disabled={!canPurchase || confirming}
+                onClick={cancelEditingOrder}
+              >
+                {confirming ? <Loader2 size={14} className="spin" /> : null}
+                {t('lidc.map.airportWizard.cancelOrder')}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="lidc-btn lidc-btn-primary lidc-btn-block"
+                disabled={!canPurchase || confirming || cartLines.length === 0 || (!factionEconomy && cartTotal > spendBudget)}
+                onClick={confirmOrder}
+              >
+                {confirming ? <Loader2 size={14} className="spin" /> : null}
+                {t(editingOrder ? 'lidc.map.airportWizard.saveOrder' : 'lidc.map.airportWizard.confirmOrder')}
+              </button>
+            )}
             {editingOrder && (
               <button
                 type="button"

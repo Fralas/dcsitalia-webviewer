@@ -580,15 +580,6 @@
   color: #fff;
 }
 
-.lidc-airport-wizard-credits.is-preview {
-  margin-top: 8px;
-  opacity: 0.84;
-}
-
-.lidc-airport-wizard-credits.is-preview.is-negative strong {
-  color: #f87171;
-}
-
 .lidc-airport-wizard-order-tools {
   display: inline-flex;
   align-items: center;

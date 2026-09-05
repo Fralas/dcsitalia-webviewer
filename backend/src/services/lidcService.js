@@ -1740,7 +1740,7 @@ export function updateAirportOrderStatus({ baseId, orderId, action, userId }) {
   }
 
   const actionKey = sanitizeText(action, 20).toLowerCase();
-  if (!['accept', 'unaccept', 'complete'].includes(actionKey)) {
+  if (!['accept', 'unaccept', 'complete', 'cancel'].includes(actionKey)) {
     throw new Error('Invalid order action');
   }
 
@@ -1759,6 +1759,7 @@ export function updateAirportOrderStatus({ baseId, orderId, action, userId }) {
 
   const order = orders[orderIndex];
   const status = normalizeOrderStatus(order.status);
+  const squadrons = readSquadrons();
 
   if (actionKey === 'accept') {
     if (status !== 'pending') {
@@ -1780,6 +1781,29 @@ export function updateAirportOrderStatus({ baseId, orderId, action, userId }) {
       acceptedAt: 0,
       acceptedByUserId: '',
     };
+  } else if (actionKey === 'cancel') {
+    if (!canEditAirportOrder(order, actorId, squadrons)) {
+      throw new Error('Not allowed to cancel this order');
+    }
+    const squadronIndex = findSquadronIndexById(squadrons, order.squadronId);
+    if (squadronIndex >= 0) {
+      const squadron = squadrons[squadronIndex];
+      const cargo = applyWarehouseDelta(
+        getWarehouseStock(squadron, airport.id),
+        order.items,
+        [],
+      );
+      squadrons[squadronIndex] = {
+        ...squadron,
+        credits: getSquadronCredits(squadron) + Math.max(0, Math.floor(Number(order.cost) || 0)),
+        warehouses: {
+          ...(squadron.warehouses && typeof squadron.warehouses === 'object' ? squadron.warehouses : {}),
+          [airport.id]: cargo,
+        },
+      };
+      writeSquadrons(squadrons);
+    }
+    orders.splice(orderIndex, 1);
   } else {
     if (status !== 'accepted') {
       throw new Error('Order cannot be completed');
@@ -1794,7 +1818,6 @@ export function updateAirportOrderStatus({ baseId, orderId, action, userId }) {
 
   logistics.orders = orders;
   persistBaseLogistics(airport.id, logistics);
-  const squadrons = readSquadrons();
   const shopperSquadron = getUserPrimarySquadron(actorId);
 
   return {

@@ -326,7 +326,7 @@ export function updateAirportOrderStatus({ baseId, orderId, action, userId, user
   }
 
   const actionKey = sanitizeText(action, 20).toLowerCase();
-  if (!['accept', 'unaccept', 'complete'].includes(actionKey)) {
+  if (!['accept', 'unaccept', 'complete', 'cancel'].includes(actionKey)) {
     throw new Error('Invalid order action');
   }
 
@@ -366,6 +366,11 @@ export function updateAirportOrderStatus({ baseId, orderId, action, userId, user
       acceptedAt: 0,
       acceptedByUserId: '',
     };
+  } else if (actionKey === 'cancel') {
+    if (status !== 'pending') {
+      throw new Error('Order cannot be cancelled');
+    }
+    orders.splice(orderIndex, 1);
   } else {
     if (status !== 'accepted') {
       throw new Error('Order cannot be completed');
