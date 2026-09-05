@@ -1909,6 +1909,7 @@ function FlatMapView({
   tankerWp1,
   tankerRoutes,
   orderAlerts = {},
+  onMapReady,
 }) {
   const center = normalizeMapCoordinates(focusCoordinates) || { lat: 35.5, lon: 37.5 };
   const activeBasemap = BASEMAP_CONFIG[basemapMode] || BASEMAP_CONFIG[BASEMAP_MODE_DARK];
@@ -1926,6 +1927,12 @@ function FlatMapView({
   }, [airportsData]);
   const [leafletMap, setLeafletMap] = useState(null);
   const [hoveredAirport, setHoveredAirport] = useState(null);
+
+  useEffect(() => {
+    if (!leafletMap || !onMapReady) return undefined;
+    leafletMap.whenReady(() => onMapReady());
+    return undefined;
+  }, [leafletMap, onMapReady]);
 
   useEffect(() => {
     if (!showAirports) setHoveredAirport(null);
@@ -2440,6 +2447,7 @@ function MapLibreFlatMapView({
   tankerRoutes,
   mapMaxZoom,
   orderAlerts = {},
+  onMapReady,
 }) {
   const MIN_PITCH = 0;
   const MAX_PITCH = 85;
@@ -2468,6 +2476,9 @@ function MapLibreFlatMapView({
   const mapRef = useRef(null);
   const domesOverlayRef = useRef(null);
   const [mapInstance, setMapInstance] = useState(null);
+  const mapReadyNotifiedRef = useRef(false);
+  const onMapReadyRef = useRef(onMapReady);
+  onMapReadyRef.current = onMapReady;
   const [hoveredAirport, setHoveredAirport] = useState(null);
   const dcsarByIdRef = useRef(new Map());
   const domes3dRef = useRef({
@@ -3449,6 +3460,13 @@ function MapLibreFlatMapView({
     });
     mapRef.current = map;
     setMapInstance(map);
+    mapReadyNotifiedRef.current = false;
+    const notifyMapReady = () => {
+      if (mapReadyNotifiedRef.current) return;
+      mapReadyNotifiedRef.current = true;
+      onMapReadyRef.current?.();
+    };
+    const readyFallback = window.setTimeout(notifyMapReady, 4000);
     map.dragRotate.disable();
     // Reduce zoom aggressiveness from fast wheel input to avoid unstable camera states.
     map.scrollZoom.setWheelZoomRate(1 / 1500);
@@ -4272,11 +4290,13 @@ function MapLibreFlatMapView({
         map.resize();
         window.requestAnimationFrame(() => {
           map.resize();
+          notifyMapReady();
         });
       });
     });
 
     return () => {
+      window.clearTimeout(readyFallback);
       logMapDebug('map-unmount');
       if (domes3dRef.current.paintThreeOverlay && mapRef.current) {
         mapRef.current.off('render', domes3dRef.current.paintThreeOverlay);
@@ -4769,9 +4789,20 @@ function MapLibreFlatMapView({
   );
 }
 
-export default function FrontlineMap({ language = 'en', tacticalMapId, airportsData, airportCatalog = [], airbaseStatus = {} }) {
+export default function FrontlineMap({ language = 'en', tacticalMapId, airportsData, airportCatalog = [], airbaseStatus = {}, onMapReady }) {
   const tacticalMap = getTacticalMapByCampaignId(tacticalMapId) || getDefaultTacticalMap();
   const startInTacticalMode = tacticalMap?.startInTacticalMode === true;
+  const onMapReadyRef = useRef(onMapReady);
+  onMapReadyRef.current = onMapReady;
+  const notifyMapReady = useCallback(() => {
+    onMapReadyRef.current?.();
+  }, []);
+
+  useEffect(() => {
+    if (startInTacticalMode) return undefined;
+    notifyMapReady();
+    return undefined;
+  }, [startInTacticalMode, notifyMapReady]);
   const theaterFocus = normalizeMapCoordinates(tacticalMap?.focusCoordinates);
   const initialZones = Array.isArray(tacticalMap?.defaultZones) && tacticalMap.defaultZones.length > 0
     ? tacticalMap.defaultZones
@@ -6944,6 +6975,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       tankerWp1={tankerWp1}
                       tankerRoutes={tankerRoutes}
                       orderAlerts={airportOrderAlerts}
+                      onMapReady={notifyMapReady}
                     />
                   ) : (
                     <FlatMapView
@@ -6996,6 +7028,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       tankerWp1={tankerWp1}
                       tankerRoutes={tankerRoutes}
                       orderAlerts={airportOrderAlerts}
+                      onMapReady={notifyMapReady}
                     />
                   )}
                 </div>

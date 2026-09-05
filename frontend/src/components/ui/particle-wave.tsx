@@ -6,36 +6,23 @@ interface ParticleWaveProps {
 }
 
 const ParticleWave: React.FC<ParticleWaveProps> = ({ className = '' }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const sceneRef = useRef<{
-    scene: THREE.Scene;
-    camera: THREE.PerspectiveCamera;
-    renderer: THREE.WebGLRenderer;
-    particles: THREE.Points;
-    particleMaterial: THREE.ShaderMaterial;
-    animationId: number | null;
-    mouse: THREE.Vector2;
-    clock: THREE.Clock;
-  } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Function to detect current theme
-  const getCurrentTheme = () => {
-    return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-  };
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return undefined;
 
-  // Function to get background color based on theme
-  const getBackgroundColor = (theme: string) => {
-    return theme === 'dark'
-      ? new THREE.Color(0x000000) // Black background for dark theme
-      : new THREE.Color(0xffffff); // White background for light theme
-  };
+    const canvas = document.createElement('canvas');
+    canvas.className = `block ${className}`.trim();
+    canvas.style.width = '100vw';
+    canvas.style.height = '100vh';
+    canvas.style.margin = '0';
+    canvas.style.overflow = 'hidden';
+    container.appendChild(canvas);
 
-  // Function to get particle color based on theme
-  const getParticleColor = (theme: string) => {
-    return theme === 'dark'
-      ? new THREE.Vector3(1.0, 1.0, 1.0) // White particles for dark theme
-      : new THREE.Vector3(0.0, 0.0, 0.0); // Black particles for light theme
-  };
+    const winWidth = window.innerWidth;
+    const winHeight = window.innerHeight;
+    const aspectRatio = winWidth / Math.max(winHeight, 1);
 
     const particleVertex = `
     uniform float uTime;
@@ -52,7 +39,7 @@ const ParticleWave: React.FC<ParticleWaveProps> = ({ className = '' }) => {
     }
   `;
 
-  const particleFragment = `
+    const particleFragment = `
     varying float vStripe;
     void main() {
       float x = clamp(vStripe * 0.5 + 0.5, 0.0, 1.0);
@@ -64,36 +51,38 @@ const ParticleWave: React.FC<ParticleWaveProps> = ({ className = '' }) => {
     }
   `;
 
-  const initScene = () => {
-    if (!canvasRef.current) return;
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: false,
+        alpha: false,
+        stencil: false,
+        depth: true,
+      });
+    } catch (error) {
+      console.warn('Particle wave WebGL init failed:', error);
+      canvas.remove();
+      return undefined;
+    }
 
-    const canvas = canvasRef.current;
-    const winWidth = window.innerWidth;
-    const winHeight = window.innerHeight;
-    const aspectRatio = winWidth / winHeight;
+    const gl = renderer.getContext();
+    if (!gl) {
+      renderer.dispose();
+      canvas.remove();
+      return undefined;
+    }
 
-    // Camera
+    const isDark = document.documentElement.classList.contains('dark');
+    renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
+    renderer.setSize(winWidth, winHeight);
+    renderer.setClearColor(isDark ? 0x000000 : 0xffffff);
+
     const camera = new THREE.PerspectiveCamera(75, aspectRatio, 0.01, 1000);
     const gridAngle = Math.PI / 4;
     camera.position.set(Math.sin(gridAngle) * 5, 6, Math.cos(gridAngle) * 5);
 
-    // Scene
     const scene = new THREE.Scene();
-
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({
-      canvas,
-      antialias: false,
-      alpha: false,
-      powerPreference: 'high-performance',
-      stencil: false,
-      depth: true,
-    });
-    renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
-    renderer.setSize(winWidth, winHeight);
-    renderer.setClearColor(getBackgroundColor(getCurrentTheme()));
-
-    // Particles
     const gap = 0.42;
     const amountX = 200;
     const amountY = 200;
@@ -119,97 +108,51 @@ const ParticleWave: React.FC<ParticleWaveProps> = ({ className = '' }) => {
       vertexShader: particleVertex,
       fragmentShader: particleFragment,
       uniforms: {
-        uTime: { value: 0 }
-      }
+        uTime: { value: 0 },
+      },
     });
 
     const particles = new THREE.Points(particleGeometry, particleMaterial);
     particles.frustumCulled = false;
     particles.rotation.y = Math.PI / 4 + Math.PI / 6;
     scene.add(particles);
-
     camera.lookAt(scene.position);
 
-    const mouse = new THREE.Vector2(-10, -10);
+    let animationId = 0;
+    let lastTime = performance.now();
 
-    sceneRef.current = {
-      scene,
-      camera,
-      renderer,
-      particles,
-      particleMaterial,
-      animationId: null,
-      mouse,
-      clock: new THREE.Clock()
+    const animate = (now: number) => {
+      const delta = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+      particleMaterial.uniforms.uTime.value -= delta * 3.0;
+      renderer.render(scene, camera);
+      animationId = requestAnimationFrame(animate);
     };
-  };
+    animationId = requestAnimationFrame(animate);
 
-  const animate = () => {
-    if (!sceneRef.current) return;
+    const handleResize = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      camera.aspect = width / Math.max(height, 1);
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
+      renderer.setSize(width, height);
+    };
 
-    const { camera, renderer, particleMaterial, clock } = sceneRef.current;
-    const delta = Math.min(clock.getDelta(), 0.05);
-    particleMaterial.uniforms.uTime.value -= delta * 3.0;
-    renderer.render(sceneRef.current.scene, camera);
-    sceneRef.current.animationId = requestAnimationFrame(animate);
-  };
-
-  const handleResize = () => {
-    if (!sceneRef.current) return;
-
-    const { camera, renderer } = sceneRef.current;
-    const winWidth = window.innerWidth;
-    const winHeight = window.innerHeight;
-
-    camera.aspect = winWidth / winHeight;
-    camera.updateProjectionMatrix();
-    renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
-    renderer.setSize(winWidth, winHeight);
-  };
-
-  useEffect(() => {
-    initScene();
-    animate();
-
-    const handleResizeEvent = () => handleResize();
-
-    window.addEventListener('resize', handleResizeEvent);
+    window.addEventListener('resize', handleResize);
 
     return () => {
-      if (sceneRef.current?.animationId) {
-        cancelAnimationFrame(sceneRef.current.animationId);
-      }
-      window.removeEventListener('resize', handleResizeEvent);
-
-      // Cleanup Three.js resources
-      if (sceneRef.current) {
-        const { scene, renderer, particles } = sceneRef.current;
-        scene.remove(particles);
-        if (particles.geometry) particles.geometry.dispose();
-        if (particles.material) {
-          if (Array.isArray(particles.material)) {
-            particles.material.forEach(material => material.dispose());
-          } else {
-            particles.material.dispose();
-          }
-        }
-        renderer.dispose();
-      }
+      cancelAnimationFrame(animationId);
+      window.removeEventListener('resize', handleResize);
+      scene.remove(particles);
+      particleGeometry.dispose();
+      particleMaterial.dispose();
+      renderer.dispose();
+      canvas.remove();
     };
-  }, []);
+  }, [className]);
 
-  return (
-    <canvas
-      ref={canvasRef}
-      className={`block ${className}`}
-      style={{
-        width: '100vw',
-        height: '100vh',
-        margin: 0,
-        overflow: 'hidden'
-      }}
-    />
-  );
+  return <div ref={containerRef} className={className} />;
 };
 
 export { ParticleWave };

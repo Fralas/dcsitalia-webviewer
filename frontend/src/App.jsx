@@ -198,8 +198,11 @@ function App() {
   const [isStorylineOpen, setIsStorylineOpen] = useState(false);
   const storylineReturnViewRef = useRef('landing');
   const bootReady = !loading && !userLoading;
+  const [mapReady, setMapReady] = useState(() => initialRoute.view !== 'frontline');
+  const revealReady = bootReady && (Boolean(error) || currentView !== 'frontline' || mapReady);
 
   const hideSplash = () => {
+    bootRevealDone.current = true;
     setSplashFading(true);
     window.setTimeout(() => {
       setSplashVisible(false);
@@ -208,6 +211,8 @@ function App() {
   };
 
   const replaySplash = () => {
+    bootRevealDone.current = false;
+    setMapReady(currentView !== 'frontline');
     setSplashFading(false);
     setSplashVisible(true);
     setSplashKey((key) => key + 1);
@@ -299,12 +304,18 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!bootReady || splashPreview || currentView !== 'frontline') return undefined;
+    const timeoutId = window.setTimeout(() => setMapReady(true), 4000);
+    return () => window.clearTimeout(timeoutId);
+  }, [bootReady, splashPreview, currentView, activeTacticalMapId]);
+
+  useEffect(() => {
     if (splashPreview) {
       bootRevealDone.current = true;
       return undefined;
     }
 
-    if (!bootReady || bootRevealDone.current) {
+    if (!revealReady || bootRevealDone.current) {
       return undefined;
     }
 
@@ -340,6 +351,7 @@ function App() {
       fadeTimerId = window.setTimeout(() => {
         if (!cancelled) {
           setSplashVisible(false);
+          window.dispatchEvent(new Event('resize'));
         }
       }, BOOT_FADE_MS);
     };
@@ -350,7 +362,7 @@ function App() {
       cancelled = true;
       window.clearTimeout(fadeTimerId);
     };
-  }, [bootReady, splashPreview]);
+  }, [revealReady, splashPreview]);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -509,12 +521,12 @@ function App() {
         </div>
       ) : null}
 
-      {!error && bootReady && (!splashVisible || splashFading) ? (
+      {!error && bootReady ? (
     <>
     <div
       className={`app-shell h-screen flex flex-col overflow-hidden ${(currentView === 'landing' || currentView === 'lidc') ? 'bg-[#0E0E0E]' : 'bg-yt-bg-primary'}`}
-      aria-hidden={splashVisible || isStorylineOpen}
-      {...((splashVisible || isStorylineOpen) ? { inert: '' } : {})}
+      aria-hidden={isStorylineOpen || (splashVisible && !bootReady)}
+      {...(isStorylineOpen ? { inert: '' } : {})}
     >
       <header className={`app-header${currentView === 'landing' ? ' app-header--landing' : ''}${currentView === 'lidc' ? ' app-header--lidc' : ''}${currentView === 'frontline' ? ' app-header--frontline' : ''}`}>
         <div className="app-header__inner">
@@ -640,6 +652,7 @@ function App() {
             airportsData={Object.values(airports)}
             airportCatalog={airportCatalog}
             airbaseStatus={airbaseStatus}
+            onMapReady={() => setMapReady(true)}
           />
         )}
         {currentView === 'profile' && (

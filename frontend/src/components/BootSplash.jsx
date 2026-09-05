@@ -1,6 +1,23 @@
+import { Component } from 'react';
 import { ParticleWave } from '@/components/ui/particle-wave';
 import bannerImg from '../../img/DCS_ITALIA_ICON.png';
 import './BootSplash.css';
+
+class SplashWaveBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { failed: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (this.state.failed) return null;
+    return this.props.children;
+  }
+}
 
 export default function BootSplash({
   fading = false,
@@ -20,7 +37,9 @@ export default function BootSplash({
       aria-busy={!fading}
     >
       <div className="boot-splash__wave" aria-hidden="true">
-        <ParticleWave />
+        <SplashWaveBoundary>
+          <ParticleWave />
+        </SplashWaveBoundary>
       </div>
       <div className="boot-splash__veil" aria-hidden="true" />
 
