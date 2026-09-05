@@ -4,7 +4,7 @@ import './HidcMapAirportHoverPointer.css';
 const BASE_OUTWARD_PX = 44;
 const BASE_LABEL_GAP_PX = 2;
 const BASE_NAME_FONT_PX = 12;
-const BASE_ZONE_FONT_PX = 8;
+const BASE_ZONE_FONT_PX = 10;
 const POINTER_REFERENCE_ZOOM = 8;
 
 function getPointerScale(zoom) {
