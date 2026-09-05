@@ -45,7 +45,7 @@ function resolveScoreFile() {
 
   const productionPoints = optionalPath('PRODUCTION_POINTS_FILE');
   if (productionPoints) {
-    return path.join(path.dirname(productionPoints), 'Export_Score.json');
+    return path.join(path.dirname(productionPoints), 'score.json');
   }
   return null;
 }

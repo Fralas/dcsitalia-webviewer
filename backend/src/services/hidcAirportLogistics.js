@@ -1,6 +1,9 @@
 import crypto from 'crypto';
+import path from 'path';
 import { getAirportById } from '../config/airports.config.js';
+import { optionalPath } from '../config/envPaths.js';
 import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
+import { writeJsonAtomic } from './lidcDcsBridge.js';
 import {
   buildShopPurchaseLines,
   createDefaultBaseLogistics,
@@ -13,6 +16,24 @@ import {
 } from './lidcService.js';
 
 const MAX_BASE_ORDERS = 80;
+const ORDER_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const ORDER_CODE_LENGTH = 6;
+
+function resolveDcoreOrdersFile() {
+  const explicit = optionalPath('HIDC_LOGISTICS_ORDERS_FILE');
+  if (explicit) return explicit;
+
+  const scoreFile = optionalPath('DSCORE_SCORE_FILE');
+  if (scoreFile) return path.join(path.dirname(scoreFile), 'Export_WebLogistics_Orders.json');
+
+  const productionPoints = optionalPath('PRODUCTION_POINTS_FILE');
+  if (productionPoints) return path.join(path.dirname(productionPoints), 'Export_WebLogistics_Orders.json');
+
+  const webCommands = optionalPath('WEB_COMMANDS_FILE');
+  if (webCommands) return path.join(path.dirname(webCommands), 'Export_WebLogistics_Orders.json');
+
+  return null;
+}
 
 function sanitizeText(value, maxLength = 120) {
   return String(value || '').trim().slice(0, maxLength);
@@ -37,6 +58,7 @@ function persistBaseLogistics(airportId, logistics) {
   const store = readBaseLogisticsStore();
   store.bases[airportId] = logistics;
   writeBaseLogisticsStore(store);
+  exportHidcLogisticsOrders();
 }
 
 function getOrCreateBaseLogistics(baseId) {
@@ -45,20 +67,57 @@ function getOrCreateBaseLogistics(baseId) {
 
   const store = readBaseLogisticsStore();
   const existing = store.bases[airport.id];
+  const { orders, changed: codesAssigned } = ensureOrderCodes(existing?.orders);
   const next = {
     baseId: airport.id,
     credits: 0,
     fuel: normalizeLogisticsStock(existing?.fuel, LOGISTICS_FUEL_CATALOG),
     armament: normalizeLogisticsStock(existing?.armament, LOGISTICS_ARMAMENT_CATALOG),
-    orders: normalizeBaseOrders(existing?.orders),
+    orders,
   };
 
   store.bases[airport.id] = next;
-  if (!existing) {
+  if (!existing || codesAssigned) {
     writeBaseLogisticsStore(store);
+    if (codesAssigned) exportHidcLogisticsOrders();
   }
 
   return next;
+}
+
+function listUsedOrderCodes(store = readBaseLogisticsStore()) {
+  const used = new Set();
+  Object.values(store.bases || {}).forEach((base) => {
+    normalizeBaseOrders(base?.orders).forEach((order) => {
+      const code = sanitizeText(order?.code, 12).toUpperCase();
+      if (code) used.add(code);
+    });
+  });
+  return used;
+}
+
+function generateOrderCode(used = listUsedOrderCodes()) {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const bytes = crypto.randomBytes(ORDER_CODE_LENGTH);
+    let code = '';
+    for (let i = 0; i < ORDER_CODE_LENGTH; i += 1) {
+      code += ORDER_CODE_ALPHABET[bytes[i] % ORDER_CODE_ALPHABET.length];
+    }
+    if (!used.has(code)) return code;
+  }
+  throw new Error('Could not allocate an order code');
+}
+
+function ensureOrderCodes(rawOrders, used = listUsedOrderCodes()) {
+  let changed = false;
+  const orders = normalizeBaseOrders(rawOrders).map((order) => {
+    if (sanitizeText(order.code, 12)) return order;
+    const code = generateOrderCode(used);
+    used.add(code);
+    changed = true;
+    return { ...order, code };
+  });
+  return { orders, changed };
 }
 
 function toPublicAirportOrder(order, actorId, bluePoints) {
@@ -102,11 +161,71 @@ function occupancyAirport(airport) {
   };
 }
 
-function assertBluePoints(bluePoints, totalCost) {
-  if (!Number.isFinite(Number(bluePoints))) return;
-  if (Math.max(0, Math.floor(Number(bluePoints))) < totalCost) {
-    throw new Error('Insufficient BLUE faction points');
+function toDcoreOrderItem(line, catalogById) {
+  const catalogItem = catalogById.get(sanitizeText(line?.itemId, 80));
+  return {
+    item_id: sanitizeText(line?.itemId, 80),
+    name: sanitizeText(line?.name || catalogItem?.name, 120),
+    kind: sanitizeText(line?.kind || catalogItem?.kind, 40),
+    destination: sanitizeText(line?.destination || catalogItem?.destination, 40),
+    quantity: Math.max(0, Math.floor(Number(line?.quantity) || 0)),
+    cost: Math.max(0, Math.floor(Number(line?.cost) || 0)),
+    contents: Array.isArray(catalogItem?.contents)
+      ? catalogItem.contents.map((entry) => ({
+        label: sanitizeText(entry?.label, 80),
+        quantity: Math.max(0, Math.floor(Number(entry?.quantity) || 0)),
+      }))
+      : [],
+  };
+}
+
+function toDcoreOrder(airport, order, catalogById) {
+  return {
+    code: sanitizeText(order?.code, 12).toUpperCase(),
+    id: sanitizeText(order?.id, 120),
+    status: sanitizeText(order?.status, 20).toLowerCase() || 'pending',
+    airport_id: airport.id,
+    airport_name: airport.displayName || airport.name,
+    icao: airport.icao || '',
+    lat: Number.isFinite(airport.coordinates?.lat) ? airport.coordinates.lat : null,
+    lon: Number.isFinite(airport.coordinates?.lon) ? airport.coordinates.lon : null,
+    cost: Math.max(0, Math.floor(Number(order?.cost) || 0)),
+    created_at: Number(order?.createdAt) || Date.now(),
+    created_by: sanitizeText(order?.createdByUserName || order?.squadronName, 120),
+    created_by_id: sanitizeText(order?.createdByUserId, 80),
+    accepted_at: Number(order?.acceptedAt) || 0,
+    accepted_by_id: sanitizeText(order?.acceptedByUserId, 80),
+    items: (Array.isArray(order?.items) ? order.items : []).map((line) => toDcoreOrderItem(line, catalogById)),
+  };
+}
+
+export function exportHidcLogisticsOrders() {
+  const targetPath = resolveDcoreOrdersFile();
+  if (!targetPath) return null;
+
+  const store = readBaseLogisticsStore();
+  const catalogById = new Map(listLogisticsShop().map((item) => [item.id, item]));
+  const orders = [];
+  Object.entries(store.bases || {}).forEach(([baseId, logistics]) => {
+    const airport = getAirportById(baseId);
+    if (!airport) return;
+    normalizeBaseOrders(logistics?.orders)
+      .filter((order) => order.status !== 'completed' && sanitizeText(order.code, 12))
+      .forEach((order) => orders.push(toDcoreOrder(airport, order, catalogById)));
+  });
+
+  orders.sort((a, b) => (Number(b.created_at) || 0) - (Number(a.created_at) || 0));
+
+  try {
+    writeJsonAtomic(targetPath, {
+      orders,
+      updatedAt: Date.now(),
+    });
+  } catch (error) {
+    console.error('Failed to export HIDC logistics orders for DCORE:', error.message);
   }
+
+  return targetPath;
 }
 
 export function getAirportOccupancy(baseId, actorUserId = '', options = {}) {
@@ -116,6 +235,7 @@ export function getAirportOccupancy(baseId, actorUserId = '', options = {}) {
   const logistics = getOrCreateBaseLogistics(airport.id) || createDefaultBaseLogistics(airport.id);
   const actorId = sanitizeText(actorUserId, 80);
   const bluePoints = options.bluePoints;
+  const actorName = options.actorName || options.userName;
 
   return {
     airport: occupancyAirport(airport),
@@ -123,17 +243,10 @@ export function getAirportOccupancy(baseId, actorUserId = '', options = {}) {
     logistics,
     resources: summarizeLogistics(logistics),
     shop: listLogisticsShop(),
-    shopper: toShopper(actorId, options.actorName, bluePoints),
+    shopper: toShopper(actorId, actorName, bluePoints),
     orders: listVisibleAirportOrders(logistics.orders, actorId, bluePoints),
     economy: 'faction',
   };
-}
-
-export function quoteAirportLogisticsItems({ itemId, quantity, items }) {
-  const rawLines = Array.isArray(items) && items.length > 0
-    ? items
-    : [{ itemId, quantity: quantity || 1 }];
-  return buildShopPurchaseLines(rawLines);
 }
 
 export function purchaseAirportLogistics({
@@ -144,7 +257,6 @@ export function purchaseAirportLogistics({
   userId,
   userName,
   bluePoints,
-  skipBalanceCheck = false,
 }) {
   const actorId = sanitizeText(userId, 80);
   if (!actorId) {
@@ -160,12 +272,12 @@ export function purchaseAirportLogistics({
     ? items
     : [{ itemId, quantity: quantity || 1 }];
   const { purchaseLines, totalCost } = buildShopPurchaseLines(rawLines);
-  if (!skipBalanceCheck) assertBluePoints(bluePoints, totalCost);
 
   const logistics = getOrCreateBaseLogistics(airport.id);
   const displayName = sanitizeText(userName, 120) || actorId;
   const order = {
     id: `order_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+    code: generateOrderCode(),
     createdAt: Date.now(),
     createdByUserId: actorId,
     createdByUserName: displayName,
@@ -267,7 +379,6 @@ export function updateAirportOrder({
   userId,
   userName,
   bluePoints,
-  skipBalanceCheck = false,
 }) {
   const actorId = sanitizeText(userId, 80);
   if (!actorId) {
@@ -292,9 +403,6 @@ export function updateAirportOrder({
   if (sanitizeText(order.status, 20).toLowerCase() !== 'pending') {
     throw new Error('Not allowed to edit this order');
   }
-
-  const extraCost = Math.max(0, totalCost - Number(order.cost || 0));
-  if (!skipBalanceCheck) assertBluePoints(bluePoints, extraCost);
 
   orders[orderIndex] = {
     ...order,

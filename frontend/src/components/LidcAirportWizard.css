@@ -555,6 +555,40 @@
   font-size: 13px;
 }
 
+.lidc-airport-wizard-order-title {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lidc-airport-wizard-order-code {
+  width: fit-content;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--lidc-accent-gold);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.lidc-airport-wizard-order-code:hover {
+  color: #fff;
+}
+
+.lidc-airport-wizard-credits.is-preview {
+  margin-top: 8px;
+  opacity: 0.84;
+}
+
+.lidc-airport-wizard-credits.is-preview.is-negative strong {
+  color: #f87171;
+}
+
 .lidc-airport-wizard-order-tools {
   display: inline-flex;
   align-items: center;

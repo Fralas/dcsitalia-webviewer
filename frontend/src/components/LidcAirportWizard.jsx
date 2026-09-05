@@ -73,7 +73,7 @@ function ShopCard({ item, canAdd, onAdd }) {
   );
 }
 
-function ShopGroup({ items, remainingCredits, canPurchase, onAdd }) {
+function ShopGroup({ items, remainingCredits, canPurchase, onAdd, ignoreCreditLimit = false }) {
   if (!items.length) return null;
 
   return (
@@ -82,7 +82,7 @@ function ShopGroup({ items, remainingCredits, canPurchase, onAdd }) {
         <ShopCard
           key={item.id}
           item={item}
-          canAdd={canPurchase && remainingCredits >= item.cost}
+          canAdd={canPurchase && (ignoreCreditLimit || remainingCredits >= item.cost)}
           onAdd={onAdd}
         />
       ))}
@@ -218,7 +218,12 @@ export default function LidcAirportWizard({
   const spendBudget = editingOrder
     ? Number(editingOrder.squadronCredits || 0) + Number(editingOrder.cost || 0)
     : (knownCredits == null ? 0 : knownCredits);
-  const remainingCredits = Number.isFinite(spendBudget) ? Math.max(0, spendBudget - cartTotal) : Number.POSITIVE_INFINITY;
+  const remainingCredits = factionEconomy
+    ? Number.POSITIVE_INFINITY
+    : (Number.isFinite(spendBudget) ? Math.max(0, spendBudget - cartTotal) : 0);
+  const previewRemaining = factionEconomy && knownCredits != null
+    ? knownCredits - cartTotal
+    : null;
   const canPurchase = factionEconomy
     ? isLogged
     : isLogged && (editingOrder ? Boolean(editingOrder.canEdit) : Boolean(shopper));
@@ -275,12 +280,18 @@ export default function LidcAirportWizard({
   function addToCart(itemId) {
     const item = shopById.get(itemId);
     if (!item || !canPurchase) return;
-    if (remainingCredits < item.cost) return;
+    if (!factionEconomy && remainingCredits < item.cost) return;
     setPurchaseError('');
     setCart((prev) => ({
       ...prev,
       [itemId]: Math.max(0, Math.floor(Number(prev[itemId]) || 0)) + 1,
     }));
+  }
+
+  function copyOrderCode(code) {
+    const value = String(code || '').trim();
+    if (!value || !navigator.clipboard?.writeText) return;
+    navigator.clipboard.writeText(value).catch(() => {});
   }
 
   function setCartQuantity(itemId, nextQuantity) {
@@ -297,8 +308,8 @@ export default function LidcAirportWizard({
   }
 
   async function confirmOrder() {
-    if (!canPurchase || !airport?.id || cartLines.length === 0 || remainingCredits < 0) return;
-    if (cartTotal > spendBudget) return;
+    if (!canPurchase || !airport?.id || cartLines.length === 0) return;
+    if (!factionEconomy && (remainingCredits < 0 || cartTotal > spendBudget)) return;
     setConfirming(true);
     setPurchaseError('');
     try {
@@ -470,7 +481,19 @@ export default function LidcAirportWizard({
                       className={`lidc-airport-wizard-order ${isAccepted ? 'is-accepted' : ''}`}
                     >
                       <header>
-                        <h4>{order.squadronName || '—'}</h4>
+                        <div className="lidc-airport-wizard-order-title">
+                          <h4>{order.squadronName || '—'}</h4>
+                          {order.code && (
+                            <button
+                              type="button"
+                              className="lidc-airport-wizard-order-code"
+                              title={t('lidc.map.airportWizard.copyOrderCode')}
+                              onClick={() => copyOrderCode(order.code)}
+                            >
+                              {t('lidc.map.airportWizard.orderCode')} {order.code}
+                            </button>
+                          )}
+                        </div>
                         <div className="lidc-airport-wizard-order-tools">
                           {(order.canAccept || order.canComplete || order.canUnaccept || order.canEdit) && (
                             <div className="lidc-airport-wizard-order-actions">
@@ -598,6 +621,12 @@ export default function LidcAirportWizard({
                 <span>{t(factionEconomy ? 'lidc.map.airportWizard.blueFactionPoints' : 'lidc.map.airportWizard.credits')}</span>
                 <strong>{knownCredits == null ? '—' : formatStock(knownCredits)}</strong>
               </div>
+              {factionEconomy && cartTotal > 0 && (
+                <div className={`lidc-airport-wizard-credits is-preview${previewRemaining != null && previewRemaining < 0 ? ' is-negative' : ''}`}>
+                  <span>{t('lidc.map.airportWizard.pointsPreview')}</span>
+                  <strong>{previewRemaining == null ? '—' : formatStock(previewRemaining)}</strong>
+                </div>
+              )}
               {!isLogged && (
                 <p className="lidc-occupancy-panel__hint">{t('lidc.map.airportWizard.loginToBuy')}</p>
               )}
@@ -621,6 +650,7 @@ export default function LidcAirportWizard({
                   items={aircraftShop}
                   remainingCredits={remainingCredits}
                   canPurchase={canPurchase}
+                  ignoreCreditLimit={factionEconomy}
                   onAdd={addToCart}
                 />
               </section>
@@ -631,6 +661,7 @@ export default function LidcAirportWizard({
                   items={helicopterShop}
                   remainingCredits={remainingCredits}
                   canPurchase={canPurchase}
+                  ignoreCreditLimit={factionEconomy}
                   onAdd={addToCart}
                 />
               </section>
@@ -672,7 +703,7 @@ export default function LidcAirportWizard({
                   <button
                     type="button"
                     className="is-add"
-                    disabled={!canPurchase || remainingCredits < line.item.cost}
+                    disabled={!canPurchase || (!factionEconomy && remainingCredits < line.item.cost)}
                     onClick={() => addToCart(line.item.id)}
                   >
                     <Plus size={12} />
@@ -690,7 +721,7 @@ export default function LidcAirportWizard({
             <button
               type="button"
               className="lidc-btn lidc-btn-primary lidc-btn-block"
-              disabled={!canPurchase || confirming || cartLines.length === 0 || cartTotal > spendBudget}
+              disabled={!canPurchase || confirming || cartLines.length === 0 || (!factionEconomy && cartTotal > spendBudget)}
               onClick={confirmOrder}
             >
               {confirming ? <Loader2 size={14} className="spin" /> : null}

@@ -2185,49 +2185,23 @@ app.get('/api/airports/:id/occupancy', (req, res) => {
 
 /**
  * POST /api/airports/:id/logistics/purchase
- * Create a logistics order paid with BLUE faction points.
+ * Create a HIDC logistics order. Faction points are preview-only; DCORE deducts in-game.
  */
-app.post('/api/airports/:id/logistics/purchase', async (req, res) => {
+app.post('/api/airports/:id/logistics/purchase', (req, res) => {
   if (!req.session.user?.id) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
   try {
-    const actor = getSessionActor(req);
-    const result = await dscoreFactionPoints.transact(async ({ spend, credit, read }) => {
-      const { totalCost } = hidcAirportLogistics.quoteAirportLogisticsItems({
-        itemId: req.body?.itemId,
-        quantity: req.body?.quantity,
-        items: req.body?.items,
-      });
-      const cost = Math.max(0, Math.floor(Number(totalCost) || 0));
-      const nextBlue = cost > 0 ? await spend(cost) : read();
-      try {
-        const created = hidcAirportLogistics.purchaseAirportLogistics({
-          baseId: req.params.id,
-          itemId: req.body?.itemId,
-          quantity: req.body?.quantity,
-          items: req.body?.items,
-          userId: actor?.id || req.session.user.id,
-          userName: actor?.name || '',
-          bluePoints: nextBlue,
-          skipBalanceCheck: true,
-        });
-        return {
-          ...created,
-          shopper: {
-            ...(created.shopper || {}),
-            credits: nextBlue,
-          },
-          orders: (created.orders || []).map((order) => ({
-            ...order,
-            squadronCredits: nextBlue,
-          })),
-        };
-      } catch (error) {
-        if (cost > 0) await credit(cost);
-        throw error;
-      }
+    const ctx = getHidcLogisticsContext(req);
+    const result = hidcAirportLogistics.purchaseAirportLogistics({
+      baseId: req.params.id,
+      itemId: req.body?.itemId,
+      quantity: req.body?.quantity,
+      items: req.body?.items,
+      userId: ctx.userId,
+      userName: ctx.userName,
+      bluePoints: ctx.bluePoints,
     });
     return res.json(result);
   } catch (error) {
@@ -2241,62 +2215,31 @@ app.post('/api/airports/:id/logistics/purchase', async (req, res) => {
  * PATCH /api/airports/:id/logistics/orders/:orderId
  * Accept, unaccept, complete, or edit a HIDC logistics order.
  */
-app.patch('/api/airports/:id/logistics/orders/:orderId', async (req, res) => {
+app.patch('/api/airports/:id/logistics/orders/:orderId', (req, res) => {
   if (!req.session.user?.id) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
   try {
-    const actor = getSessionActor(req);
+    const ctx = getHidcLogisticsContext(req);
     const action = req.body?.action;
-    const result = await dscoreFactionPoints.transact(async ({ spend, credit, read }) => {
-      const userId = actor?.id || req.session.user.id;
-      const userName = actor?.name || '';
-      const bluePoints = read();
-      if (action) {
-        return hidcAirportLogistics.updateAirportOrderStatus({
+    const result = action
+      ? hidcAirportLogistics.updateAirportOrderStatus({
           baseId: req.params.id,
           orderId: req.params.orderId,
           action,
-          userId,
-          userName,
-          bluePoints,
-        });
-      }
-
-      const previous = hidcAirportLogistics.getAirportOccupancy(req.params.id, userId, { bluePoints, actorName: userName });
-      const previousOrder = (previous?.orders || []).find((entry) => entry.id === req.params.orderId);
-      const { totalCost } = hidcAirportLogistics.quoteAirportLogisticsItems({ items: req.body?.items });
-      const extraCost = Math.max(0, Number(totalCost || 0) - Number(previousOrder?.cost || 0));
-      const refund = Math.max(0, Number(previousOrder?.cost || 0) - Number(totalCost || 0));
-      if (extraCost > 0) await spend(extraCost);
-      try {
-        const updated = hidcAirportLogistics.updateAirportOrder({
+          userId: ctx.userId,
+          userName: ctx.userName,
+          bluePoints: ctx.bluePoints,
+        })
+      : hidcAirportLogistics.updateAirportOrder({
           baseId: req.params.id,
           orderId: req.params.orderId,
           items: req.body?.items,
-          userId,
-          userName,
-          bluePoints: read(),
-          skipBalanceCheck: true,
+          userId: ctx.userId,
+          userName: ctx.userName,
+          bluePoints: ctx.bluePoints,
         });
-        const nextBlue = refund > 0 ? await credit(refund) : read();
-        return {
-          ...updated,
-          shopper: {
-            ...(updated.shopper || {}),
-            credits: nextBlue,
-          },
-          orders: (updated.orders || []).map((order) => ({
-            ...order,
-            squadronCredits: nextBlue,
-          })),
-        };
-      } catch (error) {
-        if (extraCost > 0) await credit(extraCost);
-        throw error;
-      }
-    });
     return res.json(result);
   } catch (error) {
     const message = String(error?.message || 'Failed to update logistics order');
@@ -5878,6 +5821,7 @@ syncWebSpawnMarkersFromFile();
 syncTankerRoutesFromFile();
 syncDbuildSitesFromFile();
 exportPendingWarehouseOps();
+hidcAirportLogistics.exportHidcLogisticsOrders();
 syncLidcLinkRequestsFromFile();
 syncLidcWarehouseOpsAckFromFile();
 lidcService.exportLidcAirframeRegistry();

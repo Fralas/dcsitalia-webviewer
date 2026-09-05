@@ -1420,6 +1420,8 @@ function normalizeBaseOrders(rawOrders) {
 
       return {
         id: sanitizeText(order?.id, 120) || `order_${Date.now()}`,
+        code: sanitizeText(order?.code, 12).toUpperCase(),
+        createdByUserName: sanitizeText(order?.createdByUserName, 120),
         createdAt: Number.isFinite(Number(order?.createdAt)) ? Number(order.createdAt) : Date.now(),
         createdByUserId: sanitizeText(order?.createdByUserId, 80),
         acceptedAt: Number.isFinite(Number(order?.acceptedAt)) ? Number(order.acceptedAt) : 0,
