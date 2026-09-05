@@ -33,11 +33,16 @@
 
 .hidc-airport-pointer__label {
   position: absolute;
+  isolation: isolate;
   box-sizing: border-box;
   width: max-content;
   max-width: none;
   transform: translate(0, -100%);
-  padding: 0 0 3px;
+  padding: 2px 4px 3px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
   color: rgba(255, 255, 255, 0.95);
   font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
   font-weight: 700;
@@ -46,14 +51,28 @@
   text-transform: uppercase;
   white-space: nowrap;
   overflow: visible;
-  -webkit-text-stroke: 0.55px #000;
-  paint-order: stroke fill;
-  text-shadow:
-    -0.35px -0.35px 0 #000,
-    0.35px -0.35px 0 #000,
-    -0.35px 0.35px 0 #000,
-    0.35px 0.35px 0 #000;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
   animation: hidc-airport-arm-label 0.28s ease-out 0.06s both;
+}
+
+.hidc-airport-pointer__label::before,
+.hidc-airport-pointer__zone::before {
+  content: '';
+  position: absolute;
+  inset: -12px -18px;
+  z-index: -1;
+  border-radius: 22px;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 68% 62% at 50% 50%,
+    rgba(255, 255, 255, 0.16) 0%,
+    rgba(255, 255, 255, 0.06) 38%,
+    transparent 72%
+  );
+  backdrop-filter: blur(5px) saturate(1.1);
+  -webkit-backdrop-filter: blur(5px) saturate(1.1);
+  -webkit-mask-image: radial-gradient(ellipse 74% 70% at 50% 50%, #000 18%, transparent 78%);
+  mask-image: radial-gradient(ellipse 74% 70% at 50% 50%, #000 18%, transparent 78%);
 }
 
 .hidc-airport-pointer__label--blue {
@@ -70,20 +89,20 @@
 
 .hidc-airport-pointer__zone {
   position: absolute;
-  top: calc(100% + 3px);
+  isolation: isolate;
+  top: calc(100% + 5px);
   left: 0;
+  padding: 2px 3px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
   font-weight: 600;
   letter-spacing: 0.08em;
   line-height: 1;
-  opacity: 0.92;
+  opacity: 1;
   text-transform: none;
-  -webkit-text-stroke: 0.45px #000;
-  paint-order: stroke fill;
-  text-shadow:
-    -0.3px -0.3px 0 #000,
-    0.3px -0.3px 0 #000,
-    -0.3px 0.3px 0 #000,
-    0.3px 0.3px 0 #000;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 @keyframes hidc-airport-arm-extend {
