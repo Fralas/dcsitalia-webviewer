@@ -719,6 +719,12 @@ export async function getAirportOccupancy(airportId) {
   });
 }
 
+export async function getHidcLogisticsAlerts() {
+  return fetchAPI('/airports/logistics-alerts', {
+    credentials: 'include',
+  });
+}
+
 export async function purchaseAirportLogistics(airportId, payload) {
   return fetchAPI(`/airports/${encodeURIComponent(airportId)}/logistics/purchase`, {
     method: 'POST',

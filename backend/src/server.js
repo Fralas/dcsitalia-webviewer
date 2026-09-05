@@ -2171,6 +2171,14 @@ function getHidcLogisticsContext(req) {
 }
 
 /**
+ * GET /api/airports/logistics-alerts
+ * Open HIDC order counts per airbase, for map attention markers.
+ */
+app.get('/api/airports/logistics-alerts', (req, res) => {
+  res.json(hidcAirportLogistics.listAirportOrderAlerts());
+});
+
+/**
  * GET /api/airports/:id/occupancy
  * HIDC airbase overview + warehouse logistics (BLUE faction points / DSCORE).
  */

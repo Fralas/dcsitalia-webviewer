@@ -199,6 +199,22 @@ function toDcoreOrder(airport, order, catalogById) {
   };
 }
 
+export function listAirportOrderAlerts() {
+  const store = readBaseLogisticsStore();
+  const orders = {};
+
+  Object.entries(store.bases && typeof store.bases === 'object' ? store.bases : {}).forEach(([baseId, logistics]) => {
+    const id = sanitizeText(baseId, 120);
+    if (!id) return;
+    const orderCount = normalizeBaseOrders(logistics?.orders)
+      .filter((order) => sanitizeText(order.status, 20).toLowerCase() !== 'completed')
+      .length;
+    if (orderCount > 0) orders[id] = orderCount;
+  });
+
+  return { orders };
+}
+
 export function exportHidcLogisticsOrders() {
   const targetPath = resolveDcoreOrdersFile();
   if (!targetPath) return null;
