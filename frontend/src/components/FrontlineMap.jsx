@@ -1904,7 +1904,7 @@ function FlatMapView({
       <MapContainer
         center={[center.lat, center.lon]}
         zoom={7}
-        minZoom={4}
+        minZoom={6}
         maxZoom={effectiveMaxZoom}
         style={{ height: '100%', width: '100%' }}
         scrollWheelZoom
@@ -2394,7 +2394,7 @@ function MapLibreFlatMapView({
   const LOGISTICS_CH47_DISTANCE_THRESHOLD_METERS = 70000;
   const LOGISTICS_CH47_YAW_OFFSET_RAD = THREE.MathUtils.degToRad(70) + Math.PI;
   const LOGISTICS_CONVOY_YAW_OFFSET_RAD = 0;
-  const MIN_SAFE_ZOOM = 5;
+  const MIN_SAFE_ZOOM = 6;
   const effectiveMaxZoom = mapMaxZoom || MAP_ZOOM_DEFAULT_MAX;
   const containerRef = useRef(null);
   const mapRef = useRef(null);
@@ -3366,7 +3366,7 @@ function MapLibreFlatMapView({
       style,
       antialias: true,
       center: initialCamera ? [initialCamera.lng, initialCamera.lat] : [center.lon, center.lat],
-      zoom: initialCamera ? initialCamera.zoom : 7,
+      zoom: initialCamera ? Math.max(MIN_SAFE_ZOOM, Number(initialCamera.zoom) || 7) : 7,
       minZoom: MIN_SAFE_ZOOM,
       maxZoom: effectiveMaxZoom,
       pitch: initialCamera ? initialCamera.pitch : 48,
@@ -4405,6 +4405,7 @@ function MapLibreFlatMapView({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    map.setMinZoom(MIN_SAFE_ZOOM);
     map.setMaxZoom(effectiveMaxZoom);
   }, [effectiveMaxZoom]);
 
@@ -5627,7 +5628,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   };
 
   const handleFlatMapZoomChange = (zoom) => {
-    if (!isDesktopDevice) return;
+    if (!isDesktopDevice || startInTacticalMode) return;
     if (zoom <= 5 && mapModeRef.current) {
       mapModeRef.current = false;
       setMapMode(false);
