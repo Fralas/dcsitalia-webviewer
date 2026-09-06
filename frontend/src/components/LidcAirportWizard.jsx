@@ -10,6 +10,7 @@ import {
   Pencil,
   Plane,
   Plus,
+  Search,
   Shield,
   Trash2,
   Undo2,
@@ -47,7 +48,21 @@ function shopImageFor(item) {
 }
 
 function displayShopText(value) {
-  return String(value || '').replaceAll('_', ' ');
+  return String(value || '')
+    .replace(/SContainer/gi, 'Small Container')
+    .replaceAll('_', ' ');
+}
+
+function shopKindLabel(item) {
+  const id = String(item?.id || item?.itemId || item?.name || '');
+  if (
+    item?.imageKey === 'container_green_small'
+    || id.startsWith('SContainer')
+    || /small container/i.test(String(item?.name || ''))
+  ) {
+    return t('lidc.map.airportWizard.smallContainer');
+  }
+  return t(`lidc.map.airportWizard.${item.kind}`);
 }
 
 function contentsLabel(item) {
@@ -78,7 +93,7 @@ function ShopCard({ item, canAdd, onAdd }) {
         <img src={imageUrl} alt="" draggable={false} />
       ) : null}
       <strong>{displayShopText(item.name)}</strong>
-      <em>{t(`lidc.map.airportWizard.${item.kind}`)}</em>
+      <em>{shopKindLabel(item)}</em>
       <p>{contents}</p>
       <span className="lidc-airport-wizard-shop-card__cost">
         <Coins size={14} />
@@ -86,6 +101,19 @@ function ShopCard({ item, canAdd, onAdd }) {
       </span>
     </button>
   );
+}
+
+function shopSearchHaystack(item) {
+  const kindLabel = shopKindLabel(item);
+  const parts = [
+    item.id,
+    item.name,
+    item.kind,
+    kindLabel,
+    contentsLabel(item),
+    ...(Array.isArray(item.contents) ? item.contents.map((entry) => entry.label) : []),
+  ];
+  return displayShopText(parts.filter(Boolean).join(' ')).toLowerCase().replace(/\s+/g, ' ');
 }
 
 function ShopGroup({ items, remainingCredits, canPurchase, onAdd, ignoreCreditLimit = false }) {
@@ -183,6 +211,7 @@ export default function LidcAirportWizard({
   const [cart, setCart] = useState({});
   const [confirming, setConfirming] = useState(false);
   const [purchaseError, setPurchaseError] = useState('');
+  const [cargoSearch, setCargoSearch] = useState('');
   const [editingOrderId, setEditingOrderId] = useState('');
   const [orderBusyId, setOrderBusyId] = useState('');
   const catalogAirport = getLidcAirportById(airport?.id) || occupancy?.airport || airport;
@@ -202,6 +231,12 @@ export default function LidcAirportWizard({
   const shopById = useMemo(() => {
     return new Map(shop.map((item) => [item.id, item]));
   }, [shop]);
+
+  const cargoQuery = displayShopText(cargoSearch).trim().toLowerCase().replace(/\s+/g, ' ');
+  const filteredShop = useMemo(() => {
+    if (!cargoQuery) return shop;
+    return shop.filter((item) => shopSearchHaystack(item).includes(cargoQuery));
+  }, [shop, cargoQuery]);
 
   const cartLines = useMemo(() => {
     return Object.entries(cart)
@@ -665,13 +700,38 @@ export default function LidcAirportWizard({
               </section>
 
               <section className="lidc-airport-wizard-block">
-                <ShopGroup
-                  items={shop}
-                  remainingCredits={remainingCredits}
-                  canPurchase={canPurchase}
-                  ignoreCreditLimit={factionEconomy}
-                  onAdd={addToCart}
-                />
+                <label className="lidc-airport-wizard-search">
+                  <Search size={16} aria-hidden="true" />
+                  <input
+                    type="search"
+                    value={cargoSearch}
+                    onChange={(event) => setCargoSearch(event.target.value)}
+                    onMouseDown={(event) => event.stopPropagation()}
+                    placeholder={t('lidc.map.airportWizard.searchCargo')}
+                    aria-label={t('lidc.map.airportWizard.searchCargo')}
+                  />
+                  {cargoSearch ? (
+                    <button
+                      type="button"
+                      className="lidc-airport-wizard-search__clear"
+                      onClick={() => setCargoSearch('')}
+                      aria-label={t('lidc.map.airportWizard.clearSearch')}
+                    >
+                      <X size={14} />
+                    </button>
+                  ) : null}
+                </label>
+                {filteredShop.length > 0 ? (
+                  <ShopGroup
+                    items={filteredShop}
+                    remainingCredits={remainingCredits}
+                    canPurchase={canPurchase}
+                    ignoreCreditLimit={factionEconomy}
+                    onAdd={addToCart}
+                  />
+                ) : (
+                  <p className="lidc-occupancy-panel__hint">{t('lidc.map.airportWizard.searchEmpty')}</p>
+                )}
               </section>
               </div>
             </div>
@@ -698,7 +758,7 @@ export default function LidcAirportWizard({
                 <img src={shopImageFor(line.item)} alt="" draggable={false} />
                 <div>
                   <strong>{displayShopText(line.item.name)}</strong>
-                  <span>{t(`lidc.map.airportWizard.${line.item.kind}`)}</span>
+                  <span>{shopKindLabel(line.item)}</span>
                 </div>
                 <div className="lidc-airport-wizard-cart__qty">
                   <button

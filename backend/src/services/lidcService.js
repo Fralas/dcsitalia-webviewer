@@ -148,11 +148,11 @@ const LOGISTICS_SHOP_CATALOG = Object.freeze([
     contents: 'AGM_84A x28',
   }),
   defineShopPreset({
-    category: 'SCONTAINER', id: 'SContainer_AG_Heli', name: 'SContainer_AG_Heli', destination: 'ELICOTTERI',
+    category: 'SCONTAINER', id: 'SContainer_AG_Heli', name: 'Small Container AG Heli', destination: 'ELICOTTERI',
     contents: 'AGM_114L x100; AGM_114K x100; Hydra_70_M151HE x60',
   }),
   defineShopPreset({
-    category: 'SCONTAINER', id: 'SContainer_GPS_1', name: 'SContainer_GPS_1', destination: 'AEREI',
+    category: 'SCONTAINER', id: 'SContainer_GPS_1', name: 'Small Container GPS 1', destination: 'AEREI',
     contents: 'GBU_38 x40; CBU_105 x23',
   }),
   defineShopPreset({

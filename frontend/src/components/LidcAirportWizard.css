@@ -763,6 +763,67 @@
   text-transform: uppercase;
 }
 
+.lidc-airport-wizard-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  color: var(--lidc-mute);
+}
+
+.lidc-airport-wizard-search > svg {
+  position: absolute;
+  left: 12px;
+  pointer-events: none;
+}
+
+.lidc-airport-wizard-search input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 36px 0 38px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--lidc-ink);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.lidc-airport-wizard-search input::placeholder {
+  color: var(--lidc-mute);
+}
+
+.lidc-airport-wizard-search input:focus {
+  border-color: rgba(232, 197, 106, 0.45);
+  background: rgba(232, 197, 106, 0.06);
+}
+
+.lidc-airport-wizard-search input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.lidc-airport-wizard-search__clear {
+  position: absolute;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--lidc-mute);
+  cursor: pointer;
+}
+
+.lidc-airport-wizard-search__clear:hover {
+  color: var(--lidc-ink);
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .lidc-airport-wizard-shop {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
