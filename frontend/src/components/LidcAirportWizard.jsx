@@ -18,8 +18,7 @@ import {
 import * as mgrs from 'mgrs';
 import ammoContainerImage from '../../img/crates/container_blue_mid.png';
 import ammoHeliContainerImage from '../../img/crates/container_green_small.png';
-import ammoCrateImage from '../../img/crates/prop_mil_crate_01.png';
-import ammoHeliCrateImage from '../../img/crates/prop_box_ammo03a_set2.png';
+import ammoCrateImage from '../../img/crates/ammo_crate.webp';
 import { formatLidcAirportLabel, getLidcAirportById } from '../config/lidcAfghanistanAirports';
 import * as api from '../services/api';
 import { t } from '../utils/locale';
@@ -29,16 +28,31 @@ import './LidcAirportWizard.css';
 
 const TABS = ['overview', 'logistics'];
 
+const SHOP_IMAGES = {
+  container_blue_mid: ammoContainerImage,
+  container_green_small: ammoHeliContainerImage,
+  ammo_crate: ammoCrateImage,
+};
+
 function shopImageFor(item) {
-  if (item.kind === 'container') {
-    return item.destination === 'helicopters' ? ammoHeliContainerImage : ammoContainerImage;
+  if (item?.imageKey && SHOP_IMAGES[item.imageKey]) {
+    return SHOP_IMAGES[item.imageKey];
   }
-  return item.destination === 'helicopters' ? ammoHeliCrateImage : ammoCrateImage;
+  if (item?.kind === 'container') {
+    return String(item.id || item.itemId || item.name || '').startsWith('SContainer')
+      ? ammoHeliContainerImage
+      : ammoContainerImage;
+  }
+  return ammoCrateImage;
+}
+
+function displayShopText(value) {
+  return String(value || '').replaceAll('_', ' ');
 }
 
 function contentsLabel(item) {
   return (Array.isArray(item.contents) ? item.contents : [])
-    .map((entry) => `${entry.label} ×${entry.quantity}`)
+    .map((entry) => `${displayShopText(entry.label)} ×${entry.quantity}`)
     .join(' · ');
 }
 
@@ -46,23 +60,24 @@ function ShopCard({ item, canAdd, onAdd }) {
   const transport = Array.isArray(item.transport) ? item.transport : [];
   const imageUrl = shopImageFor(item);
   const contents = contentsLabel(item);
+  const isCrate = item.kind === 'crate';
 
   return (
     <button
       type="button"
-      className="lidc-airport-wizard-shop-card"
+      className={`lidc-airport-wizard-shop-card${isCrate ? ' is-crate' : ''}`}
       disabled={!canAdd}
       title={contents}
       onClick={() => onAdd(item.id)}
     >
       <span className="lidc-airport-wizard-shop-card__transport" aria-hidden="true">
         <Plane size={14} />
-        {transport.includes('helicopter') && <Helicopter size={14} />}
+        {isCrate && transport.includes('helicopter') && <Helicopter size={14} />}
       </span>
       {imageUrl ? (
         <img src={imageUrl} alt="" draggable={false} />
       ) : null}
-      <strong>{item.name}</strong>
+      <strong>{displayShopText(item.name)}</strong>
       <em>{t(`lidc.map.airportWizard.${item.kind}`)}</em>
       <p>{contents}</p>
       <span className="lidc-airport-wizard-shop-card__cost">
@@ -181,14 +196,6 @@ export default function LidcAirportWizard({
   const editingOrder = orders.find((order) => order.id === editingOrderId) || null;
   const factionEconomy = variant === 'hidc' || occupancy?.economy === 'faction';
   const showSquadrons = !factionEconomy;
-  const aircraftShop = useMemo(
-    () => shop.filter((item) => item.destination !== 'helicopters'),
-    [shop],
-  );
-  const helicopterShop = useMemo(
-    () => shop.filter((item) => item.destination === 'helicopters'),
-    [shop],
-  );
   const shopper = occupancy?.shopper || null;
   const knownCredits = Number.isFinite(Number(shopper?.credits)) ? Number(shopper.credits) : null;
 
@@ -568,7 +575,7 @@ export default function LidcAirportWizard({
                         {(order.items || []).map((item, index) => (
                           <div key={`${order.id}-${item.itemId}-${index}`}>
                             <img src={shopImageFor(item)} alt="" draggable={false} />
-                            <strong>{item.name}</strong>
+                            <strong>{displayShopText(item.name)}</strong>
                             <em>×{item.quantity}</em>
                           </div>
                         ))}
@@ -658,20 +665,8 @@ export default function LidcAirportWizard({
               </section>
 
               <section className="lidc-airport-wizard-block">
-                <h3>{t('lidc.map.airportWizard.shopAircraft')}</h3>
                 <ShopGroup
-                  items={aircraftShop}
-                  remainingCredits={remainingCredits}
-                  canPurchase={canPurchase}
-                  ignoreCreditLimit={factionEconomy}
-                  onAdd={addToCart}
-                />
-              </section>
-
-              <section className="lidc-airport-wizard-block">
-                <h3>{t('lidc.map.airportWizard.shopHelicopters')}</h3>
-                <ShopGroup
-                  items={helicopterShop}
+                  items={shop}
                   remainingCredits={remainingCredits}
                   canPurchase={canPurchase}
                   ignoreCreditLimit={factionEconomy}
@@ -702,7 +697,7 @@ export default function LidcAirportWizard({
               <article key={line.item.id} className="lidc-airport-wizard-cart__line">
                 <img src={shopImageFor(line.item)} alt="" draggable={false} />
                 <div>
-                  <strong>{line.item.name}</strong>
+                  <strong>{displayShopText(line.item.name)}</strong>
                   <span>{t(`lidc.map.airportWizard.${line.item.kind}`)}</span>
                 </div>
                 <div className="lidc-airport-wizard-cart__qty">

@@ -70,86 +70,150 @@ function parseShopContents(raw) {
     });
 }
 
-function defineShopPreset({ category, id, name, destination, contents, total, types }) {
-  const kind = category === 'CONTAINER' ? 'container' : 'crate';
-  const totalQuantity = Math.max(0, Math.floor(Number(total) || 0));
+function shopImageKey(category) {
+  if (category === 'SCONTAINER') return 'container_green_small';
+  if (category === 'CASSA') return 'ammo_crate';
+  return 'container_blue_mid';
+}
+
+function defineShopPreset({ category, id, name, destination, contents }) {
+  const parsedContents = Object.freeze(parseShopContents(contents));
+  const kind = category === 'CASSA' ? 'crate' : 'container';
+  const totalQuantity = parsedContents.reduce((sum, entry) => sum + Math.max(0, Number(entry.quantity) || 0), 0);
   return Object.freeze({
     id,
     kind,
+    imageKey: shopImageKey(category),
     name,
     destination: destination === 'ELICOTTERI' ? 'helicopters' : 'aircraft',
-    contents: Object.freeze(parseShopContents(contents)),
+    contents: parsedContents,
     total: totalQuantity,
-    types: Math.max(0, Math.floor(Number(types) || 0)),
+    types: parsedContents.filter((entry) => (Number(entry.quantity) || 0) > 0).length,
     cost: kind === 'container' ? totalQuantity * 30 : totalQuantity * 72,
-    transport: Object.freeze(kind === 'container' ? ['aircraft'] : ['aircraft', 'helicopter']),
+    transport: Object.freeze(kind === 'crate' ? ['aircraft', 'helicopter'] : ['aircraft']),
   });
 }
 
 const LOGISTICS_SHOP_CATALOG = Object.freeze([
   defineShopPreset({
-    category: 'CONTAINER', id: 'CONT-AIR-01', name: 'GEN', destination: 'AEREI',
-    contents: 'Mk-82 x30; Mk-84 x10; AIM-120C x20; AIM-9X x20', total: 80, types: 4,
+    category: 'CONTAINER', id: 'Container AA_New', name: 'Container AA_New', destination: 'AEREI',
+    contents: 'AIM120C x34; AIM9X x20; AIM9M x10',
   }),
   defineShopPreset({
-    category: 'CONTAINER', id: 'CONT-AIR-02', name: 'STRIKE', destination: 'AEREI',
-    contents: 'Mk-82 x40; Mk-83 x20; AGM-65D x20', total: 80, types: 3,
+    category: 'CONTAINER', id: 'Container AA_Old', name: 'Container AA_Old', destination: 'AEREI',
+    contents: 'AIM54C_Mk60 x8; AIM7P x10; AIM9M x10',
   }),
   defineShopPreset({
-    category: 'CONTAINER', id: 'CONT-AIR-03', name: 'SEAD', destination: 'AEREI',
-    contents: 'AGM-88C x20; AGM-65G x20; AIM-120C x20; AIM-9M x20', total: 80, types: 4,
+    category: 'CONTAINER', id: 'Container_AG_GPS 1', name: 'Container_AG_GPS 1', destination: 'AEREI',
+    contents: 'GBU_38 x45; GBU_31 x20',
   }),
   defineShopPreset({
-    category: 'CONTAINER', id: 'CONT-AIR-04', name: 'CAS', destination: 'AEREI',
-    contents: 'Mk-82 x30; CBU-97 x20; AGM-65D x20; Hydra 70 x30', total: 100, types: 4,
+    category: 'CONTAINER', id: 'Container_AG_GPS 2', name: 'Container_AG_GPS 2', destination: 'AEREI',
+    contents: 'CBU_105 x50; GBU_54 x56',
   }),
   defineShopPreset({
-    category: 'CONTAINER', id: 'CONT-AIR-05', name: 'AAM', destination: 'AEREI',
-    contents: 'AIM-120C x30; AIM-9X x30; AIM-7M x20; AIM-9M x10', total: 90, types: 4,
+    category: 'CONTAINER', id: 'Container_AG_LGB 1', name: 'Container_AG_LGB 1', destination: 'AEREI',
+    contents: 'GBU_12 x5; GBU_24 x2',
   }),
   defineShopPreset({
-    category: 'CASSA', id: 'BOX-AIR-01', name: 'BOMBS', destination: 'AEREI',
-    contents: 'Mk-82 x6; Mk-84 x4', total: 10, types: 2,
+    category: 'CONTAINER', id: 'Container_AG_Glide 1', name: 'Container_AG_Glide 1', destination: 'AEREI',
+    contents: 'AGM_154A x3; AGM_154C x3',
   }),
   defineShopPreset({
-    category: 'CASSA', id: 'BOX-AIR-02', name: 'AAM', destination: 'AEREI',
-    contents: 'AIM-120C x5; AIM-9X x5', total: 10, types: 2,
+    category: 'CONTAINER', id: 'Container_AG_Cruise 1', name: 'Container_AG_Cruise 1', destination: 'AEREI',
+    contents: 'AGM_84H x10; AGM_84A x3',
   }),
   defineShopPreset({
-    category: 'CASSA', id: 'BOX-AIR-03', name: 'SEAD', destination: 'AEREI',
-    contents: 'AGM-65D x6; AGM-88C x4', total: 10, types: 2,
+    category: 'CONTAINER', id: 'Container_AG_Maverick 1', name: 'Container_AG_Maverick 1', destination: 'AEREI',
+    contents: 'AGM_65H x30; AGM_65D x26',
   }),
   defineShopPreset({
-    category: 'CASSA', id: 'BOX-AIR-04', name: 'CLUSTER', destination: 'AEREI',
-    contents: 'CBU-97 x5; Mk-82 x5', total: 10, types: 2,
+    category: 'CONTAINER', id: 'Container_AG_Maverick 2', name: 'Container_AG_Maverick 2', destination: 'AEREI',
+    contents: 'AGM_65E x30; AGM_65K x28',
   }),
   defineShopPreset({
-    category: 'CASSA', id: 'BOX-AIR-05', name: 'AAM2', destination: 'AEREI',
-    contents: 'AIM-7M x5; AIM-9M x5', total: 10, types: 2,
+    category: 'CONTAINER', id: 'Container_AG_Hellfire', name: 'Container_AG_Hellfire', destination: 'AEREI',
+    contents: 'AGM_114L x200; AGM_114K x188',
   }),
   defineShopPreset({
-    category: 'CONTAINER', id: 'CONT-HEL-01', name: 'HELLFIRE', destination: 'ELICOTTERI',
-    contents: 'AGM-114K x40; AGM-114L x30', total: 70, types: 2,
+    category: 'CONTAINER', id: 'Container_AG_SEAD1', name: 'Container_AG_SEAD1', destination: 'AEREI',
+    contents: 'AGM_88C x10; AGM_122 x5',
   }),
   defineShopPreset({
-    category: 'CONTAINER', id: 'CONT-HEL-02', name: 'MIXED', destination: 'ELICOTTERI',
-    contents: 'AGM-114K x25; APKWS x25; Hydra 70 x25; AGM-114L x20', total: 95, types: 4,
+    category: 'CONTAINER', id: 'Container_AG_Rockets', name: 'Container_AG_Rockets', destination: 'AEREI',
+    contents: 'Hydra_70_M151HE x500; APKWS M282 x167',
   }),
   defineShopPreset({
-    category: 'CONTAINER', id: 'CONT-HEL-03', name: 'RUS', destination: 'ELICOTTERI',
-    contents: '9M127 Vikhr x30; 9M120 Ataka x30; S-8 x20; S-13 x10', total: 90, types: 4,
+    category: 'CONTAINER', id: 'Container_ASW', name: 'Container_ASW', destination: 'AEREI',
+    contents: 'AGM_84A x28',
   }),
   defineShopPreset({
-    category: 'CASSA', id: 'BOX-HEL-01', name: 'APKWS', destination: 'ELICOTTERI',
-    contents: 'APKWS x10', total: 10, types: 1,
+    category: 'SCONTAINER', id: 'SContainer_AG_Heli', name: 'SContainer_AG_Heli', destination: 'ELICOTTERI',
+    contents: 'AGM_114L x100; AGM_114K x100; Hydra_70_M151HE x60',
   }),
   defineShopPreset({
-    category: 'CASSA', id: 'BOX-HEL-02', name: 'HYDRA', destination: 'ELICOTTERI',
-    contents: 'Hydra 70 x10', total: 10, types: 1,
+    category: 'SCONTAINER', id: 'SContainer_GPS_1', name: 'SContainer_GPS_1', destination: 'AEREI',
+    contents: 'GBU_38 x40; CBU_105 x23',
   }),
   defineShopPreset({
-    category: 'CASSA', id: 'BOX-HEL-03', name: 'HELLFIRE', destination: 'ELICOTTERI',
-    contents: 'AGM-114K x6; AGM-114L x4', total: 10, types: 2,
+    category: 'CONTAINER', id: 'Container_AG_Rus', name: 'Container_AG_Rus', destination: 'ELICOTTERI',
+    contents: '9M120 x100; S8FP2 x252',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_120', name: 'Crate_120', destination: 'ELICOTTERI',
+    contents: 'AIM120C x8',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_9X', name: 'Crate_9X', destination: 'ELICOTTERI',
+    contents: 'AIM9X x14',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_GBU38', name: 'Crate_GBU38', destination: 'ELICOTTERI',
+    contents: 'GBU_38 x5',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_GBU54', name: 'Crate_GBU54', destination: 'ELICOTTERI',
+    contents: 'GBU_54 x5',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_CBU105', name: 'Crate_CBU105', destination: 'ELICOTTERI',
+    contents: 'CBU_105 x3',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_AGM65D', name: 'Crate_AGM65D', destination: 'ELICOTTERI',
+    contents: 'AGM_65D x6',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_AGM65F', name: 'Crate_AGM65F', destination: 'ELICOTTERI',
+    contents: 'AGM_65F x4',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_AGM114K', name: 'Crate_AGM114K', destination: 'ELICOTTERI',
+    contents: 'AGM_114K x14',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_AGM114L', name: 'Crate_AGM114L', destination: 'ELICOTTERI',
+    contents: 'AGM_114L x14',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_AGM88', name: 'Crate_AGM88', destination: 'ELICOTTERI',
+    contents: 'AGM_88C x3',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_Hydra', name: 'Crate_Hydra', destination: 'ELICOTTERI',
+    contents: 'Hydra_70_M151HE x14',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_APKWS', name: 'Crate_APKWS', destination: 'ELICOTTERI',
+    contents: 'APKWS M282 x14',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_Ataka', name: 'Crate_Ataka', destination: 'ELICOTTERI',
+    contents: '9M120 x14',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_S8FP2', name: 'Crate_S8FP2', destination: 'ELICOTTERI',
+    contents: 'S8FP2 x14',
   }),
 ]);
 
@@ -1364,6 +1428,7 @@ function listLogisticsShop() {
   return LOGISTICS_SHOP_CATALOG.map((item) => ({
     id: item.id,
     kind: item.kind,
+    imageKey: item.imageKey,
     name: item.name,
     destination: item.destination,
     contents: item.contents.map((entry) => ({ ...entry })),

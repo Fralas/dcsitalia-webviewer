@@ -827,6 +827,12 @@
   margin: 22px 0 4px;
 }
 
+.lidc-airport-wizard-shop-card.is-crate img {
+  width: min(92px, 62%);
+  height: 68px;
+  margin: 26px 0 8px;
+}
+
 .lidc-airport-wizard-shop-card strong {
   font-size: 11px;
   letter-spacing: 0.08em;
