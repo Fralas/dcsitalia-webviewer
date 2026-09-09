@@ -215,7 +215,6 @@
 }
 
 .app-header__nav-btn--debug {
-  border-color: rgba(255, 140, 0, 0.55);
   color: #ffb347;
   font-size: 11px;
   font-weight: 600;
@@ -227,7 +226,6 @@
 }
 
 .app-header__nav-btn--debug:hover:not(:disabled) {
-  border-color: rgba(255, 140, 0, 0.85);
   color: #ffd18a;
   background: rgba(255, 140, 0, 0.12);
 }
@@ -243,19 +241,18 @@
   gap: 6px;
   height: 34px;
   padding: 0 10px;
-  border-radius: 8px;
-  border: 1px solid var(--header-border);
-  background: var(--header-surface);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
   color: var(--header-text-secondary);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
   cursor: pointer;
-  transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
+  transition: background 0.16s ease, color 0.16s ease;
 }
 
 .app-header__lang:hover {
-  border-color: #2d3333;
   background: #151717;
   color: var(--header-text);
 }
@@ -281,37 +278,32 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  border: 1px solid transparent;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
   background: transparent;
   color: var(--header-nav-default);
   cursor: pointer;
-  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+  transition: background 0.16s ease, color 0.16s ease;
 }
 
 .app-header__nav-btn--lang {
   width: auto;
-  height: 34px;
   padding: 0 10px;
-  border-radius: 8px;
-  border: 1px solid var(--header-border);
-  background: var(--header-surface);
+  gap: 6px;
   color: var(--header-text-secondary);
 }
 
 .app-header__nav-btn:hover {
   color: var(--header-text);
-  border-color: #2d3333;
   background: #151717;
 }
 
 .app-header__nav-btn.is-active {
   color: var(--header-accent);
-  border-color: var(--header-accent-border-active);
   background: var(--header-accent-soft);
-  box-shadow: none;
 }
 
 .app-header__summary {
@@ -351,21 +343,20 @@
   align-items: center;
   gap: 8px;
   height: 34px;
-  padding: 0 10px 0 4px;
-  border-radius: 999px;
-  border: 1px solid var(--header-border);
-  background: var(--header-surface);
+  padding: 0 8px 0 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
   color: var(--header-text-secondary);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
+  transition: background 0.16s ease, color 0.16s ease;
 }
 
 .app-header__user-btn:hover {
-  border-color: #2d3333;
   background: #151717;
   color: var(--header-text);
 }
@@ -396,20 +387,19 @@
   gap: 6px;
   height: 34px;
   padding: 0 10px;
-  border-radius: 8px;
-  border: 1px solid var(--header-border);
-  background: var(--header-surface);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
   color: var(--header-text-secondary);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+  transition: background 0.16s ease, color 0.16s ease;
 }
 
 .app-header__login-btn:hover {
-  border-color: #2d3333;
   background: #151717;
   color: var(--header-text);
 }

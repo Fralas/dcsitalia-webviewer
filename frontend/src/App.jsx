@@ -564,7 +564,7 @@ function App() {
                   storylineReturnViewRef.current = 'lidc';
                   setIsStorylineOpen(true);
                 }}
-                className="app-header__nav-btn app-header__nav-btn--lang"
+                className="app-header__nav-btn"
                 title={t('lidc.storyline.open')}
                 aria-label={t('lidc.storyline.open')}
               >
@@ -592,7 +592,7 @@ function App() {
             <button
               type="button"
               onClick={() => goToView('changelogs')}
-              className={`app-header__nav-btn app-header__nav-btn--lang${currentView === 'changelogs' ? ' is-active' : ''}`}
+              className={`app-header__nav-btn${currentView === 'changelogs' ? ' is-active' : ''}`}
               title="Apri changelog"
               aria-label="Apri changelog"
             >
@@ -602,7 +602,7 @@ function App() {
             <button
               type="button"
               onClick={() => goToView('wiki')}
-              className={`app-header__nav-btn app-header__nav-btn--lang${currentView === 'wiki' ? ' is-active' : ''}`}
+              className={`app-header__nav-btn${currentView === 'wiki' ? ' is-active' : ''}`}
               title="Apri wiki"
               aria-label="Apri wiki"
             >
