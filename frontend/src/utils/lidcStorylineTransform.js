@@ -150,7 +150,11 @@ export function loadSavedTransform() {
         Array.isArray(parsed.zones) ? parsed.zones : defaults.zones,
         defaults.zones,
       ),
-      easterEggs: mergeEasterEggTransforms(parsed.easterEggs),
+      easterEggs: mergeEasterEggTransforms(
+        Array.isArray(parsed.easterEggs) && parsed.easterEggs.length > 0
+          ? parsed.easterEggs
+          : defaults.easterEggs,
+      ),
       zonesCoordinateSpace: parsed.zonesCoordinateSpace,
     };
   } catch {

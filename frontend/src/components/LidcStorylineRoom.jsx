@@ -29,7 +29,6 @@ import {
   enforceUniformScaleFromDrag,
   getDefaultTransform,
   isTerminalCameraConfigured,
-  LIDC_STORYLINE_TRANSFORM_STORAGE_KEY,
   loadSavedTransform,
   migrateTransformZonesToRoomLocal,
   normalizeTerminalCamera,
@@ -275,9 +274,11 @@ const STORYLINE_DEBUG_USER_ID = '675706661570347041';
 export default function LidcStorylineRoom({ onClose }) {
   const { user } = useUser();
   const canUseStorylineDebug = String(user?.id || '') === STORYLINE_DEBUG_USER_ID;
+  const canUseStorylineDebugRef = useRef(canUseStorylineDebug);
+  canUseStorylineDebugRef.current = canUseStorylineDebug;
   const containerRef = useRef(null);
   const sceneApiRef = useRef(null);
-  const transformRef = useRef(loadSavedTransform());
+  const transformRef = useRef(getDefaultTransform());
   const debugOpenRef = useRef(false);
   const whiteboardOpenRef = useRef(false);
   const terminalOpenRef = useRef(false);
@@ -304,7 +305,7 @@ export default function LidcStorylineRoom({ onClose }) {
   const [activeInteractEvent, setActiveInteractEvent] = useState(null);
   const [showControlsHint, setShowControlsHint] = useState(false);
   const [controlsHintFading, setControlsHintFading] = useState(false);
-  const [transform, setTransform] = useState(() => loadSavedTransform());
+  const [transform, setTransform] = useState(() => getDefaultTransform());
   const [transformMode, setTransformMode] = useState('translate');
   const [cameraPosition, setCameraPosition] = useState([0, 0, 0]);
   const [cameraRotation, setCameraRotation] = useState([0, 0, 0]);
@@ -1466,24 +1467,9 @@ export default function LidcStorylineRoom({ onClose }) {
 
         setupRoomLighting(roomContentGroup, roomLocalBounds);
 
-        let storedTransform = null;
-        try {
-          const raw = localStorage.getItem(LIDC_STORYLINE_TRANSFORM_STORAGE_KEY);
-          storedTransform = raw ? JSON.parse(raw) : null;
-        } catch {
-          storedTransform = null;
-        }
-
-        const initialTransform = loadSavedTransform();
-
-        if (!storedTransform?.easterEggs) {
-          const roomCenter = new THREE.Vector3(0, roomLocalBounds.min.y + 0.5, 0);
-          roomContentGroup.localToWorld(roomCenter);
-          initialTransform.easterEggs = (initialTransform.easterEggs ?? []).map((egg) => ({
-            ...egg,
-            position: roomCenter.toArray().map((value) => +value.toFixed(4)),
-          }));
-        }
+        const initialTransform = canUseStorylineDebugRef.current
+          ? loadSavedTransform()
+          : getDefaultTransform();
 
         applyObjectTransform(roomContentGroup, initialTransform.room);
         if (whiteboardGroup && initialTransform.whiteboard) {
@@ -1491,15 +1477,7 @@ export default function LidcStorylineRoom({ onClose }) {
         }
 
         const migratedTransform = migrateTransformZonesToRoomLocal(initialTransform, roomContentGroup);
-
-        if (storedTransform?.whiteboard) {
-          applyLoadedSceneTransform(migratedTransform);
-        } else {
-          migratedTransform.whiteboard = readObjectTransform(whiteboardGroup);
-          syncZones(migratedTransform.zones ?? []);
-          syncEasterEggs(migratedTransform.easterEggs ?? []);
-          refreshRoomBounds();
-        }
+        applyLoadedSceneTransform(migratedTransform);
 
         transformRef.current = migratedTransform;
         applyPlayerTransform(migratedTransform);
