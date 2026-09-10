@@ -1,0 +1,615 @@
+/*
+ * Deck builder shell. Inherits the LIDC palette from `.lidc-page` / `.lidc-wizard-root`,
+ * with fallbacks so it also renders standalone.
+ */
+.lidc-deck-builder {
+  --deck-ink: var(--lidc-ink, #ffffff);
+  --deck-body: var(--lidc-body, #dadbdf);
+  --deck-mute: var(--lidc-mute, #7d8187);
+  --deck-hairline: var(--lidc-hairline, #4e4e4e);
+  --deck-canvas: var(--lidc-canvas, #0e0e0e);
+  --deck-canvas-soft: var(--lidc-canvas-soft, #1b1b1b);
+  --deck-gold: var(--lidc-accent-gold, #ffbb00);
+  --deck-orange: var(--lidc-accent-orange, #ff6b01);
+  --deck-danger: var(--lidc-danger, #ff7f7f);
+  --deck-radius: var(--lidc-row-radius, 15px);
+  --deck-slot-width: 190px;
+  --deck-slot-height: 128px;
+
+  position: relative;
+  display: grid;
+  gap: 14px;
+  font-family: var(--lidc-font, "Inter", "Segoe UI", sans-serif);
+  color: var(--deck-ink);
+}
+
+/* ---------- Summary bar ---------- */
+
+.lidc-deck-builder-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-radius: var(--deck-radius);
+  background: var(--deck-canvas-soft);
+}
+
+.lidc-deck-builder-summary-main {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.lidc-deck-builder-summary-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--deck-mute);
+}
+
+.lidc-deck-builder-summary-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.lidc-deck-builder-summary-value strong {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--deck-gold);
+}
+
+.lidc-deck-builder-summary-value span {
+  font-size: 13px;
+  color: var(--deck-mute);
+}
+
+.lidc-deck-builder-summary-value.is-over strong {
+  color: var(--deck-danger);
+}
+
+.lidc-deck-builder-summary-units {
+  font-size: 12px;
+  color: var(--deck-mute);
+}
+
+.lidc-deck-builder-summary-units strong {
+  color: var(--deck-body);
+}
+
+.lidc-deck-builder-hint {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px dashed var(--deck-hairline);
+  border-radius: var(--deck-radius);
+  font-size: 12px;
+  color: var(--deck-mute);
+}
+
+/* ---------- Category racks ---------- */
+
+.lidc-deck-builder-categories {
+  display: grid;
+  gap: 12px;
+}
+
+.lidc-deck-cat {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--lidc-radius, 25px);
+  background: var(--deck-canvas);
+}
+
+.lidc-deck-cat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lidc-deck-cat-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--deck-body);
+}
+
+.lidc-deck-cat-title h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--deck-ink);
+}
+
+.lidc-deck-cat-budget {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--deck-mute);
+}
+
+.lidc-deck-cat-budget strong {
+  font-size: 15px;
+  color: var(--deck-ink);
+}
+
+.lidc-deck-cat-budget.is-over strong {
+  color: var(--deck-danger);
+}
+
+.lidc-deck-cat-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.lidc-deck-cat-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--deck-gold);
+  transition: width 220ms ease;
+}
+
+.lidc-deck-cat-bar.is-over span {
+  background: var(--deck-danger);
+}
+
+.lidc-deck-cat-foot {
+  margin: 0;
+  font-size: 11px;
+  color: var(--deck-mute);
+}
+
+.lidc-deck-cat-foot.has-close {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lidc-deck-cat-foot strong {
+  color: var(--deck-body);
+}
+
+.lidc-deck-cat-foot-close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  line-height: 1;
+  cursor: pointer;
+  transition: opacity 140ms ease;
+}
+
+.lidc-deck-cat-foot-close:hover {
+  opacity: 0.72;
+}
+
+/* ---------- Slots ---------- */
+
+.lidc-deck-slots {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.lidc-deck-card {
+  position: relative;
+  box-sizing: border-box;
+  width: var(--deck-slot-width);
+  height: var(--deck-slot-height);
+  padding: 8px 10px 10px;
+  border: 1px solid var(--deck-hairline);
+  border-radius: var(--deck-radius);
+  background: var(--deck-canvas-soft);
+  transition: border-color 160ms ease;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.lidc-deck-card:hover {
+  border-color: rgba(255, 187, 0, 0.45);
+}
+
+.lidc-deck-card-head {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  right: 28px;
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+
+.lidc-deck-card-qty {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--deck-ink);
+  line-height: 1.2;
+}
+
+.lidc-deck-card-name {
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--deck-body);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lidc-deck-card-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(14, 14, 14, 0.72);
+  color: var(--deck-mute);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease, color 140ms ease, background 140ms ease;
+}
+
+.lidc-deck-card:hover .lidc-deck-card-remove {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.lidc-deck-card-remove:hover {
+  color: var(--deck-danger);
+  background: rgba(255, 127, 127, 0.16);
+}
+
+.lidc-deck-card-body {
+  position: absolute;
+  inset: 22px 0 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lidc-deck-card-media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 108px;
+  height: 68px;
+  background: transparent;
+  color: var(--deck-mute);
+  overflow: visible;
+}
+
+.lidc-deck-card-image {
+  display: block;
+  width: 108px;
+  height: 68px;
+  object-fit: contain;
+  object-position: center;
+  pointer-events: none;
+  user-select: none;
+}
+
+.lidc-deck-step-btn {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--deck-ink);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: opacity 140ms ease, background 140ms ease;
+}
+
+.lidc-deck-card:hover .lidc-deck-step-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.lidc-deck-step-btn--minus {
+  left: 6px;
+}
+
+.lidc-deck-step-btn--plus {
+  right: 6px;
+}
+
+.lidc-deck-step-btn:hover:not(:disabled) {
+  background: var(--deck-orange);
+  color: #121212;
+}
+
+.lidc-deck-step-btn:disabled {
+  opacity: 0;
+  cursor: not-allowed;
+}
+
+.lidc-deck-card:hover .lidc-deck-step-btn:disabled {
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.lidc-deck-card-cost {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: var(--deck-gold);
+}
+
+.lidc-deck-card-cost strong {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.lidc-deck-slot-add {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: var(--deck-slot-width);
+  height: var(--deck-slot-height);
+  border: 1px dashed var(--deck-hairline);
+  border-radius: var(--deck-radius);
+  background: transparent;
+  color: var(--deck-mute);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+  flex-shrink: 0;
+}
+
+.lidc-deck-slot-add:hover:not(:disabled) {
+  border-color: var(--deck-gold);
+  color: var(--deck-gold);
+  background: rgba(255, 187, 0, 0.06);
+}
+
+.lidc-deck-slot-add.is-active {
+  border-style: solid;
+  border-color: var(--deck-gold);
+  color: var(--deck-gold);
+  background: rgba(255, 187, 0, 0.1);
+}
+
+.lidc-deck-slot-add.is-active svg {
+  transform: rotate(180deg);
+}
+
+.lidc-deck-slot-add:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.lidc-deck-slot-ghost {
+  box-sizing: border-box;
+  width: var(--deck-slot-width);
+  height: var(--deck-slot-height);
+  border: 1px dashed rgba(255, 255, 255, 0.07);
+  border-radius: var(--deck-radius);
+  flex-shrink: 0;
+}
+
+.lidc-deck-slot-add-compact {
+  position: absolute;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--deck-mute);
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease;
+}
+
+.lidc-deck-slot-add-compact:hover:not(:disabled) {
+  color: var(--deck-gold);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.lidc-deck-slot-add-compact:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ---------- Deck / picker separator ---------- */
+
+.lidc-deck-section-divider {
+  height: 1px;
+  margin: 2px 12px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ---------- Unit picker ---------- */
+
+/* Inline expansion: the wrapper animates from 0fr to 1fr so the panel pushes
+   the rest of the category down instead of overlaying it. */
+.lidc-deck-picker-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 260ms ease;
+}
+
+.lidc-deck-picker-wrap.is-open {
+  grid-template-rows: 1fr;
+}
+
+.lidc-deck-picker-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.lidc-deck-picker {
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.lidc-deck-picker-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 10px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--deck-orange) transparent;
+}
+
+.lidc-deck-picker-list::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.lidc-deck-picker-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.lidc-deck-picker-list::-webkit-scrollbar-thumb {
+  background: var(--deck-orange);
+  border-radius: 999px;
+}
+
+.lidc-deck-picker-list::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--deck-orange) 82%, #ffffff);
+}
+
+.lidc-deck-picker-empty {
+  width: 100%;
+  margin: 0;
+  padding: 18px 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--deck-mute);
+}
+
+.lidc-deck-picker-row {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  width: var(--deck-slot-width);
+  height: var(--deck-slot-height);
+  padding: 10px 12px;
+  border: 1px solid var(--deck-hairline);
+  border-radius: var(--deck-radius);
+  background: var(--deck-canvas-soft);
+  color: var(--deck-ink);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
+  flex-shrink: 0;
+}
+
+.lidc-deck-picker-row:hover:not(:disabled) {
+  border-color: rgba(255, 187, 0, 0.45);
+  background: #212121;
+}
+
+.lidc-deck-picker-row.is-blocked {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.lidc-deck-picker-row-name {
+  width: 100%;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lidc-deck-picker-row-media {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+  color: var(--deck-mute);
+}
+
+.lidc-deck-picker-row-image {
+  display: block;
+  width: 108px;
+  height: 68px;
+  object-fit: contain;
+  object-position: center;
+  pointer-events: none;
+  user-select: none;
+}
+
+.lidc-deck-picker-row-cost {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--deck-gold);
+}
+
+@media (max-width: 720px) {
+  .lidc-deck-slot-ghost {
+    display: none;
+  }
+}

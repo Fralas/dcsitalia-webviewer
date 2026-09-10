@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Lock, Settings, MapPin, Trash2, RefreshCw, Eye, EyeOff, Shield, Target } from 'lucide-react';
 import { login, logout, isAuthenticated, apiRequest } from '../utils/api';
 import * as api from '../services/api';
+import InlineError from './InlineError';
 
 /**
  * Admin Panel Component
@@ -162,11 +163,7 @@ export default function AdminPanel() {
               </div>
             </div>
 
-            {loginError && (
-              <div className="bg-red-500/20 border border-red-500 text-red-400 px-4 py-2 rounded text-sm">
-                {loginError}
-              </div>
-            )}
+            <InlineError message={loginError} />
 
             <button
               type="submit"

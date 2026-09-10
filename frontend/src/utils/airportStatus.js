@@ -55,6 +55,44 @@ function lookupAirbaseStatusValue(airport, airbaseStatus = {}) {
   return undefined;
 }
 
+export function normalizeAirportCoalition(value) {
+  if (value === true || value === 1) return 'blue';
+  if (value === false || value === 0) return 'neutral';
+
+  const state = String(value || '').trim().toLowerCase();
+  if (state === 'blue' || state === 'blu' || state === 'true') return 'blue';
+  if (state === 'red' || state === 'rosso') return 'red';
+  if (state === 'neutral' || state === 'neutrale' || state === 'white' || state === 'false') return 'neutral';
+  return 'neutral';
+}
+
+export function resolveAirportTypeCoalition(...sources) {
+  for (const source of sources) {
+    const raw = typeof source === 'string' ? source : source?.coalition;
+    const state = String(raw || '').trim().toLowerCase();
+    if (state === 'blue' || state === 'blu') return 'blue';
+    if (state === 'red' || state === 'rosso') return 'red';
+    if (state === 'neutral' || state === 'neutrale' || state === 'white') return 'neutral';
+  }
+  return '';
+}
+
+export function getAirportCoalition(airport, airbaseStatus = null) {
+  const hasStatusFile = airbaseStatus && Object.keys(airbaseStatus).length > 0;
+  if (hasStatusFile) {
+    const statusValue = lookupAirbaseStatusValue(airport, airbaseStatus);
+    if (statusValue !== undefined) {
+      return normalizeAirportCoalition(statusValue);
+    }
+  }
+
+  if (airport?.isMainBase || airport?.isCarrier || airport?.isAlwaysActive) {
+    return 'blue';
+  }
+
+  return 'neutral';
+}
+
 /**
  * Resolve whether an airport should appear as coalition-active on the map.
  */
@@ -67,7 +105,7 @@ export function isAirportActiveOnMap(airport, airbaseStatus = null) {
   if (hasStatusFile) {
     const statusValue = lookupAirbaseStatusValue(airport, airbaseStatus);
     if (statusValue !== undefined) {
-      return statusValue !== false;
+      return normalizeAirportCoalition(statusValue) === 'blue';
     }
   }
 

@@ -1,49 +1,135 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  AlertTriangle,
-  Coins,
+  Copy,
   Check,
   ChevronLeft,
   ChevronDown,
   ChevronRight,
   Disc3,
-  Forklift,
-  Helicopter,
-  List,
   Loader2,
-  LogIn,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Plane,
   Save,
   Settings,
   Trash2,
-  Upload,
-  Users,
   UserPlus,
+  Maximize2,
   X,
 } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import airports from '../config/airports';
+import { formatLidcAirportLabel, getLidcAirportById } from '../config/lidcAfghanistanAirports';
 import * as api from '../services/api';
+import socketService from '../services/socket';
 import { t } from '../utils/locale';
+import { normalizeSquadronLogo } from '../utils/normalizeSquadronLogo';
+import { getLidcUnitImageUrl } from '../utils/lidcUnitImages';
+import LidcTheaterMap from './LidcTheaterMap';
+import LidcAirportPresencePanel from './LidcAirportPresencePanel';
+import LidcAirportWizard from './LidcAirportWizard';
+import LidcDeckBuilder, {
+  DECK_CATEGORY_META,
+  buildDeckPayloadFromQuantities,
+  buildQuantitiesFromDeck,
+  computeDeckSpentByCategory,
+  createEmptyDeckCategoryMap,
+} from './LidcDeckBuilder';
+import LidcSpecializationPicker, { sumSpecializationCaps } from './LidcSpecializationPicker';
+import LidcSquadronIdentityStep from './LidcSquadronIdentityStep';
+import InlineError from './InlineError';
 import './LidcPage.css';
 
-const WIZARD_STEPS = ['info', 'template', 'deck', 'invites', 'review'];
+const WIZARD_STEPS = ['info', 'specializations', 'deck', 'review'];
+const SPECIALIZATION_SLOTS = 2;
 
-const CATEGORY_META = [
-  { key: 'aircrafts', labelKey: 'lidc.deck.categories.aircrafts' },
-  { key: 'helicopters', labelKey: 'lidc.deck.categories.helicopters' },
-  { key: 'logistics', labelKey: 'lidc.deck.categories.logistics' },
-  { key: 'groundAssets', labelKey: 'lidc.deck.categories.groundAssets' },
-];
+const CATEGORY_META = DECK_CATEGORY_META;
 
 const LIDC_SIDEBAR_VIEWS = Object.freeze({
-  SQUADRON_LIST: 'squadronList',
-  SQUADRON_MEMBERS: 'squadronMembers',
-  SQUADRON_AIRCRAFTS: 'squadronAircrafts',
+  SQUADRON_DECK: 'squadronDeck',
 });
+
+const DECK_SLOT_FLIP_MS = 680;
+const DECK_SLOT_FLIP_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const SHOW_SQUADRON_LEAVE_DELETE_UI = false;
+const SHOW_SQUADRON_LEAVE_DEBUG_HEADER = true;
+
+function cancelDeckSlotFlip(deckSlot, transitionRef) {
+  if (!deckSlot) return;
+
+  if (transitionRef.current.onTransitionEnd) {
+    deckSlot.removeEventListener('transitionend', transitionRef.current.onTransitionEnd);
+    transitionRef.current.onTransitionEnd = null;
+  }
+
+  if (deckSlot.classList.contains('is-flip-animating')) {
+    deckSlot.getBoundingClientRect();
+  }
+
+  deckSlot.style.transition = 'none';
+  deckSlot.style.transform = '';
+  deckSlot.style.transformOrigin = '';
+  deckSlot.classList.remove('is-flip-animating');
+  deckSlot.offsetHeight;
+  deckSlot.style.transition = '';
+}
+
+function flipDeckSlot(deckSlot, firstRect, transitionRef, { transitionId, force = false } = {}) {
+  if (!deckSlot || !firstRect) return;
+  if (transitionId != null && transitionId !== transitionRef.current.id) return;
+
+  cancelDeckSlotFlip(deckSlot, transitionRef);
+
+  const lastRect = deckSlot.getBoundingClientRect();
+  const dx = firstRect.left - lastRect.left;
+  const dy = firstRect.top - lastRect.top;
+  const sx = firstRect.width / Math.max(lastRect.width, 1);
+  const sy = firstRect.height / Math.max(lastRect.height, 1);
+
+  if (!force && Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) {
+    return;
+  }
+
+  deckSlot.classList.add('is-flip-animating');
+  deckSlot.style.transformOrigin = 'top left';
+  deckSlot.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
+  deckSlot.style.transition = 'transform 0s';
+
+  requestAnimationFrame(() => {
+    if (transitionId != null && transitionId !== transitionRef.current.id) return;
+    deckSlot.style.transition = `transform ${DECK_SLOT_FLIP_MS}ms ${DECK_SLOT_FLIP_EASING}`;
+    deckSlot.style.transform = '';
+  });
+
+  const onEnd = (event) => {
+    if (event.target !== deckSlot || event.propertyName !== 'transform') return;
+    if (transitionId != null && transitionId !== transitionRef.current.id) return;
+
+    deckSlot.style.transition = '';
+    deckSlot.style.transform = '';
+    deckSlot.style.transformOrigin = '';
+    deckSlot.classList.remove('is-flip-animating');
+    deckSlot.removeEventListener('transitionend', onEnd);
+    if (transitionRef.current.onTransitionEnd === onEnd) {
+      transitionRef.current.onTransitionEnd = null;
+    }
+  };
+
+  transitionRef.current.onTransitionEnd = onEnd;
+  deckSlot.addEventListener('transitionend', onEnd);
+}
+
+function scheduleDeckLayoutTransition(deckSlot, firstRect, transitionRef, options = {}) {
+  if (!deckSlot || !firstRect) return;
+
+  requestAnimationFrame(() => {
+    if (options.transitionId != null && options.transitionId !== transitionRef.current.id) return;
+    flipDeckSlot(deckSlot, firstRect, transitionRef, options);
+  });
+}
+
+function prefersReducedDeckMotion() {
+  return typeof window !== 'undefined'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
 
 const AIRFRAME_STATUSES = Object.freeze({
   AIRBORNE: 'airborne',
@@ -96,49 +182,6 @@ const MOCK_MEMBER_PROFILES = Object.freeze([
   },
 ]);
 
-function createEmptyCategoryMap() {
-  return {
-    aircrafts: 0,
-    helicopters: 0,
-    logistics: 0,
-    groundAssets: 0,
-  };
-}
-
-function computeSpentByCategory(quantities, units) {
-  const spent = createEmptyCategoryMap();
-
-  units.forEach((unit) => {
-    const quantity = Number(quantities?.[unit.id] || 0);
-    if (quantity <= 0) return;
-
-    const category = unit.category;
-    if (spent[category] === undefined) return;
-    spent[category] += Number(unit.cost || 0) * quantity;
-  });
-
-  return spent;
-}
-
-function buildDeckPayload(quantities, units) {
-  const deck = {
-    aircrafts: [],
-    helicopters: [],
-    logistics: [],
-    groundAssets: [],
-  };
-
-  units.forEach((unit) => {
-    const quantity = Math.floor(Number(quantities?.[unit.id] || 0));
-    if (!Number.isFinite(quantity) || quantity <= 0) return;
-    if (!deck[unit.category]) return;
-
-    deck[unit.category].push({ unitId: unit.id, quantity });
-  });
-
-  return deck;
-}
-
 function formatTimestamp(value) {
   if (!Number.isFinite(value)) return '-';
   return new Date(value).toLocaleString();
@@ -175,18 +218,65 @@ function hashText(value) {
 }
 
 function getMockStatusForAirframe(airframe) {
-  const seed = hashText(`${airframe?.id || ''}:${airframe?.boardNumber || ''}`);
-  const remainder = seed % 3;
-  if (remainder === 0) return AIRFRAME_STATUSES.AIRBORNE;
-  if (remainder === 1) return AIRFRAME_STATUSES.GROUNDED;
-  return AIRFRAME_STATUSES.DESTROYED;
+  const dcsState = String(airframe?.dcsState || '').toLowerCase();
+  if (dcsState === 'in_use') return AIRFRAME_STATUSES.AIRBORNE;
+  if (dcsState === 'destroyed') return AIRFRAME_STATUSES.DESTROYED;
+  if (dcsState === 'in_hangar') return AIRFRAME_STATUSES.GROUNDED;
+  return AIRFRAME_STATUSES.GROUNDED;
 }
 
-function getMockBaseForAirframe(airframe, airportList) {
+function resolveAirframeBase(airframe, airportList, fallbackBaseId = '') {
   if (!Array.isArray(airportList) || airportList.length === 0) return null;
-  const seed = hashText(`${airframe?.id || ''}:${airframe?.unitId || ''}`);
-  const index = seed % airportList.length;
-  return airportList[index] || null;
+
+  const currentBaseId = String(airframe?.currentBaseId || '');
+  if (currentBaseId) {
+    const byId = airportList.find((entry) => entry.id === currentBaseId);
+    if (byId) return byId;
+  }
+
+  const currentAirbase = String(airframe?.currentAirbase || '').trim();
+  if (currentAirbase) {
+    const normalizedTarget = currentAirbase.toLowerCase();
+    const byName = airportList.find((entry) => {
+      const aliases = [
+        entry?.name,
+        entry?.displayName,
+        entry?.csvPrefix?.replace(/_/g, ' '),
+      ].filter(Boolean);
+      return aliases.some((alias) => String(alias).toLowerCase() === normalizedTarget);
+    });
+    if (byName) return byName;
+  }
+
+  const fallback = String(fallbackBaseId || '').trim();
+  if (fallback) {
+    return airportList.find((entry) => entry.id === fallback) || null;
+  }
+
+  return null;
+}
+
+function preserveLocalMockAirframeAssignments(previousSquadron, nextSquadron) {
+  if (!nextSquadron) return nextSquadron;
+
+  const previousAirframes = Array.isArray(previousSquadron?.airframes) ? previousSquadron.airframes : [];
+  const previousById = new Map(
+    previousAirframes.map((entry) => [String(entry?.id || ''), entry]),
+  );
+  const nextAirframes = Array.isArray(nextSquadron.airframes) ? nextSquadron.airframes : [];
+
+  return {
+    ...nextSquadron,
+    airframes: nextAirframes.map((airframe) => {
+      const previous = previousById.get(String(airframe?.id || ''));
+      const previousPilot = String(previous?.assignedPilotUserId || '');
+      const nextPilot = String(airframe?.assignedPilotUserId || '');
+      if (!nextPilot && previousPilot.startsWith('mock_member_')) {
+        return { ...airframe, assignedPilotUserId: previousPilot };
+      }
+      return airframe;
+    }),
+  };
 }
 
 function buildMockAirframeLogs({ airframe, baseLabel, pilotLabel, status }) {
@@ -219,17 +309,49 @@ function buildMockAirframeLogs({ airframe, baseLabel, pilotLabel, status }) {
   }));
 }
 
+function formatInviteCode(code) {
+  const normalized = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (normalized.length !== 8) return normalized;
+  return `${normalized.slice(0, 4)}-${normalized.slice(4)}`;
+}
+
+function normalizeUcidLinkResponse(response) {
+  if (response?.linked) {
+    return {
+      linked: true,
+      pending: null,
+      link: response.link || null,
+    };
+  }
+
+  const pending = response?.pending || (
+    response?.code
+      ? { code: response.code, expiresAt: response.expiresAt }
+      : null
+  );
+
+  return {
+    linked: false,
+    pending,
+    link: null,
+  };
+}
+
+function isAuthenticationError(error) {
+  const status = Number(error?.status);
+  const message = String(error?.message || '').toLowerCase();
+  return status === 401 || message.includes('not authenticated');
+}
+
 export default function LidcPage() {
   const { user } = useUser();
 
-  const [templates, setTemplates] = useState([]);
+  const [specializations, setSpecializations] = useState([]);
   const [units, setUnits] = useState([]);
-  const [inviteCandidates, setInviteCandidates] = useState([]);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
-  const [loadingUsers, setLoadingUsers] = useState(false);
   const [catalogError, setCatalogError] = useState('');
 
-  const [activeView, setActiveView] = useState(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
+  const [activeView, setActiveView] = useState(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK);
   const [isSquadronManagementOpen, setIsSquadronManagementOpen] = useState(true);
   const [isSidebarPinned, setIsSidebarPinned] = useState(false);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
@@ -246,13 +368,42 @@ export default function LidcPage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [logoDataUrl, setLogoDataUrl] = useState('');
+  const [logoUploadError, setLogoUploadError] = useState('');
   const [baseId, setBaseId] = useState('');
-  const [templateId, setTemplateId] = useState('');
+  const [specializationIds, setSpecializationIds] = useState([]);
   const [quantities, setQuantities] = useState({});
-  const [selectedInviteIds, setSelectedInviteIds] = useState([]);
-  const [inviteSearchQuery, setInviteSearchQuery] = useState('');
+
+  const [isDeckEditorOpen, setIsDeckEditorOpen] = useState(false);
+  const [deckEditorQuantities, setDeckEditorQuantities] = useState({});
+  const [deckEditorError, setDeckEditorError] = useState('');
+  const [deckEditorSaving, setDeckEditorSaving] = useState(false);
+
+  const [joinInviteCode, setJoinInviteCode] = useState('');
+  const [joinError, setJoinError] = useState('');
+  const [joiningSquadron, setJoiningSquadron] = useState(false);
+  const [inviteCodeCopied, setInviteCodeCopied] = useState(false);
+  const [linkCodeCopied, setLinkCodeCopied] = useState(false);
+  const [memberContextMenu, setMemberContextMenu] = useState(null);
+  const [memberActionError, setMemberActionError] = useState('');
+  const [memberActionBusy, setMemberActionBusy] = useState(false);
+  const [mockMemberProfiles, setMockMemberProfiles] = useState(() => (
+    MOCK_MEMBER_PROFILES.map((entry) => ({ ...entry }))
+  ));
+  const [isDeckPanelFullscreen, setIsDeckPanelFullscreen] = useState(false);
+  const [deckBoardExpanded, setDeckBoardExpanded] = useState(false);
+  const [isMapPanelFullscreen, setIsMapPanelFullscreen] = useState(false);
+  const [mapBoardExpanded, setMapBoardExpanded] = useState(false);
+  const [boardPanelsCollapsed, setBoardPanelsCollapsed] = useState(false);
+  const [selectedMapAirportId, setSelectedMapAirportId] = useState('');
+  const [airportOccupancy, setAirportOccupancy] = useState(null);
+  const [airportOccupancyLoading, setAirportOccupancyLoading] = useState(false);
+  const [airportOccupancyError, setAirportOccupancyError] = useState('');
+  const [airportWizardTab, setAirportWizardTab] = useState('');
+  const [airportOrderAlerts, setAirportOrderAlerts] = useState({});
+  const [airportFuelAlerts, setAirportFuelAlerts] = useState({});
 
   const [submitError, setSubmitError] = useState('');
+  const [wizardAdvanceAttempted, setWizardAdvanceAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [createdSquadron, setCreatedSquadron] = useState(null);
 
@@ -261,12 +412,23 @@ export default function LidcPage() {
   const [leavingSquadron, setLeavingSquadron] = useState(false);
   const [deletingSquadron, setDeletingSquadron] = useState(false);
   const [pendingSquadronAction, setPendingSquadronAction] = useState('');
+  const [headerDebugSlot, setHeaderDebugSlot] = useState(null);
   const [userLidcState, setUserLidcState] = useState({
     hasSquadron: false,
     squadron: null,
-    invites: [],
   });
-  const [hideInSquadronNotice, setHideInSquadronNotice] = useState(false);
+  const deckSlotRef = useRef(null);
+  const mapSlotRef = useRef(null);
+  const deckLayoutTransitionRef = useRef({
+    id: 0,
+    onTransitionEnd: null,
+    layoutExpanded: false,
+  });
+  const mapLayoutTransitionRef = useRef({
+    id: 0,
+    onTransitionEnd: null,
+    layoutExpanded: false,
+  });
   const [activeSquadron, setActiveSquadron] = useState(null);
   const [loadingSquadronDetails, setLoadingSquadronDetails] = useState(false);
   const [squadronDetailsError, setSquadronDetailsError] = useState('');
@@ -276,20 +438,23 @@ export default function LidcPage() {
   const [airframeEditorError, setAirframeEditorError] = useState('');
   const [airframeEditorSaving, setAirframeEditorSaving] = useState(false);
   const [isPilotMenuOpen, setIsPilotMenuOpen] = useState(false);
+  const [draggedMemberId, setDraggedMemberId] = useState('');
+  const [dropTargetAirframeId, setDropTargetAirframeId] = useState('');
   const pilotMenuRef = useRef(null);
-  const [memberActionMenuForId, setMemberActionMenuForId] = useState('');
-  const memberActionMenuRef = useRef(null);
 
   const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false);
   const [templateEditorRaw, setTemplateEditorRaw] = useState('');
   const [templateEditorError, setTemplateEditorError] = useState('');
   const [templateEditorSaving, setTemplateEditorSaving] = useState(false);
 
+  const [ucidLinkStatus, setUcidLinkStatus] = useState({ linked: false, pending: null, link: null });
+  const [ucidLinkLoading, setUcidLinkLoading] = useState(false);
+  const [ucidLinkError, setUcidLinkError] = useState('');
+
   function applyUserLidcState(response) {
     const nextState = {
       hasSquadron: Boolean(response?.hasSquadron),
       squadron: response?.squadron || null,
-      invites: Array.isArray(response?.invites) ? response.invites : [],
     };
 
     setUserLidcState(nextState);
@@ -311,27 +476,34 @@ export default function LidcPage() {
     let mounted = true;
 
     async function loadCatalog() {
+      if (!user?.id) {
+        if (!mounted) return;
+        setCatalogError('');
+        setLoadingCatalog(false);
+        return;
+      }
+
       setLoadingCatalog(true);
       setCatalogError('');
 
       try {
-        const response = await api.getLidcTemplates();
+        const response = await api.getLidcSpecializations();
         if (!mounted) return;
 
-        const nextTemplates = Array.isArray(response?.templates) ? response.templates : [];
+        const nextSpecializations = Array.isArray(response?.specializations) ? response.specializations : [];
         const nextUnits = Array.isArray(response?.units) ? response.units : [];
 
-        setTemplates(nextTemplates);
+        setSpecializations(nextSpecializations);
         setUnits(nextUnits);
-
-        if (nextTemplates.length > 0) {
-          setTemplateId((prev) => {
-            if (nextTemplates.some((entry) => entry.id === prev)) return prev;
-            return nextTemplates[0].id;
-          });
-        }
+        setSpecializationIds((prev) => prev.filter(
+          (id) => nextSpecializations.some((entry) => entry.id === id),
+        ));
       } catch (error) {
         if (!mounted) return;
+        if (isAuthenticationError(error)) {
+          setCatalogError('');
+          return;
+        }
         setCatalogError(error.message || t('lidc.errors.catalogLoadFailed'));
       } finally {
         if (mounted) setLoadingCatalog(false);
@@ -343,43 +515,21 @@ export default function LidcPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
-    let mounted = true;
-
-    async function loadInviteCandidates() {
-      if (!user) {
-        setInviteCandidates([]);
-        return;
-      }
-
-      setLoadingUsers(true);
-      try {
-        const response = await api.getLidcUsers();
-        if (!mounted) return;
-        setInviteCandidates(Array.isArray(response?.users) ? response.users : []);
-      } catch (error) {
-        if (!mounted) return;
-        setInviteCandidates([]);
-      } finally {
-        if (mounted) setLoadingUsers(false);
-      }
+    const validViews = Object.values(LIDC_SIDEBAR_VIEWS);
+    if (!validViews.includes(activeView)) {
+      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK);
     }
-
-    loadInviteCandidates();
-
-    return () => {
-      mounted = false;
-    };
-  }, [user]);
+  }, [activeView]);
 
   const isEntryWizardVisible = !isWizardOpen
     && !loadingUserState
     && Boolean(user?.id)
     && !Boolean(userLidcState.hasSquadron)
-    && (panelMode === 'home' || panelMode === 'invites');
-  const shouldBlurBehindOverlay = isWizardOpen || (isEntryWizardVisible && panelMode === 'home');
+    && panelMode === 'join';
+  const shouldBlurBehindOverlay = isWizardOpen || isEntryWizardVisible || Boolean(airportWizardTab);
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
@@ -402,6 +552,71 @@ export default function LidcPage() {
   }, [shouldBlurBehindOverlay]);
 
   useEffect(() => {
+    if ((!isDeckPanelFullscreen && !isMapPanelFullscreen) || typeof document === 'undefined') return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key !== 'Escape' || selectedAirframeDraft) return;
+      if (airportWizardTab) {
+        setAirportWizardTab('');
+        return;
+      }
+      if (selectedMapAirportId) {
+        setSelectedMapAirportId('');
+        return;
+      }
+      if (isMapPanelFullscreen) {
+        closeMapFullscreen();
+      } else if (isDeckPanelFullscreen) {
+        closeFullscreenPanel();
+      }
+    };
+
+    document.body.classList.add('lidc-deck-expanded-open');
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.classList.remove('lidc-deck-expanded-open');
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isDeckPanelFullscreen, isMapPanelFullscreen, selectedAirframeDraft, selectedMapAirportId, airportWizardTab]);
+
+  useEffect(() => {
+    if (!mapBoardExpanded || typeof document === 'undefined') return undefined;
+
+    const root = document.documentElement;
+    const appShell = document.querySelector('.app-shell');
+    const header = document.querySelector('.app-header');
+
+    const syncMapFullscreenOffset = () => {
+      const headerHeight = header?.getBoundingClientRect().height ?? 72;
+      root.style.setProperty('--lidc-map-fullscreen-top', `${headerHeight}px`);
+    };
+
+    syncMapFullscreenOffset();
+    appShell?.classList.add('is-lidc-map-fullscreen');
+    document.body.classList.add('lidc-map-fullscreen-open');
+    window.addEventListener('resize', syncMapFullscreenOffset);
+
+    return () => {
+      window.removeEventListener('resize', syncMapFullscreenOffset);
+      root.style.removeProperty('--lidc-map-fullscreen-top');
+      appShell?.classList.remove('is-lidc-map-fullscreen');
+      document.body.classList.remove('lidc-map-fullscreen-open');
+    };
+  }, [mapBoardExpanded]);
+
+  useLayoutEffect(() => {
+    if (!SHOW_SQUADRON_LEAVE_DEBUG_HEADER) {
+      setHeaderDebugSlot(null);
+      return undefined;
+    }
+
+    setHeaderDebugSlot(document.getElementById('app-header-debug-slot'));
+
+    return undefined;
+  });
+
+  useEffect(() => {
     let mounted = true;
 
     async function loadUserState() {
@@ -412,9 +627,7 @@ export default function LidcPage() {
         setUserLidcState({
           hasSquadron: false,
           squadron: null,
-          invites: [],
         });
-        setHideInSquadronNotice(false);
         setActiveSquadron(null);
         setSquadronDetailsError('');
         setAirframeUpdateError('');
@@ -438,7 +651,9 @@ export default function LidcPage() {
         applyUserLidcState(response);
       } catch (error) {
         if (!mounted) return;
-        setUserStateError(error.message || t('lidc.errors.userStateFailed'));
+        if (!isAuthenticationError(error)) {
+          setUserStateError(error.message || t('lidc.errors.userStateFailed'));
+        }
       } finally {
         if (mounted) setLoadingUserState(false);
       }
@@ -451,9 +666,85 @@ export default function LidcPage() {
     };
   }, [user]);
 
+  async function refreshUcidLinkStatus({ ensureCode = false } = {}) {
+    if (!user?.id) {
+      setUcidLinkStatus({ linked: false, pending: null, link: null });
+      return;
+    }
+
+    setUcidLinkLoading(true);
+    setUcidLinkError('');
+    try {
+      let response = await api.getLidcUcidLinkStatus();
+      if (ensureCode && !response?.linked && !response?.pending?.code) {
+        response = await api.startLidcUcidLink();
+      }
+      setUcidLinkStatus(normalizeUcidLinkResponse(response));
+    } catch (error) {
+      if (!isAuthenticationError(error)) {
+        setUcidLinkError(error.message || t('lidc.link.error'));
+      }
+    } finally {
+      setUcidLinkLoading(false);
+    }
+  }
+
   useEffect(() => {
-    setHideInSquadronNotice(false);
-  }, [user?.id, userLidcState?.squadron?.id]);
+    refreshUcidLinkStatus({ ensureCode: true });
+  }, [user?.id]);
+
+  useEffect(() => {
+    socketService.connect();
+    const socket = socketService.socket;
+    if (!socket) return undefined;
+
+    const handleLidcUpdated = async () => {
+      const squadronId = activeSquadron?.id || userLidcState?.squadron?.id;
+      if (squadronId) {
+        try {
+          const response = await api.getLidcSquadron(squadronId);
+          setActiveSquadron((prev) => preserveLocalMockAirframeAssignments(prev, response?.squadron || null));
+        } catch (error) {
+          if (!isAuthenticationError(error)) {
+            console.error('Failed to refresh LIDC squadron state:', error);
+          }
+        }
+      }
+
+      const occupancyAirportId = selectedMapAirportId;
+      if (!occupancyAirportId) return;
+      try {
+        const occupancy = await api.getLidcAirportOccupancy(occupancyAirportId);
+        setAirportOccupancy(occupancy);
+        setAirportOccupancyError('');
+      } catch (error) {
+        if (!isAuthenticationError(error)) {
+          console.error('Failed to refresh LIDC airport occupancy:', error);
+        }
+      }
+    };
+
+    socket.on('lidc:updated', handleLidcUpdated);
+    return () => {
+      socket.off('lidc:updated', handleLidcUpdated);
+    };
+  }, [activeSquadron?.id, userLidcState?.squadron?.id, selectedMapAirportId, user?.id]);
+
+  useEffect(() => {
+    socketService.connect();
+    const socket = socketService.socket;
+    if (!socket) return undefined;
+
+    const handleLinked = (payload) => {
+      if (!payload?.discordId || payload.discordId !== user?.id) return;
+      refreshUcidLinkStatus({ ensureCode: false });
+    };
+
+    socket.on('lidc:linked', handleLinked);
+    return () => {
+      socket.off('lidc:linked', handleLinked);
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     setSelectedAirframeDraft(null);
@@ -465,7 +756,9 @@ export default function LidcPage() {
     let mounted = true;
 
     async function loadSquadronDetails() {
-      const squadronId = userLidcState?.squadron?.id;
+      const squadronId = userLidcState?.hasSquadron
+        ? String(userLidcState?.squadron?.id || '')
+        : '';
       if (!user?.id || !squadronId) {
         if (!mounted) return;
         setLoadingSquadronDetails(false);
@@ -480,7 +773,7 @@ export default function LidcPage() {
       try {
         const response = await api.getLidcSquadron(squadronId);
         if (!mounted) return;
-        setActiveSquadron(response?.squadron || null);
+        setActiveSquadron((prev) => preserveLocalMockAirframeAssignments(prev, response?.squadron || null));
       } catch (error) {
         if (!mounted) return;
         setActiveSquadron(null);
@@ -495,7 +788,34 @@ export default function LidcPage() {
     return () => {
       mounted = false;
     };
-  }, [user?.id, userLidcState?.squadron?.id]);
+  }, [user?.id, userLidcState?.hasSquadron, userLidcState?.squadron?.id]);
+
+  useEffect(() => {
+    setInviteCodeCopied(false);
+  }, [activeSquadron?.id, activeSquadron?.inviteCode]);
+
+  useEffect(() => {
+    setLinkCodeCopied(false);
+  }, [ucidLinkStatus.pending?.code]);
+
+  useEffect(() => {
+    if (!memberContextMenu) return undefined;
+
+    const closeMenu = () => setMemberContextMenu(null);
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') closeMenu();
+    };
+
+    window.addEventListener('click', closeMenu);
+    window.addEventListener('scroll', closeMenu, true);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('click', closeMenu);
+      window.removeEventListener('scroll', closeMenu, true);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [memberContextMenu]);
 
   function clearSidebarTimers() {
     if (sidebarOpenTimerRef.current) {
@@ -568,53 +888,45 @@ export default function LidcPage() {
     };
   }, []);
 
-  const selectedTemplate = useMemo(
-    () => templates.find((entry) => entry.id === templateId) || null,
-    [templates, templateId],
+  const selectedSpecializations = useMemo(
+    () => specializationIds
+      .map((id) => specializations.find((entry) => entry.id === id))
+      .filter(Boolean),
+    [specializations, specializationIds],
   );
 
-  const unitsByCategory = useMemo(() => {
-    const map = {
-      aircrafts: [],
-      helicopters: [],
-      logistics: [],
-      groundAssets: [],
-    };
+  const spentByCategory = useMemo(
+    () => computeDeckSpentByCategory(quantities, units),
+    [quantities, units],
+  );
 
-    units.forEach((unit) => {
-      if (!map[unit.category]) return;
-      map[unit.category].push(unit);
-    });
+  const capsByCategory = useMemo(
+    () => sumSpecializationCaps(selectedSpecializations),
+    [selectedSpecializations],
+  );
 
-    Object.keys(map).forEach((category) => {
-      map[category].sort((a, b) => String(a.label).localeCompare(String(b.label)));
-    });
+  const deckPayload = useMemo(
+    () => buildDeckPayloadFromQuantities(quantities, units),
+    [quantities, units],
+  );
 
-    return map;
-  }, [units]);
-
-  const spentByCategory = useMemo(() => computeSpentByCategory(quantities, units), [quantities, units]);
-
-  const capsByCategory = useMemo(() => {
-    const caps = createEmptyCategoryMap();
-    if (!selectedTemplate?.caps) return caps;
-
+  // A squadron keeps the caps it was created with, so the editor budgets against them.
+  const activeSquadronCaps = useMemo(() => {
+    const caps = createEmptyDeckCategoryMap();
+    const source = activeSquadron?.costSummary?.caps;
     CATEGORY_META.forEach(({ key }) => {
-      caps[key] = Number(selectedTemplate.caps?.[key] || 0);
+      caps[key] = Math.max(0, Number(source?.[key] || 0));
     });
-
     return caps;
-  }, [selectedTemplate]);
+  }, [activeSquadron]);
 
-  const remainingByCategory = useMemo(() => {
-    const remaining = createEmptyCategoryMap();
-    CATEGORY_META.forEach(({ key }) => {
-      remaining[key] = Math.max(0, (capsByCategory[key] || 0) - (spentByCategory[key] || 0));
-    });
-    return remaining;
-  }, [capsByCategory, spentByCategory]);
-
-  const deckPayload = useMemo(() => buildDeckPayload(quantities, units), [quantities, units]);
+  const deckEditorTotalUnits = useMemo(
+    () => Object.values(deckEditorQuantities).reduce((sum, value) => {
+      const quantity = Math.floor(Number(value || 0));
+      return sum + (Number.isFinite(quantity) && quantity > 0 ? quantity : 0);
+    }, 0),
+    [deckEditorQuantities],
+  );
 
   const totalDeckUnits = useMemo(() => {
     return Object.values(quantities).reduce((sum, value) => {
@@ -632,10 +944,10 @@ export default function LidcPage() {
 
   const validation = useMemo(() => {
     const infoValid = name.trim().length > 0 && baseId.trim().length > 0;
-    const templateValid = Boolean(selectedTemplate);
+    const specializationsValid = selectedSpecializations.length === SPECIALIZATION_SLOTS;
     const deckHasUnits = totalDeckUnits > 0;
 
-    let capsValid = Boolean(templateValid);
+    let capsValid = specializationsValid;
     CATEGORY_META.forEach(({ key }) => {
       if ((spentByCategory[key] || 0) > (capsByCategory[key] || 0)) {
         capsValid = false;
@@ -644,53 +956,212 @@ export default function LidcPage() {
 
     return {
       infoValid,
-      templateValid,
+      specializationsValid,
       deckHasUnits,
       capsValid,
-      canSubmit: infoValid && templateValid && deckHasUnits && capsValid,
+      canSubmit: infoValid && specializationsValid && deckHasUnits && capsValid,
     };
-  }, [name, baseId, selectedTemplate, totalDeckUnits, spentByCategory, capsByCategory]);
+  }, [name, baseId, selectedSpecializations, totalDeckUnits, spentByCategory, capsByCategory]);
 
   const currentStepKey = WIZARD_STEPS[currentStep] || WIZARD_STEPS[0];
   const isLogged = Boolean(user?.id);
+  const selectedMapAirport = useMemo(
+    () => getLidcAirportById(selectedMapAirportId),
+    [selectedMapAirportId],
+  );
+
+  const handleSelectMapAirport = useCallback((airportId) => {
+    const nextId = String(airportId || '');
+    setSelectedMapAirportId((prev) => {
+      if (prev === nextId && airportWizardTab) return prev;
+      return prev === nextId ? '' : nextId;
+    });
+  }, [airportWizardTab]);
+
+  const handleClearMapAirport = useCallback(() => {
+    if (airportWizardTab) return;
+    setSelectedMapAirportId('');
+  }, [airportWizardTab]);
+
+  const handleOpenAirportWizard = useCallback((tab) => {
+    setAirportWizardTab(tab === 'logistics' ? 'logistics' : 'overview');
+  }, []);
+
+  const handleCloseAirportWizard = useCallback(() => {
+    setAirportWizardTab('');
+  }, []);
+
+  const handleAirportLogisticsUpdated = useCallback((result) => {
+    setAirportOccupancy((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        shop: result?.shop || prev.shop,
+        shopper: result?.shopper || prev.shopper,
+        orders: result?.orders || prev.orders,
+      };
+    });
+    if (!selectedMapAirportId) return;
+    const nextCount = Array.isArray(result?.orders) ? result.orders.length : 0;
+    setAirportOrderAlerts((prev) => {
+      const next = { ...prev };
+      if (nextCount > 0) {
+        next[selectedMapAirportId] = nextCount;
+      } else {
+        delete next[selectedMapAirportId];
+      }
+      return next;
+    });
+  }, [selectedMapAirportId]);
+
+  useEffect(() => {
+    if (selectedMapAirportId || airportWizardTab) return undefined;
+    setAirportOccupancy(null);
+    setAirportOccupancyError('');
+    setAirportOccupancyLoading(false);
+    return undefined;
+  }, [selectedMapAirportId, airportWizardTab]);
+
+  useEffect(() => {
+    if (!selectedMapAirportId) return undefined;
+
+    let mounted = true;
+
+    async function loadAirportOccupancy() {
+      setAirportOccupancyLoading(true);
+      setAirportOccupancyError('');
+      try {
+        const occupancy = await api.getLidcAirportOccupancy(selectedMapAirportId);
+        if (!mounted) return;
+        setAirportOccupancy(occupancy);
+        const nextCount = Array.isArray(occupancy?.orders) ? occupancy.orders.length : 0;
+        setAirportOrderAlerts((prev) => {
+          const next = { ...prev };
+          if (nextCount > 0) {
+            next[selectedMapAirportId] = nextCount;
+          } else {
+            delete next[selectedMapAirportId];
+          }
+          return next;
+        });
+        const fuelCount = (Array.isArray(occupancy?.logistics?.fuel) ? occupancy.logistics.fuel : []).filter((entry) => {
+          const capacity = Number(entry?.capacity) || 0;
+          return capacity > 0 && (Number(entry?.quantity) || 0) / capacity < 0.2;
+        }).length;
+        setAirportFuelAlerts((prev) => {
+          const next = { ...prev };
+          if (fuelCount > 0) {
+            next[selectedMapAirportId] = fuelCount;
+          } else {
+            delete next[selectedMapAirportId];
+          }
+          return next;
+        });
+      } catch (error) {
+        if (!mounted) return;
+        setAirportOccupancy(null);
+        setAirportOccupancyError(error.message || t('lidc.map.occupancy.loadFailed'));
+      } finally {
+        if (mounted) setAirportOccupancyLoading(false);
+      }
+    }
+
+    loadAirportOccupancy();
+    return () => {
+      mounted = false;
+    };
+  }, [selectedMapAirportId]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadOrderAlerts() {
+      try {
+        const result = await api.getLidcLogisticsAlerts();
+        if (!mounted) return;
+        setAirportOrderAlerts(result?.orders && typeof result.orders === 'object' ? result.orders : {});
+        setAirportFuelAlerts(result?.fuelLow && typeof result.fuelLow === 'object' ? result.fuelLow : {});
+      } catch (error) {
+        if (!mounted) return;
+      }
+    }
+
+    loadOrderAlerts();
+    const interval = window.setInterval(loadOrderAlerts, 20000);
+    return () => {
+      mounted = false;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedMapAirportId || isMapPanelFullscreen) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key !== 'Escape') return;
+      if (airportWizardTab) {
+        setAirportWizardTab('');
+        return;
+      }
+      setSelectedMapAirportId('');
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedMapAirportId, isMapPanelFullscreen, airportWizardTab]);
   const userHasSquadron = Boolean(userLidcState.hasSquadron);
-  const isManagementFocusView = activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS
-    || activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS;
+  const isDeckFocusView = userHasSquadron;
+  const isTableFocusView = isDeckPanelFullscreen || isDeckFocusView;
+  const showDeckManagementView = isDeckFocusView;
   const effectivePreviewBaseId = baseId
     || activeSquadron?.baseId
     || createdSquadron?.baseId
     || userLidcState?.squadron?.baseId
     || '';
-  const previewBase = useMemo(
-    () => airports.find((entry) => entry.id === effectivePreviewBaseId) || null,
-    [effectivePreviewBaseId],
-  );
+  const previewBase = useMemo(() => {
+    const lidcAirport = getLidcAirportById(effectivePreviewBaseId);
+    if (lidcAirport) {
+      return {
+        id: lidcAirport.id,
+        name: lidcAirport.name,
+        displayName: formatLidcAirportLabel(lidcAirport),
+      };
+    }
+    return airports.find((entry) => entry.id === effectivePreviewBaseId) || null;
+  }, [effectivePreviewBaseId]);
 
   const previewIdentity = useMemo(() => {
-    const baseSquadron = activeSquadron || createdSquadron || userLidcState.squadron || null;
+    const baseSquadron = userHasSquadron
+      ? (activeSquadron || userLidcState.squadron || null)
+      : (createdSquadron || null);
     return {
       name: name || baseSquadron?.name || t('lidc.preview.fallbackName'),
       description: description || baseSquadron?.description || t('lidc.preview.fallbackDescription'),
       baseLabel: previewBase?.displayName || previewBase?.name || baseSquadron?.baseId || '-',
-      templateName: baseSquadron?.templateName || selectedTemplate?.name || '-',
+      specializationNames: (
+        Array.isArray(baseSquadron?.specializationNames) && baseSquadron.specializationNames.length > 0
+          ? baseSquadron.specializationNames
+          : selectedSpecializations.map((entry) => entry.name)
+      ),
     };
-  }, [activeSquadron, createdSquadron, userLidcState.squadron, name, description, previewBase, selectedTemplate]);
+  }, [userHasSquadron, activeSquadron, createdSquadron, userLidcState.squadron, name, description, previewBase, selectedSpecializations]);
 
   function resetWizardDraft() {
     setCurrentStep(0);
     setName('');
     setDescription('');
     setLogoDataUrl('');
+    setLogoUploadError('');
     setBaseId('');
     setQuantities({});
-    setSelectedInviteIds([]);
-    setInviteSearchQuery('');
+    setSpecializationIds([]);
+    setJoinInviteCode('');
+    setJoinError('');
     setSubmitError('');
+    setWizardAdvanceAttempted(false);
     setCreatedSquadron(null);
-
-    if (templates.length > 0) {
-      setTemplateId(templates[0].id);
-    }
   }
 
   function openCreateWizard() {
@@ -702,61 +1173,260 @@ export default function LidcPage() {
     setIsWizardOpen(false);
     setCurrentStep(0);
     setSubmitError('');
+    setWizardAdvanceAttempted(false);
+    setLogoUploadError('');
   }
 
-  function updateQuantity(unit, nextQuantity) {
-    const quantity = Math.max(0, Math.floor(Number(nextQuantity || 0)));
+  async function handleJoinSquadron() {
+    const code = joinInviteCode.trim();
+    if (!code || joiningSquadron) return;
 
-    if (selectedTemplate) {
-      const category = unit.category;
-      const currentQuantity = Number(quantities[unit.id] || 0);
-      const diff = quantity - currentQuantity;
+    setJoinError('');
+    setJoiningSquadron(true);
 
-      if (diff > 0) {
-        const projectedSpent = (spentByCategory[category] || 0) + (diff * Number(unit.cost || 0));
-        if (projectedSpent > (capsByCategory[category] || 0)) return;
+    try {
+      const response = await api.joinLidcSquadronByInviteCode(code);
+      const joined = response?.squadron || null;
+
+      const stateResponse = await api.getLidcMe();
+      applyUserLidcState(stateResponse);
+
+      if (joined) {
+        setActiveSquadron(joined);
       }
+
+      setPanelMode('home');
+      setJoinInviteCode('');
+      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK);
+    } catch (error) {
+      if (Number(error?.status) === 409) {
+        try {
+          const stateResponse = await api.getLidcMe();
+          const nextState = applyUserLidcState(stateResponse);
+          if (nextState.hasSquadron) {
+            setPanelMode('home');
+            setJoinInviteCode('');
+            return;
+          }
+        } catch (_) {
+          // Fall back to default error rendering.
+        }
+      }
+
+      setJoinError(error.message || t('lidc.errors.joinFailed'));
+    } finally {
+      setJoiningSquadron(false);
+    }
+  }
+
+  async function copyInviteCode(code) {
+    const formatted = formatInviteCode(code);
+    if (!formatted) return;
+
+    try {
+      await navigator.clipboard.writeText(formatted);
+      setInviteCodeCopied(true);
+      window.setTimeout(() => setInviteCodeCopied(false), 2000);
+    } catch (_) {
+      // Clipboard unavailable.
+    }
+  }
+
+  async function copyLinkCode(code) {
+    const normalized = String(code || '').trim();
+    if (!normalized) return;
+
+    try {
+      await navigator.clipboard.writeText(normalized);
+      setLinkCodeCopied(true);
+      window.setTimeout(() => setLinkCodeCopied(false), 2000);
+    } catch (_) {
+      // Clipboard unavailable.
+    }
+  }
+
+  function resetMapExpansion() {
+    ++mapLayoutTransitionRef.current.id;
+    cancelDeckSlotFlip(mapSlotRef.current, mapLayoutTransitionRef);
+    mapLayoutTransitionRef.current.layoutExpanded = false;
+    setMapBoardExpanded(false);
+    setIsMapPanelFullscreen(false);
+  }
+
+  function resetDeckExpansion() {
+    ++deckLayoutTransitionRef.current.id;
+    cancelDeckSlotFlip(deckSlotRef.current, deckLayoutTransitionRef);
+    deckLayoutTransitionRef.current.layoutExpanded = false;
+    setDeckBoardExpanded(false);
+    setIsDeckPanelFullscreen(false);
+    setIsPilotMenuOpen(false);
+  }
+
+  function openFullscreenPanel(view) {
+    if (mapBoardExpanded || isMapPanelFullscreen) {
+      resetMapExpansion();
     }
 
-    setQuantities((prev) => {
-      const next = { ...prev };
-      if (quantity <= 0) {
-        delete next[unit.id];
-      } else {
-        next[unit.id] = quantity;
-      }
-      return next;
+    if (view === 'deck') {
+      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK);
+    }
+
+    const transitionId = ++deckLayoutTransitionRef.current.id;
+    const deckSlot = deckSlotRef.current;
+
+    if (prefersReducedDeckMotion()) {
+      deckLayoutTransitionRef.current.layoutExpanded = true;
+      setBoardPanelsCollapsed(true);
+      setDeckBoardExpanded(true);
+      setIsDeckPanelFullscreen(true);
+      setIsPilotMenuOpen(false);
+      return;
+    }
+
+    cancelDeckSlotFlip(deckSlot, deckLayoutTransitionRef);
+    const firstRect = deckSlot?.getBoundingClientRect();
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (transitionId !== deckLayoutTransitionRef.current.id) return;
+
+        setBoardPanelsCollapsed(true);
+        setDeckBoardExpanded(true);
+        deckLayoutTransitionRef.current.layoutExpanded = true;
+        setIsDeckPanelFullscreen(true);
+        setIsPilotMenuOpen(false);
+        scheduleDeckLayoutTransition(deckSlot, firstRect, deckLayoutTransitionRef, { transitionId });
+      });
     });
   }
 
-  function toggleInvite(userId) {
-    if (!userId) return;
+  function closeFullscreenPanel() {
+    const transitionId = ++deckLayoutTransitionRef.current.id;
+    const deckSlot = deckSlotRef.current;
+    const shouldForceFlip = deckLayoutTransitionRef.current.layoutExpanded
+      || Boolean(deckSlot?.classList.contains('is-expanded'))
+      || isDeckPanelFullscreen;
 
-    setSelectedInviteIds((prev) => {
-      if (prev.includes(userId)) {
-        return prev.filter((entry) => entry !== userId);
-      }
-      return [...prev, userId];
+    if (prefersReducedDeckMotion()) {
+      deckLayoutTransitionRef.current.layoutExpanded = false;
+      cancelDeckSlotFlip(deckSlot, deckLayoutTransitionRef);
+      setBoardPanelsCollapsed(false);
+      setDeckBoardExpanded(false);
+      setIsDeckPanelFullscreen(false);
+      return;
+    }
+
+    cancelDeckSlotFlip(deckSlot, deckLayoutTransitionRef);
+    const firstRect = deckSlot?.getBoundingClientRect();
+
+    setIsDeckPanelFullscreen(false);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (transitionId !== deckLayoutTransitionRef.current.id) return;
+
+        setBoardPanelsCollapsed(false);
+        setDeckBoardExpanded(false);
+        deckLayoutTransitionRef.current.layoutExpanded = false;
+
+        scheduleDeckLayoutTransition(deckSlot, firstRect, deckLayoutTransitionRef, {
+          transitionId,
+          force: shouldForceFlip,
+        });
+      });
     });
   }
 
-  function handleLogoUpload(event) {
-    const file = event.target.files?.[0];
+  function openMapFullscreen() {
+    if (deckBoardExpanded || isDeckPanelFullscreen) {
+      resetDeckExpansion();
+    }
+
+    const transitionId = ++mapLayoutTransitionRef.current.id;
+    const mapSlot = mapSlotRef.current;
+
+    if (prefersReducedDeckMotion()) {
+      mapLayoutTransitionRef.current.layoutExpanded = true;
+      setBoardPanelsCollapsed(true);
+      setMapBoardExpanded(true);
+      setIsMapPanelFullscreen(true);
+      return;
+    }
+
+    cancelDeckSlotFlip(mapSlot, mapLayoutTransitionRef);
+    const firstRect = mapSlot?.getBoundingClientRect();
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (transitionId !== mapLayoutTransitionRef.current.id) return;
+
+        setBoardPanelsCollapsed(true);
+        setMapBoardExpanded(true);
+        mapLayoutTransitionRef.current.layoutExpanded = true;
+        setIsMapPanelFullscreen(true);
+        scheduleDeckLayoutTransition(mapSlot, firstRect, mapLayoutTransitionRef, { transitionId });
+      });
+    });
+  }
+
+  function closeMapFullscreen() {
+    const transitionId = ++mapLayoutTransitionRef.current.id;
+    const mapSlot = mapSlotRef.current;
+    const shouldForceFlip = mapLayoutTransitionRef.current.layoutExpanded
+      || Boolean(mapSlot?.classList.contains('is-expanded'))
+      || isMapPanelFullscreen;
+
+    if (prefersReducedDeckMotion()) {
+      mapLayoutTransitionRef.current.layoutExpanded = false;
+      cancelDeckSlotFlip(mapSlot, mapLayoutTransitionRef);
+      setBoardPanelsCollapsed(false);
+      setMapBoardExpanded(false);
+      setIsMapPanelFullscreen(false);
+      return;
+    }
+
+    cancelDeckSlotFlip(mapSlot, mapLayoutTransitionRef);
+    const firstRect = mapSlot?.getBoundingClientRect();
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (transitionId !== mapLayoutTransitionRef.current.id) return;
+
+        setBoardPanelsCollapsed(false);
+        setMapBoardExpanded(false);
+        setIsMapPanelFullscreen(false);
+        mapLayoutTransitionRef.current.layoutExpanded = false;
+
+        scheduleDeckLayoutTransition(mapSlot, firstRect, mapLayoutTransitionRef, {
+          transitionId,
+          force: shouldForceFlip,
+        });
+      });
+    });
+  }
+
+  function handlePreviewExpandKeyDown(event, view) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    openFullscreenPanel(view);
+  }
+
+  function handleLogoFile(file) {
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setLogoDataUrl(reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
-    event.target.value = '';
+    setLogoUploadError('');
+
+    normalizeSquadronLogo(file)
+      .then((normalizedLogo) => {
+        setLogoDataUrl(normalizedLogo);
+      })
+      .catch(() => {
+        setLogoUploadError(t('lidc.errors.logoUploadFailed'));
+      });
   }
 
   function buildSubmitError() {
     if (!validation.infoValid) return t('lidc.errors.infoRequired');
-    if (!validation.templateValid) return t('lidc.errors.templateRequired');
+    if (!validation.specializationsValid) return t('lidc.errors.specializationsRequired');
     if (!validation.deckHasUnits) return t('lidc.errors.deckEmpty');
     if (!validation.capsValid) return t('lidc.errors.deckCapsExceeded');
     if (!isLogged) return t('lidc.errors.loginRequired');
@@ -765,7 +1435,9 @@ export default function LidcPage() {
 
   function getStepBlockingError(stepKey) {
     if (stepKey === 'info' && !validation.infoValid) return t('lidc.errors.infoRequired');
-    if (stepKey === 'template' && !validation.templateValid) return t('lidc.errors.templateRequired');
+    if (stepKey === 'specializations' && !validation.specializationsValid) {
+      return t('lidc.errors.specializationsRequired');
+    }
     if (stepKey === 'deck') {
       if (!validation.deckHasUnits) return t('lidc.errors.deckEmpty');
       if (!validation.capsValid) return t('lidc.errors.deckCapsExceeded');
@@ -775,11 +1447,29 @@ export default function LidcPage() {
   }
 
   const currentStepBlockingError = getStepBlockingError(currentStepKey);
-  const canGoNextStep = currentStep < (WIZARD_STEPS.length - 1) && currentStepBlockingError === '';
+  const wizardFooterError = currentStep < WIZARD_STEPS.length - 1
+    ? (wizardAdvanceAttempted && currentStepBlockingError
+      ? `${t('lidc.wizard.requiredToContinue')}: ${currentStepBlockingError}`
+      : '')
+    : (submitError || '');
+
+  function goToWizardStep(nextIndex) {
+    setWizardAdvanceAttempted(false);
+    setSubmitError('');
+    setCurrentStep(nextIndex);
+  }
 
   function goToNextStep() {
-    if (!canGoNextStep) return;
-    setCurrentStep((prev) => Math.min(WIZARD_STEPS.length - 1, prev + 1));
+    if (currentStep >= WIZARD_STEPS.length - 1) return;
+    if (currentStepBlockingError) {
+      setWizardAdvanceAttempted(true);
+      return;
+    }
+    goToWizardStep(Math.min(WIZARD_STEPS.length - 1, currentStep + 1));
+  }
+
+  function goToPreviousStep() {
+    goToWizardStep(Math.max(0, currentStep - 1));
   }
 
   async function handleCreateSquadron() {
@@ -798,8 +1488,7 @@ export default function LidcPage() {
         description,
         logoDataUrl,
         baseId,
-        templateId: selectedTemplate.id,
-        invites: selectedInviteIds.map((entry) => ({ userId: entry })),
+        specializationIds,
         deck: deckPayload,
       };
 
@@ -815,7 +1504,7 @@ export default function LidcPage() {
           squadron: {
             id: created.id,
             name: created.name,
-            templateName: created.templateName,
+            specializationNames: created.specializationNames,
             baseId: created.baseId,
             createdAt: created.createdAt,
           },
@@ -823,15 +1512,14 @@ export default function LidcPage() {
       }
 
       closeWizard();
-      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
+      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK);
     } catch (error) {
       if (Number(error?.status) === 409) {
         try {
           const stateResponse = await api.getLidcMe();
           const nextState = applyUserLidcState(stateResponse);
           if (nextState.hasSquadron) {
-            setHideInSquadronNotice(false);
-            setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
+            setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK);
             setPanelMode('home');
             closeWizard();
             return;
@@ -851,20 +1539,26 @@ export default function LidcPage() {
     if (isSquadronActionBusy) return;
     if (action !== 'leave' && action !== 'delete') return;
     if (action === 'delete' && !isCurrentUserOwner) return;
+    setUserStateError('');
     setPendingSquadronAction(action);
   }
 
   function closeSquadronActionConfirm() {
     if (isSquadronActionBusy) return;
     setPendingSquadronAction('');
+    setUserStateError('');
   }
 
   async function handleLeaveSquadron() {
     const squadronId = activeSquadron?.id || userLidcState?.squadron?.id || '';
-    if (!squadronId || leavingSquadron) return;
+    if (!squadronId || leavingSquadron) {
+      if (!squadronId && !leavingSquadron) {
+        setUserStateError(t('lidc.errors.squadronLoadFailed'));
+      }
+      return false;
+    }
 
     setLeavingSquadron(true);
-    setPendingSquadronAction('');
     setUserStateError('');
     setSquadronDetailsError('');
     setAirframeUpdateError('');
@@ -872,8 +1566,6 @@ export default function LidcPage() {
     setSelectedAirframeDraft(null);
     setAirframeEditorError('');
     setAirframeEditorSaving(false);
-    setMemberActionMenuForId('');
-
     try {
       await api.leaveLidcSquadron(squadronId);
 
@@ -882,11 +1574,14 @@ export default function LidcPage() {
 
       setCreatedSquadron(null);
       setActiveSquadron(null);
-      setHideInSquadronNotice(false);
       setPanelMode('home');
-      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
+      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK);
+
+      setPendingSquadronAction('');
+      return true;
     } catch (error) {
       setUserStateError(error.message || t('lidc.errors.leaveFailed'));
+      return false;
     } finally {
       setLeavingSquadron(false);
     }
@@ -894,10 +1589,14 @@ export default function LidcPage() {
 
   async function handleDeleteSquadron() {
     const squadronId = activeSquadron?.id || userLidcState?.squadron?.id || '';
-    if (!squadronId || deletingSquadron) return;
+    if (!squadronId || deletingSquadron) {
+      if (!squadronId && !deletingSquadron) {
+        setUserStateError(t('lidc.errors.squadronLoadFailed'));
+      }
+      return false;
+    }
 
     setDeletingSquadron(true);
-    setPendingSquadronAction('');
     setUserStateError('');
     setSquadronDetailsError('');
     setAirframeUpdateError('');
@@ -905,8 +1604,6 @@ export default function LidcPage() {
     setSelectedAirframeDraft(null);
     setAirframeEditorError('');
     setAirframeEditorSaving(false);
-    setMemberActionMenuForId('');
-
     try {
       await api.deleteLidcSquadron(squadronId);
 
@@ -915,14 +1612,29 @@ export default function LidcPage() {
 
       setCreatedSquadron(null);
       setActiveSquadron(null);
-      setHideInSquadronNotice(false);
       setPanelMode('home');
-      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST);
+      setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_DECK);
+
+      setPendingSquadronAction('');
+      return true;
     } catch (error) {
       setUserStateError(error.message || t('lidc.errors.deleteFailed'));
+      return false;
     } finally {
       setDeletingSquadron(false);
     }
+  }
+
+  async function handleDebugLeaveSquadron() {
+    if (isSquadronActionBusy) return;
+    setUserStateError('');
+
+    if (isCurrentUserOwner) {
+      await handleDeleteSquadron();
+      return;
+    }
+
+    await handleLeaveSquadron();
   }
 
   async function confirmPendingSquadronAction() {
@@ -936,9 +1648,50 @@ export default function LidcPage() {
     }
   }
 
+  function openDeckEditor() {
+    if (!activeSquadron) return;
+    setDeckEditorError('');
+    setDeckEditorQuantities(buildQuantitiesFromDeck(activeSquadron.deck));
+    setIsDeckEditorOpen(true);
+  }
+
+  function closeDeckEditor() {
+    if (deckEditorSaving) return;
+    setIsDeckEditorOpen(false);
+    setDeckEditorError('');
+  }
+
+  async function saveDeckEditor() {
+    const squadronId = activeSquadron?.id || '';
+    if (!squadronId || deckEditorSaving) return;
+
+    if (deckEditorTotalUnits <= 0) {
+      setDeckEditorError(t('lidc.errors.deckEmpty'));
+      return;
+    }
+
+    setDeckEditorSaving(true);
+    setDeckEditorError('');
+
+    try {
+      const deck = buildDeckPayloadFromQuantities(deckEditorQuantities, units);
+      const response = await api.updateLidcSquadronDeck(squadronId, deck);
+
+      if (response?.squadron) {
+        setActiveSquadron(response.squadron);
+      }
+
+      setIsDeckEditorOpen(false);
+    } catch (error) {
+      setDeckEditorError(error.message || t('lidc.errors.deckUpdateFailed'));
+    } finally {
+      setDeckEditorSaving(false);
+    }
+  }
+
   function openTemplateEditor() {
     setTemplateEditorError('');
-    setTemplateEditorRaw(JSON.stringify({ templates, units }, null, 2));
+    setTemplateEditorRaw(JSON.stringify({ specializations, units }, null, 2));
     setIsTemplateEditorOpen(true);
   }
 
@@ -955,16 +1708,15 @@ export default function LidcPage() {
 
     setTemplateEditorSaving(true);
     try {
-      const response = await api.updateLidcTemplates(parsed);
-      const nextTemplates = Array.isArray(response?.templates) ? response.templates : [];
+      const response = await api.updateLidcSpecializations(parsed);
+      const nextSpecializations = Array.isArray(response?.specializations) ? response.specializations : [];
       const nextUnits = Array.isArray(response?.units) ? response.units : [];
 
-      setTemplates(nextTemplates);
+      setSpecializations(nextSpecializations);
       setUnits(nextUnits);
-
-      if (!nextTemplates.some((entry) => entry.id === templateId) && nextTemplates.length > 0) {
-        setTemplateId(nextTemplates[0].id);
-      }
+      setSpecializationIds((prev) => prev.filter(
+        (id) => nextSpecializations.some((entry) => entry.id === id),
+      ));
 
       setIsTemplateEditorOpen(false);
     } catch (error) {
@@ -973,18 +1725,6 @@ export default function LidcPage() {
       setTemplateEditorSaving(false);
     }
   }
-
-  const filteredInviteCandidates = useMemo(() => {
-    const query = inviteSearchQuery.trim().toLowerCase();
-    if (!query) return inviteCandidates;
-
-    return inviteCandidates.filter((entry) => {
-      const globalName = String(entry?.globalName || '').toLowerCase();
-      const username = String(entry?.username || '').toLowerCase();
-      const id = String(entry?.id || '').toLowerCase();
-      return globalName.includes(query) || username.includes(query) || id.includes(query);
-    });
-  }, [inviteCandidates, inviteSearchQuery]);
 
   const squadronMembers = useMemo(() => {
     const list = Array.isArray(activeSquadron?.memberProfiles) ? activeSquadron.memberProfiles : [];
@@ -996,17 +1736,17 @@ export default function LidcPage() {
       map.set(memberId, member);
     });
 
-    MOCK_MEMBER_PROFILES.forEach((mockMember) => {
+    mockMemberProfiles.forEach((mockMember) => {
       const memberId = String(mockMember.userId || '');
       if (!memberId) return;
       if (!map.has(memberId)) {
-        map.set(memberId, mockMember);
+        map.set(memberId, { ...mockMember, isMock: true });
       }
     });
 
     return Array.from(map.values())
       .sort((a, b) => formatUserLabel(a).localeCompare(formatUserLabel(b), 'en', { sensitivity: 'base' }));
-  }, [activeSquadron]);
+  }, [activeSquadron, mockMemberProfiles]);
 
   const squadronMembersById = useMemo(() => {
     const map = new Map();
@@ -1024,7 +1764,90 @@ export default function LidcPage() {
   const currentUserRole = String(currentUserProfile?.role || '').toLowerCase();
   const isCurrentUserOwner = currentUserRole === 'owner'
     || (currentUserId !== '' && currentUserId === String(activeSquadron?.createdBy?.id || ''));
+  const canAssignAirframes = Boolean(
+    isLogged
+    && userHasSquadron
+    && (isCurrentUserOwner || currentUserRole === 'owner' || currentUserRole === 'admin' || currentUserRole === 'leader'),
+  );
   const isSquadronActionBusy = leavingSquadron || deletingSquadron;
+
+  function closeMemberContextMenu() {
+    setMemberContextMenu(null);
+  }
+
+  function openMemberContextMenu(event, member) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!isCurrentUserOwner || memberActionBusy) return;
+    if (!member?.memberId || member.memberId === currentUserId || member.role === 'owner') return;
+
+    const menuWidth = 176;
+    const menuHeight = 132;
+    const pad = 10;
+    const x = Math.min(event.clientX, window.innerWidth - menuWidth - pad);
+    const y = Math.min(event.clientY, window.innerHeight - menuHeight - pad);
+    setMemberActionError('');
+    setMemberContextMenu({
+      memberId: member.memberId,
+      x: Math.max(pad, x),
+      y: Math.max(pad, y),
+    });
+  }
+
+  async function applyMemberAction(memberId, action) {
+    if (!memberId || memberActionBusy) return;
+
+    const target = memberRows.find((entry) => entry.memberId === memberId);
+    const isMockMember = Boolean(target?.isMock) || memberId.startsWith('mock_member_');
+
+    setMemberActionBusy(true);
+    setMemberActionError('');
+    closeMemberContextMenu();
+
+    try {
+      if (isMockMember) {
+        setMockMemberProfiles((prev) => {
+          if (action === 'remove') {
+            return prev.filter((entry) => String(entry.userId) !== memberId);
+          }
+          if (action === 'promote') {
+            return prev.map((entry) => (
+              String(entry.userId) === memberId ? { ...entry, role: 'admin' } : entry
+            ));
+          }
+          if (action === 'demote') {
+            return prev.map((entry) => (
+              String(entry.userId) === memberId ? { ...entry, role: 'member' } : entry
+            ));
+          }
+          return prev;
+        });
+        return;
+      }
+
+      const squadronId = String(activeSquadron?.id || '');
+      if (!squadronId) return;
+
+      let response;
+      if (action === 'promote') {
+        response = await api.updateLidcMemberRole(squadronId, memberId, 'admin');
+      } else if (action === 'demote') {
+        response = await api.updateLidcMemberRole(squadronId, memberId, 'member');
+      } else if (action === 'remove') {
+        response = await api.removeLidcMember(squadronId, memberId);
+      } else {
+        return;
+      }
+
+      if (response?.squadron) {
+        setActiveSquadron(response.squadron);
+      }
+    } catch (error) {
+      setMemberActionError(error.message || t('lidc.members.actions.failed'));
+    } finally {
+      setMemberActionBusy(false);
+    }
+  }
 
   const squadronAirframes = useMemo(() => {
     const list = Array.isArray(activeSquadron?.airframes) ? activeSquadron.airframes : [];
@@ -1043,7 +1866,11 @@ export default function LidcPage() {
       const pilotUserId = String(airframe.assignedPilotUserId || '');
       const pilotProfile = pilotUserId ? (squadronMembersById.get(pilotUserId) || null) : null;
       const pilotLabel = pilotProfile ? formatUserLabel(pilotProfile) : t('lidc.airframes.unassigned');
-      const baseEntry = getMockBaseForAirframe(airframe, airports);
+      const baseEntry = resolveAirframeBase(
+        airframe,
+        airports,
+        activeSquadron?.baseId || userLidcState?.squadron?.baseId || '',
+      );
       const baseIdValue = String(baseEntry?.id || activeSquadron?.baseId || userLidcState?.squadron?.baseId || '');
       const baseLabel = baseEntry?.displayName || baseEntry?.name || baseIdValue || '-';
       const boardNumber = String(airframe.boardNumber || '').toUpperCase();
@@ -1058,8 +1885,11 @@ export default function LidcPage() {
       return {
         ...airframe,
         model,
+        unitImageUrl: getLidcUnitImageUrl(airframe.unitId),
         pilotUserId,
         pilotLabel,
+        pilotAvatarUrl: String(pilotProfile?.avatarUrl || ''),
+        pilotInitial: getUserInitial(pilotProfile),
         baseId: baseIdValue,
         baseLabel,
         boardNumber,
@@ -1069,36 +1899,63 @@ export default function LidcPage() {
     });
   }, [squadronAirframes, squadronMembersById, activeSquadron?.baseId, userLidcState?.squadron?.baseId]);
 
+  const airframeGroupsByBase = useMemo(() => {
+    const homeBaseId = String(activeSquadron?.baseId || userLidcState?.squadron?.baseId || '');
+    const groups = new Map();
+
+    airframeRows.forEach((airframe) => {
+      const key = airframe.baseId || airframe.baseLabel || '_unknown';
+      if (!groups.has(key)) {
+        groups.set(key, {
+          id: key,
+          baseId: airframe.baseId,
+          baseLabel: airframe.baseLabel,
+          airframes: [],
+        });
+      }
+      groups.get(key).airframes.push(airframe);
+    });
+
+    return Array.from(groups.values()).sort((a, b) => {
+      const aHome = a.baseId && a.baseId === homeBaseId ? 0 : 1;
+      const bHome = b.baseId && b.baseId === homeBaseId ? 0 : 1;
+      if (aHome !== bHome) return aHome - bHome;
+      return String(a.baseLabel || '').localeCompare(String(b.baseLabel || ''), 'en', { sensitivity: 'base' });
+    });
+  }, [airframeRows, activeSquadron?.baseId, userLidcState?.squadron?.baseId]);
+
   const memberRows = useMemo(() => {
     return squadronMembers.map((member) => {
       const memberId = String(member?.userId || '');
       const role = String(member?.role || 'member').toLowerCase();
       const roleLabel = role === 'owner'
         ? t('lidc.members.owner')
-        : (role === 'admin' ? 'Admin' : t('lidc.members.member'));
-      const displayName = formatUserLabel(member);
-      const counts = airframeRows.reduce((acc, row) => {
-        if (String(row?.pilotUserId || '') !== memberId) return acc;
-        const category = String(row?.category || '').toLowerCase();
-        if (category === 'aircrafts') acc.a += 1;
-        if (category === 'helicopters') acc.h += 1;
-        if (category === 'logistics') acc.l += 1;
-        return acc;
-      }, { a: 0, h: 0, l: 0 });
+        : (role === 'admin' ? t('lidc.members.admin') : t('lidc.members.member'));
 
       return {
         memberId,
-        displayName,
+        displayName: formatUserLabel(member),
         role,
         roleLabel,
         avatarUrl: String(member?.avatarUrl || ''),
         avatarFallback: getUserInitial(member),
-        assignedAircraftCountA: counts.a,
-        assignedAircraftCountH: counts.h,
-        assignedAircraftCountL: counts.l,
+        isMock: Boolean(member?.isMock) || memberId.startsWith('mock_member_'),
       };
     });
-  }, [squadronMembers, airframeRows]);
+  }, [squadronMembers]);
+
+  const assignedPilotUserIds = useMemo(() => {
+    const ids = new Set();
+    airframeRows.forEach((airframe) => {
+      const pilotUserId = String(airframe?.pilotUserId || '');
+      if (pilotUserId) ids.add(pilotUserId);
+    });
+    return ids;
+  }, [airframeRows]);
+
+  const unassignedMemberRows = useMemo(() => {
+    return memberRows.filter((member) => !assignedPilotUserIds.has(member.memberId));
+  }, [memberRows, assignedPilotUserIds]);
 
   const selectedAirframeRow = useMemo(() => {
     const selectedId = String(selectedAirframeDraft?.id || '');
@@ -1134,30 +1991,6 @@ export default function LidcPage() {
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [selectedAirframeDraft, isPilotMenuOpen]);
-
-  useEffect(() => {
-    if (!memberActionMenuForId) return undefined;
-
-    const handlePointerDown = (event) => {
-      if (memberActionMenuRef.current && !memberActionMenuRef.current.contains(event.target)) {
-        setMemberActionMenuForId('');
-      }
-    };
-
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        setMemberActionMenuForId('');
-      }
-    };
-
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [memberActionMenuForId]);
 
   useEffect(() => {
     if (!pendingSquadronAction) return undefined;
@@ -1205,6 +2038,79 @@ export default function LidcPage() {
     setIsPilotMenuOpen(false);
   }
 
+  async function assignAirframePilot(airframe, nextPilotUserIdRaw, { closeEditor = false } = {}) {
+    if (!airframe?.id || !canAssignAirframes) return false;
+
+    const nextPilotUserId = String(nextPilotUserIdRaw || '');
+    const currentPilotUserId = String(airframe.assignedPilotUserId || airframe.pilotUserId || '');
+    if (nextPilotUserId === currentPilotUserId) {
+      if (closeEditor) closeAirframeEditor();
+      return true;
+    }
+
+    if (nextPilotUserId && !squadronMembersById.has(nextPilotUserId)) {
+      const message = t('lidc.airframes.validation.pilotMustBeMember');
+      if (closeEditor) setAirframeEditorError(message);
+      else setAirframeUpdateError(message);
+      return false;
+    }
+
+    if (nextPilotUserId && assignedPilotUserIds.has(nextPilotUserId) && nextPilotUserId !== currentPilotUserId) {
+      return false;
+    }
+
+    const member = nextPilotUserId ? squadronMembersById.get(nextPilotUserId) : null;
+    const isMockMember = Boolean(member?.isMock) || String(nextPilotUserId).startsWith('mock_member_');
+
+    if (closeEditor) {
+      setAirframeEditorError('');
+      setAirframeEditorSaving(true);
+    }
+    setAirframeUpdateError('');
+    setUpdatingAirframeId(airframe.id);
+
+    try {
+      if (isMockMember || (nextPilotUserId === '' && String(currentPilotUserId).startsWith('mock_member_'))) {
+        setActiveSquadron((prev) => {
+          if (!prev) return prev;
+          const airframes = Array.isArray(prev.airframes) ? prev.airframes : [];
+          return {
+            ...prev,
+            airframes: airframes.map((entry) => (
+              String(entry?.id) === String(airframe.id)
+                ? { ...entry, assignedPilotUserId: nextPilotUserId || null }
+                : entry
+            )),
+          };
+        });
+        if (closeEditor) closeAirframeEditor();
+        return true;
+      }
+
+      const squadronId = activeSquadron?.id || userLidcState?.squadron?.id || '';
+      if (!squadronId) {
+        throw new Error(t('lidc.errors.airframeAssignFailed'));
+      }
+
+      const response = await api.assignLidcAirframePilot(
+        squadronId,
+        airframe.id,
+        nextPilotUserId || null,
+      );
+      setActiveSquadron((prev) => preserveLocalMockAirframeAssignments(prev, response?.squadron || prev));
+      if (closeEditor) closeAirframeEditor();
+      return true;
+    } catch (error) {
+      const message = error.message || t('lidc.errors.airframeAssignFailed');
+      if (closeEditor) setAirframeEditorError(message);
+      else setAirframeUpdateError(message);
+      return false;
+    } finally {
+      setUpdatingAirframeId('');
+      if (closeEditor) setAirframeEditorSaving(false);
+    }
+  }
+
   async function saveAirframeEditorDraft() {
     if (!selectedAirframeDraft) return;
 
@@ -1214,82 +2120,57 @@ export default function LidcPage() {
       return;
     }
 
-    const pilotUserId = String(selectedAirframeDraft.pilotUserId || '');
+    await assignAirframePilot(row, selectedAirframeDraft.pilotUserId, { closeEditor: true });
+  }
 
-    if (pilotUserId && !squadronMembersById.has(pilotUserId)) {
-      setAirframeEditorError(t('lidc.airframes.validation.pilotMustBeMember'));
+  function handleMemberDragStart(event, member) {
+    if (!canAssignAirframes || !member?.memberId) {
+      event.preventDefault();
       return;
     }
 
-    setAirframeEditorError('');
-    setAirframeEditorSaving(true);
-    setAirframeUpdateError('');
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', member.memberId);
+    setDraggedMemberId(member.memberId);
+    setDropTargetAirframeId('');
+  }
 
-    try {
-      const squadronId = activeSquadron?.id || userLidcState?.squadron?.id || '';
-      const currentPilotUserId = String(row.assignedPilotUserId || '');
-      if (squadronId && pilotUserId !== currentPilotUserId) {
-        setUpdatingAirframeId(row.id);
-        const response = await api.assignLidcAirframePilot(
-          squadronId,
-          row.id,
-          pilotUserId || null,
-        );
-        setActiveSquadron(response?.squadron || null);
-      }
+  function handleMemberDragEnd() {
+    setDraggedMemberId('');
+    setDropTargetAirframeId('');
+  }
 
-      closeAirframeEditor();
-    } catch (error) {
-      setAirframeEditorError(error.message || t('lidc.errors.airframeAssignFailed'));
-    } finally {
-      setUpdatingAirframeId('');
-      setAirframeEditorSaving(false);
+  function handleAirframeDragOver(event, airframe) {
+    if (!canAssignAirframes || !draggedMemberId || airframe?.pilotUserId) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    if (dropTargetAirframeId !== airframe.id) {
+      setDropTargetAirframeId(airframe.id);
     }
   }
 
-  function renderOverviewView() {
-    const previewLogo = logoDataUrl || activeSquadron?.logoDataUrl || '';
-
-    return (
-      <div className="lidc-visual-grid">
-        <article className="lidc-visual-card">
-          <div className="lidc-eyebrow">{t('lidc.preview.eyebrow')}</div>
-          <h2>{previewIdentity.name}</h2>
-          <p>{previewIdentity.description}</p>
-          <div className="lidc-preview-meta">
-            <span>{t('lidc.info.base')}: {previewIdentity.baseLabel}</span>
-            <span>{t('lidc.template.title')}: {previewIdentity.templateName}</span>
-          </div>
-        </article>
-
-        <article className="lidc-visual-card lidc-visual-logo-card">
-          {previewLogo ? (
-            <img src={previewLogo} alt="Squadron logo" className="lidc-preview-logo" />
-          ) : (
-            <div className="lidc-preview-logo lidc-preview-logo-empty">{t('lidc.preview.logoPlaceholder')}</div>
-          )}
-        </article>
-      </div>
-    );
+  function handleAirframeDragLeave(event, airframe) {
+    if (event.currentTarget.contains(event.relatedTarget)) return;
+    if (dropTargetAirframeId === airframe.id) {
+      setDropTargetAirframeId('');
+    }
   }
 
-  function renderCapsView() {
-    const capsSource = activeSquadron?.costSummary?.caps || capsByCategory;
-    const spentSource = activeSquadron?.costSummary?.spent || spentByCategory;
+  async function handleAirframeDrop(event, airframe) {
+    event.preventDefault();
+    event.stopPropagation();
+    const memberId = String(event.dataTransfer.getData('text/plain') || draggedMemberId || '');
+    setDraggedMemberId('');
+    setDropTargetAirframeId('');
+    if (!memberId || airframe?.pilotUserId) return;
+    await assignAirframePilot(airframe, memberId);
+  }
 
-    return (
-      <div className="lidc-visual-card">
-        <h3>{t('lidc.preview.templateCaps')}</h3>
-        <div className="lidc-visual-list">
-          {CATEGORY_META.map(({ key, labelKey }) => (
-            <div key={key} className="lidc-visual-row">
-              <span>{t(labelKey)}</span>
-              <strong>{Number(spentSource[key] || 0)} / {Number(capsSource[key] || 0)}</strong>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+  function handleAirframeContextMenu(event, airframe) {
+    if (!canAssignAirframes || !airframe?.pilotUserId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    assignAirframePilot(airframe, null);
   }
 
   function getPendingSquadronActionText() {
@@ -1298,8 +2179,42 @@ export default function LidcPage() {
     return '';
   }
 
+  function renderDebugLeaveHeaderButton() {
+    if (!SHOW_SQUADRON_LEAVE_DEBUG_HEADER || !isLogged || !userHasSquadron || !headerDebugSlot) {
+      return null;
+    }
+
+    return createPortal(
+      <div className="app-header__debug-leave">
+        <button
+          type="button"
+          className="app-header__nav-btn app-header__nav-btn--lang app-header__nav-btn--debug"
+          onClick={handleDebugLeaveSquadron}
+          disabled={isSquadronActionBusy}
+          title={isCurrentUserOwner
+            ? t('lidc.debug.deleteSquadron')
+            : t('lidc.debug.leaveSquadron')}
+          aria-label={isCurrentUserOwner
+            ? t('lidc.debug.deleteSquadron')
+            : t('lidc.debug.leaveSquadron')}
+        >
+          {(leavingSquadron || deletingSquadron)
+            ? <Loader2 size={14} className="spin" />
+            : <X size={14} />}
+          <span>{isCurrentUserOwner
+            ? t('lidc.debug.deleteSquadron')
+            : t('lidc.debug.leaveSquadron')}</span>
+        </button>
+        {userStateError && (
+          <InlineError message={userStateError} compact className="app-header__debug-error" />
+        )}
+      </div>,
+      headerDebugSlot,
+    );
+  }
+
   function renderSquadronManagementActions() {
-    if (!userHasSquadron) return null;
+    if (!SHOW_SQUADRON_LEAVE_DELETE_UI || !userHasSquadron) return null;
 
     return (
       <div className="lidc-squadron-management-actions">
@@ -1331,209 +2246,255 @@ export default function LidcPage() {
     );
   }
 
-  function renderMemberManagementView() {
+  function renderAirframeTable({ interactive = false, flush = false } = {}) {
+    if (loadingSquadronDetails) {
+      return (
+        <div className="lidc-loading">
+          <Loader2 size={14} className="spin" />
+          <span>{t('lidc.general.loading')}</span>
+        </div>
+      );
+    }
+
+    if (squadronDetailsError) {
+      return <InlineError message={squadronDetailsError} />;
+    }
+
+    if (airframeRows.length === 0) {
+      return <div className="lidc-muted-box">{t('lidc.airframes.empty')}</div>;
+    }
+
+    const allowAssign = canAssignAirframes;
+    const isDraggingMember = Boolean(draggedMemberId);
+
     return (
-      <div className="lidc-visual-card lidc-visual-card-members">
-        {renderSquadronManagementActions()}
-
-        {loadingSquadronDetails && (
-          <div className="lidc-loading">
-            <Loader2 size={14} className="spin" />
-            <span>{t('lidc.general.loading')}</span>
-          </div>
+      <>
+        {allowAssign && airframeUpdateError && (
+          <InlineError message={airframeUpdateError} />
         )}
+        <div className={`lidc-airframe-table-wrap lidc-deck-board-wrap ${flush ? 'lidc-deck-table-wrap is-flush' : ''} ${interactive ? 'is-interactive' : 'is-readonly'} ${isDraggingMember ? 'is-assigning' : ''}`}>
+          <div className="lidc-deck-board">
+            {airframeGroupsByBase.map((group) => (
+              <section key={group.id} className="lidc-deck-base-group">
+                <div className="lidc-panel-row lidc-panel-row--static lidc-deck-base-row">
+                  <span className="lidc-deck-base-row-name">{group.baseLabel}</span>
+                  <span className="lidc-deck-base-row-count">{group.airframes.length}</span>
+                </div>
+                <div className="lidc-deck-base-aircrafts">
+                  {group.airframes.map((airframe) => {
+                    const isUpdating = updatingAirframeId === airframe.id;
+                    const statusLabel = getAirframeStatusLabel(airframe.status);
+                    const isEmpty = !airframe.pilotUserId;
+                    const isDropTarget = allowAssign && isEmpty && dropTargetAirframeId === airframe.id;
 
-        {squadronDetailsError && <div className="lidc-inline-error">{squadronDetailsError}</div>}
-
-        {!loadingSquadronDetails && !squadronDetailsError && squadronMembers.length === 0 && (
-          <div className="lidc-muted-box">{t('lidc.members.empty')}</div>
-        )}
-
-        {!loadingSquadronDetails && !squadronDetailsError && memberRows.length > 0 && (
-          <div className="lidc-airframe-table-wrap">
-            <table className="lidc-airframe-table lidc-member-table">
-              <thead>
-                <tr>
-                  <th>Utente</th>
-                  <th title="Aircrafts assegnati">
-                    <span className="lidc-member-count-head">
-                      <Plane size={14} />
-                    </span>
-                  </th>
-                  <th title="Helicopters assegnati">
-                    <span className="lidc-member-count-head">
-                      <Helicopter size={14} />
-                    </span>
-                  </th>
-                  <th title="Logistics assegnati">
-                    <span className="lidc-member-count-head">
-                      <Forklift size={14} />
-                    </span>
-                  </th>
-                  <th>Ruolo</th>
-                  <th>Azioni</th>
-                </tr>
-              </thead>
-              <tbody>
-                {memberRows.map((member) => (
-                  <tr key={member.memberId}>
-                    <td>
-                      <div className="lidc-member-user-cell">
-                        {member.avatarUrl ? (
-                          <img src={member.avatarUrl} alt={member.displayName} className="lidc-member-table-avatar" />
+                    return (
+                      <button
+                        key={airframe.id}
+                        type="button"
+                        className={[
+                          'lidc-deck-airframe',
+                          `is-${airframe.status}`,
+                          isUpdating ? 'is-updating' : '',
+                          'is-clickable',
+                          allowAssign && isEmpty ? 'is-droppable' : '',
+                          allowAssign && !isEmpty ? 'is-assigned' : '',
+                          isDropTarget ? 'is-drop-target' : '',
+                          isDraggingMember && !isEmpty ? 'is-drop-blocked' : '',
+                        ].filter(Boolean).join(' ')}
+                        onClick={() => openAirframeEditor(airframe)}
+                        onContextMenu={allowAssign ? (event) => handleAirframeContextMenu(event, airframe) : undefined}
+                        onDragOver={allowAssign ? (event) => handleAirframeDragOver(event, airframe) : undefined}
+                        onDragLeave={allowAssign ? (event) => handleAirframeDragLeave(event, airframe) : undefined}
+                        onDrop={allowAssign ? (event) => handleAirframeDrop(event, airframe) : undefined}
+                        title={`${airframe.model} · ${airframe.boardNumber || '-'} · ${airframe.pilotLabel} · ${statusLabel}`}
+                      >
+                        <div className="lidc-deck-airframe-media">
+                          <span className="lidc-deck-airframe-board">{airframe.boardNumber || '-'}</span>
+                          {airframe.unitImageUrl ? (
+                            <img
+                              src={airframe.unitImageUrl}
+                              alt={airframe.model}
+                              className="lidc-deck-airframe-image"
+                              draggable={false}
+                            />
+                          ) : (
+                            <span className="lidc-deck-airframe-image-fallback" aria-hidden="true">
+                              {airframe.model}
+                            </span>
+                          )}
+                        </div>
+                        {airframe.pilotAvatarUrl ? (
+                          <img
+                            src={airframe.pilotAvatarUrl}
+                            alt={airframe.pilotLabel}
+                            className="lidc-deck-airframe-pilot"
+                            draggable={false}
+                          />
                         ) : (
-                          <span className="lidc-member-table-avatar lidc-member-table-avatar-fallback">{member.avatarFallback}</span>
+                          <span
+                            className={`lidc-deck-airframe-pilot lidc-deck-airframe-pilot-fallback ${airframe.pilotUserId ? '' : 'is-unassigned'}`}
+                            aria-label={airframe.pilotLabel}
+                          >
+                            {airframe.pilotUserId ? airframe.pilotInitial : ''}
+                          </span>
                         )}
-                        <div className="lidc-airframe-cell-main">
-                          <strong>{member.displayName}</strong>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="lidc-member-count-cell">
-                      <span className="lidc-member-assigned-count">
-                        <strong>{member.assignedAircraftCountA}</strong>
-                      </span>
-                    </td>
-                    <td className="lidc-member-count-cell">
-                      <span className="lidc-member-assigned-count">
-                        <strong>{member.assignedAircraftCountH}</strong>
-                      </span>
-                    </td>
-                    <td className="lidc-member-count-cell">
-                      <span className="lidc-member-assigned-count">
-                        <strong>{member.assignedAircraftCountL}</strong>
-                      </span>
-                    </td>
-                    <td>
-                      <span className="lidc-member-role-text">
-                        {member.roleLabel}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="lidc-member-actions" ref={memberActionMenuForId === member.memberId ? memberActionMenuRef : null}>
-                        <button
-                          type="button"
-                          className={`lidc-member-action-trigger ${memberActionMenuForId === member.memberId ? 'is-open' : ''}`}
-                          onClick={() => setMemberActionMenuForId((prev) => (prev === member.memberId ? '' : member.memberId))}
-                        >
-                          Azioni
-                          <ChevronDown size={12} />
-                        </button>
-
-                        {memberActionMenuForId === member.memberId && (
-                          <div className="lidc-member-action-menu" role="menu">
-                            <button
-                              type="button"
-                              className="lidc-member-action-menu-item"
-                              disabled={member.role === 'owner' || member.role === 'admin'}
-                            >
-                              Promuovi
-                            </button>
-                            <button
-                              type="button"
-                              className="lidc-member-action-menu-item"
-                              disabled={member.role === 'owner' || member.role !== 'admin'}
-                            >
-                              Degrada
-                            </button>
-                            <button
-                              type="button"
-                              className="lidc-member-action-menu-item is-danger"
-                              disabled={member.role === 'owner'}
-                            >
-                              Rimuovi
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
           </div>
+        </div>
+      </>
+    );
+  }
+
+  function renderTableExpandHint() {
+    if (
+      isDeckPanelFullscreen
+      || !isTableFocusView
+      || loadingSquadronDetails
+      || squadronDetailsError
+    ) {
+      return null;
+    }
+
+    return (
+      <button
+        type="button"
+        className="lidc-panel-deck-expand-hint"
+        onClick={() => openFullscreenPanel()}
+      >
+        <Maximize2 size={13} />
+        {t('lidc.deck.expandHint')}
+      </button>
+    );
+  }
+
+  function renderDeckPanelHeader() {
+    return (
+      <header className={`lidc-panel-deck-head ${isDeckPanelFullscreen ? 'is-fullscreen' : ''}`}>
+        <div className="lidc-panel-deck-head-main">
+          <h2 className="lidc-panel-title">SQUADRON DECK</h2>
+          {showDeckManagementView && activeSquadron && isCurrentUserOwner && (
+            <button
+              type="button"
+              className="lidc-deck-edit-btn"
+              onClick={openDeckEditor}
+            >
+              <Settings size={13} />
+              {t('lidc.builder.editDeck')}
+            </button>
+          )}
+        </div>
+        {isDeckPanelFullscreen ? (
+          <button
+            type="button"
+            className="lidc-panel-deck-expanded-close"
+            onClick={closeFullscreenPanel}
+            aria-label={t('lidc.wizard.close')}
+          >
+            <X size={18} />
+          </button>
+        ) : (
+          renderTableExpandHint()
         )}
+      </header>
+    );
+  }
+
+  function renderDeckPanelBodyContent({ interactive = false } = {}) {
+    const hasSelectedSquadron = Boolean(activeSquadron);
+
+    if (loadingSquadronDetails) {
+      return (
+        <div className="lidc-loading">
+          <Loader2 size={14} className="spin" />
+          <span>{t('lidc.general.loading')}</span>
+        </div>
+      );
+    }
+
+    if (squadronDetailsError) {
+      return <InlineError message={squadronDetailsError} />;
+    }
+
+    if (showDeckManagementView) {
+      if (!hasSelectedSquadron) {
+        return (
+          <div className="lidc-panel-rows">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={`deck-placeholder-${index}`} className="lidc-panel-row lidc-panel-row--placeholder" />
+            ))}
+          </div>
+        );
+      }
+      if (interactive) {
+        return (
+          <div className="lidc-panel-deck-expanded-content is-deck-expanded">
+            {renderAirframeTable({ interactive: true, flush: true })}
+          </div>
+        );
+      }
+      return renderDeckManagementView();
+    }
+
+    return (
+      <div className="lidc-panel-rows">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div key={`deck-placeholder-${index}`} className="lidc-panel-row lidc-panel-row--placeholder" />
+        ))}
       </div>
     );
   }
 
-  function renderAircraftManagementView() {
+  function renderExpandableTablePreview({ view, title, hint, children, flush = false }) {
+    const canExpand = !loadingSquadronDetails && !squadronDetailsError;
+
+    if (!canExpand) {
+      return (
+        <div className={['lidc-panel-table-preview-static', flush && 'is-flush'].filter(Boolean).join(' ')}>
+          {children}
+        </div>
+      );
+    }
+
+    if (flush) {
+      return (
+        <div className="lidc-panel-table-preview-static is-flush">
+          {children}
+        </div>
+      );
+    }
+
     return (
-      <div className="lidc-visual-card lidc-visual-card-aircrafts">
-        {renderSquadronManagementActions()}
-
-        {loadingSquadronDetails && (
-          <div className="lidc-loading">
-            <Loader2 size={14} className="spin" />
-            <span>{t('lidc.general.loading')}</span>
-          </div>
-        )}
-
-        {squadronDetailsError && <div className="lidc-inline-error">{squadronDetailsError}</div>}
-        {airframeUpdateError && <div className="lidc-inline-error">{airframeUpdateError}</div>}
-
-        {!loadingSquadronDetails && !squadronDetailsError && airframeRows.length === 0 && (
-          <div className="lidc-muted-box">{t('lidc.airframes.empty')}</div>
-        )}
-
-        {!loadingSquadronDetails && !squadronDetailsError && airframeRows.length > 0 && (
-          <div className="lidc-airframe-table-wrap">
-            <table className="lidc-airframe-table">
-              <thead>
-                <tr>
-                  <th>{t('lidc.airframes.columns.model')}</th>
-                  <th>{t('lidc.airframes.columns.pilot')}</th>
-                  <th>{t('lidc.airframes.columns.base')}</th>
-                  <th>{t('lidc.airframes.columns.boardNumber')}</th>
-                  <th>{t('lidc.airframes.columns.status')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {airframeRows.map((airframe) => {
-                  const statusClassName = `lidc-status-pill is-${airframe.status}`;
-                  const isUpdating = updatingAirframeId === airframe.id;
-
-                  return (
-                    <tr
-                      key={airframe.id}
-                      className={isUpdating ? 'is-updating' : ''}
-                      onClick={() => openAirframeEditor(airframe)}
-                    >
-                      <td>
-                        <div className="lidc-airframe-cell-main">
-                          <strong>{airframe.model}</strong>
-                          <span>{airframe.unitLabel || airframe.unitId}</span>
-                        </div>
-                      </td>
-                      <td>{airframe.pilotLabel}</td>
-                      <td>{airframe.baseLabel}</td>
-                      <td><code>{airframe.boardNumber}</code></td>
-                      <td>
-                        <span className={statusClassName}>
-                          {getAirframeStatusLabel(airframe.status)}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div
+        className="lidc-panel-table-preview"
+        role="button"
+        tabIndex={0}
+        onClick={() => openFullscreenPanel(view)}
+        onKeyDown={(event) => handlePreviewExpandKeyDown(event, view)}
+        aria-label={hint}
+      >
+        <div className="lidc-panel-table-preview-head">
+          <span>{title}</span>
+          <span className="lidc-panel-table-preview-hint">
+            <Maximize2 size={13} />
+            {hint}
+          </span>
+        </div>
+        {children}
       </div>
     );
   }
 
-  function renderVisualization() {
-    if (activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS) return renderMemberManagementView();
-    if (activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS) return renderAircraftManagementView();
-
-    return (
-      <div className="lidc-squadron-view-stack">
-        {renderOverviewView()}
-        {renderCapsView()}
-      </div>
-    );
+  function renderDeckManagementView() {
+    return renderExpandableTablePreview({
+      view: 'deck',
+      flush: true,
+      children: renderAirframeTable({ interactive: false, flush: true }),
+    });
   }
 
   function renderCenterStage() {
@@ -1555,125 +2516,51 @@ export default function LidcPage() {
       );
     }
 
-    if (!isLogged) {
+    if (panelMode === 'join') {
       return (
         <div className="lidc-center-card">
           <div className="lidc-center-head">
-            <h2>{t('lidc.center.loginTitle')}</h2>
-            <p>{t('lidc.center.loginHint')}</p>
+            <h2>{t('lidc.center.joinTitle')}</h2>
+            <p>{t('lidc.center.joinHint')}</p>
           </div>
-          <div className="lidc-auth-warning">
-            <div className="lidc-auth-warning-text">
-              <AlertTriangle size={16} />
-              <span>{t('lidc.auth.loginToCreate')}</span>
-            </div>
-            <button
-              type="button"
-              className="lidc-btn lidc-btn-primary lidc-btn-block"
-              onClick={() => { window.location.href = '/api/auth/discord'; }}
-            >
-              <LogIn size={14} />
-              {t('lidc.auth.loginButton')}
-            </button>
-          </div>
-        </div>
-      );
-    }
 
-    if (userHasSquadron) {
-      const squadronName = createdSquadron?.name || userLidcState?.squadron?.name || '-';
-      return (
-        <div className="lidc-center-card">
-          <button
-            type="button"
-            className="lidc-center-dismiss-btn"
-            onClick={() => setHideInSquadronNotice(true)}
-            aria-label={t('lidc.wizard.close')}
-            title={t('lidc.wizard.close')}
-          >
-            <X size={14} />
-          </button>
-          <div className="lidc-center-head">
-            <h2>{t('lidc.center.inSquadronTitle')}</h2>
-            <p>{t('lidc.center.inSquadronHint', { name: squadronName })}</p>
+          <div className="lidc-join-code-panel">
+            <label className="lidc-field">
+              <span>{t('lidc.inviteCode.label')}</span>
+              <input
+                value={joinInviteCode}
+                onChange={(event) => setJoinInviteCode(event.target.value.toUpperCase())}
+                placeholder={t('lidc.inviteCode.placeholder')}
+                maxLength={9}
+                className="lidc-invite-code-input"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </label>
+            <InlineError message={joinError} />
           </div>
-          {createdSquadron && (
-            <div className="lidc-success">
-              <Check size={16} />
-              <div>
-                <div className="lidc-success-title">{t('lidc.review.created')}</div>
-                <div className="lidc-success-meta">ID: {createdSquadron.id}</div>
-              </div>
-            </div>
-          )}
-          {userStateError && <div className="lidc-inline-error">{userStateError}</div>}
+
           <div className="lidc-center-actions">
             <button
               type="button"
               className="lidc-btn lidc-btn-outline"
-              onClick={() => openSquadronActionConfirm('leave')}
-              disabled={isSquadronActionBusy}
+              onClick={() => {
+                setPanelMode('home');
+                setJoinError('');
+                setJoinInviteCode('');
+              }}
             >
-              {leavingSquadron ? <Loader2 size={14} className="spin" /> : <X size={14} />}
-              {t('lidc.center.leaveSquadron')}
-            </button>
-            {adminEditorButton}
-          </div>
-        </div>
-      );
-    }
-
-    if (panelMode === 'invites') {
-      return (
-        <div className="lidc-center-card">
-          <div className="lidc-center-head">
-            <h2>{t('lidc.center.inviteListTitle')}</h2>
-            <p>{t('lidc.center.inviteListHint')}</p>
-          </div>
-
-          {userStateError && <div className="lidc-inline-error">{userStateError}</div>}
-
-          {userLidcState.invites.length === 0 ? (
-            <div className="lidc-muted-box">{t('lidc.invites.receivedEmpty')}</div>
-          ) : (
-            <div className="lidc-received-list">
-              {userLidcState.invites.map((invite) => {
-                const invitedBy = invite?.invitedBy || {};
-                const invitedByName = invitedBy.globalName || invitedBy.username || invitedBy.id || '-';
-                const squadronName = invite?.squadronName || '-';
-                const avatarUrl = invitedBy.avatarUrl || '';
-
-                return (
-                  <article key={`${invite.squadronId}-${invite.invitedAt}`} className="lidc-received-item">
-                    <div className="lidc-received-head">
-                      <span>{squadronName}</span>
-                      <span className="lidc-user-tag">{t('lidc.invites.pending')}</span>
-                    </div>
-                    <div className="lidc-received-meta">
-                      {avatarUrl ? (
-                        <img src={avatarUrl} alt={invitedByName} className="lidc-user-avatar" />
-                      ) : (
-                        <div className="lidc-user-avatar lidc-user-avatar-fallback">{invitedByName.slice(0, 1).toUpperCase()}</div>
-                      )}
-                      <div>
-                        <div className="lidc-user-name">{invitedByName}</div>
-                        <div className="lidc-user-sub">{formatTimestamp(invite?.invitedAt)}</div>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-
-          <div className="lidc-center-actions">
-            <button type="button" className="lidc-btn lidc-btn-outline" onClick={() => setPanelMode('home')}>
               <ChevronLeft size={14} />
               {t('lidc.center.backHome')}
             </button>
-            <button type="button" className="lidc-btn lidc-btn-primary" onClick={openCreateWizard}>
-              <Disc3 size={14} />
-              {t('lidc.home.createSquadron')}
+            <button
+              type="button"
+              className="lidc-btn lidc-btn-primary"
+              onClick={handleJoinSquadron}
+              disabled={!joinInviteCode.trim() || joiningSquadron}
+            >
+              {joiningSquadron ? <Loader2 size={14} className="spin" /> : <UserPlus size={14} />}
+              {t('lidc.home.joinSquadron')}
             </button>
           </div>
           {adminEditorButton}
@@ -1681,182 +2568,371 @@ export default function LidcPage() {
       );
     }
 
+    return null;
+  }
+
+  function renderMembersListPanel() {
+    let body;
+
+    if (!isLogged || !userHasSquadron) {
+      body = <div className="lidc-muted-box">{t('lidc.members.empty')}</div>;
+    } else if (loadingSquadronDetails) {
+      body = (
+        <div className="lidc-panel-row lidc-panel-row--static">
+          <Loader2 size={18} className="spin" />
+          <span>{t('lidc.general.loading')}</span>
+        </div>
+      );
+    } else if (squadronDetailsError) {
+      body = <InlineError message={squadronDetailsError} />;
+    } else if (unassignedMemberRows.length === 0) {
+      body = <div className="lidc-muted-box">{t('lidc.members.unassignedEmpty')}</div>;
+    } else {
+      body = unassignedMemberRows.map((member) => (
+        <div
+          key={member.memberId}
+          className={`lidc-panel-row lidc-panel-row--member ${isCurrentUserOwner && member.role !== 'owner' && member.memberId !== currentUserId ? 'is-actionable' : ''} ${canAssignAirframes ? 'is-draggable' : ''} ${draggedMemberId === member.memberId ? 'is-dragging' : ''}`}
+          draggable={canAssignAirframes}
+          onDragStart={(event) => handleMemberDragStart(event, member)}
+          onDragEnd={handleMemberDragEnd}
+          onContextMenu={(event) => openMemberContextMenu(event, member)}
+        >
+          {member.avatarUrl ? (
+            <img src={member.avatarUrl} alt="" className="lidc-panel-row-logo" draggable={false} />
+          ) : (
+            <span className="lidc-panel-row-logo lidc-panel-row-logo-fallback" aria-hidden="true">
+              {member.avatarFallback}
+            </span>
+          )}
+          <span className="lidc-panel-row-name">{member.displayName}</span>
+          {(member.role === 'owner' || member.role === 'admin') && (
+            <span className={`lidc-member-role-label ${member.role === 'owner' ? 'is-owner' : 'is-admin'}`}>
+              {member.roleLabel}
+            </span>
+          )}
+        </div>
+      ));
+    }
+
     return (
-      <div className="lidc-center-card">
-        <div className="lidc-center-head">
-          <h2>{t('lidc.center.notInSquadronTitle')}</h2>
-          <p>{t('lidc.center.notInSquadronHint')}</p>
+      <section className="lidc-panel lidc-panel-list">
+        <h2 className="lidc-panel-title">{t('lidc.members.listTitle')}</h2>
+        <InlineError message={memberActionError} />
+        <div className="lidc-panel-list-body">
+          <div className="lidc-panel-rows">
+            {body}
+          </div>
         </div>
-
-        {userStateError && <div className="lidc-inline-error">{userStateError}</div>}
-
-        <div className="lidc-home-actions">
-          <button type="button" className="lidc-home-btn" onClick={openCreateWizard}>
-            <Disc3 size={18} />
-            <span>{t('lidc.home.createSquadron')}</span>
-          </button>
-          <button type="button" className="lidc-home-btn" onClick={() => setPanelMode('invites')}>
-            <UserPlus size={18} />
-            <span>{t('lidc.home.invitesList')}</span>
-          </button>
-        </div>
-        {adminEditorButton}
-      </div>
+      </section>
     );
   }
 
-  const wizardPortalTarget = typeof document !== 'undefined' ? document.body : null;
-  const showInlineCenterStage = !isWizardOpen
-    && !isEntryWizardVisible
-    && !(userHasSquadron && hideInSquadronNotice);
-  const isSidebarExpanded = isNarrowLayout || isSidebarPinned || isSidebarHovered;
+  function renderMemberContextMenu() {
+    if (!memberContextMenu) return null;
 
-  return (
-    <div className="lidc-page">
-      <div className={`lidc-layout ${isSidebarExpanded ? 'is-sidebar-expanded' : 'is-sidebar-collapsed'}`}>
-        <aside
-          className={`lidc-sidebar ${isSidebarExpanded ? 'is-expanded' : 'is-collapsed'}`}
-          onMouseEnter={handleSidebarMouseEnter}
-          onMouseLeave={handleSidebarMouseLeave}
-          onFocusCapture={() => setIsSidebarHovered(true)}
-          onBlurCapture={(event) => {
-            const nextTarget = event.relatedTarget;
-            if (!event.currentTarget.contains(nextTarget)) {
-              handleSidebarMouseLeave();
-            }
-          }}
+    const member = memberRows.find((entry) => entry.memberId === memberContextMenu.memberId);
+    if (!member) return null;
+
+    const canPromote = member.role === 'member' || member.role === 'leader';
+    const canDemote = member.role === 'admin' || member.role === 'leader';
+
+    return createPortal(
+      <div
+        className="lidc-member-context-menu"
+        style={{ left: memberContextMenu.x, top: memberContextMenu.y }}
+        role="menu"
+        onClick={(event) => event.stopPropagation()}
+        onContextMenu={(event) => event.preventDefault()}
+      >
+        <button
+          type="button"
+          className="lidc-member-action-menu-item"
+          role="menuitem"
+          disabled={memberActionBusy || !canPromote}
+          onClick={() => applyMemberAction(member.memberId, 'promote')}
         >
-          <button
-            type="button"
-            className="lidc-sidebar-pin"
-            onClick={() => setIsSidebarPinned((prev) => !prev)}
-            aria-label={isSidebarPinned ? 'Collapse sidebar' : 'Pin sidebar'}
-            title={isSidebarPinned ? 'Collapse sidebar' : 'Pin sidebar'}
-          >
-            {isSidebarPinned ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
-          </button>
+          {t('lidc.members.actions.promote')}
+        </button>
+        <button
+          type="button"
+          className="lidc-member-action-menu-item"
+          role="menuitem"
+          disabled={memberActionBusy || !canDemote}
+          onClick={() => applyMemberAction(member.memberId, 'demote')}
+        >
+          {t('lidc.members.actions.demote')}
+        </button>
+        <button
+          type="button"
+          className="lidc-member-action-menu-item is-danger"
+          role="menuitem"
+          disabled={memberActionBusy}
+          onClick={() => applyMemberAction(member.memberId, 'remove')}
+        >
+          {t('lidc.members.actions.remove')}
+        </button>
+      </div>,
+      document.body,
+    );
+  }
 
-          <div className="lidc-sidebar-header">
-            <div className="lidc-eyebrow">LIDC</div>
-            <h1>{t('lidc.title')}</h1>
-            <p>{t('lidc.subtitle')}</p>
+  function renderMySquadronPanel() {
+    const showNoSquadronActions = isLogged && !userHasSquadron && !loadingUserState;
+    const showDiscordCta = !isLogged && !loadingUserState;
+    const squadronTitle = userHasSquadron
+      ? previewIdentity.name
+      : t('lidc.home.mySquadronTitle');
+
+    return (
+      <section className="lidc-panel lidc-panel-squadron">
+        <h2 className="lidc-panel-title">{squadronTitle}</h2>
+
+        {isLogged && <InlineError message={catalogError} className="lidc-panel-inline-error" />}
+
+        {showNoSquadronActions && (
+          <div className="lidc-panel-squadron-actions">
+            <button
+              type="button"
+              className="lidc-panel-squadron-action-btn lidc-panel-squadron-action-btn--primary"
+              onClick={openCreateWizard}
+            >
+              {t('lidc.home.createSquadronAction')}
+            </button>
+            <button
+              type="button"
+              className="lidc-panel-squadron-action-btn"
+              onClick={() => {
+                setPanelMode('join');
+                setJoinError('');
+              }}
+            >
+              {t('lidc.home.joinSquadron')}
+            </button>
           </div>
+        )}
 
-          <nav className="lidc-side-nav" aria-label="LIDC sidebar navigation">
-            <div className="lidc-eyebrow">{t('lidc.sidebar.navigation')}</div>
-
-            <div className="lidc-side-nav-list">
-              <button
-                type="button"
-                className={`lidc-side-nav-item ${
-                  activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_LIST ? 'is-active' : ''
-                }`}
-                onClick={() => setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_LIST)}
-                title={t('lidc.sidebar.squadronList')}
-                aria-label={t('lidc.sidebar.squadronList')}
-              >
-                <List size={14} />
-                <span className="lidc-side-nav-label">{t('lidc.sidebar.squadronList')}</span>
-              </button>
-
-              <div className="lidc-side-nav-group">
-                {isSidebarExpanded ? (
-                  <button
-                    type="button"
-                    className="lidc-side-nav-group-trigger"
-                    onClick={() => setIsSquadronManagementOpen((prev) => !prev)}
-                    aria-expanded={isSquadronManagementOpen}
-                    title={t('lidc.sidebar.squadronManagement')}
-                    aria-label={t('lidc.sidebar.squadronManagement')}
-                  >
-                    <span className="lidc-side-nav-group-title">
-                      <Settings size={14} />
-                      <span className="lidc-side-nav-label">{t('lidc.sidebar.squadronManagement')}</span>
-                    </span>
-                    <ChevronDown
-                      size={14}
-                      className={`lidc-side-nav-group-caret ${isSquadronManagementOpen ? 'is-open' : ''}`}
-                    />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="lidc-side-nav-group-trigger lidc-side-nav-group-trigger-icon-only"
-                    onClick={() => setIsSquadronManagementOpen((prev) => !prev)}
-                    aria-expanded={false}
-                    title={t('lidc.sidebar.squadronManagement')}
-                    aria-label={t('lidc.sidebar.squadronManagement')}
-                  >
-                    <Settings size={14} />
-                  </button>
-                )}
-
-                <div
-                  className={`lidc-side-nav-children ${
-                    isSidebarExpanded && isSquadronManagementOpen ? 'is-open' : 'is-closed'
-                  }`}
-                  aria-hidden={!(isSidebarExpanded && isSquadronManagementOpen)}
-                >
+        {isLogged && !showNoSquadronActions && (
+          <div className="lidc-codes-stack">
+            <div className="lidc-code-box">
+              <span className="lidc-code-box-label">{t('lidc.link.title')}</span>
+              {ucidLinkLoading ? (
+                <p className="lidc-code-box-hint">{t('lidc.general.loadingUserState')}</p>
+              ) : ucidLinkStatus.linked ? (
+                <p className="lidc-link-box-status is-linked">
+                  {t('lidc.link.linked')}
+                  {ucidLinkStatus.link?.name ? ` — ${ucidLinkStatus.link.name}` : ''}
+                </p>
+              ) : ucidLinkStatus.pending?.code ? (
+                <>
+                  <div className="lidc-secret-code-row">
+                    <strong
+                      className="lidc-secret-code-value"
+                      tabIndex={0}
+                      title={t('lidc.link.reveal')}
+                    >
+                      {ucidLinkStatus.pending.code}
+                    </strong>
                     <button
                       type="button"
-                      className={`lidc-side-nav-item is-child ${
-                        activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS ? 'is-active' : ''
-                      }`}
-                      onClick={() => setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_MEMBERS)}
-                      title={t('lidc.sidebar.memberManagement')}
-                      aria-label={t('lidc.sidebar.memberManagement')}
+                      className="lidc-secret-code-copy"
+                      onClick={() => copyLinkCode(ucidLinkStatus.pending.code)}
+                      title={linkCodeCopied ? t('lidc.inviteCode.copied') : t('lidc.inviteCode.copy')}
+                      aria-label={linkCodeCopied ? t('lidc.inviteCode.copied') : t('lidc.inviteCode.copy')}
                     >
-                      <Users size={14} />
-                      <span className="lidc-side-nav-label">{t('lidc.sidebar.memberManagement')}</span>
+                      {linkCodeCopied ? <Check size={14} /> : <Copy size={14} />}
                     </button>
-                    <button
-                      type="button"
-                      className={`lidc-side-nav-item is-child ${
-                        activeView === LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS ? 'is-active' : ''
-                      }`}
-                      onClick={() => setActiveView(LIDC_SIDEBAR_VIEWS.SQUADRON_AIRCRAFTS)}
-                      title={t('lidc.sidebar.aircraftManagement')}
-                      aria-label={t('lidc.sidebar.aircraftManagement')}
-                    >
-                      <Plane size={14} />
-                      <span className="lidc-side-nav-label">{t('lidc.sidebar.aircraftManagement')}</span>
-                    </button>
+                  </div>
+                  <p className="lidc-code-box-hint">{t('lidc.link.codeHint')}</p>
+                </>
+              ) : (
+                <p className="lidc-code-box-hint">{t('lidc.link.notLinked')}</p>
+              )}
+              <InlineError message={ucidLinkError} />
+            </div>
+
+            {userHasSquadron && activeSquadron?.inviteCode && (
+              <div className="lidc-code-box">
+                <span className="lidc-code-box-label">{t('lidc.inviteCode.shareLabel')}</span>
+                <div className="lidc-secret-code-row">
+                  <strong
+                    className="lidc-secret-code-value"
+                    tabIndex={0}
+                    title={t('lidc.inviteCode.reveal')}
+                  >
+                    {formatInviteCode(activeSquadron.inviteCode)}
+                  </strong>
+                  <button
+                    type="button"
+                    className="lidc-secret-code-copy"
+                    onClick={() => copyInviteCode(activeSquadron.inviteCode)}
+                    title={inviteCodeCopied ? t('lidc.inviteCode.copied') : t('lidc.inviteCode.copy')}
+                    aria-label={inviteCodeCopied ? t('lidc.inviteCode.copied') : t('lidc.inviteCode.copy')}
+                  >
+                    {inviteCodeCopied ? <Check size={14} /> : <Copy size={14} />}
+                  </button>
                 </div>
-              </div>
-            </div>
-          </nav>
-
-          <div className="lidc-sidebar-summary">
-            <div className="lidc-summary-row">
-              <span>{t('lidc.info.base')}</span>
-              <strong>{previewIdentity.baseLabel}</strong>
-            </div>
-            <div className="lidc-summary-row">
-              <span>{t('lidc.template.title')}</span>
-              <strong>{previewIdentity.templateName}</strong>
-            </div>
-            <div className="lidc-summary-row">
-              <span>{t('lidc.deck.totalUnits')}</span>
-              <strong>{effectiveTotalDeckUnits}</strong>
-            </div>
-          </div>
-        </aside>
-
-        <section className="lidc-main">
-          <div className={`lidc-main-shell ${isManagementFocusView ? 'is-management-focus' : ''}`}>
-            <div className={`lidc-visual-panel ${isManagementFocusView ? 'is-management-focus' : ''}`}>
-              {catalogError && <div className="lidc-inline-error">{catalogError}</div>}
-              {renderVisualization()}
-            </div>
-
-            {showInlineCenterStage && (
-              <div className="lidc-center-stage">
-                {renderCenterStage()}
+                <p className="lidc-code-box-hint">{t('lidc.inviteCode.shareHint')}</p>
               </div>
             )}
           </div>
-        </section>
+        )}
+
+        {showDiscordCta && (
+          <a href="/api/auth/discord" className="lidc-discord-btn">
+            Join our DISCORD
+          </a>
+        )}
+
+        {showInlineCenterStage && (
+          <div className="lidc-panel-center-stage">
+            {renderCenterStage()}
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  function renderSquadronDeckPanel() {
+    const showLockedOverlay = !userHasSquadron && !loadingUserState && !isDeckPanelFullscreen;
+
+    return (
+      <section
+        className={[
+          'lidc-panel',
+          'lidc-panel-deck',
+          isTableFocusView ? 'is-table-focus' : '',
+          deckBoardExpanded ? 'is-expanded' : '',
+          isDeckPanelFullscreen ? 'is-borderless' : '',
+          showLockedOverlay ? 'is-locked' : '',
+        ].filter(Boolean).join(' ')}
+        aria-expanded={deckBoardExpanded}
+      >
+        {renderDeckPanelHeader()}
+        <div className="lidc-panel-deck-body">
+          {renderDeckPanelBodyContent({ interactive: isDeckPanelFullscreen })}
+          {showLockedOverlay && <div className="lidc-panel-overlay" aria-hidden="true" />}
+        </div>
+      </section>
+    );
+  }
+
+  function renderMapPanel() {
+    return (
+      <aside
+        className={[
+          'lidc-panel-map',
+          mapBoardExpanded ? 'is-expanded' : '',
+          isMapPanelFullscreen ? 'is-borderless' : '',
+        ].filter(Boolean).join(' ')}
+        aria-label={t('lidc.map.title')}
+        aria-expanded={mapBoardExpanded}
+      >
+        <div className="lidc-map-frame">
+          <LidcTheaterMap
+            layoutKey={Number(mapBoardExpanded) + Number(isMapPanelFullscreen)}
+            selectedAirportId={selectedMapAirportId}
+            onSelectAirport={handleSelectMapAirport}
+            onClearAirport={handleClearMapAirport}
+            orderAlerts={airportOrderAlerts}
+          />
+          <header className={`lidc-panel-map-overlay ${mapBoardExpanded ? 'is-fullscreen' : ''}`}>
+            <h2 className="lidc-panel-title">{t('lidc.map.title')}</h2>
+            {mapBoardExpanded ? (
+              <button
+                type="button"
+                className="lidc-panel-deck-expanded-close"
+                onClick={closeMapFullscreen}
+                aria-label={t('lidc.wizard.close')}
+              >
+                <X size={18} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="lidc-panel-map-expand-hint"
+                onClick={openMapFullscreen}
+              >
+                <Maximize2 size={13} />
+                {t('lidc.map.expandHint')}
+              </button>
+            )}
+          </header>
+          {selectedMapAirport && (
+            <LidcAirportPresencePanel
+              airport={selectedMapAirport}
+              occupancy={airportOccupancy}
+              loading={airportOccupancyLoading}
+              error={airportOccupancyError}
+              orderAlertCount={airportOrderAlerts[selectedMapAirport.id] || 0}
+              fuelAlertCount={airportFuelAlerts[selectedMapAirport.id] || 0}
+              onClose={handleClearMapAirport}
+              onOpenWizard={handleOpenAirportWizard}
+            />
+          )}
+        </div>
+      </aside>
+    );
+  }
+
+  const wizardPortalTarget = typeof document !== 'undefined'
+    ? document.getElementById('lidc-overlay-root') || document.body
+    : null;
+  const showNotInSquadronHomePopup = isLogged && !userHasSquadron && panelMode === 'home' && !loadingUserState;
+  const showInlineCenterStage = !isWizardOpen
+    && !isEntryWizardVisible
+    && !showNotInSquadronHomePopup
+    && !userHasSquadron
+    && isLogged;
+
+  const isDeckBoardExpanded = deckBoardExpanded;
+  const isMapBoardExpanded = mapBoardExpanded;
+  const isAnyBoardPanelOpen = isDeckBoardExpanded || isMapBoardExpanded;
+
+  return (
+    <div className={`lidc-page ${isAnyBoardPanelOpen ? 'is-deck-panel-open' : ''} ${isMapBoardExpanded ? 'is-map-fullscreen' : ''}`}>
+      <div className="lidc-shell">
+        <div className={`lidc-board ${isDeckBoardExpanded ? 'is-deck-expanded' : ''} ${isMapBoardExpanded ? 'is-map-expanded' : ''}`}>
+          <div
+            className={`lidc-board-slot lidc-board-slot-list ${boardPanelsCollapsed ? 'is-collapsed' : ''}`}
+            aria-hidden={boardPanelsCollapsed}
+          >
+            {renderMembersListPanel()}
+          </div>
+          <div
+            className={`lidc-board-slot lidc-board-slot-squadron ${boardPanelsCollapsed ? 'is-collapsed' : ''}`}
+            aria-hidden={boardPanelsCollapsed}
+          >
+            {renderMySquadronPanel()}
+          </div>
+          <div
+            ref={mapSlotRef}
+            className={[
+              'lidc-board-slot',
+              'lidc-board-slot-map',
+              deckBoardExpanded ? 'is-collapsed' : '',
+              mapBoardExpanded ? 'is-expanded' : '',
+            ].filter(Boolean).join(' ')}
+            aria-hidden={deckBoardExpanded}
+          >
+            {renderMapPanel()}
+          </div>
+          <div
+            ref={deckSlotRef}
+            className={[
+              'lidc-board-slot',
+              'lidc-board-slot-deck',
+              mapBoardExpanded ? 'is-collapsed' : '',
+              deckBoardExpanded ? 'is-expanded' : '',
+            ].filter(Boolean).join(' ')}
+            aria-hidden={mapBoardExpanded}
+          >
+            {renderSquadronDeckPanel()}
+          </div>
+        </div>
       </div>
+
+      {renderDebugLeaveHeaderButton()}
+      {renderMemberContextMenu()}
 
       {isEntryWizardVisible && wizardPortalTarget && createPortal(
         <div className="lidc-center-stage lidc-center-stage-global">
@@ -1867,19 +2943,14 @@ export default function LidcPage() {
 
       {isWizardOpen && wizardPortalTarget && createPortal(
         <div className="lidc-wizard-root">
-          <div className="lidc-wizard-backdrop" />
+          <div className="lidc-wizard-backdrop" onClick={closeWizard} aria-hidden="true" />
 
-          <section className="lidc-wizard-card" role="dialog" aria-modal="true">
-            <header className="lidc-wizard-head">
-              <div>
-                <h2>{t('lidc.wizard.title')}</h2>
-                <p>{t('lidc.wizard.subtitle')}</p>
-              </div>
-              <button type="button" className="lidc-btn lidc-btn-outline" onClick={closeWizard}>
-                {t('lidc.wizard.close')}
-              </button>
-            </header>
-
+          <section
+            className={`lidc-wizard-card ${currentStepKey === 'specializations' || currentStepKey === 'info' ? 'lidc-wizard-card--template' : ''}`}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t(`lidc.steps.${currentStepKey}`)}
+          >
             <div className="lidc-wizard-stepper-shell">
               <div className="lidc-wizard-steps" aria-label="Wizard steps">
                 {WIZARD_STEPS.map((stepKey, index) => {
@@ -1891,7 +2962,7 @@ export default function LidcPage() {
                     <div key={stepKey} className="lidc-wizard-step-col">
                       <button
                         type="button"
-                        onClick={() => isComplete && setCurrentStep(index)}
+                        onClick={() => isComplete && goToWizardStep(index)}
                         disabled={!isComplete}
                         className={`lidc-progress-node ${
                           isComplete ? 'is-complete' : isActive ? 'is-active' : 'is-upcoming'
@@ -1914,9 +2985,19 @@ export default function LidcPage() {
                   );
                 })}
               </div>
+
+              <button
+                type="button"
+                className="lidc-wizard-close"
+                onClick={closeWizard}
+                aria-label={t('lidc.wizard.close')}
+                title={t('lidc.wizard.close')}
+              >
+                <X size={18} />
+              </button>
             </div>
 
-            <div className="lidc-wizard-body">
+            <div className={`lidc-wizard-body ${currentStepKey === 'specializations' || currentStepKey === 'info' ? 'lidc-wizard-body--template' : ''}`}>
               {currentStepKey === 'info' && (
                 <section className="lidc-step-section">
                   <header className="lidc-step-section-head">
@@ -1924,87 +3005,34 @@ export default function LidcPage() {
                     <p>{t('lidc.wizard.sections.infoHint')}</p>
                   </header>
 
-                  <div className="lidc-form-stack">
-                    <label className="lidc-field">
-                      <span>{t('lidc.info.name')}</span>
-                      <input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} />
-                    </label>
-
-                    <label className="lidc-field">
-                      <span>{t('lidc.info.description')}</span>
-                      <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={4} maxLength={1200} />
-                    </label>
-
-                    <label className="lidc-field">
-                      <span>{t('lidc.info.base')}</span>
-                      <select value={baseId} onChange={(event) => setBaseId(event.target.value)}>
-                        <option value="">{t('lidc.info.basePlaceholder')}</option>
-                        {airports.map((entry) => (
-                          <option key={entry.id} value={entry.id}>{entry.displayName || entry.name}</option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <div className="lidc-field">
-                      <span>{t('lidc.info.logo')}</span>
-                      <label className="lidc-upload-btn">
-                        <Upload size={14} />
-                        <span>{t('lidc.info.logoUpload')}</span>
-                        <input type="file" accept="image/*" onChange={handleLogoUpload} />
-                      </label>
-                      {logoDataUrl && <img src={logoDataUrl} alt="Logo preview" className="lidc-logo-preview" />}
-                    </div>
-                  </div>
+                  <LidcSquadronIdentityStep
+                    name={name}
+                    description={description}
+                    baseId={baseId}
+                    logoDataUrl={logoDataUrl}
+                    logoUploadError={logoUploadError}
+                    onNameChange={setName}
+                    onDescriptionChange={setDescription}
+                    onBaseChange={setBaseId}
+                    onLogoFile={handleLogoFile}
+                    onLogoClear={() => setLogoDataUrl('')}
+                  />
                 </section>
               )}
 
-              {currentStepKey === 'template' && (
+              {currentStepKey === 'specializations' && (
                 <section className="lidc-step-section">
                   <header className="lidc-step-section-head">
-                    <h3>{t('lidc.wizard.sections.templateTitle')}</h3>
-                    <p>{t('lidc.wizard.sections.templateHint')}</p>
+                    <h3>{t('lidc.wizard.sections.specializationsTitle')}</h3>
+                    <p>{t('lidc.wizard.sections.specializationsHint', { count: SPECIALIZATION_SLOTS })}</p>
                   </header>
 
-                  <div className="lidc-template-plan-list">
-                    {templates.map((entry, index) => {
-                      const isSelected = templateId === entry.id;
-                      const totalCap = CATEGORY_META.reduce((sum, { key }) => sum + Number(entry?.caps?.[key] || 0), 0);
-                      return (
-                        <button
-                          type="button"
-                          key={entry.id}
-                          className={`lidc-template-plan ${isSelected ? 'is-selected' : ''}`}
-                          onClick={() => setTemplateId(entry.id)}
-                        >
-                          <div className="lidc-template-plan-main">
-                            <div className="lidc-template-plan-head">
-                              <span className={`lidc-template-radio ${isSelected ? 'is-selected' : ''}`} aria-hidden="true" />
-                              <div className="lidc-template-plan-title-wrap">
-                                <h4>{entry.name}</h4>
-                                {index === 0 && <span className="lidc-template-badge">{t('lidc.template.recommended')}</span>}
-                              </div>
-                            </div>
-
-                            <p>{entry.description || t('lidc.template.noDescription')}</p>
-
-                            <ul className="lidc-template-plan-features">
-                              {CATEGORY_META.map(({ key, labelKey }) => (
-                                <li key={key}>
-                                  <Check size={13} />
-                                  <span>{t(labelKey)}: <strong>{Number(entry?.caps?.[key] || 0)}</strong></span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-
-                          <div className="lidc-template-plan-footer">
-                            <span>{t('lidc.template.totalCap')}</span>
-                            <strong>{totalCap}</strong>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <LidcSpecializationPicker
+                    specializations={specializations}
+                    selectedIds={specializationIds}
+                    slots={SPECIALIZATION_SLOTS}
+                    onChange={setSpecializationIds}
+                  />
                 </section>
               )}
 
@@ -2015,121 +3043,12 @@ export default function LidcPage() {
                     <p>{t('lidc.wizard.sections.deckHint')}</p>
                   </header>
 
-                  <div className="lidc-deck-sections">
-                    {CATEGORY_META.map(({ key, labelKey }) => (
-                      <section key={key} className="lidc-deck-category">
-                        <header>
-                          <h3>{t(labelKey)}</h3>
-                          <span className={`lidc-cap-pill ${spentByCategory[key] > capsByCategory[key] ? 'is-over' : ''}`}>
-                            {t('lidc.deck.remaining')}: <strong>{remainingByCategory[key]}</strong>
-                          </span>
-                        </header>
-
-                        <div className="lidc-unit-list">
-                          {(unitsByCategory[key] || []).map((unit) => {
-                          const qty = Number(quantities[unit.id] || 0);
-                          const canIncrease = selectedTemplate && ((remainingByCategory[key] || 0) >= unit.cost || qty > 0);
-                          const isBlocked = qty <= 0 && !canIncrease;
-                          const rowClassName = [
-                            'lidc-unit-row',
-                            isBlocked ? 'is-blocked' : '',
-                          ].filter(Boolean).join(' ');
-
-                          return (
-                              <div key={unit.id} className={rowClassName}>
-                                <div className="lidc-unit-main">
-                                  <div className="lidc-unit-name"><strong>{unit.label}</strong></div>
-                                  <div className="lidc-unit-meta">
-                                    <span className={`lidc-unit-cost-chip ${qty > 0 ? 'is-selected' : ''}`} title={t('lidc.deck.unitCost', { cost: unit.cost })}>
-                                      <Coins size={13} />
-                                      <strong>{qty > 0 ? unit.cost * qty : unit.cost}</strong>
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="lidc-stepper-controls">
-                                  <button type="button" className="lidc-icon-btn" onClick={() => updateQuantity(unit, qty - 1)} disabled={qty <= 0}>-</button>
-                                  <span className="lidc-unit-qty">{qty}</span>
-                                  <button type="button" className="lidc-icon-btn" onClick={() => updateQuantity(unit, qty + 1)} disabled={!canIncrease}>+</button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </section>
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              {currentStepKey === 'invites' && (
-                <section className="lidc-step-section">
-                  <header className="lidc-step-section-head">
-                    <h3>{t('lidc.wizard.sections.invitesTitle')}</h3>
-                    <p>{t('lidc.wizard.sections.invitesHint')}</p>
-                  </header>
-
-                  <div className="lidc-invite-panel">
-                    <label className="lidc-field">
-                      <span>{t('lidc.invites.searchLabel')}</span>
-                      <input
-                        value={inviteSearchQuery}
-                        onChange={(event) => setInviteSearchQuery(event.target.value)}
-                        placeholder={t('lidc.invites.searchPlaceholder')}
-                        maxLength={80}
-                      />
-                    </label>
-
-                    {loadingUsers && (
-                      <div className="lidc-loading">
-                        <Loader2 size={14} className="spin" />
-                        <span>{t('lidc.general.loadingUsers')}</span>
-                      </div>
-                    )}
-
-                    {!loadingUsers && inviteCandidates.length === 0 && (
-                      <div className="lidc-muted-box">{t('lidc.invites.empty')}</div>
-                    )}
-
-                    {!loadingUsers && inviteCandidates.length > 0 && (
-                      <div className="lidc-user-list">
-                        {filteredInviteCandidates.map((entry) => {
-                          const isSelected = selectedInviteIds.includes(entry.id);
-                          const displayName = entry.globalName || entry.username || entry.id;
-                          const avatarUrl = entry.avatarUrl || '';
-                          const isSelf = user?.id && user.id === entry.id;
-
-                          return (
-                            <button
-                              type="button"
-                              key={entry.id}
-                              className={`lidc-user-item ${isSelected ? 'is-selected' : ''}`}
-                              onClick={() => !isSelf && toggleInvite(entry.id)}
-                              disabled={isSelf}
-                            >
-                              {avatarUrl ? (
-                                <img src={avatarUrl} alt={displayName} className="lidc-user-avatar" />
-                              ) : (
-                                <div className="lidc-user-avatar lidc-user-avatar-fallback">{displayName.slice(0, 1).toUpperCase()}</div>
-                              )}
-                              <div className="lidc-user-meta">
-                                <div className="lidc-user-name">{displayName}</div>
-                                <div className="lidc-user-sub">{formatTimestamp(entry.lastSeenAt)}</div>
-                              </div>
-                              {isSelf ? (
-                                <span className="lidc-user-tag">{t('lidc.invites.you')}</span>
-                              ) : (
-                                <span className="lidc-user-tag">{isSelected ? t('lidc.invites.pending') : t('lidc.invites.add')}</span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {!loadingUsers && inviteCandidates.length > 0 && filteredInviteCandidates.length === 0 && (
-                      <div className="lidc-muted-box">{t('lidc.invites.searchEmpty')}</div>
-                    )}
-                  </div>
+                  <LidcDeckBuilder
+                    units={units}
+                    quantities={quantities}
+                    caps={capsByCategory}
+                    onChange={setQuantities}
+                  />
                 </section>
               )}
 
@@ -2143,8 +3062,11 @@ export default function LidcPage() {
                   <div className="lidc-review-panel">
                     <div className="lidc-review-line"><span>{t('lidc.info.name')}</span><strong>{name || '-'}</strong></div>
                     <div className="lidc-review-line"><span>{t('lidc.info.base')}</span><strong>{previewBase?.displayName || '-'}</strong></div>
-                    <div className="lidc-review-line"><span>{t('lidc.template.title')}</span><strong>{selectedTemplate?.name || '-'}</strong></div>
-                    <div className="lidc-review-line"><span>{t('lidc.invites.title')}</span><strong>{selectedInviteIds.length}</strong></div>
+                    <div className="lidc-review-line">
+                      <span>{t('lidc.specializations.title')}</span>
+                      <strong>{selectedSpecializations.map((entry) => entry.name).join(' + ') || '-'}</strong>
+                    </div>
+                    <div className="lidc-review-line"><span>{t('lidc.inviteCode.generatedOnCreate')}</span><strong>{t('lidc.inviteCode.yes')}</strong></div>
                     <div className="lidc-review-line"><span>{t('lidc.deck.totalUnits')}</span><strong>{totalDeckUnits}</strong></div>
 
                     <div className="lidc-review-assets">
@@ -2176,8 +3098,6 @@ export default function LidcPage() {
                         );
                       })}
                     </div>
-
-                    {submitError && <div className="lidc-inline-error">{submitError}</div>}
                   </div>
                 </section>
               )}
@@ -2187,15 +3107,17 @@ export default function LidcPage() {
               <button
                 type="button"
                 className="lidc-btn lidc-btn-outline"
-                onClick={() => setCurrentStep((prev) => Math.max(0, prev - 1))}
+                onClick={goToPreviousStep}
                 disabled={currentStep === 0}
               >
                 <ChevronLeft size={14} />
                 {t('lidc.general.back')}
               </button>
 
+              <InlineError message={wizardFooterError} compact className="lidc-wizard-error-host" />
+
               {currentStep < WIZARD_STEPS.length - 1 ? (
-                <button type="button" className="lidc-btn lidc-btn-primary" onClick={goToNextStep} disabled={!canGoNextStep}>
+                <button type="button" className="lidc-btn lidc-btn-primary" onClick={goToNextStep}>
                   {t('lidc.general.next')}
                   <ChevronRight size={14} />
                 </button>
@@ -2204,32 +3126,57 @@ export default function LidcPage() {
                   type="button"
                   className="lidc-btn lidc-btn-primary"
                   onClick={handleCreateSquadron}
-                  disabled={!validation.canSubmit || submitting}
+                  disabled={submitting}
                 >
                   {submitting ? <Loader2 size={14} className="spin" /> : <Disc3 size={14} />}
                   {t('lidc.review.createButton')}
                 </button>
               )}
             </footer>
-
-            {currentStepBlockingError && currentStep < WIZARD_STEPS.length - 1 && (
-              <div className="lidc-inline-error lidc-wizard-error">{t('lidc.wizard.requiredToContinue')}: {currentStepBlockingError}</div>
-            )}
           </section>
         </div>,
         wizardPortalTarget,
       )}
 
+      {airportWizardTab && selectedMapAirport && wizardPortalTarget && createPortal(
+        <LidcAirportWizard
+          airport={selectedMapAirport}
+          occupancy={airportOccupancy}
+          activeTab={airportWizardTab}
+          isLogged={isLogged}
+          onChangeTab={setAirportWizardTab}
+          onClose={handleCloseAirportWizard}
+          onLogisticsUpdated={handleAirportLogisticsUpdated}
+        />,
+        wizardPortalTarget,
+      )}
+
       {selectedAirframeDraft && (
-        <div className="lidc-modal-root">
-          <button type="button" className="lidc-modal-backdrop" onClick={closeAirframeEditor} />
-          <div className="lidc-modal-card lidc-airframe-modal-card">
-            <div className="lidc-modal-head">
-              <h3>{t('lidc.airframes.editorTitle')}</h3>
-            </div>
+        <div className="lidc-modal-root lidc-airframe-modal-root">
+          <button type="button" className="lidc-modal-backdrop lidc-airframe-modal-backdrop" onClick={closeAirframeEditor} />
+          <div className="lidc-modal-card lidc-airframe-modal-card" role="dialog" aria-modal="true" aria-labelledby="lidc-airframe-modal-title">
+            <header className="lidc-airframe-modal-head">
+              <div className="lidc-airframe-modal-head-main">
+                <h3 id="lidc-airframe-modal-title">{t('lidc.airframes.editorTitle')}</h3>
+                {selectedAirframeRow && (
+                  <p className="lidc-airframe-modal-subtitle">
+                    {selectedAirframeRow.model}
+                    {selectedAirframeRow.boardNumber ? ` · ${selectedAirframeRow.boardNumber}` : ''}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                className="lidc-panel-deck-expanded-close"
+                onClick={closeAirframeEditor}
+                aria-label={t('lidc.wizard.close')}
+              >
+                <X size={18} />
+              </button>
+            </header>
 
             {selectedAirframeRow ? (
-              <>
+              <div className="lidc-airframe-modal-body">
                 <div className="lidc-airframe-meta-stack">
                   <div className="lidc-airframe-readonly-grid">
                     <article className="lidc-airframe-readonly-item">
@@ -2246,7 +3193,9 @@ export default function LidcPage() {
                     </article>
                     <article className="lidc-airframe-readonly-item">
                       <span>{t('lidc.airframes.columns.status')}</span>
-                      <strong>{getAirframeStatusLabel(selectedAirframeRow.status)}</strong>
+                      <span className={`lidc-status-pill is-${String(selectedAirframeRow.status || 'grounded').toLowerCase()}`}>
+                        {getAirframeStatusLabel(selectedAirframeRow.status)}
+                      </span>
                     </article>
                   </div>
 
@@ -2320,7 +3269,7 @@ export default function LidcPage() {
                 <section className="lidc-airframe-log-panel">
                   <header>
                     <h4>{t('lidc.airframes.logsTitle')}</h4>
-                    <span>{t('lidc.airframes.logsMockBadge')}</span>
+                    <span className="lidc-chip">{t('lidc.airframes.logsMockBadge')}</span>
                   </header>
                   <div className="lidc-airframe-log-list">
                     {(selectedAirframeRow.logs || []).map((log) => (
@@ -2335,16 +3284,16 @@ export default function LidcPage() {
                     ))}
                   </div>
                 </section>
-              </>
+              </div>
             ) : (
               <div className="lidc-muted-box">{t('lidc.airframes.empty')}</div>
             )}
 
             {(airframeEditorError || airframeUpdateError) && (
-              <div className="lidc-inline-error">{airframeEditorError || airframeUpdateError}</div>
+              <InlineError message={airframeEditorError || airframeUpdateError} />
             )}
 
-            <div className="lidc-modal-actions">
+            <div className="lidc-modal-actions lidc-airframe-modal-actions">
               <button type="button" className="lidc-btn lidc-btn-outline" onClick={closeAirframeEditor}>
                 {t('lidc.general.cancel')}
               </button>
@@ -2373,6 +3322,9 @@ export default function LidcPage() {
             <div className="lidc-modal-head">
               <h3>{t('lidc.center.confirmTitle')}</h3>
               <p>{t('lidc.center.confirmQuestion', { action: getPendingSquadronActionText() })}</p>
+              {userStateError && (
+                <InlineError message={userStateError} className="lidc-confirm-modal-error" />
+              )}
             </div>
 
             <div className="lidc-modal-actions lidc-confirm-modal-actions">
@@ -2402,6 +3354,49 @@ export default function LidcPage() {
         </div>
       )}
 
+      {isDeckEditorOpen && (
+        <div className="lidc-modal-root lidc-deck-editor-modal-root">
+          <button type="button" className="lidc-modal-backdrop" onClick={closeDeckEditor} />
+          <div className="lidc-modal-card lidc-deck-editor-modal-card" role="dialog" aria-modal="true">
+            <div className="lidc-modal-head">
+              <h3>{t('lidc.builder.editorTitle')}</h3>
+              <p>{t('lidc.builder.editorHint')}</p>
+            </div>
+
+            <div className="lidc-deck-editor-body">
+              <LidcDeckBuilder
+                units={units}
+                quantities={deckEditorQuantities}
+                caps={activeSquadronCaps}
+                onChange={setDeckEditorQuantities}
+              />
+            </div>
+
+            <InlineError message={deckEditorError} />
+
+            <div className="lidc-modal-actions">
+              <button
+                type="button"
+                className="lidc-btn lidc-btn-outline"
+                onClick={closeDeckEditor}
+                disabled={deckEditorSaving}
+              >
+                {t('lidc.general.cancel')}
+              </button>
+              <button
+                type="button"
+                className="lidc-btn lidc-btn-primary"
+                onClick={saveDeckEditor}
+                disabled={deckEditorSaving || deckEditorTotalUnits <= 0}
+              >
+                {deckEditorSaving ? <Loader2 size={14} className="spin" /> : <Save size={14} />}
+                {t('lidc.builder.saveDeck')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isTemplateEditorOpen && (
         <div className="lidc-modal-root">
           <button type="button" className="lidc-modal-backdrop" onClick={() => setIsTemplateEditorOpen(false)} />
@@ -2418,7 +3413,7 @@ export default function LidcPage() {
               spellCheck={false}
             />
 
-            {templateEditorError && <div className="lidc-inline-error">{templateEditorError}</div>}
+            <InlineError message={templateEditorError} />
 
             <div className="lidc-modal-actions">
               <button type="button" className="lidc-btn lidc-btn-outline" onClick={() => setIsTemplateEditorOpen(false)}>

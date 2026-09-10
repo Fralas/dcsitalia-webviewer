@@ -7,7 +7,6 @@ import {
   ClipboardList,
   Eye,
   Factory,
-  Gamepad2,
   Handshake,
   Layers3,
   Loader2,
@@ -57,7 +56,9 @@ import scoutImg from '../../img/wiki/veh/SCOUT.png';
 import shipImg from '../../img/wiki/veh/SHIP.png';
 import towImg from '../../img/wiki/veh/TOW.png';
 import { useUser } from '../contexts/UserContext';
+import InlineError from './InlineError';
 import * as api from '../services/api';
+import './WikiPage.css';
 
 function normalizeGameplayIconKey(iconKey) {
   return String(iconKey || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -201,7 +202,7 @@ const VEHICLES = [
   {
     id: 'atacms',
     category: { en: 'SUPPORT', it: 'SUPPORT' },
-    name: 'ATCAMS',
+    name: 'ATACMS',
     description: {
       en: 'Long-range tactical missile designed for deep precision strikes. Range: 162.0 NM / 300,000 m. Targets: depots, radars, SAM sites, airfields, and force concentrations. Guidance: tactical ballistic missile with INS/GPS.',
       it: 'Missile tattico a lungo raggio pensato per colpire obiettivi in profondita con alta precisione. Raggio: 162.0 NM / 300,000 m. Bersagli: depositi, radar, SAM, aeroporti, concentrazioni di forze. Guida: missile balistico tattico INS/GPS.',
@@ -245,6 +246,16 @@ const VEHICLES = [
     description: {
       en: 'Light ground element for forward observation, contact, and target acquisition. Targets: reconnaissance of enemy ground units and movements. Method: optical/passive observation. Feature: Helicopter transportable. Active EFOW range: 2 km.',
       it: 'Elemento terrestre leggero dedicato a osservazione avanzata, contatto e acquisizione bersagli. Bersagli: ricognizione su unita terrestri e movimenti nemici. Metodo: osservazione ottica/passiva. Caratteristica: trasportabile su elicottero. EFOW attiva: raggio 2 km.',
+    },
+    image: scoutImg,
+  },
+  {
+    id: 'assaulter',
+    category: { en: 'GROUND', it: 'GROUND' },
+    name: 'ASSAULTER',
+    description: {
+      en: 'Rifle infantry team for close assault and embark aboard helicopters or ships. Targets: enemy infantry, light positions, and boarding actions. Weapon: small arms, direct fire. Feature: Helicopter transportable.',
+      it: 'Squadra di fanteria d\'assalto per combattimento ravvicinato e imbarco su elicotteri o navi. Bersagli: fanteria nemica, postazioni leggere, azioni di boarding. Arma: armi individuali, tiro diretto. Caratteristica: trasportabile su elicottero.',
     },
     image: scoutImg,
   },
@@ -417,6 +428,9 @@ const DEFAULT_LANGUAGE = 'en';
 const UI_COPY = {
   en: {
     language: 'Language',
+    wikiKicker: 'Reference',
+    wikiTitle: 'Wiki',
+    wikiLede: 'Campaign mechanics, spawnable assets, and field notes.',
     gameplay: 'Gameplay',
     gameplaySubtitle: 'Core campaign gameplay features.',
     vehicles: 'Vehicles',
@@ -494,6 +508,9 @@ const UI_COPY = {
   },
   it: {
     language: 'Lingua',
+    wikiKicker: 'Riferimento',
+    wikiTitle: 'Wiki',
+    wikiLede: 'Meccaniche di campagna, asset spawnabili e note operative.',
     gameplay: 'Gameplay',
     gameplaySubtitle: 'Feature di gioco principali della campagna.',
     vehicles: 'Veicoli',
@@ -885,29 +902,20 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
   );
 
   const markdownComponents = useMemo(() => ({
-    h1: ({ node, ...props }) => <h1 className="mb-2 mt-4 text-2xl font-black uppercase tracking-[0.04em] text-yt-text-primary" {...props} />,
-    h2: ({ node, ...props }) => <h2 className="mb-2 mt-4 text-xl font-extrabold uppercase tracking-[0.04em] text-yt-text-primary" {...props} />,
-    h3: ({ node, ...props }) => <h3 className="mb-2 mt-3 text-lg font-bold text-yt-text-primary" {...props} />,
-    p: ({ node, ...props }) => <p className="mb-3 leading-relaxed text-yt-text-secondary" {...props} />,
-    ul: ({ node, ...props }) => <ul className="mb-3 list-disc space-y-1 pl-5 text-yt-text-secondary" {...props} />,
-    ol: ({ node, ...props }) => <ol className="mb-3 list-decimal space-y-1 pl-5 text-yt-text-secondary" {...props} />,
-    li: ({ node, ...props }) => <li className="leading-relaxed" {...props} />,
+    h1: ({ node, ...props }) => <h1 {...props} />,
+    h2: ({ node, ...props }) => <h2 {...props} />,
+    h3: ({ node, ...props }) => <h3 {...props} />,
+    p: ({ node, ...props }) => <p {...props} />,
+    ul: ({ node, ...props }) => <ul {...props} />,
+    ol: ({ node, ...props }) => <ol {...props} />,
+    li: ({ node, ...props }) => <li {...props} />,
     table: ({ node, ...props }) => (
-      <div className="mb-4 overflow-x-auto">
-        <table className="w-full border-collapse text-sm text-yt-text-secondary" {...props} />
+      <div className="overflow-x-auto">
+        <table {...props} />
       </div>
     ),
-    thead: ({ node, ...props }) => <thead className="bg-[#0f1a2a]" {...props} />,
-    th: ({ node, ...props }) => <th className="border border-yt-border/80 px-3 py-2 text-left font-bold text-yt-text-primary" {...props} />,
-    td: ({ node, ...props }) => <td className="border border-yt-border/70 px-3 py-2 align-top" {...props} />,
-    blockquote: ({ node, ...props }) => <blockquote className="mb-3 border-l-2 border-yt-accent/60 pl-3 text-yt-text-secondary/95" {...props} />,
-    a: ({ node, ...props }) => <a className="text-yt-accent underline" target="_blank" rel="noreferrer" {...props} />,
-    img: ({ node, ...props }) => <img className="my-3 max-h-[420px] w-auto max-w-full rounded border border-yt-border/80 bg-[#0b121d] p-1" loading="lazy" {...props} />,
-    code: ({ inline, className, children, ...props }) => (
-      inline
-        ? <code className="rounded bg-[#0e1827] px-1.5 py-0.5 text-[0.95em] text-yt-accent" {...props}>{children}</code>
-        : <code className="block overflow-x-auto rounded-xl border border-yt-border/80 bg-[#0b121d] p-3 text-sm text-yt-text-primary" {...props}>{children}</code>
-    ),
+    a: ({ node, ...props }) => <a target="_blank" rel="noreferrer" {...props} />,
+    img: ({ node, ...props }) => <img loading="lazy" {...props} />,
   }), []);
 
   const closeGameplayArticleFullscreen = () => {
@@ -1494,21 +1502,21 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
     const DraftIcon = resolveGameplayIcon(wikiDraft.iconKey, Layers3);
 
     return (
-      <article className="flex h-full flex-col rounded-2xl border border-yt-border/80 bg-[#0f1723] p-4 sm:p-5">
-        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 className="inline-flex items-center gap-2 text-xl font-extrabold uppercase tracking-[0.05em] text-yt-text-primary">
-              <SelectedArticleIcon className="h-5 w-5 text-yt-accent" />
+      <article className="wiki-article" onClick={(event) => event.stopPropagation()}>
+        <div className="wiki-article__bar">
+          <div className="wiki-article__copy">
+            <h3 className="wiki-article__title">
+              <SelectedArticleIcon />
               {selectedGameplayPageTitle}
             </h3>
-            <p className="mt-1 text-sm text-yt-text-secondary">{selectedGameplayPageSummary}</p>
+            <p className="wiki-article__summary">{selectedGameplayPageSummary}</p>
             {selectedGameplayPage.updatedAt && (
-              <p className="mt-1 text-xs text-yt-text-secondary/80">
+              <p className="wiki-article__meta">
                 {ui.lastUpdated}: {new Date(selectedGameplayPage.updatedAt).toLocaleString(dateLocale)}
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="wiki-article__actions">
             {canEditWiki && (
               <button
                 type="button"
@@ -1523,70 +1531,66 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                   }
                   setEditorOpen((prev) => !prev);
                 }}
-                className="inline-flex items-center gap-2 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary transition-colors hover:border-yt-accent hover:text-yt-accent"
+                className="wiki-btn"
               >
-                <PenSquare className="h-3.5 w-3.5" />
+                <PenSquare />
                 {editorOpen ? ui.closeEditor : ui.editArticle}
               </button>
             )}
             <button
               type="button"
               onClick={closeGameplayArticleFullscreen}
-              className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary transition-colors hover:border-yt-accent hover:text-yt-accent"
+              className="wiki-btn wiki-btn--ghost"
               aria-label={ui.closeArticle}
             >
-              <X className="h-3.5 w-3.5" />
+              <X />
               {ui.close}
             </button>
           </div>
         </div>
 
-        <div
-          className={`overflow-auto rounded-xl border border-yt-border/75 bg-[#0c1320] px-4 py-3 ${
-            canEditWiki && editorOpen ? 'max-h-[40vh] sm:max-h-[46vh]' : 'min-h-0 flex-1'
-          }`}
-        >
+        <div className={`wiki-article__body wiki-md${canEditWiki && editorOpen ? ' is-editing' : ''}`}>
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
             {selectedGameplayPageContent}
           </ReactMarkdown>
         </div>
 
         {canEditWiki && editorOpen && (
-          <div className="mt-4 rounded-xl border border-yt-border/80 bg-[#0b121d] p-3">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.1em] text-yt-text-secondary">
-                <Eye className="h-3.5 w-3.5" />
+          <div className="wiki-editor">
+            <div className="wiki-editor__head">
+              <div className="wiki-editor__title">
+                <Eye />
                 {ui.editorPreview}
               </div>
-              <div className="text-xs text-yt-text-secondary">{draftStatus}</div>
+              <div className="wiki-editor__status">{draftStatus}</div>
             </div>
 
             {draftLoading ? (
-              <div className="flex items-center gap-2 text-sm text-yt-text-secondary">
+              <div className="wiki-status">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 {ui.loadingDraft}
               </div>
             ) : (
-              <div className="grid gap-3 lg:grid-cols-2">
-                <div className="space-y-2">
+              <div className="wiki-editor__grid">
+                <div className="wiki-editor__fields">
                   <div>
-                    <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.09em] text-yt-text-secondary">{ui.icon}</p>
-                    <div className="flex flex-wrap items-center gap-2">
+                    <p className="wiki-label">{ui.icon}</p>
+                    <div className="wiki-icon-row">
                       <button
                         type="button"
                         onClick={() => setWikiDraftIconPickerOpen((prev) => !prev)}
-                        className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-yt-text-primary hover:border-yt-accent hover:text-yt-accent"
+                        className="wiki-btn"
                       >
-                        <DraftIcon className="h-3.5 w-3.5 text-yt-accent" />
+                        <DraftIcon />
                         {wikiDraftIconPickerOpen ? ui.hideIcons : ui.chooseIcon}
                       </button>
-                      <span className="text-xs text-yt-text-secondary">
+                      <span className="wiki-icon-row__name">
                         {GAMEPLAY_ICON_LABEL_MAP[normalizeGameplayIconKey(wikiDraft.iconKey)] || ui.noIcon}
                       </span>
                     </div>
                     {wikiDraftIconPickerOpen && (
-                      <div className="mt-2 space-y-2 rounded border border-yt-border/70 bg-[#0f1725] p-2.5">
-                        <p className="text-[11px] text-yt-text-secondary">
+                      <div className="wiki-icon-picker">
+                        <p className="wiki-icon-picker__hint">
                           {ui.iconSearchHint}
                         </p>
                         <input
@@ -1594,47 +1598,41 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                           value={wikiDraftIconSearch}
                           onChange={(event) => setWikiDraftIconSearch(event.target.value)}
                           placeholder={ui.searchIcon}
-                          className="w-full rounded border border-yt-border/80 bg-[#111a28] px-2.5 py-1.5 text-xs text-yt-text-primary outline-none focus:border-yt-accent"
+                          className="wiki-input"
                         />
-                        <div className="max-h-56 overflow-y-auto pr-1">
-                          <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-8">
-                            {filteredDraftIcons.map(({ key, label, Icon }) => {
-                              const selected = normalizeGameplayIconKey(wikiDraft.iconKey) === key;
-                              return (
-                                <button
-                                  key={key}
-                                  type="button"
-                                  title={label}
-                                  onClick={() => {
-                                    setWikiDraft((prev) => ({ ...prev, iconKey: key }));
-                                    setWikiDraftIconPickerOpen(false);
-                                    setWikiDraftIconSearch('');
-                                  }}
-                                  className={`inline-flex h-9 items-center justify-center rounded border transition-colors ${
-                                    selected
-                                      ? 'border-yt-accent bg-yt-accent/20 text-yt-accent'
-                                      : 'border-yt-border/80 bg-[#101827] text-yt-text-secondary hover:border-yt-accent/70 hover:text-yt-accent'
-                                  }`}
-                                >
-                                  <Icon className="h-4 w-4" />
-                                </button>
-                              );
-                            })}
-                          </div>
-                          {filteredDraftIcons.length === 0 && (
-                            <p className="px-1 py-2 text-xs text-yt-text-secondary">{ui.noIconsFound}</p>
-                          )}
+                        <div className="wiki-icon-grid">
+                          {filteredDraftIcons.map(({ key, label, Icon }) => {
+                            const selected = normalizeGameplayIconKey(wikiDraft.iconKey) === key;
+                            return (
+                              <button
+                                key={key}
+                                type="button"
+                                title={label}
+                                onClick={() => {
+                                  setWikiDraft((prev) => ({ ...prev, iconKey: key }));
+                                  setWikiDraftIconPickerOpen(false);
+                                  setWikiDraftIconSearch('');
+                                }}
+                                className={`wiki-icon-cell${selected ? ' is-selected' : ''}`}
+                              >
+                                <Icon />
+                              </button>
+                            );
+                          })}
                         </div>
+                        {filteredDraftIcons.length === 0 && (
+                          <p className="wiki-empty">{ui.noIconsFound}</p>
+                        )}
                       </div>
                     )}
                   </div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-yt-accent">{ui.englishBase}</p>
+                  <p className="wiki-label wiki-label--accent">{ui.englishBase}</p>
                   <input
                     type="text"
                     value={wikiDraft.titleEn}
                     onChange={(event) => setWikiDraft((prev) => ({ ...prev, titleEn: event.target.value }))}
                     placeholder={ui.titlePlaceholder}
-                    className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                    className="wiki-input"
                   />
                   <textarea
                     rows={3}
@@ -1642,7 +1640,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                     onChange={(event) => setWikiDraft((prev) => ({ ...prev, summaryEn: event.target.value }))}
                     placeholder={ui.summaryPlaceholder}
                     maxLength={WIKI_SHORT_DESCRIPTION_MAX_LENGTH}
-                    className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                    className="wiki-textarea"
                   />
                   <textarea
                     rows={10}
@@ -1656,16 +1654,16 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                     onDragOver={handleMarkdownDragOver}
                     onDrop={(event) => handleMarkdownDrop(event, 'wikiDraft', 'contentEn')}
                     placeholder={ui.contentPlaceholder}
-                    className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                    className="wiki-textarea wiki-textarea--code"
                   />
 
-                  <p className="pt-1 text-[11px] font-bold uppercase tracking-[0.09em] text-yt-text-secondary">{ui.italianTranslation}</p>
+                  <p className="wiki-label wiki-label--pad">{ui.italianTranslation}</p>
                   <input
                     type="text"
                     value={wikiDraft.titleIt}
                     onChange={(event) => setWikiDraft((prev) => ({ ...prev, titleIt: event.target.value }))}
                     placeholder={ui.titlePlaceholderIt}
-                    className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                    className="wiki-input"
                   />
                   <textarea
                     rows={3}
@@ -1673,7 +1671,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                     onChange={(event) => setWikiDraft((prev) => ({ ...prev, summaryIt: event.target.value }))}
                     placeholder={ui.summaryPlaceholderIt}
                     maxLength={WIKI_SHORT_DESCRIPTION_MAX_LENGTH}
-                    className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                    className="wiki-textarea"
                   />
                   <textarea
                     rows={8}
@@ -1687,19 +1685,19 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                     onDragOver={handleMarkdownDragOver}
                     onDrop={(event) => handleMarkdownDrop(event, 'wikiDraft', 'contentIt')}
                     placeholder={ui.contentPlaceholderIt}
-                    className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                    className="wiki-textarea wiki-textarea--code"
                   />
-                  <div className="flex flex-wrap gap-2">
+                  <div className="wiki-actions">
                     <button
                       type="button"
                       onClick={handlePublishGameplayArticle}
-                      className="inline-flex items-center gap-1 rounded border border-emerald-500/45 bg-emerald-500/15 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-emerald-300"
+                      className="wiki-btn wiki-btn--primary"
                     >
-                      <Save className="h-3.5 w-3.5" />
+                      <Save />
                       {ui.publish}
                     </button>
-                    <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary hover:border-yt-accent hover:text-yt-accent">
-                      {uploadingMedia ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                    <label className="wiki-btn">
+                      {uploadingMedia ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload />}
                       {ui.uploadMedia}
                       <input
                         ref={wikiMediaInputRef}
@@ -1719,24 +1717,24 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                         }
                         setEditorOpen(false);
                       }}
-                      className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary"
+                      className="wiki-btn wiki-btn--ghost"
                     >
-                      <X className="h-3.5 w-3.5" />
+                      <X />
                       {ui.close}
                     </button>
                   </div>
                 </div>
 
-                <div className="rounded border border-yt-border/80 bg-[#111a28] p-3">
-                  <h4 className="mb-2 text-xs font-bold uppercase tracking-[0.1em] text-yt-accent">{ui.preview}</h4>
-                  <h3 className="inline-flex items-center gap-2 text-lg font-extrabold uppercase tracking-[0.05em] text-yt-text-primary">
-                    <DraftIcon className="h-4 w-4 text-yt-accent" />
+                <div className="wiki-preview">
+                  <p className="wiki-label wiki-label--accent">{ui.preview}</p>
+                  <h3 className="wiki-preview__title">
+                    <DraftIcon />
                     {getDraftLocalizedField(wikiDraft, 'title', language) || ui.titleFallback}
                   </h3>
-                  <p className="mb-3 mt-1 text-sm text-yt-text-secondary">
+                  <p className="wiki-preview__summary">
                     {getDraftLocalizedField(wikiDraft, 'summary', language) || ui.summaryFallback}
                   </p>
-                  <div className="max-h-[420px] overflow-auto rounded border border-yt-border/70 bg-[#0c1320] px-3 py-2">
+                  <div className="wiki-preview__body wiki-md">
                     <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                       {getDraftLocalizedField(wikiDraft, 'content', language) || ui.emptyContentFallback}
                     </ReactMarkdown>
@@ -1751,109 +1749,82 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
   };
 
   const renderShowroomContent = () => (
-    <div className="space-y-5">
-      <div>
-        <h2 className="text-xl font-black uppercase tracking-[0.08em] text-yt-text-primary">{ui.vehicles}</h2>
-        <p className="mt-1 text-xs text-yt-text-secondary">{ui.vehiclesSubtitle}</p>
-      </div>
-      <div className="grid items-start gap-4 lg:grid-cols-[64px,minmax(0,1fr)]">
-        <aside className="h-fit self-start rounded-2xl border border-yt-border/80 bg-[#0f1723] p-1.5">
-          <div className="flex items-center justify-center gap-2 lg:flex-col">
-            {vehicleGroups.map((group) => {
-              const categoryLabel = localizeText(group.category, language);
-              const active = selectedVehicleGroup?.key === group.key;
-              const CategoryIcon = VEHICLE_CATEGORY_ICON_BY_KEY[group.key] || Package;
+    <>
+      <nav className="wiki-cats" aria-label={ui.showroomListAria}>
+        {vehicleGroups.map((group) => {
+          const categoryLabel = localizeText(group.category, language);
+          const active = selectedVehicleGroup?.key === group.key;
+          const CategoryIcon = VEHICLE_CATEGORY_ICON_BY_KEY[group.key] || Package;
 
-              return (
-                <button
-                  key={group.key}
-                  type="button"
-                  onClick={() => handleVehicleCategoryFilterChange(group.key)}
-                  title={categoryLabel}
-                  aria-label={categoryLabel}
-                  aria-pressed={active}
-                  className={`inline-flex h-11 w-11 items-center justify-center rounded-xl border transition-all ${
-                    active
-                      ? 'border-yt-accent/70 bg-yt-accent/15 text-yt-accent shadow-[0_0_0_1px_rgba(78,197,255,0.24)]'
-                      : 'border-yt-border/80 bg-[#111a28] text-yt-text-secondary hover:border-yt-accent/45 hover:text-yt-accent'
-                  }`}
-                >
-                  <CategoryIcon className="h-4 w-4" />
-                </button>
-              );
-            })}
-          </div>
-        </aside>
+          return (
+            <button
+              key={group.key}
+              type="button"
+              onClick={() => handleVehicleCategoryFilterChange(group.key)}
+              title={categoryLabel}
+              aria-pressed={active}
+              className={`wiki-cat${active ? ' is-active' : ''}`}
+            >
+              <CategoryIcon />
+              {categoryLabel}
+            </button>
+          );
+        })}
+      </nav>
 
-        {!selectedVehicleGroup ? (
-          <p className="flex items-center rounded-xl border border-yt-border/75 bg-[#0f1723] px-4 py-3 text-sm text-yt-text-secondary">
-            {ui.noVehicles}
-          </p>
-        ) : (
-          <article
-            key={selectedVehicleGroup.key}
-            className={`rounded-2xl border border-yt-border/80 bg-[#0f1723] p-4 transition-all duration-200 ease-out ${
-              isVehicleCategoryContentVisible ? 'translate-x-0 opacity-100' : 'translate-x-2 opacity-0'
-            }`}
-          >
-            <h3 className="mb-3 text-sm font-extrabold uppercase tracking-[0.1em] text-yt-accent">
-              {localizeText(selectedVehicleGroup.category, language)}
-            </h3>
-            <div className="max-h-[min(72vh,620px)] overflow-auto rounded-xl border border-yt-border/70">
-              <table className="min-w-full border-collapse text-sm">
-                <thead className="bg-[#111b2a]">
-                  <tr>
-                    <th className="border border-yt-border/70 px-3 py-2 text-left font-bold uppercase tracking-[0.08em] text-yt-text-primary">
-                      {ui.vehicleName}
-                    </th>
-                    <th className="border border-yt-border/70 px-3 py-2 text-left font-bold uppercase tracking-[0.08em] text-yt-text-primary">
-                      {ui.vehicleImage}
-                    </th>
-                    <th className="border border-yt-border/70 px-3 py-2 text-left font-bold uppercase tracking-[0.08em] text-yt-text-primary">
-                      {ui.vehicleDescription}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedVehicleGroup.vehicles.map((vehicle) => (
-                    <tr key={vehicle.id} className="bg-[#0f1723] align-top">
-                      <td className="border border-yt-border/70 px-3 py-2 font-semibold text-yt-text-primary">
-                        {vehicle.name}
-                      </td>
-                      <td className="border border-yt-border/70 px-3 py-2">
-                        <img
-                          src={vehicle.image}
-                          alt={vehicle.name}
-                          className="h-12 w-20 object-contain sm:h-14 sm:w-24"
-                          loading="lazy"
-                        />
-                      </td>
-                      <td className="border border-yt-border/70 px-3 py-2 leading-relaxed text-yt-text-secondary">
-                        {localizeText(vehicle.description, language)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </article>
-        )}
-      </div>
-    </div>
+      {!selectedVehicleGroup ? (
+        <p className="wiki-empty">{ui.noVehicles}</p>
+      ) : (
+        <div
+          key={selectedVehicleGroup.key}
+          className="wiki-table-wrap"
+          style={{
+            opacity: isVehicleCategoryContentVisible ? 1 : 0,
+            transition: 'opacity 170ms ease',
+          }}
+        >
+          <table className="wiki-table">
+            <thead>
+              <tr>
+                <th>{ui.vehicleName}</th>
+                <th>{ui.vehicleImage}</th>
+                <th>{ui.vehicleDescription}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {selectedVehicleGroup.vehicles.map((vehicle) => (
+                <tr key={vehicle.id}>
+                  <td>{vehicle.name}</td>
+                  <td>
+                    <img
+                      src={vehicle.image}
+                      alt={vehicle.name}
+                      loading="lazy"
+                    />
+                  </td>
+                  <td>{localizeText(vehicle.description, language)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
   );
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 pb-6">
-      <section className="rounded-3xl border border-yt-border/70 bg-yt-bg-secondary/85 p-5 shadow-[0_16px_34px_rgba(0,0,0,0.32)] backdrop-blur-sm">
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl border border-yt-accent/35 bg-yt-accent/12 p-2">
-              <Gamepad2 className="h-5 w-5 text-yt-accent" />
-            </div>
-            <div>
-              <h2 className="text-xl font-black uppercase tracking-[0.08em] text-yt-text-primary">{ui.gameplay}</h2>
-              <p className="text-sm text-yt-text-secondary">{ui.gameplaySubtitle}</p>
-            </div>
+    <div className="wiki">
+      <header className="wiki__masthead">
+        <p className="wiki__kicker">{ui.wikiKicker}</p>
+        <h1 className="wiki__title">{ui.wikiTitle}</h1>
+        <p className="wiki__lede">{ui.wikiLede}</p>
+      </header>
+
+      <section className="wiki__section">
+        <div className="wiki__section-head">
+          <div className="wiki__section-copy">
+            <h2 className="wiki__section-title">{ui.gameplay}</h2>
+            <p className="wiki__section-subtitle">{ui.gameplaySubtitle}</p>
           </div>
           {canEditWiki && (
             <button
@@ -1875,62 +1846,60 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                 setNewTopicStatus('');
                 setNewTopicOpen(true);
               }}
-              className="inline-flex items-center gap-1.5 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary transition-colors hover:border-yt-accent hover:text-yt-accent"
+              className="wiki-btn"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus />
               {newTopicOpen ? ui.closeNewTopic : ui.newTopic}
             </button>
           )}
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2">
-          {gameplayItems.map(({ id, title, description, Icon }) => (
-            <button
-              type="button"
-              key={id}
-              onClick={() => handleSelectGameplayItem(id)}
-              className={`rounded-2xl border bg-[#101926] p-4 text-left shadow-[0_8px_18px_rgba(0,0,0,0.26)] transition-all ${
-                selectedGameplayFeature?.id === id
-                  ? 'border-yt-accent/60 ring-1 ring-yt-accent/35'
-                  : 'border-yt-border/80 hover:border-yt-accent/45'
-              }`}
-            >
-              <div className="mb-2 inline-flex items-center gap-2 rounded-lg border border-yt-border/80 bg-[#0b121d] px-2.5 py-1">
-                <Icon className="h-4 w-4 text-yt-accent" />
-                <h3 className="text-xs font-bold uppercase tracking-[0.09em] text-yt-accent">{title}</h3>
-              </div>
-              <p className="text-sm leading-relaxed text-yt-text-secondary">{description}</p>
-            </button>
-          ))}
-        </div>
+        {gameplayItems.length > 0 && (
+          <div className="wiki-topics">
+            {gameplayItems.map(({ id, title, description, Icon }) => (
+              <button
+                type="button"
+                key={id}
+                onClick={() => handleSelectGameplayItem(id)}
+                className={`wiki-topic${selectedGameplayFeature?.id === id ? ' is-active' : ''}`}
+              >
+                <span className="wiki-topic__icon">
+                  <Icon />
+                </span>
+                <h3 className="wiki-topic__title">{title}</h3>
+                <p className="wiki-topic__summary">{description}</p>
+              </button>
+            ))}
+          </div>
+        )}
 
         {canEditWiki && newTopicOpen && (
-          <div className="mt-4 rounded-2xl border border-yt-border/80 bg-[#0f1723] p-4">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <h3 className="text-sm font-bold uppercase tracking-[0.1em] text-yt-accent">{ui.createNewTopic}</h3>
+          <div className="wiki-editor">
+            <div className="wiki-editor__head">
+              <h3 className="wiki-editor__title">{ui.createNewTopic}</h3>
               {newTopicStatus && (
-                <span className="text-xs text-yt-text-secondary">{newTopicStatus}</span>
+                <span className="wiki-editor__status">{newTopicStatus}</span>
               )}
             </div>
-            <div className="space-y-2">
+            <div className="wiki-editor__fields">
               <div>
-                <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.09em] text-yt-text-secondary">{ui.icon}</p>
-                <div className="flex flex-wrap items-center gap-2">
+                <p className="wiki-label">{ui.icon}</p>
+                <div className="wiki-icon-row">
                   <button
                     type="button"
                     onClick={() => setNewTopicIconPickerOpen((prev) => !prev)}
-                    className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-yt-text-primary hover:border-yt-accent hover:text-yt-accent"
+                    className="wiki-btn"
                   >
-                    <NewTopicSelectedIcon className="h-3.5 w-3.5 text-yt-accent" />
+                    <NewTopicSelectedIcon />
                     {newTopicIconPickerOpen ? ui.hideIcons : ui.chooseIcon}
                   </button>
-                  <span className="text-xs text-yt-text-secondary">
+                  <span className="wiki-icon-row__name">
                     {GAMEPLAY_ICON_LABEL_MAP[normalizeGameplayIconKey(newTopicDraft.iconKey)] || ui.noIcon}
                   </span>
                 </div>
                 {newTopicIconPickerOpen && (
-                  <div className="mt-2 space-y-2 rounded border border-yt-border/70 bg-[#0f1725] p-2.5">
-                    <p className="text-[11px] text-yt-text-secondary">
+                  <div className="wiki-icon-picker">
+                    <p className="wiki-icon-picker__hint">
                       {ui.iconSearchHint}
                     </p>
                     <input
@@ -1938,47 +1907,41 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                       value={newTopicIconSearch}
                       onChange={(event) => setNewTopicIconSearch(event.target.value)}
                       placeholder={ui.searchIcon}
-                      className="w-full rounded border border-yt-border/80 bg-[#111a28] px-2.5 py-1.5 text-xs text-yt-text-primary outline-none focus:border-yt-accent"
+                      className="wiki-input"
                     />
-                    <div className="max-h-56 overflow-y-auto pr-1">
-                      <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-8">
-                        {filteredNewTopicIcons.map(({ key, label, Icon }) => {
-                          const selected = normalizeGameplayIconKey(newTopicDraft.iconKey) === key;
-                          return (
-                            <button
-                              key={key}
-                              type="button"
-                              title={label}
-                              onClick={() => {
-                                setNewTopicDraft((prev) => ({ ...prev, iconKey: key }));
-                                setNewTopicIconPickerOpen(false);
-                                setNewTopicIconSearch('');
-                              }}
-                              className={`inline-flex h-9 items-center justify-center rounded border transition-colors ${
-                                selected
-                                  ? 'border-yt-accent bg-yt-accent/20 text-yt-accent'
-                                  : 'border-yt-border/80 bg-[#101827] text-yt-text-secondary hover:border-yt-accent/70 hover:text-yt-accent'
-                              }`}
-                            >
-                              <Icon className="h-4 w-4" />
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {filteredNewTopicIcons.length === 0 && (
-                        <p className="px-1 py-2 text-xs text-yt-text-secondary">{ui.noIconsFound}</p>
-                      )}
+                    <div className="wiki-icon-grid">
+                      {filteredNewTopicIcons.map(({ key, label, Icon }) => {
+                        const selected = normalizeGameplayIconKey(newTopicDraft.iconKey) === key;
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            title={label}
+                            onClick={() => {
+                              setNewTopicDraft((prev) => ({ ...prev, iconKey: key }));
+                              setNewTopicIconPickerOpen(false);
+                              setNewTopicIconSearch('');
+                            }}
+                            className={`wiki-icon-cell${selected ? ' is-selected' : ''}`}
+                          >
+                            <Icon />
+                          </button>
+                        );
+                      })}
                     </div>
+                    {filteredNewTopicIcons.length === 0 && (
+                      <p className="wiki-empty">{ui.noIconsFound}</p>
+                    )}
                   </div>
                 )}
               </div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-yt-accent">{ui.englishBase}</p>
+              <p className="wiki-label wiki-label--accent">{ui.englishBase}</p>
               <input
                 type="text"
                 value={newTopicDraft.titleEn}
                 onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, titleEn: event.target.value }))}
                 placeholder={ui.topicTitlePlaceholder}
-                className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                className="wiki-input"
               />
               <textarea
                 rows={3}
@@ -1986,7 +1949,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                 onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, summaryEn: event.target.value }))}
                 placeholder={ui.topicSummaryPlaceholder}
                 maxLength={WIKI_SHORT_DESCRIPTION_MAX_LENGTH}
-                className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                className="wiki-textarea"
               />
               <textarea
                 rows={8}
@@ -2000,16 +1963,16 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                 onDragOver={handleMarkdownDragOver}
                 onDrop={(event) => handleMarkdownDrop(event, 'newTopicDraft', 'contentEn')}
                 placeholder={ui.topicContentPlaceholder}
-                className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                className="wiki-textarea wiki-textarea--code"
               />
 
-              <p className="pt-1 text-[11px] font-bold uppercase tracking-[0.09em] text-yt-text-secondary">{ui.italianTranslation}</p>
+              <p className="wiki-label wiki-label--pad">{ui.italianTranslation}</p>
               <input
                 type="text"
                 value={newTopicDraft.titleIt}
                 onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, titleIt: event.target.value }))}
                 placeholder={ui.topicTitlePlaceholderIt}
-                className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                className="wiki-input"
               />
               <textarea
                 rows={3}
@@ -2017,7 +1980,7 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                 onChange={(event) => setNewTopicDraft((prev) => ({ ...prev, summaryIt: event.target.value }))}
                 placeholder={ui.topicSummaryPlaceholderIt}
                 maxLength={WIKI_SHORT_DESCRIPTION_MAX_LENGTH}
-                className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                className="wiki-textarea"
               />
               <textarea
                 rows={6}
@@ -2031,20 +1994,20 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                 onDragOver={handleMarkdownDragOver}
                 onDrop={(event) => handleMarkdownDrop(event, 'newTopicDraft', 'contentIt')}
                 placeholder={ui.topicContentPlaceholderIt}
-                className="w-full rounded border border-yt-border/80 bg-[#111a28] px-3 py-2 font-mono text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                className="wiki-textarea wiki-textarea--code"
               />
-              <div className="flex flex-wrap gap-2">
+              <div className="wiki-actions">
                 <button
                   type="button"
                   onClick={handleCreateGameplayTopic}
                   disabled={creatingTopic}
-                  className="inline-flex items-center gap-1 rounded border border-emerald-500/45 bg-emerald-500/15 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-emerald-300 disabled:cursor-not-allowed disabled:opacity-65"
+                  className="wiki-btn wiki-btn--primary"
                 >
-                  {creatingTopic ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                  {creatingTopic ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save />}
                   {ui.createTopic}
                 </button>
-                <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary hover:border-yt-accent hover:text-yt-accent">
-                  {uploadingMedia ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                <label className="wiki-btn">
+                  {uploadingMedia ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload />}
                   {ui.uploadMedia}
                   <input
                     ref={newTopicMediaInputRef}
@@ -2067,21 +2030,21 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
                       newTopicMediaInputRef.current.value = '';
                     }
                   }}
-                  className="inline-flex items-center gap-1 rounded border border-yt-border/80 bg-[#101827] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-yt-text-primary"
+                  className="wiki-btn wiki-btn--ghost"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X />
                   {ui.cancel}
                 </button>
               </div>
-              <div className="rounded border border-yt-border/80 bg-[#111a28] p-3">
-                <h4 className="mb-2 text-xs font-bold uppercase tracking-[0.1em] text-yt-accent">{ui.preview}</h4>
-                <h3 className="text-lg font-extrabold uppercase tracking-[0.05em] text-yt-text-primary">
+              <div className="wiki-preview">
+                <p className="wiki-label wiki-label--accent">{ui.preview}</p>
+                <h3 className="wiki-preview__title">
                   {getDraftLocalizedField(newTopicDraft, 'title', language) || ui.titleFallback}
                 </h3>
-                <p className="mb-3 mt-1 text-sm text-yt-text-secondary">
+                <p className="wiki-preview__summary">
                   {getDraftLocalizedField(newTopicDraft, 'summary', language) || ui.summaryFallback}
                 </p>
-                <div className="max-h-[340px] overflow-auto rounded border border-yt-border/70 bg-[#0c1320] px-3 py-2">
+                <div className="wiki-preview__body wiki-md">
                   <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                     {getDraftLocalizedField(newTopicDraft, 'content', language) || ui.emptyContentFallback}
                   </ReactMarkdown>
@@ -2092,40 +2055,33 @@ export default function WikiPage({ language = DEFAULT_LANGUAGE }) {
         )}
 
         {wikiLoading && (
-          <div className="mt-4 rounded-xl border border-yt-border/80 bg-[#0e1520] px-3 py-2 text-sm text-yt-text-secondary">
-            {ui.loadingArticles}
-          </div>
+          <p className="wiki-status">{ui.loadingArticles}</p>
         )}
         {wikiError && (
-          <div className="mt-4 rounded-xl border border-red-500/35 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-            {wikiError}
+          <div className="wiki-status">
+            <InlineError message={wikiError} />
           </div>
         )}
       </section>
 
       {isGameplayArticleFullscreen && typeof document !== 'undefined' && createPortal(
         <div
-          className={`fixed inset-0 z-[275] flex items-center justify-center bg-[#03070fe0] p-3 transition-opacity duration-300 sm:p-5 ${
-            isGameplayArticleFullscreenActive ? 'opacity-100' : 'opacity-0'
-          }`}
+          className={`wiki-overlay${isGameplayArticleFullscreenActive ? ' is-open' : ''}`}
           onClick={closeGameplayArticleFullscreen}
         >
-          <section
-            className={`relative h-[min(92vh,1080px)] w-[min(1200px,96vw)] overflow-auto rounded-3xl border border-yt-border/85 bg-yt-bg-secondary/95 p-4 shadow-[0_26px_60px_rgba(0,0,0,0.62)] transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] sm:p-6 ${
-              isGameplayArticleFullscreenActive ? 'scale-100 opacity-100' : 'scale-[0.975] opacity-0'
-            }`}
-            onClick={(event) => event.stopPropagation()}
-          >
-            {renderGameplayArticleContent()}
-          </section>
+          {renderGameplayArticleContent()}
         </div>,
         document.body,
       )}
 
-      <section className="relative overflow-hidden rounded-3xl border border-yt-border/70 bg-yt-bg-secondary/90 p-5 shadow-[0_20px_46px_rgba(0,0,0,0.38)]">
-        <div className="relative">
-          {renderShowroomContent()}
+      <section className="wiki__section">
+        <div className="wiki__section-head">
+          <div className="wiki__section-copy">
+            <h2 className="wiki__section-title">{ui.vehicles}</h2>
+            <p className="wiki__section-subtitle">{ui.vehiclesSubtitle}</p>
+          </div>
         </div>
+        {renderShowroomContent()}
       </section>
     </div>
   );

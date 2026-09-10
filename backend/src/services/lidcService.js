@@ -1,21 +1,272 @@
 ﻿import crypto from 'crypto';
-import fs from 'fs';
 import path from 'path';
+import {
+  computeWarehouseDeltaDiff,
+  exportPendingWarehouseOps,
+  getUnitDcsType,
+  isWarehouseSpawnableCategory,
+  LIDC_EXPORT_FILES,
+  processDeferredWarehouseOps,
+  queueWarehouseDeltaOps,
+  queueWarehouseOpsForSquadronDeck,
+  resolveBaseIdFromDcsAirbaseName,
+  resolveDcsAirbaseName,
+  writeJsonAtomic,
+} from './lidcDcsBridge.js';
+import { getLidcAirportById, LIDC_AFGHANISTAN_AIRPORTS } from '../config/lidcAfghanistanAirports.js';
+import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data/lidc');
-const TEMPLATES_FILE = path.join(DATA_DIR, 'templates.json');
+// Filename kept from the pre-specialization schema so existing deployments keep their catalog.
+const CATALOG_FILE = path.join(DATA_DIR, 'templates.json');
 const SQUADRONS_FILE = path.join(DATA_DIR, 'squadrons.json');
 const DISCORD_USERS_FILE = path.join(DATA_DIR, 'discord-users.json');
+const UCID_LINKS_FILE = path.join(DATA_DIR, 'ucid-links.json');
+const LINK_CODES_FILE = path.join(DATA_DIR, 'link-codes.json');
+const BASE_LOGISTICS_FILE = path.join(DATA_DIR, 'base-logistics.json');
+const LINK_CODE_TTL_MS = 10 * 60 * 1000;
+const LINK_CODE_PATTERN = /^LIDC-[A-Z0-9]{6}$/;
 const MAX_LOGO_DATA_URL_LENGTH = 12_000_000;
 const BOARD_NUMBER_PATTERN = /^\d{3}[A-Z]{2}$/;
 const BOARD_NUMBER_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const BOARD_NUMBER_MAX_ATTEMPTS = 20_000;
+const INVITE_CODE_PATTERN = /^[A-Z0-9]{8}$/;
+const INVITE_CODE_MAX_ATTEMPTS = 200;
 
 export const DECK_CATEGORIES = Object.freeze([
   'aircrafts',
   'helicopters',
   'logistics',
   'groundAssets',
+]);
+
+const ROTARY_LOGISTICS_UNIT_IDS = new Set(['ch47f', 'mi8mt', 'uh1h']);
+const DEFAULT_BASE_CREDITS = 18000;
+const DEFAULT_SQUADRON_CREDITS = 18000;
+const LOGISTICS_FUEL_CATALOG = Object.freeze([
+  { id: 'jet-a1', label: 'Jet A-1', unit: 'kg', defaultQuantity: 42000, capacity: 90000, unitCost: 8 },
+  { id: 'jp8', label: 'JP-8', unit: 'kg', defaultQuantity: 26000, capacity: 60000, unitCost: 9 },
+  { id: 'diesel', label: 'Diesel', unit: 'kg', defaultQuantity: 14000, capacity: 40000, unitCost: 4 },
+]);
+const LOGISTICS_ARMAMENT_CATALOG = Object.freeze([
+  { id: 'aim-120c', label: 'AIM-120C', unit: 'ea', defaultQuantity: 18, capacity: 48, unitCost: 120 },
+  { id: 'aim-9x', label: 'AIM-9X', unit: 'ea', defaultQuantity: 24, capacity: 64, unitCost: 55 },
+  { id: 'agm-65d', label: 'AGM-65D', unit: 'ea', defaultQuantity: 12, capacity: 36, unitCost: 70 },
+  { id: 'gbu-12', label: 'GBU-12', unit: 'ea', defaultQuantity: 20, capacity: 60, unitCost: 40 },
+  { id: 'hydra-70', label: 'Hydra 70', unit: 'ea', defaultQuantity: 96, capacity: 240, unitCost: 8 },
+  { id: '30mm', label: '30mm API', unit: 'rds', defaultQuantity: 2400, capacity: 8000, unitCost: 1 },
+  { id: '20mm', label: '20mm M55', unit: 'rds', defaultQuantity: 4000, capacity: 12000, unitCost: 1 },
+]);
+
+function parseShopContents(raw) {
+  return String(raw || '')
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const match = part.match(/^(.*)\s+x(\d+)$/i);
+      if (!match) return { label: part, quantity: 0 };
+      return { label: match[1].trim(), quantity: Number(match[2]) };
+    });
+}
+
+function shopImageKey(category) {
+  if (category === 'SCONTAINER') return 'container_green_small';
+  if (category === 'CASSA') return 'ammo_crate';
+  return 'container_blue_mid';
+}
+
+function shopCostForCategory(category) {
+  if (category === 'SCONTAINER') return 2;
+  if (category === 'CASSA') return 1;
+  return 4;
+}
+
+const LOGISTICS_SHOP_WEIGHTS_LBS = Object.freeze({
+  'Container AA_New': 39764,
+  'Container AA_Old': 37036,
+  'Container_AG_GPS 1': 89925,
+  'Container_AG_GPS 2': 99591,
+  'Container_AG_LGB 1': 29892,
+  'Container_AG_Glide 1': 28462,
+  'Container_AG_Cruise 1': 38592,
+  'Container_AG_Maverick 1': 49260,
+  'Container_AG_Maverick 2': 59357,
+  'Container_AG_Hellfire': 62329,
+  'Container_AG_SEAD1': 30975,
+  'Container_AG_Rockets': 82684,
+  'Container_ASW': 55874,
+  'SContainer_AG_Heli': 49450,
+  'SContainer_GPS_1': 65662,
+  'Container_AG_Rus': 60737,
+  'Crate_120': 3102,
+  'Crate_9X': 2660,
+  'Crate_GBU38': 3109,
+  'Crate_GBU54': 3109,
+  'Crate_CBU105': 3042,
+  'Crate_AGM65D': 3090,
+  'Crate_AGM65F': 3128,
+  'Crate_AGM114K': 1427,
+  'Crate_AGM114L': 1543,
+  'Crate_AGM88': 3070,
+  'Crate_Hydra': 1575,
+  'Crate_APKWS': 472,
+  'Crate_Ataka': 1559,
+  'Crate_S8FP2': 1575,
+});
+
+function shopWeightLbs(id) {
+  return Math.max(0, Math.floor(Number(LOGISTICS_SHOP_WEIGHTS_LBS[id]) || 0));
+}
+
+function shopLineWeightLbs(catalogItem, quantity, storedWeight = 0) {
+  const stored = Math.max(0, Math.floor(Number(storedWeight) || 0));
+  if (stored > 0) return stored;
+  const qty = Math.max(0, Math.floor(Number(quantity) || 0));
+  return Math.max(0, Math.floor(Number(catalogItem?.weightLbs) || 0)) * qty;
+}
+
+function defineShopPreset({ category, id, name, destination, contents }) {
+  const parsedContents = Object.freeze(parseShopContents(contents));
+  const kind = category === 'CASSA' ? 'crate' : 'container';
+  const totalQuantity = parsedContents.reduce((sum, entry) => sum + Math.max(0, Number(entry.quantity) || 0), 0);
+  return Object.freeze({
+    id,
+    category,
+    kind,
+    imageKey: shopImageKey(category),
+    name,
+    destination: destination === 'ELICOTTERI' ? 'helicopters' : 'aircraft',
+    contents: parsedContents,
+    total: totalQuantity,
+    types: parsedContents.filter((entry) => (Number(entry.quantity) || 0) > 0).length,
+    cost: shopCostForCategory(category),
+    weightLbs: shopWeightLbs(id),
+    transport: Object.freeze(kind === 'crate' ? ['aircraft', 'helicopter'] : ['aircraft']),
+  });
+}
+
+const LOGISTICS_SHOP_CATALOG = Object.freeze([
+  defineShopPreset({
+    category: 'CONTAINER', id: 'Container AA_New', name: 'Container AA_New', destination: 'AEREI',
+    contents: 'AIM120C x34; AIM9X x20; AIM9M x10',
+  }),
+  defineShopPreset({
+    category: 'CONTAINER', id: 'Container AA_Old', name: 'Container AA_Old', destination: 'AEREI',
+    contents: 'AIM54C_Mk60 x8; AIM7P x10; AIM9M x10',
+  }),
+  defineShopPreset({
+    category: 'CONTAINER', id: 'Container_AG_GPS 1', name: 'Container_AG_GPS 1', destination: 'AEREI',
+    contents: 'GBU_38 x45; GBU_31 x20',
+  }),
+  defineShopPreset({
+    category: 'CONTAINER', id: 'Container_AG_GPS 2', name: 'Container_AG_GPS 2', destination: 'AEREI',
+    contents: 'CBU_105 x50; GBU_54 x56',
+  }),
+  defineShopPreset({
+    category: 'CONTAINER', id: 'Container_AG_LGB 1', name: 'Container_AG_LGB 1', destination: 'AEREI',
+    contents: 'GBU_12 x5; GBU_24 x2',
+  }),
+  defineShopPreset({
+    category: 'CONTAINER', id: 'Container_AG_Glide 1', name: 'Container_AG_Glide 1', destination: 'AEREI',
+    contents: 'AGM_154A x3; AGM_154C x3',
+  }),
+  defineShopPreset({
+    category: 'CONTAINER', id: 'Container_AG_Cruise 1', name: 'Container_AG_Cruise 1', destination: 'AEREI',
+    contents: 'AGM_84H x10; AGM_84A x3',
+  }),
+  defineShopPreset({
+    category: 'CONTAINER', id: 'Container_AG_Maverick 1', name: 'Container_AG_Maverick 1', destination: 'AEREI',
+    contents: 'AGM_65H x30; AGM_65D x26',
+  }),
+  defineShopPreset({
+    category: 'CONTAINER', id: 'Container_AG_Maverick 2', name: 'Container_AG_Maverick 2', destination: 'AEREI',
+    contents: 'AGM_65E x30; AGM_65K x28',
+  }),
+  defineShopPreset({
+    category: 'CONTAINER', id: 'Container_AG_Hellfire', name: 'Container_AG_Hellfire', destination: 'AEREI',
+    contents: 'AGM_114L x200; AGM_114K x188',
+  }),
+  defineShopPreset({
+    category: 'CONTAINER', id: 'Container_AG_SEAD1', name: 'Container_AG_SEAD1', destination: 'AEREI',
+    contents: 'AGM_88C x10; AGM_122 x5',
+  }),
+  defineShopPreset({
+    category: 'CONTAINER', id: 'Container_AG_Rockets', name: 'Container_AG_Rockets', destination: 'AEREI',
+    contents: 'Hydra_70_M151HE x500; APKWS M282 x167',
+  }),
+  defineShopPreset({
+    category: 'CONTAINER', id: 'Container_ASW', name: 'Container_ASW', destination: 'AEREI',
+    contents: 'AGM_84A x28',
+  }),
+  defineShopPreset({
+    category: 'SCONTAINER', id: 'SContainer_AG_Heli', name: 'Small Container AG Heli', destination: 'ELICOTTERI',
+    contents: 'AGM_114L x100; AGM_114K x100; Hydra_70_M151HE x60',
+  }),
+  defineShopPreset({
+    category: 'SCONTAINER', id: 'SContainer_GPS_1', name: 'Small Container GPS 1', destination: 'AEREI',
+    contents: 'GBU_38 x40; CBU_105 x23',
+  }),
+  defineShopPreset({
+    category: 'CONTAINER', id: 'Container_AG_Rus', name: 'Container_AG_Rus', destination: 'ELICOTTERI',
+    contents: '9M120 x100; S8FP2 x252',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_120', name: 'Crate_120', destination: 'ELICOTTERI',
+    contents: 'AIM120C x8',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_9X', name: 'Crate_9X', destination: 'ELICOTTERI',
+    contents: 'AIM9X x14',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_GBU38', name: 'Crate_GBU38', destination: 'ELICOTTERI',
+    contents: 'GBU_38 x5',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_GBU54', name: 'Crate_GBU54', destination: 'ELICOTTERI',
+    contents: 'GBU_54 x5',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_CBU105', name: 'Crate_CBU105', destination: 'ELICOTTERI',
+    contents: 'CBU_105 x3',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_AGM65D', name: 'Crate_AGM65D', destination: 'ELICOTTERI',
+    contents: 'AGM_65D x6',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_AGM65F', name: 'Crate_AGM65F', destination: 'ELICOTTERI',
+    contents: 'AGM_65F x4',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_AGM114K', name: 'Crate_AGM114K', destination: 'ELICOTTERI',
+    contents: 'AGM_114K x14',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_AGM114L', name: 'Crate_AGM114L', destination: 'ELICOTTERI',
+    contents: 'AGM_114L x14',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_AGM88', name: 'Crate_AGM88', destination: 'ELICOTTERI',
+    contents: 'AGM_88C x3',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_Hydra', name: 'Crate_Hydra', destination: 'ELICOTTERI',
+    contents: 'Hydra_70_M151HE x14',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_APKWS', name: 'Crate_APKWS', destination: 'ELICOTTERI',
+    contents: 'APKWS M282 x14',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_Ataka', name: 'Crate_Ataka', destination: 'ELICOTTERI',
+    contents: '9M120 x14',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_S8FP2', name: 'Crate_S8FP2', destination: 'ELICOTTERI',
+    contents: 'S8FP2 x14',
+  }),
 ]);
 
 export const LIDC_MEMBER_ROLES = Object.freeze([
@@ -32,70 +283,94 @@ const LIDC_ROLE_PRIORITY = Object.freeze({
   member: 3,
 });
 
-const DEFAULT_TEMPLATES_SEED = Object.freeze({
-  templates: [
+export const SPECIALIZATION_SLOTS = 2;
+
+const DEFAULT_CATALOG_SEED = Object.freeze({
+  specializations: [
     {
-      id: 'group-helicopters',
-      name: 'Gruppo Elicotteri',
-      description: 'Focalizzato su rotanti e supporto avanzato.',
+      id: 'air-superiority',
+      name: 'Superiorita Aerea',
+      description: 'Caccia da intercettazione e controllo dello spazio aereo.',
       caps: {
-        aircrafts: 180,
-        helicopters: 460,
-        logistics: 260,
-        groundAssets: 200,
+        aircrafts: 340,
+        helicopters: 60,
+        logistics: 60,
+        groundAssets: 40,
       },
     },
     {
-      id: 'strike-wing',
-      name: 'Strike Wing',
-      description: 'Focalizzato su superiorita aerea e strike assets.',
+      id: 'strike-package',
+      name: 'Strike Package',
+      description: 'Attacco al suolo e interdizione a lungo raggio.',
       caps: {
-        aircrafts: 420,
-        helicopters: 220,
-        logistics: 220,
-        groundAssets: 180,
+        aircrafts: 290,
+        helicopters: 80,
+        logistics: 70,
+        groundAssets: 60,
       },
     },
     {
-      id: 'task-force-logistics',
-      name: 'Task Force Logistica',
-      description: 'Focalizzato su sustainment, trasporto e supporto.',
+      id: 'rotary-wing',
+      name: 'Ala Rotante',
+      description: 'Elicotteri da attacco e ricognizione armata.',
       caps: {
-        aircrafts: 160,
-        helicopters: 240,
-        logistics: 500,
-        groundAssets: 200,
-      },
-    },
-    {
-      id: 'combined-arms',
-      name: 'Combined Arms',
-      description: 'Bilanciato su tutte le categorie operative.',
-      caps: {
-        aircrafts: 300,
+        aircrafts: 50,
         helicopters: 300,
-        logistics: 300,
-        groundAssets: 300,
+        logistics: 90,
+        groundAssets: 60,
+      },
+    },
+    {
+      id: 'air-assault',
+      name: 'Air Assault',
+      description: 'Trasporto tattico e inserimento rapido di truppe.',
+      caps: {
+        aircrafts: 60,
+        helicopters: 200,
+        logistics: 150,
+        groundAssets: 90,
+      },
+    },
+    {
+      id: 'sustainment',
+      name: 'Sustainment',
+      description: 'Rifornimento, trasporto strategico e supporto logistico.',
+      caps: {
+        aircrafts: 50,
+        helicopters: 90,
+        logistics: 260,
+        groundAssets: 100,
+      },
+    },
+    {
+      id: 'ground-defense',
+      name: 'Difesa Terrestre',
+      description: 'Difesa aerea integrata e assetti corazzati.',
+      caps: {
+        aircrafts: 60,
+        helicopters: 70,
+        logistics: 90,
+        groundAssets: 280,
       },
     },
   ],
   units: [
-    { id: 'f16c', label: 'F-16C', category: 'aircrafts', cost: 95 },
-    { id: 'fa18c', label: 'F/A-18C Hornet', category: 'aircrafts', cost: 100 },
-    { id: 'f15e', label: 'F-15E Strike Eagle', category: 'aircrafts', cost: 120 },
-    { id: 'a10c2', label: 'A-10C II', category: 'aircrafts', cost: 85 },
-    { id: 'm2000c', label: 'Mirage 2000C', category: 'aircrafts', cost: 80 },
+    { id: 'f16c', label: 'F-16C', category: 'aircrafts', cost: 95, dcsType: 'F-16C_50' },
+    { id: 'fa18c', label: 'F/A-18C Hornet', category: 'aircrafts', cost: 100, dcsType: 'F/A-18C_hornet' },
+    { id: 'f15e', label: 'F-15E Strike Eagle', category: 'aircrafts', cost: 120, dcsType: 'F-15ESE' },
+    { id: 'a10c2', label: 'A-10C II', category: 'aircrafts', cost: 85, dcsType: 'A-10C_2' },
+    { id: 'm2000c', label: 'Mirage 2000C', category: 'aircrafts', cost: 80, dcsType: 'M-2000C' },
 
-    { id: 'ah64d', label: 'AH-64D Apache', category: 'helicopters', cost: 110 },
-    { id: 'oh58d', label: 'OH-58D Kiowa', category: 'helicopters', cost: 65 },
-    { id: 'ka50', label: 'Ka-50', category: 'helicopters', cost: 95 },
-    { id: 'mi24p', label: 'Mi-24P Hind', category: 'helicopters', cost: 100 },
-    { id: 'sa342', label: 'SA-342 Gazelle', category: 'helicopters', cost: 55 },
+    { id: 'ah64d', label: 'AH-64D Apache', category: 'helicopters', cost: 110, dcsType: 'AH-64D_BLK_II' },
+    { id: 'oh58d', label: 'OH-58D Kiowa', category: 'helicopters', cost: 65, dcsType: 'OH58D' },
+    { id: 'ka50', label: 'Ka-50', category: 'helicopters', cost: 95, dcsType: 'Ka-50' },
+    { id: 'mi24p', label: 'Mi-24P Hind', category: 'helicopters', cost: 100, dcsType: 'Mi-24P' },
+    { id: 'sa342', label: 'SA-342 Gazelle', category: 'helicopters', cost: 55, dcsType: 'SA342M' },
 
-    { id: 'c130j', label: 'C-130J Super Hercules', category: 'logistics', cost: 130 },
-    { id: 'ch47f', label: 'CH-47F Chinook', category: 'logistics', cost: 115 },
-    { id: 'mi8mt', label: 'Mi-8MT', category: 'logistics', cost: 90 },
-    { id: 'uh1h', label: 'UH-1H Huey', category: 'logistics', cost: 70 },
+    { id: 'c130j', label: 'C-130J Super Hercules', category: 'logistics', cost: 130, dcsType: 'C-130J-30' },
+    { id: 'ch47f', label: 'CH-47F Chinook', category: 'logistics', cost: 115, dcsType: 'CH-47Fbl1' },
+    { id: 'mi8mt', label: 'Mi-8MT', category: 'logistics', cost: 90, dcsType: 'Mi-8MT' },
+    { id: 'uh1h', label: 'UH-1H Huey', category: 'logistics', cost: 70, dcsType: 'UH-1H' },
 
     { id: 'm1a2', label: 'M1A2 Abrams', category: 'groundAssets', cost: 85 },
     { id: 'bradley', label: 'M2A2 Bradley IFV', category: 'groundAssets', cost: 60 },
@@ -106,46 +381,29 @@ const DEFAULT_TEMPLATES_SEED = Object.freeze({
 });
 
 function ensureStorage() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
+  loadJson(DOC.LIDC_CATALOG, {
+    specializations: DEFAULT_CATALOG_SEED.specializations,
+    units: DEFAULT_CATALOG_SEED.units,
+    updatedAt: Date.now(),
+  }, CATALOG_FILE);
+  loadJson(DOC.LIDC_SQUADRONS, [], SQUADRONS_FILE);
+  loadJson(DOC.LIDC_DISCORD_USERS, [], DISCORD_USERS_FILE);
+  loadJson(DOC.LIDC_UCID_LINKS, {}, UCID_LINKS_FILE);
+  loadJson(DOC.LIDC_LINK_CODES, {}, LINK_CODES_FILE);
+  loadJson(DOC.LIDC_BASE_LOGISTICS, { bases: {}, updatedAt: Date.now() }, BASE_LOGISTICS_FILE);
 
-  if (!fs.existsSync(TEMPLATES_FILE)) {
-    writeJsonAtomic(TEMPLATES_FILE, {
-      templates: DEFAULT_TEMPLATES_SEED.templates,
-      units: DEFAULT_TEMPLATES_SEED.units,
-      updatedAt: Date.now(),
-    });
-  }
-
-  if (!fs.existsSync(SQUADRONS_FILE)) {
-    writeJsonAtomic(SQUADRONS_FILE, []);
-  }
-
-  if (!fs.existsSync(DISCORD_USERS_FILE)) {
-    writeJsonAtomic(DISCORD_USERS_FILE, []);
-  }
-}
-
-function readJson(filePath, fallback) {
-  try {
-    const raw = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(raw);
-  } catch (error) {
-    console.error(`LIDC read error (${filePath}):`, error.message);
-    return fallback;
-  }
-}
-
-function writeJsonAtomic(filePath, payload) {
-  const tempPath = `${filePath}.tmp`;
-  fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), 'utf8');
-  fs.renameSync(tempPath, filePath);
+  ensureSquadronInviteCodes();
 }
 
 function sanitizeText(value, maxLen = 500) {
   if (typeof value !== 'string') return '';
   return value.trim().slice(0, maxLen);
+}
+
+function sanitizeUserId(value, maxLen = 80) {
+  if (value == null || value === '') return '';
+  const source = typeof value === 'string' ? value : String(value);
+  return source.trim().slice(0, maxLen);
 }
 
 function normalizeCategory(value) {
@@ -179,11 +437,11 @@ function getRolePermissions(roleRaw) {
     role,
     canManageRoles: role === 'owner',
     canPurchaseAirframes: role === 'admin',
-    canManageAssignedAirframes: role === 'leader',
+    canManageAssignedAirframes: role === 'owner' || role === 'admin' || role === 'leader',
   };
 }
 
-function normalizeTemplateCaps(rawCaps) {
+function normalizeCapsMap(rawCaps) {
   const caps = {};
   DECK_CATEGORIES.forEach((category) => {
     caps[category] = normalizeCap(rawCaps?.[category]);
@@ -191,16 +449,27 @@ function normalizeTemplateCaps(rawCaps) {
   return caps;
 }
 
-function normalizeTemplate(rawTemplate, index = 0) {
-  const id = sanitizeText(rawTemplate?.id, 80) || `template_${Date.now()}_${index}`;
-  const name = sanitizeText(rawTemplate?.name, 120) || `Template ${index + 1}`;
-  const description = sanitizeText(rawTemplate?.description, 500);
+function normalizeSpecialization(rawSpecialization, index = 0) {
+  const id = sanitizeText(rawSpecialization?.id, 80) || `specialization_${Date.now()}_${index}`;
+  const name = sanitizeText(rawSpecialization?.name, 120) || `Specialization ${index + 1}`;
+  const description = sanitizeText(rawSpecialization?.description, 500);
   return {
     id,
     name,
     description,
-    caps: normalizeTemplateCaps(rawTemplate?.caps),
+    caps: normalizeCapsMap(rawSpecialization?.caps),
   };
+}
+
+function sumSpecializationCaps(specializations) {
+  const caps = {};
+  DECK_CATEGORIES.forEach((category) => {
+    caps[category] = (Array.isArray(specializations) ? specializations : []).reduce(
+      (sum, specialization) => sum + normalizeCap(specialization?.caps?.[category]),
+      0,
+    );
+  });
+  return caps;
 }
 
 function normalizeUnit(rawUnit, index = 0) {
@@ -210,63 +479,103 @@ function normalizeUnit(rawUnit, index = 0) {
   const id = sanitizeText(rawUnit?.id, 80) || `unit_${Date.now()}_${index}`;
   const label = sanitizeText(rawUnit?.label, 120) || id;
   const cost = normalizeCap(rawUnit?.cost);
+  const dcsType = sanitizeText(rawUnit?.dcsType, 80) || null;
 
   if (!id || !label || cost <= 0) {
     return null;
   }
 
-  return {
+  const unit = {
     id,
     label,
     category,
     cost,
   };
+
+  if (dcsType) {
+    unit.dcsType = dcsType;
+  }
+
+  return unit;
 }
 
-function readTemplatesState() {
-  const raw = readJson(TEMPLATES_FILE, {
-    templates: DEFAULT_TEMPLATES_SEED.templates,
-    units: DEFAULT_TEMPLATES_SEED.units,
-    updatedAt: Date.now(),
+/**
+ * Legacy catalogs stored one `templates` entry per squadron. Squadrons now combine
+ * SPECIALIZATION_SLOTS entries, so caps are divided to keep the total budget comparable.
+ */
+function migrateLegacyTemplatesToSpecializations(rawTemplates) {
+  return rawTemplates.map((entry, index) => {
+    const specialization = normalizeSpecialization(entry, index);
+    DECK_CATEGORIES.forEach((category) => {
+      specialization.caps[category] = Math.floor(specialization.caps[category] / SPECIALIZATION_SLOTS);
+    });
+    return specialization;
   });
+}
 
-  const templates = Array.isArray(raw?.templates)
-    ? raw.templates.map((entry, index) => normalizeTemplate(entry, index)).filter(Boolean)
-    : [];
+function readCatalogState() {
+  const raw = loadJson(DOC.LIDC_CATALOG, {
+    specializations: DEFAULT_CATALOG_SEED.specializations,
+    units: DEFAULT_CATALOG_SEED.units,
+    updatedAt: Date.now(),
+  }, CATALOG_FILE);
 
   const units = Array.isArray(raw?.units)
     ? raw.units.map((entry, index) => normalizeUnit(entry, index)).filter(Boolean)
     : [];
 
-  return {
-    templates,
-    units,
-    updatedAt: Number.isFinite(raw?.updatedAt) ? raw.updatedAt : Date.now(),
+  if (Array.isArray(raw?.specializations)) {
+    return {
+      specializations: raw.specializations
+        .map((entry, index) => normalizeSpecialization(entry, index))
+        .filter(Boolean),
+      units,
+      updatedAt: Number.isFinite(raw?.updatedAt) ? raw.updatedAt : Date.now(),
+    };
+  }
+
+  const specializations = Array.isArray(raw?.templates)
+    ? migrateLegacyTemplatesToSpecializations(raw.templates)
+    : DEFAULT_CATALOG_SEED.specializations.map((entry, index) => normalizeSpecialization(entry, index));
+
+  const migrated = {
+    specializations,
+    units: units.length > 0
+      ? units
+      : DEFAULT_CATALOG_SEED.units.map((entry, index) => normalizeUnit(entry, index)).filter(Boolean),
+    updatedAt: Date.now(),
   };
+
+  saveJson(DOC.LIDC_CATALOG, migrated);
+  return migrated;
 }
 
-function writeTemplatesState(state) {
-  const templates = Array.isArray(state?.templates)
-    ? state.templates.map((entry, index) => normalizeTemplate(entry, index)).filter(Boolean)
-    : [];
+function writeCatalogState(state) {
+  const rawSpecializations = Array.isArray(state?.specializations)
+    ? state.specializations
+    : (Array.isArray(state?.templates) ? state.templates : []);
+
+  const specializations = rawSpecializations
+    .map((entry, index) => normalizeSpecialization(entry, index))
+    .filter(Boolean);
 
   const units = Array.isArray(state?.units)
     ? state.units.map((entry, index) => normalizeUnit(entry, index)).filter(Boolean)
     : [];
 
-  if (templates.length === 0) {
-    throw new Error('At least one template is required');
+  if (specializations.length < SPECIALIZATION_SLOTS) {
+    throw new Error(`At least ${SPECIALIZATION_SLOTS} specializations are required`);
   }
   if (units.length === 0) {
     throw new Error('At least one unit is required');
   }
 
-  const dedupeTemplateIds = new Set();
-  templates.forEach((template) => {
-    if (dedupeTemplateIds.has(template.id)) {
-      throw new Error(`Duplicate template id: ${template.id}`);
+  const dedupeSpecializationIds = new Set();
+  specializations.forEach((specialization) => {
+    if (dedupeSpecializationIds.has(specialization.id)) {
+      throw new Error(`Duplicate specialization id: ${specialization.id}`);
     }
-    dedupeTemplateIds.add(template.id);
+    dedupeSpecializationIds.add(specialization.id);
   });
 
   const dedupeUnitIds = new Set();
@@ -278,31 +587,31 @@ function writeTemplatesState(state) {
   });
 
   const payload = {
-    templates,
+    specializations,
     units,
     updatedAt: Date.now(),
   };
 
-  writeJsonAtomic(TEMPLATES_FILE, payload);
+  saveJson(DOC.LIDC_CATALOG, payload);
   return payload;
 }
 
 function readSquadrons() {
-  const raw = readJson(SQUADRONS_FILE, []);
+  const raw = loadJson(DOC.LIDC_SQUADRONS, [], SQUADRONS_FILE);
   return Array.isArray(raw) ? raw : [];
 }
 
 function writeSquadrons(squadrons) {
-  writeJsonAtomic(SQUADRONS_FILE, Array.isArray(squadrons) ? squadrons : []);
+  saveJson(DOC.LIDC_SQUADRONS, Array.isArray(squadrons) ? squadrons : []);
 }
 
 function readDiscordUsers() {
-  const raw = readJson(DISCORD_USERS_FILE, []);
+  const raw = loadJson(DOC.LIDC_DISCORD_USERS, [], DISCORD_USERS_FILE);
   return Array.isArray(raw) ? raw : [];
 }
 
 function writeDiscordUsers(users) {
-  writeJsonAtomic(DISCORD_USERS_FILE, Array.isArray(users) ? users : []);
+  saveJson(DOC.LIDC_DISCORD_USERS, Array.isArray(users) ? users : []);
 }
 
 function buildAvatarUrl(userId, avatar) {
@@ -355,7 +664,7 @@ function normalizeDeckInput(rawDeck) {
   return normalizedDeck;
 }
 
-function calculateCostSummary({ deck, template, unitsById }) {
+function calculateCostSummary({ deck, caps: rawCaps, unitsById }) {
   const spent = {};
   const caps = {};
   const remaining = {};
@@ -365,7 +674,7 @@ function calculateCostSummary({ deck, template, unitsById }) {
 
   DECK_CATEGORIES.forEach((category) => {
     const entries = Array.isArray(deck?.[category]) ? deck[category] : [];
-    const cap = normalizeCap(template?.caps?.[category]);
+    const cap = normalizeCap(rawCaps?.[category]);
 
     let categorySpent = 0;
     entries.forEach((entry) => {
@@ -400,21 +709,105 @@ function calculateCostSummary({ deck, template, unitsById }) {
   };
 }
 
-function normalizeInvites(rawInvites) {
-  const values = Array.isArray(rawInvites) ? rawInvites : [];
-  const unique = new Set();
+function normalizeSpecializationIdsInput(rawIds, specializationsById) {
+  const list = Array.isArray(rawIds) ? rawIds : [];
+  const selected = [];
 
-  values.forEach((entry) => {
-    const userId = sanitizeText(entry?.userId || entry?.id || entry, 80);
-    if (userId) unique.add(userId);
+  list.forEach((value) => {
+    const id = sanitizeText(value, 80);
+    if (!id || selected.includes(id)) return;
+    if (!specializationsById.has(id)) {
+      throw new Error(`Unknown specialization: ${id}`);
+    }
+    selected.push(id);
   });
 
-  const invitedAt = Date.now();
-  return Array.from(unique.values()).map((userId) => ({
-    userId,
-    status: 'pending',
-    invitedAt,
-  }));
+  if (selected.length !== SPECIALIZATION_SLOTS) {
+    throw new Error(`Exactly ${SPECIALIZATION_SLOTS} distinct specializations are required`);
+  }
+
+  return selected;
+}
+
+function resolveSquadronSpecializations(squadron, specializationsById) {
+  const storedIds = Array.isArray(squadron?.specializationIds)
+    ? squadron.specializationIds
+    : [squadron?.templateId];
+
+  return storedIds
+    .map((id) => specializationsById.get(sanitizeText(id, 80)))
+    .filter(Boolean);
+}
+
+/**
+ * Squadrons created before specializations existed were budgeted against a single template.
+ * Their persisted caps are reused so an existing deck never becomes retroactively invalid.
+ */
+function resolveSquadronCaps(squadron, specializationsById) {
+  if (!Array.isArray(squadron?.specializationIds)) {
+    const storedCaps = squadron?.costSummary?.caps;
+    const hasStoredCaps = storedCaps
+      && DECK_CATEGORIES.some((category) => normalizeCap(storedCaps[category]) > 0);
+    if (hasStoredCaps) {
+      return normalizeCapsMap(storedCaps);
+    }
+  }
+
+  return sumSpecializationCaps(resolveSquadronSpecializations(squadron, specializationsById));
+}
+
+function readSquadronSpecializationNames(squadron) {
+  const stored = Array.isArray(squadron?.specializationNames) ? squadron.specializationNames : [];
+  const names = stored.map((value) => sanitizeText(value, 120)).filter(Boolean);
+  if (names.length > 0) return names;
+
+  const legacyName = sanitizeText(squadron?.templateName, 120);
+  return legacyName ? [legacyName] : [];
+}
+
+function normalizeInviteCode(value) {
+  const cleaned = sanitizeText(value, 16).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return INVITE_CODE_PATTERN.test(cleaned) ? cleaned : '';
+}
+
+function generateUniqueInviteCode(takenCodes) {
+  for (let attempt = 0; attempt < INVITE_CODE_MAX_ATTEMPTS; attempt += 1) {
+    const code = crypto.randomBytes(4).toString('hex').toUpperCase();
+    if (!takenCodes.has(code)) {
+      takenCodes.add(code);
+      return code;
+    }
+  }
+
+  throw new Error('Unable to generate invite code');
+}
+
+function ensureSquadronInviteCodes() {
+  const squadrons = readSquadrons();
+  const taken = new Set();
+  let changed = false;
+
+  squadrons.forEach((squadron) => {
+    const existing = normalizeInviteCode(squadron?.inviteCode);
+    if (existing && !taken.has(existing)) {
+      if (squadron.inviteCode !== existing) {
+        squadron.inviteCode = existing;
+        changed = true;
+      }
+      taken.add(existing);
+    }
+  });
+
+  squadrons.forEach((squadron) => {
+    if (!normalizeInviteCode(squadron?.inviteCode)) {
+      squadron.inviteCode = generateUniqueInviteCode(taken);
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    writeSquadrons(squadrons);
+  }
 }
 
 function normalizeBoardNumber(value) {
@@ -441,14 +834,14 @@ function generateBoardNumber(taken) {
 function buildSquadronMemberUserIdSet(squadron) {
   const memberIds = new Set();
 
-  const createdById = sanitizeText(squadron?.createdBy?.id, 80);
+  const createdById = sanitizeUserId(squadron?.createdBy?.id, 80);
   if (createdById) {
     memberIds.add(createdById);
   }
 
   const members = Array.isArray(squadron?.members) ? squadron.members : [];
   members.forEach((entry) => {
-    const userId = sanitizeText(entry?.userId, 80);
+    const userId = sanitizeUserId(entry?.userId, 80);
     if (userId) {
       memberIds.add(userId);
     }
@@ -478,7 +871,7 @@ function toAirframeSortKey(unit) {
 }
 
 function sanitizeAirframeAssignmentUserId(rawUserId, memberUserIds) {
-  const userId = sanitizeText(rawUserId, 80);
+  const userId = sanitizeUserId(rawUserId, 80);
   if (!userId) return null;
   return memberUserIds.has(userId) ? userId : null;
 }
@@ -594,8 +987,8 @@ function ensureSquadronAirframesPersistedById(squadronId) {
   const index = squadrons.findIndex((entry) => sanitizeText(entry?.id, 120) === targetId);
   if (index < 0) return null;
 
-  const templatesState = readTemplatesState();
-  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+  const catalogState = readCatalogState();
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
 
   const squadron = { ...squadrons[index] };
   const changed = syncSquadronAirframesInMemory(squadron, unitsById);
@@ -670,14 +1063,14 @@ function listSquadronMembersForDisplay(squadron) {
     });
 }
 
-export function getTemplatesCatalog() {
+export function getSpecializationsCatalog() {
   ensureStorage();
-  return readTemplatesState();
+  return readCatalogState();
 }
 
-export function updateTemplatesCatalog(payload) {
+export function updateSpecializationsCatalog(payload) {
   ensureStorage();
-  return writeTemplatesState(payload);
+  return writeCatalogState(payload);
 }
 
 export function upsertDiscordUser(rawUser) {
@@ -747,27 +1140,24 @@ export function createSquadron(payload, sessionUser) {
     throw new Error('Base is required');
   }
 
-  const templateId = sanitizeText(payload?.templateId, 80);
-  if (!templateId) {
-    throw new Error('Template is required');
-  }
-
   const logoDataUrl = sanitizeText(payload?.logoDataUrl, MAX_LOGO_DATA_URL_LENGTH);
   if (logoDataUrl.length > MAX_LOGO_DATA_URL_LENGTH) {
     throw new Error('Logo is too large');
   }
 
-  const templatesState = readTemplatesState();
-  const template = templatesState.templates.find((entry) => entry.id === templateId);
-  if (!template) {
-    throw new Error('Template not found');
-  }
+  const catalogState = readCatalogState();
+  const specializationsById = new Map(catalogState.specializations.map((entry) => [entry.id, entry]));
+  const specializationIds = normalizeSpecializationIdsInput(
+    payload?.specializationIds,
+    specializationsById,
+  );
+  const specializations = specializationIds.map((id) => specializationsById.get(id));
 
-  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
   const deck = normalizeDeckInput(payload?.deck || {});
   const costSummary = calculateCostSummary({
     deck,
-    template,
+    caps: sumSpecializationCaps(specializations),
     unitsById,
   });
 
@@ -775,7 +1165,13 @@ export function createSquadron(payload, sessionUser) {
     throw new Error('Deck must include at least one unit');
   }
 
-  const invites = normalizeInvites(payload?.invites);
+  const squadrons = readSquadrons();
+  const takenCodes = new Set(
+    squadrons
+      .map((entry) => normalizeInviteCode(entry?.inviteCode))
+      .filter(Boolean),
+  );
+  const inviteCode = generateUniqueInviteCode(takenCodes);
   const createdAt = Date.now();
 
   const squadron = {
@@ -784,10 +1180,10 @@ export function createSquadron(payload, sessionUser) {
     description,
     logoDataUrl,
     baseId,
-    templateId: template.id,
-    templateName: template.name,
+    specializationIds,
+    specializationNames: specializations.map((entry) => entry.name),
     deck,
-    invites,
+    inviteCode,
     members: [
       {
         userId,
@@ -796,6 +1192,8 @@ export function createSquadron(payload, sessionUser) {
       },
     ],
     costSummary,
+    credits: DEFAULT_SQUADRON_CREDITS,
+    warehouses: {},
     createdAt,
     createdBy: {
       id: userId,
@@ -807,20 +1205,895 @@ export function createSquadron(payload, sessionUser) {
   };
   syncSquadronAirframesInMemory(squadron, unitsById);
 
-  const squadrons = readSquadrons();
   squadrons.push(squadron);
   writeSquadrons(squadrons);
+
+  queueWarehouseOpsForSquadronDeck({
+    squadronId: squadron.id,
+    baseId: squadron.baseId,
+    deck: squadron.deck,
+    unitsById,
+    squadron,
+  });
+  exportPendingWarehouseOps();
+  exportLidcAirframeRegistry();
 
   return squadron;
 }
 
-export function getSquadronById(squadronId) {
+export function updateSquadronDeck({ squadronId, deck, actorUserId }) {
+  ensureStorage();
+
+  const normalizedSquadronId = sanitizeText(squadronId, 120);
+  const normalizedActorUserId = sanitizeText(actorUserId, 80);
+  if (!normalizedSquadronId) {
+    throw new Error('squadronId is required');
+  }
+  if (!normalizedActorUserId) {
+    throw new Error('Authentication required');
+  }
+
+  const squadrons = readSquadrons();
+  const squadronIndex = squadrons.findIndex(
+    (entry) => sanitizeText(entry?.id, 120) === normalizedSquadronId,
+  );
+  if (squadronIndex < 0) {
+    throw new Error('Squadron not found');
+  }
+
+  const squadron = { ...squadrons[squadronIndex] };
+  if (!isUserMemberOfSquadron(squadron, normalizedActorUserId)) {
+    throw new Error('Only squadron members can edit the deck');
+  }
+
+  const actorRole = getMemberRoleInSquadron(squadron, normalizedActorUserId);
+  const actorPermissions = getRolePermissions(actorRole);
+  if (!actorPermissions.canManageRoles) {
+    throw new Error('Only the squadron owner can edit the deck');
+  }
+
+  const catalogState = readCatalogState();
+  const specializationsById = new Map(catalogState.specializations.map((entry) => [entry.id, entry]));
+  const caps = resolveSquadronCaps(squadron, specializationsById);
+
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
+  const previousDeck = squadron.deck;
+  const nextDeck = normalizeDeckInput(deck || {});
+  const costSummary = calculateCostSummary({
+    deck: nextDeck,
+    caps,
+    unitsById,
+  });
+
+  if (costSummary.totalUnits <= 0) {
+    throw new Error('Deck must include at least one unit');
+  }
+
+  const warehouseDeltas = computeWarehouseDeltaDiff(previousDeck, nextDeck, unitsById);
+
+  squadron.deck = nextDeck;
+  squadron.costSummary = costSummary;
+  squadron.updatedAt = Date.now();
+  syncSquadronAirframesInMemory(squadron, unitsById);
+
+  squadrons[squadronIndex] = squadron;
+  writeSquadrons(squadrons);
+
+  if (warehouseDeltas.length > 0) {
+    queueWarehouseDeltaOps({
+      squadronId: squadron.id,
+      baseId: squadron.baseId,
+      deltas: warehouseDeltas,
+      unitsById,
+      squadron,
+    });
+    exportPendingWarehouseOps();
+  }
+
+  exportLidcAirframeRegistry();
+
+  return {
+    squadron: {
+      ...squadron,
+      memberProfiles: listSquadronMembersForDisplay(squadron),
+    },
+    warehouseDeltas,
+  };
+}
+
+export function listSquadrons() {
+  ensureStorage();
+
+  return readSquadrons()
+    .map((squadron) => ({
+      id: sanitizeText(squadron?.id, 120),
+      name: sanitizeText(squadron?.name, 120),
+      logoDataUrl: sanitizeText(squadron?.logoDataUrl, MAX_LOGO_DATA_URL_LENGTH) || '',
+      specializationNames: readSquadronSpecializationNames(squadron),
+      baseId: sanitizeText(squadron?.baseId, 120),
+      memberCount: Array.isArray(squadron?.members) ? squadron.members.length : 0,
+      createdAt: Number.isFinite(squadron?.createdAt) ? squadron.createdAt : null,
+    }))
+    .filter((entry) => entry.id && entry.name)
+    .sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
+}
+
+function normalizeAirportAlias(value) {
+  return sanitizeText(value, 120).toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function airframeMatchesAirport(airframe, airport, homeBaseId) {
+  const airportId = sanitizeText(airport?.id, 120);
+  const currentBaseId = sanitizeText(airframe?.currentBaseId, 120);
+  if (currentBaseId) {
+    return currentBaseId === airportId;
+  }
+
+  const currentAirbase = normalizeAirportAlias(airframe?.currentAirbase);
+  if (currentAirbase) {
+    const aliases = [airport.id, airport.name, airport.subtitle]
+      .map((entry) => normalizeAirportAlias(entry))
+      .filter(Boolean);
+    return aliases.includes(currentAirbase);
+  }
+
+  return sanitizeText(homeBaseId, 120) === airportId;
+}
+
+function isAirframePresentOnRamp(airframe) {
+  const state = sanitizeText(airframe?.dcsState, 40).toLowerCase();
+  return state !== 'in_use' && state !== 'destroyed';
+}
+
+function toOccupancyAirframe(airframe) {
+  const category = sanitizeText(airframe?.category, 40);
+
+  return {
+    id: sanitizeText(airframe?.id, 160),
+    unitId: sanitizeText(airframe?.unitId, 80),
+    unitLabel: sanitizeText(airframe?.unitLabel, 120),
+    category,
+    boardNumber: sanitizeText(airframe?.boardNumber, 16).toUpperCase(),
+    dcsState: sanitizeText(airframe?.dcsState, 40) || 'in_hangar',
+  };
+}
+
+function countOccupancyKinds(airframes) {
+  const counts = { aircrafts: 0, helicopters: 0, groundAssets: 0 };
+  (Array.isArray(airframes) ? airframes : []).forEach((airframe) => {
+    const category = sanitizeText(airframe?.category, 40);
+    const unitId = sanitizeText(airframe?.unitId, 80);
+    if (category === 'groundAssets') {
+      counts.groundAssets += 1;
+      return;
+    }
+    if (category === 'helicopters' || (category === 'logistics' && ROTARY_LOGISTICS_UNIT_IDS.has(unitId))) {
+      counts.helicopters += 1;
+      return;
+    }
+    counts.aircrafts += 1;
+  });
+  return counts;
+}
+
+function cloneLogisticsStock(catalog) {
+  return catalog.map((entry) => ({
+    id: entry.id,
+    label: entry.label,
+    unit: entry.unit,
+    quantity: entry.defaultQuantity,
+    capacity: entry.capacity,
+    unitCost: entry.unitCost,
+  }));
+}
+
+function normalizeLogisticsStock(rawList, catalog) {
+  const byId = new Map(
+    (Array.isArray(rawList) ? rawList : []).map((entry) => [sanitizeText(entry?.id, 80), entry]),
+  );
+
+  return catalog.map((template) => {
+    const existing = byId.get(template.id);
+    const quantity = Number.isFinite(Number(existing?.quantity))
+      ? Math.max(0, Math.floor(Number(existing.quantity)))
+      : template.defaultQuantity;
+    return {
+      id: template.id,
+      label: template.label,
+      unit: template.unit,
+      quantity: Math.min(template.capacity, quantity),
+      capacity: template.capacity,
+      unitCost: template.unitCost,
+    };
+  });
+}
+
+function createDefaultBaseLogistics(baseId) {
+  return {
+    baseId,
+    credits: DEFAULT_BASE_CREDITS,
+    fuel: cloneLogisticsStock(LOGISTICS_FUEL_CATALOG),
+    armament: cloneLogisticsStock(LOGISTICS_ARMAMENT_CATALOG),
+    orders: [],
+  };
+}
+
+function readBaseLogisticsStore() {
+  const raw = loadJson(DOC.LIDC_BASE_LOGISTICS, { bases: {}, updatedAt: Date.now() }, BASE_LOGISTICS_FILE);
+  return {
+    bases: raw?.bases && typeof raw.bases === 'object' ? raw.bases : {},
+    updatedAt: Number.isFinite(raw?.updatedAt) ? raw.updatedAt : Date.now(),
+  };
+}
+
+function writeBaseLogisticsStore(store) {
+  saveJson(DOC.LIDC_BASE_LOGISTICS, {
+    bases: store?.bases || {},
+    updatedAt: Date.now(),
+  });
+}
+
+function getOrCreateBaseLogistics(baseId) {
+  const airport = getLidcAirportById(baseId);
+  if (!airport) return null;
+
+  const store = readBaseLogisticsStore();
+  const existing = store.bases[airport.id];
+  const next = {
+    baseId: airport.id,
+    credits: Number.isFinite(Number(existing?.credits))
+      ? Math.max(0, Math.floor(Number(existing.credits)))
+      : DEFAULT_BASE_CREDITS,
+    fuel: normalizeLogisticsStock(existing?.fuel, LOGISTICS_FUEL_CATALOG),
+    armament: normalizeLogisticsStock(existing?.armament, LOGISTICS_ARMAMENT_CATALOG),
+    orders: normalizeBaseOrders(existing?.orders),
+  };
+
+  store.bases[airport.id] = next;
+  if (!existing) {
+    LIDC_AFGHANISTAN_AIRPORTS.forEach((entry) => {
+      if (store.bases[entry.id]) return;
+      store.bases[entry.id] = createDefaultBaseLogistics(entry.id);
+    });
+    writeBaseLogisticsStore(store);
+  }
+
+  return next;
+}
+
+function summarizeLogistics(logistics) {
+  const fuel = Array.isArray(logistics?.fuel) ? logistics.fuel : [];
+  const armament = Array.isArray(logistics?.armament) ? logistics.armament : [];
+  const fuelQuantity = fuel.reduce((sum, entry) => sum + Number(entry.quantity || 0), 0);
+  const fuelCapacity = fuel.reduce((sum, entry) => sum + Number(entry.capacity || 0), 0);
+  const armamentQuantity = armament.reduce((sum, entry) => sum + Number(entry.quantity || 0), 0);
+  return {
+    credits: Number(logistics?.credits || 0),
+    fuelQuantity,
+    fuelCapacity,
+    armamentQuantity,
+    armamentTypes: armament.length,
+  };
+}
+
+function listLogisticsShop() {
+  return LOGISTICS_SHOP_CATALOG.map((item) => ({
+    id: item.id,
+    category: item.category,
+    kind: item.kind,
+    imageKey: item.imageKey,
+    name: item.name,
+    destination: item.destination,
+    contents: item.contents.map((entry) => ({ ...entry })),
+    total: item.total,
+    types: item.types,
+    cost: item.cost,
+    weightLbs: item.weightLbs,
+    transport: [...item.transport],
+  }));
+}
+
+const MAX_BASE_ORDERS = 80;
+
+function persistBaseLogistics(airportId, logistics) {
+  const store = readBaseLogisticsStore();
+  store.bases[airportId] = logistics;
+  writeBaseLogisticsStore(store);
+}
+
+function findSquadronIndexById(squadrons, squadronId) {
+  const id = sanitizeText(squadronId, 120);
+  if (!id) return -1;
+  return squadrons.findIndex((entry) => sanitizeText(entry?.id, 120) === id);
+}
+
+function normalizeOrderStatus(rawStatus) {
+  const status = sanitizeText(rawStatus, 20).toLowerCase();
+  if (status === 'accepted' || status === 'completed') return status;
+  return 'pending';
+}
+
+function normalizeBaseOrders(rawOrders) {
+  const catalogById = new Map(LOGISTICS_SHOP_CATALOG.map((entry) => [entry.id, entry]));
+
+  return (Array.isArray(rawOrders) ? rawOrders : [])
+    .map((order) => {
+      const items = (Array.isArray(order?.items) ? order.items : [])
+        .map((line) => {
+          const catalogItem = catalogById.get(sanitizeText(line?.itemId, 80));
+          const quantity = Math.max(0, Math.floor(Number(line?.quantity) || 0));
+          const cost = Math.max(0, Math.floor(Number(line?.cost) || 0));
+          if (!catalogItem || quantity < 1) return null;
+          return {
+            itemId: catalogItem.id,
+            kind: catalogItem.kind,
+            category: catalogItem.category,
+            name: catalogItem.name,
+            destination: catalogItem.destination,
+            quantity,
+            cost: cost || catalogItem.cost * quantity,
+            weightLbs: shopLineWeightLbs(catalogItem, quantity, line?.weightLbs),
+          };
+        })
+        .filter(Boolean);
+
+      if (items.length < 1) return null;
+
+      return {
+        id: sanitizeText(order?.id, 120) || `order_${Date.now()}`,
+        code: sanitizeText(order?.code, 12).toUpperCase(),
+        createdByUserName: sanitizeText(order?.createdByUserName, 120),
+        createdAt: Number.isFinite(Number(order?.createdAt)) ? Number(order.createdAt) : Date.now(),
+        createdByUserId: sanitizeText(order?.createdByUserId, 80),
+        acceptedAt: Number.isFinite(Number(order?.acceptedAt)) ? Number(order.acceptedAt) : 0,
+        acceptedByUserId: sanitizeText(order?.acceptedByUserId, 80),
+        completedAt: Number.isFinite(Number(order?.completedAt)) ? Number(order.completedAt) : 0,
+        completedByUserId: sanitizeText(order?.completedByUserId, 80),
+        squadronId: sanitizeText(order?.squadronId, 120),
+        squadronName: sanitizeText(order?.squadronName, 120),
+        status: normalizeOrderStatus(order?.status),
+        items,
+        cost: items.reduce((sum, line) => sum + Number(line.cost || 0), 0),
+        weightLbs: items.reduce((sum, line) => sum + Number(line.weightLbs || 0), 0),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0))
+    .slice(0, MAX_BASE_ORDERS);
+}
+
+function canEditAirportOrder(order, actorId, squadrons) {
+  const userId = sanitizeText(actorId, 80);
+  if (!userId || !order) return false;
+  if (normalizeOrderStatus(order.status) !== 'pending') return false;
+  if (sanitizeText(order.createdByUserId, 80) === userId) return true;
+
+  const squadronIndex = findSquadronIndexById(squadrons, order.squadronId);
+  if (squadronIndex < 0) return false;
+  const role = getMemberRoleInSquadron(squadrons[squadronIndex], userId);
+  return role === 'owner' || role === 'admin';
+}
+
+function toPublicAirportOrder(order, actorId, squadrons) {
+  const status = normalizeOrderStatus(order?.status);
+  const squadronIndex = findSquadronIndexById(squadrons, order?.squadronId);
+  const squadron = squadronIndex >= 0 ? squadrons[squadronIndex] : null;
+  return {
+    ...order,
+    status,
+    squadronCredits: getSquadronCredits(squadron),
+    canEdit: canEditAirportOrder({ ...order, status }, actorId, squadrons),
+    canAccept: Boolean(actorId) && status === 'pending',
+    canUnaccept: Boolean(actorId) && status === 'accepted',
+    canComplete: Boolean(actorId) && status === 'accepted',
+  };
+}
+
+function listVisibleAirportOrders(rawOrders, actorId, squadrons) {
+  return normalizeBaseOrders(rawOrders)
+    .filter((order) => order.status !== 'completed')
+    .map((order) => toPublicAirportOrder(order, actorId, squadrons));
+}
+
+const FUEL_LOW_RATIO = 0.2;
+
+function countLowFuelTanks(fuel) {
+  return (Array.isArray(fuel) ? fuel : []).filter((entry) => {
+    const capacity = Number(entry?.capacity) || 0;
+    if (capacity <= 0) return false;
+    return (Number(entry?.quantity) || 0) / capacity < FUEL_LOW_RATIO;
+  }).length;
+}
+
+export function listAirportOrderAlerts() {
+  ensureStorage();
+  const store = readBaseLogisticsStore();
+  const orders = {};
+  const fuelLow = {};
+
+  Object.entries(store.bases && typeof store.bases === 'object' ? store.bases : {}).forEach(([baseId, logistics]) => {
+    const id = sanitizeText(baseId, 120);
+    if (!id) return;
+    const orderCount = normalizeBaseOrders(logistics?.orders)
+      .filter((order) => order.status !== 'completed').length;
+    const fuelCount = countLowFuelTanks(logistics?.fuel);
+    if (orderCount > 0) orders[id] = orderCount;
+    if (fuelCount > 0) fuelLow[id] = fuelCount;
+  });
+
+  return { orders, fuelLow };
+}
+
+function buildShopPurchaseLines(rawItems) {
+  const aggregated = new Map();
+  (Array.isArray(rawItems) ? rawItems : []).forEach((line) => {
+    const key = sanitizeText(line?.itemId, 80);
+    const qty = Math.floor(Number(line?.quantity));
+    if (!key || !Number.isFinite(qty) || qty < 1) return;
+    aggregated.set(key, (aggregated.get(key) || 0) + qty);
+  });
+
+  if (aggregated.size < 1) {
+    throw new Error('Invalid purchase quantity');
+  }
+
+  const catalogById = new Map(LOGISTICS_SHOP_CATALOG.map((entry) => [entry.id, entry]));
+  const purchaseLines = [];
+  let totalCost = 0;
+
+  aggregated.forEach((qty, key) => {
+    const catalogItem = catalogById.get(key);
+    if (!catalogItem) {
+      throw new Error('Item not found');
+    }
+    const lineCost = catalogItem.cost * qty;
+    totalCost += lineCost;
+    purchaseLines.push({
+      itemId: catalogItem.id,
+      kind: catalogItem.kind,
+      name: catalogItem.name,
+      destination: catalogItem.destination,
+      quantity: qty,
+      cost: lineCost,
+      weightLbs: shopLineWeightLbs(catalogItem, qty),
+    });
+  });
+
+  return { purchaseLines, totalCost };
+}
+
+function applyWarehouseDelta(cargo, previousItems, nextItems) {
+  const nextCargo = { ...cargo };
+  (Array.isArray(previousItems) ? previousItems : []).forEach((line) => {
+    const itemId = sanitizeText(line?.itemId, 80);
+    if (!itemId) return;
+    nextCargo[itemId] = Math.max(0, (nextCargo[itemId] || 0) - Math.max(0, Math.floor(Number(line?.quantity) || 0)));
+  });
+  (Array.isArray(nextItems) ? nextItems : []).forEach((line) => {
+    const itemId = sanitizeText(line?.itemId, 80);
+    if (!itemId) return;
+    nextCargo[itemId] = (nextCargo[itemId] || 0) + Math.max(0, Math.floor(Number(line?.quantity) || 0));
+  });
+  return nextCargo;
+}
+
+function getSquadronCredits(squadron) {
+  if (Number.isFinite(Number(squadron?.credits))) {
+    return Math.max(0, Math.floor(Number(squadron.credits)));
+  }
+  return DEFAULT_SQUADRON_CREDITS;
+}
+
+function getWarehouseStock(squadron, baseId) {
+  const warehouses = squadron?.warehouses && typeof squadron.warehouses === 'object'
+    ? squadron.warehouses
+    : {};
+  const stock = warehouses[baseId] && typeof warehouses[baseId] === 'object'
+    ? warehouses[baseId]
+    : {};
+
+  const cargo = {};
+  LOGISTICS_SHOP_CATALOG.forEach((item) => {
+    cargo[item.id] = Math.max(0, Math.floor(Number(stock[item.id]) || 0));
+  });
+  return cargo;
+}
+
+function toShopper(squadron, baseId) {
+  if (!squadron) return null;
+  return {
+    squadronId: sanitizeText(squadron?.id, 120),
+    squadronName: sanitizeText(squadron?.name, 120),
+    credits: getSquadronCredits(squadron),
+    cargo: getWarehouseStock(squadron, baseId),
+  };
+}
+
+export function getAirportOccupancy(baseId, actorUserId = '') {
+  ensureStorage();
+
+  const airport = getLidcAirportById(baseId);
+  if (!airport) return null;
+
+  const catalogState = readCatalogState();
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
+  const squadrons = readSquadrons();
+  const logistics = getOrCreateBaseLogistics(airport.id);
+
+  const occupancySquadrons = squadrons
+    .map((rawSquadron) => {
+      const squadron = { ...rawSquadron };
+      syncSquadronAirframesInMemory(squadron, unitsById);
+
+      const homeBaseId = sanitizeText(squadron?.baseId, 120);
+      const isHome = homeBaseId === airport.id;
+      const airframes = (Array.isArray(squadron.airframes) ? squadron.airframes : [])
+        .filter((airframe) => airframeMatchesAirport(airframe, airport, homeBaseId))
+        .filter((airframe) => isAirframePresentOnRamp(airframe))
+        .map((airframe) => toOccupancyAirframe(airframe))
+        .filter((airframe) => airframe?.id && airframe?.unitId);
+
+      airframes.sort((a, b) => {
+        const categoryCompare = String(a.category || '').localeCompare(String(b.category || ''), 'en', { sensitivity: 'base' });
+        if (categoryCompare !== 0) return categoryCompare;
+        const labelCompare = String(a.unitLabel || '').localeCompare(String(b.unitLabel || ''), 'en', { sensitivity: 'base' });
+        if (labelCompare !== 0) return labelCompare;
+        return String(a.boardNumber || '').localeCompare(String(b.boardNumber || ''), 'en', { numeric: true, sensitivity: 'base' });
+      });
+
+      const counts = countOccupancyKinds(airframes);
+      if (!isHome && airframes.length === 0) return null;
+
+      return {
+        id: sanitizeText(squadron?.id, 120),
+        name: sanitizeText(squadron?.name, 120),
+        logoDataUrl: sanitizeText(squadron?.logoDataUrl, MAX_LOGO_DATA_URL_LENGTH) || '',
+        specializationNames: readSquadronSpecializationNames(squadron),
+        memberCount: Array.isArray(squadron?.members) ? squadron.members.length : 0,
+        isHome,
+        counts,
+        airframes,
+      };
+    })
+    .filter((entry) => entry?.id && entry?.name)
+    .sort((a, b) => {
+      if (a.isHome !== b.isHome) return a.isHome ? -1 : 1;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'en', { sensitivity: 'base' });
+    });
+
+  const actorId = sanitizeText(actorUserId, 80);
+  const shopperSquadron = actorId ? getUserPrimarySquadron(actorId) : null;
+
+  return {
+    airport: {
+      id: airport.id,
+      name: airport.name,
+      subtitle: airport.subtitle,
+    },
+    squadrons: occupancySquadrons,
+    logistics,
+    resources: summarizeLogistics(logistics),
+    shop: listLogisticsShop(),
+    shopper: toShopper(shopperSquadron, airport.id),
+    orders: listVisibleAirportOrders(logistics.orders, actorId, squadrons),
+  };
+}
+
+export function purchaseAirportLogistics({ baseId, itemId, quantity, items, userId }) {
+  ensureStorage();
+
+  const actorId = sanitizeText(userId, 80);
+  if (!actorId) {
+    throw new Error('Authentication required');
+  }
+
+  const airport = getLidcAirportById(baseId);
+  if (!airport) {
+    throw new Error('Airport not found');
+  }
+
+  const rawLines = Array.isArray(items) && items.length > 0
+    ? items
+    : [{ itemId, quantity: quantity || 1 }];
+  const { purchaseLines, totalCost } = buildShopPurchaseLines(rawLines);
+
+  const squadrons = readSquadrons();
+  const shopperSquadron = getUserPrimarySquadron(actorId);
+  const squadronIndex = shopperSquadron
+    ? squadrons.findIndex((entry) => sanitizeText(entry?.id, 120) === sanitizeText(shopperSquadron.id, 120))
+    : -1;
+  if (squadronIndex < 0) {
+    throw new Error('Squadron required');
+  }
+
+  const squadron = squadrons[squadronIndex];
+  const credits = getSquadronCredits(squadron);
+  if (credits < totalCost) {
+    throw new Error('Insufficient squadron credits');
+  }
+
+  const cargo = getWarehouseStock(squadron, airport.id);
+  purchaseLines.forEach((line) => {
+    cargo[line.itemId] = (cargo[line.itemId] || 0) + line.quantity;
+  });
+
+  const nextSquadron = {
+    ...squadron,
+    credits: credits - totalCost,
+    warehouses: {
+      ...(squadron.warehouses && typeof squadron.warehouses === 'object' ? squadron.warehouses : {}),
+      [airport.id]: cargo,
+    },
+  };
+  squadrons[squadronIndex] = nextSquadron;
+  writeSquadrons(squadrons);
+
+  const logistics = getOrCreateBaseLogistics(airport.id);
+  const order = {
+    id: `order_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+    createdAt: Date.now(),
+    createdByUserId: actorId,
+    squadronId: sanitizeText(squadron?.id, 120),
+    squadronName: sanitizeText(squadron?.name, 120),
+    status: 'pending',
+    items: purchaseLines,
+    cost: totalCost,
+  };
+  logistics.orders = normalizeBaseOrders([order, ...(Array.isArray(logistics.orders) ? logistics.orders : [])]);
+  persistBaseLogistics(airport.id, logistics);
+
+  return {
+    shop: listLogisticsShop(),
+    shopper: toShopper(nextSquadron, airport.id),
+    orders: listVisibleAirportOrders(logistics.orders, actorId, squadrons),
+    purchase: {
+      items: purchaseLines,
+      cost: totalCost,
+      order,
+    },
+  };
+}
+
+export function updateAirportOrderStatus({ baseId, orderId, action, userId }) {
+  ensureStorage();
+
+  const actorId = sanitizeText(userId, 80);
+  if (!actorId) {
+    throw new Error('Authentication required');
+  }
+
+  const actionKey = sanitizeText(action, 20).toLowerCase();
+  if (!['accept', 'unaccept', 'complete', 'cancel'].includes(actionKey)) {
+    throw new Error('Invalid order action');
+  }
+
+  const airport = getLidcAirportById(baseId);
+  if (!airport) {
+    throw new Error('Airport not found');
+  }
+
+  const logistics = getOrCreateBaseLogistics(airport.id);
+  const orders = normalizeBaseOrders(logistics.orders);
+  const targetId = sanitizeText(orderId, 120);
+  const orderIndex = orders.findIndex((entry) => entry.id === targetId);
+  if (orderIndex < 0) {
+    throw new Error('Order not found');
+  }
+
+  const order = orders[orderIndex];
+  const status = normalizeOrderStatus(order.status);
+  const squadrons = readSquadrons();
+
+  if (actionKey === 'accept') {
+    if (status !== 'pending') {
+      throw new Error('Order cannot be accepted');
+    }
+    orders[orderIndex] = {
+      ...order,
+      status: 'accepted',
+      acceptedAt: Date.now(),
+      acceptedByUserId: actorId,
+    };
+  } else if (actionKey === 'unaccept') {
+    if (status !== 'accepted') {
+      throw new Error('Order cannot be cancelled');
+    }
+    orders[orderIndex] = {
+      ...order,
+      status: 'pending',
+      acceptedAt: 0,
+      acceptedByUserId: '',
+    };
+  } else if (actionKey === 'cancel') {
+    if (!canEditAirportOrder(order, actorId, squadrons)) {
+      throw new Error('Not allowed to cancel this order');
+    }
+    const squadronIndex = findSquadronIndexById(squadrons, order.squadronId);
+    if (squadronIndex >= 0) {
+      const squadron = squadrons[squadronIndex];
+      const cargo = applyWarehouseDelta(
+        getWarehouseStock(squadron, airport.id),
+        order.items,
+        [],
+      );
+      squadrons[squadronIndex] = {
+        ...squadron,
+        credits: getSquadronCredits(squadron) + Math.max(0, Math.floor(Number(order.cost) || 0)),
+        warehouses: {
+          ...(squadron.warehouses && typeof squadron.warehouses === 'object' ? squadron.warehouses : {}),
+          [airport.id]: cargo,
+        },
+      };
+      writeSquadrons(squadrons);
+    }
+    orders.splice(orderIndex, 1);
+  } else {
+    if (status !== 'accepted') {
+      throw new Error('Order cannot be completed');
+    }
+    orders[orderIndex] = {
+      ...order,
+      status: 'completed',
+      completedAt: Date.now(),
+      completedByUserId: actorId,
+    };
+  }
+
+  logistics.orders = orders;
+  persistBaseLogistics(airport.id, logistics);
+  const shopperSquadron = getUserPrimarySquadron(actorId);
+
+  return {
+    shop: listLogisticsShop(),
+    shopper: toShopper(shopperSquadron, airport.id),
+    orders: listVisibleAirportOrders(logistics.orders, actorId, squadrons),
+  };
+}
+
+export function updateAirportOrder({ baseId, orderId, items, userId }) {
+  ensureStorage();
+
+  const actorId = sanitizeText(userId, 80);
+  if (!actorId) {
+    throw new Error('Authentication required');
+  }
+
+  const airport = getLidcAirportById(baseId);
+  if (!airport) {
+    throw new Error('Airport not found');
+  }
+
+  const { purchaseLines, totalCost } = buildShopPurchaseLines(items);
+  const logistics = getOrCreateBaseLogistics(airport.id);
+  const orders = normalizeBaseOrders(logistics.orders);
+  const targetId = sanitizeText(orderId, 120);
+  const orderIndex = orders.findIndex((entry) => entry.id === targetId);
+  if (orderIndex < 0) {
+    throw new Error('Order not found');
+  }
+
+  const order = orders[orderIndex];
+  const squadrons = readSquadrons();
+  if (!canEditAirportOrder(order, actorId, squadrons)) {
+    throw new Error('Not allowed to edit this order');
+  }
+
+  const squadronIndex = findSquadronIndexById(squadrons, order.squadronId);
+  if (squadronIndex < 0) {
+    throw new Error('Squadron required');
+  }
+
+  const squadron = squadrons[squadronIndex];
+  const credits = getSquadronCredits(squadron);
+  const available = credits + Number(order.cost || 0);
+  if (available < totalCost) {
+    throw new Error('Insufficient squadron credits');
+  }
+
+  const cargo = applyWarehouseDelta(
+    getWarehouseStock(squadron, airport.id),
+    order.items,
+    purchaseLines,
+  );
+
+  const nextSquadron = {
+    ...squadron,
+    credits: available - totalCost,
+    warehouses: {
+      ...(squadron.warehouses && typeof squadron.warehouses === 'object' ? squadron.warehouses : {}),
+      [airport.id]: cargo,
+    },
+  };
+  squadrons[squadronIndex] = nextSquadron;
+  writeSquadrons(squadrons);
+
+  orders[orderIndex] = {
+    ...order,
+    items: purchaseLines,
+    cost: totalCost,
+  };
+  logistics.orders = orders;
+  persistBaseLogistics(airport.id, logistics);
+
+  return {
+    shop: listLogisticsShop(),
+    shopper: toShopper(getUserPrimarySquadron(actorId), airport.id),
+    orders: listVisibleAirportOrders(logistics.orders, actorId, squadrons),
+  };
+}
+
+export function getSquadronById(squadronId, actorUserId = '') {
   ensureStorage();
   const targetId = sanitizeText(squadronId, 120);
   if (!targetId) return null;
 
   const squadron = ensureSquadronAirframesPersistedById(targetId);
   if (!squadron) return null;
+
+  const actorId = sanitizeText(actorUserId, 80);
+  const isMember = actorId && isUserMemberOfSquadron(squadron, actorId);
+  const result = {
+    ...squadron,
+    specializationNames: readSquadronSpecializationNames(squadron),
+    memberProfiles: listSquadronMembersForDisplay(squadron),
+  };
+
+  if (!isMember) {
+    delete result.inviteCode;
+  }
+
+  return result;
+}
+
+export function joinSquadronByInviteCode({ inviteCode, sessionUser }) {
+  ensureStorage();
+
+  const userId = sanitizeText(sessionUser?.id, 80);
+  if (!userId) {
+    throw new Error('Authentication required');
+  }
+
+  const existingSquadron = getUserPrimarySquadron(userId);
+  if (existingSquadron) {
+    const existingName = sanitizeText(existingSquadron?.name, 120) || '-';
+    throw new Error(`Already in squadron: ${existingName}`);
+  }
+
+  const normalizedCode = normalizeInviteCode(inviteCode);
+  if (!normalizedCode) {
+    throw new Error('Invalid invite code');
+  }
+
+  const squadrons = readSquadrons();
+  const squadronIndex = squadrons.findIndex(
+    (entry) => normalizeInviteCode(entry?.inviteCode) === normalizedCode,
+  );
+  if (squadronIndex < 0) {
+    throw new Error('Invite code not found');
+  }
+
+  const squadron = { ...squadrons[squadronIndex] };
+  if (isUserMemberOfSquadron(squadron, userId)) {
+    throw new Error('Already in squadron');
+  }
+
+  const joinedAt = Date.now();
+  const currentMembers = Array.isArray(squadron.members) ? squadron.members : [];
+  squadron.members = [
+    ...currentMembers,
+    {
+      userId,
+      role: 'member',
+      joinedAt,
+    },
+  ];
+
+  const catalogState = readCatalogState();
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
+  syncSquadronAirframesInMemory(squadron, unitsById);
+
+  squadrons[squadronIndex] = squadron;
+  writeSquadrons(squadrons);
 
   return {
     ...squadron,
@@ -833,8 +2106,8 @@ export function updateAirframeAssignment({ squadronId, airframeId, pilotUserId, 
 
   const normalizedSquadronId = sanitizeText(squadronId, 120);
   const normalizedAirframeId = sanitizeText(airframeId, 160);
-  const normalizedActorUserId = sanitizeText(actorUserId, 80);
-  const normalizedPilotUserId = sanitizeText(pilotUserId, 80);
+  const normalizedActorUserId = sanitizeUserId(actorUserId, 80);
+  const normalizedPilotUserId = sanitizeUserId(pilotUserId, 80);
 
   if (!normalizedSquadronId || !normalizedAirframeId) {
     throw new Error('squadronId and airframeId are required');
@@ -860,8 +2133,8 @@ export function updateAirframeAssignment({ squadronId, airframeId, pilotUserId, 
     throw new Error('Only leaders can manage airframe assignments');
   }
 
-  const templatesState = readTemplatesState();
-  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+  const catalogState = readCatalogState();
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
   syncSquadronAirframesInMemory(squadron, unitsById);
 
   const airframes = Array.isArray(squadron.airframes) ? squadron.airframes : [];
@@ -889,6 +2162,7 @@ export function updateAirframeAssignment({ squadronId, airframeId, pilotUserId, 
 
   squadrons[squadronIndex] = squadron;
   writeSquadrons(squadrons);
+  exportLidcAirframeRegistry();
 
   return {
     squadron: {
@@ -983,6 +2257,79 @@ export function updateSquadronMemberRole({
   };
 }
 
+export function removeSquadronMember({
+  squadronId,
+  targetUserId,
+  actorUserId,
+}) {
+  ensureStorage();
+
+  const normalizedSquadronId = sanitizeText(squadronId, 120);
+  const normalizedTargetUserId = sanitizeText(targetUserId, 80);
+  const normalizedActorUserId = sanitizeText(actorUserId, 80);
+
+  if (!normalizedSquadronId || !normalizedTargetUserId) {
+    throw new Error('squadronId and targetUserId are required');
+  }
+  if (!normalizedActorUserId) {
+    throw new Error('Authentication required');
+  }
+
+  const squadrons = readSquadrons();
+  const squadronIndex = squadrons.findIndex((entry) => sanitizeText(entry?.id, 120) === normalizedSquadronId);
+  if (squadronIndex < 0) {
+    throw new Error('Squadron not found');
+  }
+
+  const squadron = { ...squadrons[squadronIndex] };
+  if (!isUserMemberOfSquadron(squadron, normalizedActorUserId)) {
+    throw new Error('Only squadron members can manage members');
+  }
+
+  const actorPermissions = getRolePermissions(getMemberRoleInSquadron(squadron, normalizedActorUserId));
+  if (!actorPermissions.canManageRoles) {
+    throw new Error('Only owners can manage members');
+  }
+
+  const ownerId = sanitizeText(squadron?.createdBy?.id, 80);
+  if (normalizedTargetUserId === ownerId) {
+    throw new Error('Cannot remove squadron owner');
+  }
+  if (normalizedTargetUserId === normalizedActorUserId) {
+    throw new Error('Owner cannot remove themselves');
+  }
+
+  if (!isUserMemberOfSquadron(squadron, normalizedTargetUserId)) {
+    throw new Error('Target user must be a squadron member');
+  }
+
+  const currentMembers = Array.isArray(squadron.members) ? squadron.members : [];
+  const nextMembers = currentMembers.filter(
+    (entry) => sanitizeText(entry?.userId, 80) !== normalizedTargetUserId,
+  );
+
+  if (nextMembers.length === currentMembers.length) {
+    throw new Error('Target user must be a squadron member');
+  }
+
+  squadron.members = nextMembers;
+
+  const catalogState = readCatalogState();
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
+  syncSquadronAirframesInMemory(squadron, unitsById);
+
+  squadrons[squadronIndex] = squadron;
+  writeSquadrons(squadrons);
+
+  return {
+    squadron: {
+      ...squadron,
+      memberProfiles: listSquadronMembersForDisplay(squadron),
+    },
+    removedUserId: normalizedTargetUserId,
+  };
+}
+
 export function leaveSquadron({
   squadronId,
   actorUserId,
@@ -1026,8 +2373,8 @@ export function leaveSquadron({
 
   squadron.members = nextMembers;
 
-  const templatesState = readTemplatesState();
-  const unitsById = new Map(templatesState.units.map((entry) => [entry.id, entry]));
+  const catalogState = readCatalogState();
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
   syncSquadronAirframesInMemory(squadron, unitsById);
 
   squadrons[squadronIndex] = squadron;
@@ -1108,48 +2455,6 @@ export function getUserPrimarySquadron(userIdRaw) {
   return mine[0] || null;
 }
 
-export function getPendingInvitesForUser(userIdRaw) {
-  ensureStorage();
-  const userId = sanitizeText(userIdRaw, 80);
-  if (!userId) return [];
-
-  const squadrons = readSquadrons();
-  const invites = [];
-
-  squadrons.forEach((squadron) => {
-    const squadronInvites = Array.isArray(squadron?.invites) ? squadron.invites : [];
-
-    squadronInvites.forEach((invite) => {
-      const invitedUserId = sanitizeText(invite?.userId, 80);
-      if (invitedUserId !== userId) return;
-
-      const status = sanitizeText(invite?.status, 40) || 'pending';
-      invites.push({
-        squadronId: sanitizeText(squadron?.id, 120),
-        squadronName: sanitizeText(squadron?.name, 120),
-        templateName: sanitizeText(squadron?.templateName, 120),
-        baseId: sanitizeText(squadron?.baseId, 120),
-        invitedAt: Number.isFinite(invite?.invitedAt) ? invite.invitedAt : Number(squadron?.createdAt) || Date.now(),
-        status,
-        invitedBy: {
-          id: sanitizeText(squadron?.createdBy?.id, 80),
-          globalName: sanitizeText(squadron?.createdBy?.globalName, 140),
-          username: sanitizeText(squadron?.createdBy?.username, 140),
-          avatar: sanitizeText(squadron?.createdBy?.avatar, 200),
-          avatarUrl: buildAvatarUrl(
-            sanitizeText(squadron?.createdBy?.id, 80),
-            sanitizeText(squadron?.createdBy?.avatar, 200),
-          ),
-        },
-      });
-    });
-  });
-
-  return invites
-    .filter((entry) => entry.status === 'pending')
-    .sort((a, b) => (Number(b.invitedAt) || 0) - (Number(a.invitedAt) || 0));
-}
-
 export function getUserLidcState(userIdRaw) {
   ensureStorage();
   const userId = sanitizeText(userIdRaw, 80);
@@ -1157,12 +2462,10 @@ export function getUserLidcState(userIdRaw) {
     return {
       hasSquadron: false,
       squadron: null,
-      invites: [],
     };
   }
 
   const squadron = getUserPrimarySquadron(userId);
-  const invites = getPendingInvitesForUser(userId);
 
   return {
     hasSquadron: Boolean(squadron),
@@ -1170,31 +2473,485 @@ export function getUserLidcState(userIdRaw) {
       ? {
           id: sanitizeText(squadron?.id, 120),
           name: sanitizeText(squadron?.name, 120),
-          templateName: sanitizeText(squadron?.templateName, 120),
+          specializationNames: readSquadronSpecializationNames(squadron),
           baseId: sanitizeText(squadron?.baseId, 120),
           createdAt: Number.isFinite(squadron?.createdAt) ? squadron.createdAt : null,
         }
       : null,
-    invites,
   };
+}
+
+function readUcidLinks() {
+  const raw = loadJson(DOC.LIDC_UCID_LINKS, {}, UCID_LINKS_FILE);
+  return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+}
+
+function writeUcidLinks(links) {
+  saveJson(DOC.LIDC_UCID_LINKS, links);
+}
+
+function readLinkCodes() {
+  const raw = loadJson(DOC.LIDC_LINK_CODES, {}, LINK_CODES_FILE);
+  return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+}
+
+function writeLinkCodes(codes) {
+  saveJson(DOC.LIDC_LINK_CODES, codes);
+}
+
+function pruneExpiredLinkCodes(codes = readLinkCodes()) {
+  const now = Date.now();
+  let changed = false;
+  const next = { ...codes };
+
+  Object.entries(next).forEach(([code, entry]) => {
+    const expiresAt = Number(entry?.expiresAt) || 0;
+    if (expiresAt <= now) {
+      delete next[code];
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    writeLinkCodes(next);
+  }
+
+  return next;
+}
+
+function generateLinkCode() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let suffix = '';
+  for (let i = 0; i < 6; i += 1) {
+    suffix += alphabet[crypto.randomInt(0, alphabet.length)];
+  }
+  return `LIDC-${suffix}`;
+}
+
+export function startUcidLink(userId) {
+  ensureStorage();
+
+  const normalizedUserId = sanitizeText(userId, 80);
+  if (!normalizedUserId) {
+    throw new Error('Authentication required');
+  }
+
+  const links = readUcidLinks();
+  if (links[normalizedUserId]?.ucid) {
+    return {
+      linked: true,
+      link: links[normalizedUserId],
+    };
+  }
+
+  const codes = pruneExpiredLinkCodes();
+  const existingPending = Object.entries(codes).find(([, entry]) => (
+    sanitizeText(entry?.discordId, 80) === normalizedUserId
+  ));
+  if (existingPending) {
+    const [existingCode, existingEntry] = existingPending;
+    return {
+      linked: false,
+      code: existingCode,
+      expiresAt: existingEntry.expiresAt,
+      instructions: 'Type this code in DCS chat while connected to the server.',
+    };
+  }
+
+  let code = '';
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const candidate = generateLinkCode();
+    if (!codes[candidate]) {
+      code = candidate;
+      break;
+    }
+  }
+
+  if (!code) {
+    throw new Error('Unable to generate link code');
+  }
+
+  const expiresAt = Date.now() + LINK_CODE_TTL_MS;
+  codes[code] = {
+    discordId: normalizedUserId,
+    expiresAt,
+    createdAt: Date.now(),
+  };
+  writeLinkCodes(codes);
+
+  return {
+    linked: false,
+    code,
+    expiresAt,
+    instructions: 'Type this code in DCS chat while connected to the server.',
+  };
+}
+
+export function getUcidLinkStatus(userId) {
+  ensureStorage();
+
+  const normalizedUserId = sanitizeText(userId, 80);
+  if (!normalizedUserId) {
+    throw new Error('Authentication required');
+  }
+
+  const links = readUcidLinks();
+  const link = links[normalizedUserId] || null;
+  if (link?.ucid) {
+    return {
+      linked: true,
+      link: {
+        ucid: link.ucid,
+        name: link.name || null,
+        linkedAt: link.linkedAt || null,
+      },
+    };
+  }
+
+  const codes = pruneExpiredLinkCodes();
+  const pending = Object.entries(codes).find(([, entry]) => (
+    sanitizeText(entry?.discordId, 80) === normalizedUserId
+  ));
+
+  if (!pending) {
+    return { linked: false, pending: null };
+  }
+
+  const [code, entry] = pending;
+  return {
+    linked: false,
+    pending: {
+      code,
+      expiresAt: entry.expiresAt,
+    },
+  };
+}
+
+export function processUcidLinkRequests(requests = []) {
+  ensureStorage();
+
+  if (!Array.isArray(requests) || requests.length === 0) {
+    return { linked: [], skipped: 0 };
+  }
+
+  const codes = pruneExpiredLinkCodes();
+  const links = readUcidLinks();
+  const linked = [];
+  let skipped = 0;
+
+  requests.forEach((request) => {
+    const code = sanitizeText(request?.code, 16).toUpperCase();
+    const ucid = sanitizeText(request?.ucid, 120);
+    const name = sanitizeText(request?.name, 120);
+
+    if (!code || !LINK_CODE_PATTERN.test(code) || !ucid) {
+      skipped += 1;
+      return;
+    }
+
+    const pending = codes[code];
+    if (!pending) {
+      skipped += 1;
+      return;
+    }
+
+    const discordId = sanitizeText(pending.discordId, 80);
+    if (!discordId) {
+      skipped += 1;
+      return;
+    }
+
+    links[discordId] = {
+      ucid,
+      name: name || null,
+      linkedAt: Date.now(),
+    };
+
+    delete codes[code];
+    linked.push({
+      discordId,
+      ucid,
+      name: name || null,
+      code,
+    });
+  });
+
+  if (linked.length > 0) {
+    writeUcidLinks(links);
+    writeLinkCodes(codes);
+    exportLidcAirframeRegistry();
+  }
+
+  return { linked, skipped };
+}
+
+export function getUcidLinksMap() {
+  ensureStorage();
+  return readUcidLinks();
+}
+
+function buildAirframeRegistryPayload() {
+  const catalogState = readCatalogState();
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
+  const links = readUcidLinks();
+  const squadrons = readSquadrons();
+  const nameToUcid = {};
+
+  Object.entries(links).forEach(([discordId, link]) => {
+    const ucid = sanitizeText(link?.ucid, 120);
+    const name = sanitizeText(link?.name, 120);
+    if (name && ucid) {
+      nameToUcid[name.toLowerCase()] = ucid;
+    }
+    if (ucid) {
+      nameToUcid[discordId] = ucid;
+    }
+  });
+
+  const airframes = [];
+  squadrons.forEach((squadron) => {
+    const homeAirbase = resolveDcsAirbaseName(squadron?.baseId);
+    const squadronAirframes = Array.isArray(squadron?.airframes) ? squadron.airframes : [];
+    squadronAirframes.forEach((airframe) => {
+      const unit = unitsById.get(airframe?.unitId);
+      if (!unit || !isWarehouseSpawnableCategory(unit.category)) return;
+
+      const dcsType = getUnitDcsType(unit);
+      if (!dcsType) return;
+
+      const pilotUserId = sanitizeText(airframe?.assignedPilotUserId, 80);
+      const link = pilotUserId ? links[pilotUserId] : null;
+      const ucid = sanitizeText(link?.ucid, 120) || null;
+
+      airframes.push({
+        id: sanitizeText(airframe?.id, 160),
+        squadronId: sanitizeText(squadron?.id, 120),
+        ucid,
+        pilotName: sanitizeText(link?.name, 120) || null,
+        dcsType,
+        homeAirbase: homeAirbase || null,
+        currentAirbase: sanitizeText(airframe?.currentAirbase, 120) || homeAirbase || null,
+        state: sanitizeText(airframe?.dcsState, 40) || 'in_hangar',
+      });
+    });
+  });
+
+  return {
+    links,
+    nameToUcid,
+    airframes,
+    updatedAt: Date.now(),
+  };
+}
+
+export function exportLidcAirframeRegistry() {
+  ensureStorage();
+  const payload = buildAirframeRegistryPayload();
+  writeJsonAtomic(LIDC_EXPORT_FILES.airframeRegistry, payload);
+  exportLidcPolicy();
+  return payload;
+}
+
+function managedKey(type, airbase) {
+  return `${type}::${airbase}`;
+}
+
+function buildLidcPolicyPayload() {
+  const catalogState = readCatalogState();
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
+  const ucidLinks = readUcidLinks();
+  const squadrons = readSquadrons();
+
+  const links = {};
+  Object.entries(ucidLinks).forEach(([discordId, link]) => {
+    const ucid = sanitizeText(link?.ucid, 120);
+    if (ucid) {
+      links[ucid] = discordId;
+    }
+  });
+
+  const managedMap = new Map();
+  const allow = {};
+
+  const addAllowEntry = (ucid, type, airbase) => {
+    if (!ucid || !type || !airbase) return;
+    if (!allow[ucid]) allow[ucid] = [];
+    const exists = allow[ucid].some(
+      (entry) => entry.type === type && entry.airbase === airbase,
+    );
+    if (!exists) {
+      allow[ucid].push({ type, airbase });
+    }
+  };
+
+  squadrons.forEach((squadron) => {
+    const homeAirbase = resolveDcsAirbaseName(squadron?.baseId);
+    const squadronAirframes = Array.isArray(squadron?.airframes) ? squadron.airframes : [];
+
+    squadronAirframes.forEach((airframe) => {
+      const unit = unitsById.get(airframe?.unitId);
+      if (!unit || !isWarehouseSpawnableCategory(unit.category)) return;
+
+      const dcsType = getUnitDcsType(unit);
+      if (!dcsType || !homeAirbase) return;
+
+      managedMap.set(managedKey(dcsType, homeAirbase), { type: dcsType, airbase: homeAirbase });
+
+      const pilotUserId = sanitizeText(airframe?.assignedPilotUserId, 80);
+      const link = pilotUserId ? ucidLinks[pilotUserId] : null;
+      const ucid = sanitizeText(link?.ucid, 120);
+      if (!ucid) return;
+
+      const state = sanitizeText(airframe?.dcsState, 40) || 'in_hangar';
+      if (state === 'destroyed') return;
+
+      const airbase = sanitizeText(airframe?.currentAirbase, 120) || homeAirbase;
+      addAllowEntry(ucid, dcsType, airbase);
+    });
+  });
+
+  return {
+    links,
+    allow,
+    managed: Array.from(managedMap.values()),
+    updatedAt: Date.now(),
+  };
+}
+
+export function exportLidcPolicy() {
+  ensureStorage();
+  const payload = buildLidcPolicyPayload();
+  writeJsonAtomic(LIDC_EXPORT_FILES.policy, payload);
+  return payload;
+}
+
+const DCS_STATE_TO_UI = Object.freeze({
+  in_hangar: 'grounded',
+  in_use: 'airborne',
+  destroyed: 'destroyed',
+});
+
+export function applyAirframeStateFromDcs(incomingAirframes = []) {
+  ensureStorage();
+  if (!Array.isArray(incomingAirframes) || incomingAirframes.length === 0) {
+    return { updated: 0, squadrons: readSquadrons() };
+  }
+
+  const stateById = new Map();
+  incomingAirframes.forEach((entry) => {
+    const id = sanitizeText(entry?.id, 160);
+    if (!id) return;
+    stateById.set(id, {
+      dcsState: sanitizeText(entry?.state, 40) || 'in_hangar',
+      currentAirbase: sanitizeText(entry?.airbase, 120) || null,
+      dcsStateUpdatedAt: Number(entry?.at) || Date.now(),
+      lat: Number(entry?.lat) || null,
+      lon: Number(entry?.lon) || null,
+    });
+  });
+
+  if (stateById.size === 0) {
+    return { updated: 0, squadrons: readSquadrons() };
+  }
+
+  const squadrons = readSquadrons();
+  let updated = 0;
+
+  const nextSquadrons = squadrons.map((squadron) => {
+    const airframes = Array.isArray(squadron?.airframes) ? squadron.airframes : [];
+    let squadronChanged = false;
+
+    const nextAirframes = airframes.map((airframe) => {
+      const patch = stateById.get(airframe?.id);
+      if (!patch) return airframe;
+
+      const currentBaseId = patch.currentAirbase
+        ? resolveBaseIdFromDcsAirbaseName(patch.currentAirbase)
+        : null;
+
+      const nextRecord = {
+        ...airframe,
+        dcsState: patch.dcsState,
+        dcsStateUpdatedAt: patch.dcsStateUpdatedAt,
+        currentAirbase: patch.currentAirbase,
+        currentBaseId: currentBaseId || airframe?.currentBaseId || null,
+        lastKnownLat: patch.lat,
+        lastKnownLon: patch.lon,
+      };
+
+      if (
+        airframe.dcsState !== nextRecord.dcsState
+        || airframe.currentAirbase !== nextRecord.currentAirbase
+        || airframe.currentBaseId !== nextRecord.currentBaseId
+      ) {
+        squadronChanged = true;
+        updated += 1;
+      }
+
+      return nextRecord;
+    });
+
+    if (!squadronChanged) return squadron;
+    return { ...squadron, airframes: nextAirframes };
+  });
+
+  if (updated > 0) {
+    writeSquadrons(nextSquadrons);
+    exportLidcAirframeRegistry();
+  } else {
+    exportLidcPolicy();
+  }
+
+  const catalogState = readCatalogState();
+  const unitsById = new Map(catalogState.units.map((entry) => [entry.id, entry]));
+  processDeferredWarehouseOps(nextSquadrons, unitsById);
+
+  return { updated, squadrons: nextSquadrons, uiStates: DCS_STATE_TO_UI };
 }
 
 ensureStorage();
 
+export {
+  listLogisticsShop,
+  createDefaultBaseLogistics,
+  summarizeLogistics,
+  buildShopPurchaseLines,
+  normalizeBaseOrders,
+  normalizeLogisticsStock,
+  LOGISTICS_FUEL_CATALOG,
+  LOGISTICS_ARMAMENT_CATALOG,
+};
+
 export default {
   DECK_CATEGORIES,
   LIDC_MEMBER_ROLES,
-  getTemplatesCatalog,
-  updateTemplatesCatalog,
+  SPECIALIZATION_SLOTS,
+  getSpecializationsCatalog,
+  updateSpecializationsCatalog,
   upsertDiscordUser,
   getDiscordUsers,
   createSquadron,
+  updateSquadronDeck,
+  listSquadrons,
+  getAirportOccupancy,
+  listAirportOrderAlerts,
+  purchaseAirportLogistics,
+  updateAirportOrderStatus,
+  updateAirportOrder,
   getSquadronById,
+  joinSquadronByInviteCode,
   updateAirframeAssignment,
   updateSquadronMemberRole,
+  removeSquadronMember,
   leaveSquadron,
   deleteSquadron,
   getUserPrimarySquadron,
-  getPendingInvitesForUser,
   getUserLidcState,
+  startUcidLink,
+  getUcidLinkStatus,
+  processUcidLinkRequests,
+  getUcidLinksMap,
+  exportLidcAirframeRegistry,
+  exportLidcPolicy,
+  applyAirframeStateFromDcs,
 };

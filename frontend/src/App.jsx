@@ -1,33 +1,57 @@
-import { useState, useEffect } from 'react';
-import { Activity, AlertCircle, BookOpen, CalendarSync, TowerControl, Users } from 'lucide-react';
+import { lazy, Suspense, useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { BookOpen, CalendarSync, ChevronDown, ScrollText, TowerControl } from 'lucide-react';
 import FrontlineMap from './components/FrontlineMap';
+import LandingPage from './components/landing/LandingPage';
 import UserMenu from './components/UserMenu';
 import UserProfile from './components/UserProfile';
 import ChangelogPage from './components/ChangelogPage';
 import WikiPage from './components/WikiPage';
+import PrivacyPage from './components/PrivacyPage';
 import LidcPage from './components/LidcPage';
 import AtcStripPage from './components/atc/AtcStripPage';
 import * as api from './services/api';
 import socketService from './services/socket';
-import { t } from './utils/locale';
+import { t, getActiveLocale, setActiveLocale } from './utils/locale';
 import bannerImg from '../img/DCS_ITALIA_ICON.png';
-import gbFlagImg from '../img/flags/gb.svg';
+import enFlagImg from '../img/flags/en.svg';
 import itFlagImg from '../img/flags/it.svg';
 import { useUser } from './contexts/UserContext';
+import CampaignHeaderTabs from './components/CampaignHeaderTabs';
+import BootSplash from './components/BootSplash';
+import InlineError from './components/InlineError';
+import {
+  DEFAULT_CAMPAIGN_ID,
+  getCampaignNavTarget,
+} from './config/campaigns';
+import {
+  DEFAULT_TACTICAL_MAP_ID,
+  getTacticalMapByCampaignId,
+  resolveTacticalMapFromPath,
+} from './config/tacticalMaps';
 import { canAccessAtc, canAccessLidc } from './config/featureAccess';
+import './AppHeader.css';
+
+const LidcStorylineRoom = lazy(() => import('./components/LidcStorylineRoom'));
+const LIDC_STORYLINE_CAMPAIGN_ID = 'lidc-afghanistan';
+
+const MIN_BOOT_MS = 1600;
+const BOOT_SETTLE_MS = 480;
+const BOOT_FADE_MS = 700;
 
 const VIEW_TO_PATH = Object.freeze({
-  frontline: '/',
+  landing: '/',
+  frontline: '/map',
   profile: '/profile',
   changelogs: '/changelogs',
   wiki: '/wiki',
   lidc: '/lidc',
   atc: '/atc',
+  privacy: '/privacy',
 });
-const DEFAULT_WIKI_LANGUAGE = 'en';
 
 function normalizeView(view) {
-  return Object.prototype.hasOwnProperty.call(VIEW_TO_PATH, view) ? view : 'frontline';
+  return Object.prototype.hasOwnProperty.call(VIEW_TO_PATH, view) ? view : 'landing';
 }
 
 function normalizePath(pathname = '/') {
@@ -37,48 +61,98 @@ function normalizePath(pathname = '/') {
 
 function viewFromLocation() {
   if (typeof window === 'undefined') {
-    return 'frontline';
+    return { view: 'landing', tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
   }
 
   const currentPath = normalizePath(window.location.pathname);
 
+  if (currentPath === '/map' || currentPath.startsWith('/map/')) {
+    const tacticalMap = resolveTacticalMapFromPath(currentPath);
+    return {
+      view: 'frontline',
+      tacticalMapId: tacticalMap?.campaignId || DEFAULT_TACTICAL_MAP_ID,
+    };
+  }
   if (currentPath === '/changelogs') {
-    return 'changelogs';
+    return { view: 'changelogs', tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
   }
   if (currentPath === '/wiki') {
-    return 'wiki';
+    return { view: 'wiki', tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
   }
   if (currentPath === '/profile') {
-    return 'profile';
+    return { view: 'profile', tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
   }
   if (currentPath === '/lidc') {
-    return 'lidc';
+    return { view: 'lidc', tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
   }
   if (currentPath === '/atc') {
-    return 'atc';
+    return { view: 'atc', tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
+  }
+  if (currentPath === '/privacy') {
+    return { view: 'privacy', tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
+  }
+  if (currentPath === '/') {
+    return { view: 'landing', tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
   }
 
   const params = new URLSearchParams(window.location.search);
   const viewFromQuery = params.get('view');
   if (viewFromQuery) {
-    return normalizeView(viewFromQuery);
+    return { view: normalizeView(viewFromQuery), tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
   }
 
   const hashView = window.location.hash.replace(/^#\/?/, '').replace(/\/+$/, '');
   if (hashView) {
-    return normalizeView(hashView);
+    return { view: normalizeView(hashView), tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
   }
 
-  return 'frontline';
+  return { view: 'landing', tacticalMapId: DEFAULT_TACTICAL_MAP_ID };
 }
 
-function syncUrlWithView(view, { replace = false } = {}) {
+function isSplashPreviewUrl() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  return new URLSearchParams(window.location.search).has('splash');
+}
+
+function setSplashPreviewUrl(enabled) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  const url = new URL(window.location.href);
+  if (enabled) {
+    url.searchParams.set('splash', '1');
+  } else {
+    url.searchParams.delete('splash');
+  }
+  const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+  const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (nextUrl !== currentUrl) {
+    window.history.replaceState({}, '', nextUrl);
+  }
+}
+
+function isTypingTarget(target) {
+  if (!target || typeof target !== 'object') {
+    return false;
+  }
+  const element = target;
+  const tag = String(element.tagName || '').toLowerCase();
+  return tag === 'input' || tag === 'textarea' || tag === 'select' || Boolean(element.isContentEditable);
+}
+
+function syncUrlWithView(view, { replace = false, tacticalMapId = null } = {}) {
   if (typeof window === 'undefined') {
     return;
   }
 
   const targetView = normalizeView(view);
-  const targetPath = VIEW_TO_PATH[targetView];
+  let targetPath = VIEW_TO_PATH[targetView];
+  if (targetView === 'frontline') {
+    const map = getTacticalMapByCampaignId(tacticalMapId || DEFAULT_TACTICAL_MAP_ID);
+    targetPath = map?.path || VIEW_TO_PATH.frontline;
+  }
   const url = new URL(window.location.href);
   url.pathname = targetPath;
   url.searchParams.delete('view');
@@ -98,53 +172,131 @@ function syncUrlWithView(view, { replace = false } = {}) {
   window.history.pushState({}, '', nextUrl);
 }
 
-function buildFrontlineSummary(zones = []) {
-  const summary = {
-    total: 0,
-    RED: 0,
-    BLUE: 0,
-    NEUTRAL: 0,
-    UNDER_ATTACK: 0,
-  };
-
-  zones.forEach((zone) => {
-    summary.total += 1;
-    if (summary[zone.status] !== undefined) {
-      summary[zone.status] += 1;
-    }
-  });
-
-  return summary;
-}
 
 function App() {
-  const [currentView, setCurrentView] = useState(() => viewFromLocation());
-  const [appLanguage, setAppLanguage] = useState(DEFAULT_WIKI_LANGUAGE);
+  const initialRoute = viewFromLocation();
+  const [currentView, setCurrentView] = useState(() => initialRoute.view);
+  const [activeTacticalMapId, setActiveTacticalMapId] = useState(() => initialRoute.tacticalMapId);
+  const [selectedCampaignId, setSelectedCampaignId] = useState(() => {
+    return null;
+  });
+  const [appLanguage, setAppLanguage] = useState(() => getActiveLocale());
   const [airports, setAirports] = useState({});
   const [airportCatalog, setAirportCatalog] = useState([]);
   const [airbaseStatus, setAirbaseStatus] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [frontlineSummary, setFrontlineSummary] = useState({
-    total: 0,
-    RED: 0,
-    BLUE: 0,
-    NEUTRAL: 0,
-    UNDER_ATTACK: 0,
-  });
-  const { user } = useUser();
-  const showLidc = canAccessLidc(user?.id);
-  const showAtc = canAccessAtc(user?.id);
+  const { user, loading: userLoading } = useUser();
+  const showAtc = canAccessAtc(user);
+  const showLidc = canAccessLidc(user);
+  const bootStartedAt = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const bootRevealDone = useRef(false);
+  const [splashVisible, setSplashVisible] = useState(true);
+  const [splashFading, setSplashFading] = useState(false);
+  const [splashKey, setSplashKey] = useState(0);
+  const [splashPreview, setSplashPreview] = useState(() => isSplashPreviewUrl());
+  const [isStorylineOpen, setIsStorylineOpen] = useState(false);
+  const storylineReturnViewRef = useRef('landing');
+  const bootReady = !loading && !userLoading;
+  const [mapReady, setMapReady] = useState(() => initialRoute.view !== 'frontline');
+  const revealReady = bootReady && (Boolean(error) || currentView !== 'frontline' || mapReady);
 
-  const goToView = (view) => {
+  const hideSplash = () => {
+    bootRevealDone.current = true;
+    setSplashFading(true);
+    window.setTimeout(() => {
+      setSplashVisible(false);
+      setSplashFading(false);
+    }, BOOT_FADE_MS);
+  };
+
+  const replaySplash = () => {
+    bootRevealDone.current = false;
+    setMapReady(currentView !== 'frontline');
+    setSplashFading(false);
+    setSplashVisible(true);
+    setSplashKey((key) => key + 1);
+  };
+
+  const closeSplashPreview = () => {
+    setSplashPreview(false);
+    setSplashPreviewUrl(false);
+    hideSplash();
+  };
+
+  const goToView = (view, options = {}) => {
     const normalized = normalizeView(view);
+    if (normalized === 'frontline') {
+      const nextMapId = options.tacticalMapId || activeTacticalMapId || DEFAULT_TACTICAL_MAP_ID;
+      setActiveTacticalMapId(nextMapId);
+      setCurrentView('frontline');
+      syncUrlWithView('frontline', { tacticalMapId: nextMapId, ...options });
+      return;
+    }
+    if (normalized === 'lidc' && !showLidc) {
+      return;
+    }
+    if (normalized === 'landing') {
+      setSelectedCampaignId(null);
+    }
     setCurrentView(normalized);
-    syncUrlWithView(normalized);
+    syncUrlWithView(normalized, options);
+  };
+
+  const handleSelectCampaign = (campaign) => {
+    const target = getCampaignNavTarget(campaign);
+    if (target.type === 'hidc' || target.type === 'lidc') {
+      openCampaignTarget(target);
+      return;
+    }
+    setSelectedCampaignId(campaign.id);
+    goToView('landing');
+  };
+
+  const headerActiveCampaignId = currentView === 'frontline'
+    ? activeTacticalMapId
+    : currentView === 'lidc'
+      ? 'lidc-afghanistan'
+      : null;
+
+  const openCampaignTarget = (target) => {
+    if (target?.type === 'hidc' && target.tacticalMapId) {
+      const map = getTacticalMapByCampaignId(target.tacticalMapId);
+      if (!map?.enabled) return;
+      goToView('frontline', { tacticalMapId: target.tacticalMapId });
+      return;
+    }
+    if (target?.type === 'lidc') {
+      if (target.openStoryline) {
+        storylineReturnViewRef.current = 'landing';
+        setIsStorylineOpen(true);
+        if (currentView !== 'landing') {
+          goToView('landing');
+        }
+        setSelectedCampaignId(LIDC_STORYLINE_CAMPAIGN_ID);
+        return;
+      }
+      goToView('lidc');
+    }
+  };
+
+  const closeStoryline = () => {
+    setIsStorylineOpen(false);
+    if (storylineReturnViewRef.current === 'landing') {
+      if (currentView !== 'landing') {
+        goToView('landing');
+      }
+      setSelectedCampaignId(LIDC_STORYLINE_CAMPAIGN_ID);
+    }
   };
   const isItalian = appLanguage === 'it';
 
   const toggleLanguage = () => {
-    setAppLanguage((prev) => (prev === 'it' ? 'en' : 'it'));
+    setAppLanguage((prev) => {
+      const next = prev === 'it' ? 'en' : 'it';
+      setActiveLocale(next);
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -152,20 +304,121 @@ function App() {
   }, []);
 
   useEffect(() => {
-    // Canonicalize URL (supports old ?view=changelogs links and unknown paths).
-    syncUrlWithView(currentView, { replace: true });
-  }, [currentView]);
+    if (!bootReady || splashPreview || currentView !== 'frontline') return undefined;
+    const timeoutId = window.setTimeout(() => setMapReady(true), 4000);
+    return () => window.clearTimeout(timeoutId);
+  }, [bootReady, splashPreview, currentView, activeTacticalMapId]);
 
   useEffect(() => {
-    if ((currentView === 'lidc' && !showLidc) || (currentView === 'atc' && !showAtc)) {
+    if (splashPreview) {
+      bootRevealDone.current = true;
+      return undefined;
+    }
+
+    if (!revealReady || bootRevealDone.current) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let fadeTimerId = 0;
+
+    const waitForPaint = () => new Promise((resolve) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(resolve);
+      });
+    });
+
+    const reveal = async () => {
+      const elapsed = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - bootStartedAt.current;
+      const remaining = Math.max(0, MIN_BOOT_MS - elapsed);
+      const fontsReady = document.fonts?.ready ?? Promise.resolve();
+
+      await Promise.all([
+        fontsReady.catch(() => undefined),
+        new Promise((resolve) => {
+          window.setTimeout(resolve, remaining);
+        }),
+      ]);
+
+      await waitForPaint();
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, BOOT_SETTLE_MS);
+      });
+      if (cancelled) return;
+
+      bootRevealDone.current = true;
+      setSplashFading(true);
+      fadeTimerId = window.setTimeout(() => {
+        if (!cancelled) {
+          setSplashVisible(false);
+          window.dispatchEvent(new Event('resize'));
+        }
+      }, BOOT_FADE_MS);
+    };
+
+    reveal();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(fadeTimerId);
+    };
+  }, [revealReady, splashPreview]);
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (isTypingTarget(event.target)) {
+        return;
+      }
+
+      if (event.key === 'Escape' && splashVisible) {
+        event.preventDefault();
+        if (splashPreview) {
+          closeSplashPreview();
+        } else {
+          hideSplash();
+        }
+        return;
+      }
+
+      if ((event.key === 'S' || event.key === 's') && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        event.preventDefault();
+        replaySplash();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [splashVisible, splashFading, splashPreview]);
+
+  useEffect(() => {
+    // Canonicalize URL (supports old ?view=changelogs links and unknown paths).
+    syncUrlWithView(currentView, { replace: true, tacticalMapId: activeTacticalMapId });
+  }, [currentView, activeTacticalMapId]);
+
+  useEffect(() => {
+    if (currentView === 'atc' && !showAtc) {
       setCurrentView('frontline');
       syncUrlWithView('frontline', { replace: true });
     }
-  }, [currentView, showLidc, showAtc]);
+  }, [currentView, showAtc]);
+
+  useEffect(() => {
+    if (userLoading) return;
+    if (currentView === 'lidc' && !showLidc) {
+      goToView('landing');
+    }
+  }, [currentView, showLidc, userLoading]);
 
   useEffect(() => {
     const handlePopState = () => {
-      setCurrentView(viewFromLocation());
+      const route = viewFromLocation();
+      setCurrentView(route.view);
+      setActiveTacticalMapId(route.tacticalMapId);
+      if (route.view === 'landing') {
+        setSelectedCampaignId(null);
+      }
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -175,6 +428,10 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (splashVisible && !splashFading) {
+      return undefined;
+    }
+
     socketService.connect();
 
     const unsubscribeInitial = socketService.on('data:initial', (data) => {
@@ -189,233 +446,238 @@ function App() {
       setAirbaseStatus(data || {});
     });
 
-    const unsubscribeFrontline = socketService.on('frontline:updated', (data) => {
-      const zones = data?.zones || [];
-      if (Array.isArray(zones)) {
-        setFrontlineSummary(buildFrontlineSummary(zones));
-      }
-    });
-
     return () => {
       unsubscribeInitial();
       unsubscribeUpdated();
       unsubscribeAirbaseStatus();
-      unsubscribeFrontline();
       socketService.disconnect();
     };
-  }, []);
+  }, [splashVisible, splashFading]);
 
   const loadData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const [airportsData, zonesData, airbaseStatusData, airportCatalogData] = await Promise.all([
-        api.getAirports(),
-        api.getFrontlineZones(),
-        api.getAirbaseStatus().catch(() => ({})),
-        api.getAirportCatalog().catch(() => []),
-      ]);
+    setLoading(true);
+    setError(null);
 
-      setAirports(airportsData);
-      setAirbaseStatus(airbaseStatusData || {});
-      setAirportCatalog(Array.isArray(airportCatalogData) ? airportCatalogData : []);
+    const maxAttempts = 40;
+    let lastError = null;
 
-      const zones = zonesData?.zones || zonesData;
-      if (Array.isArray(zones)) {
-        setFrontlineSummary(buildFrontlineSummary(zones));
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const [airportsData, airbaseStatusData, airportCatalogData] = await Promise.all([
+          api.getAirports(),
+          api.getAirbaseStatus().catch(() => ({})),
+          api.getAirportCatalog().catch(() => []),
+        ]);
+
+        setAirports(airportsData);
+        setAirbaseStatus(airbaseStatusData || {});
+        setAirportCatalog(Array.isArray(airportCatalogData) ? airportCatalogData : []);
+        lastError = null;
+        break;
+      } catch (err) {
+        lastError = err;
+        await new Promise((resolve) => {
+          window.setTimeout(resolve, Math.min(250 * attempt, 1500));
+        });
       }
-    } catch (err) {
-      setError(err.message);
-      console.error('Failed to load data:', err);
-    } finally {
-      setLoading(false);
     }
+
+    if (lastError) {
+      setError(lastError.message);
+      console.error('Failed to load data:', lastError);
+    }
+
+    setLoading(false);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-yt-bg-primary flex items-center justify-center">
-        <div className="text-center">
-          <Activity className="w-16 h-16 text-yt-accent animate-spin mx-auto mb-4" />
-          <p className="text-xl text-yt-text-secondary">{t('general.loading')}</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-yt-bg-primary flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-          <p className="text-xl text-red-400 mb-2">{t('general.errorTitle')}</p>
-          <p className="text-yt-text-secondary mb-4">{error}</p>
-          <button
-            onClick={loadData}
-            className="px-6 py-2 bg-yt-accent hover:bg-yt-accent/80 text-white rounded font-bold transition-all"
-          >
-            {t('general.retry')}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="app-shell h-screen bg-yt-bg-primary flex flex-col overflow-hidden">
-      <header className="sticky top-0 z-50 border-b border-yt-border/80 bg-[#0b1119f2] shadow-[0_8px_28px_rgba(0,0,0,0.35)] backdrop-blur-md">
-        <div className="mx-auto w-full px-4 py-1.5">
-          <div className="flex h-10 items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <button
-                type="button"
-                onClick={() => goToView('frontline')}
-                className="flex items-center gap-2 text-left transition-opacity hover:opacity-90"
-                title="Frontline"
-              >
-                <img
-                  src={bannerImg}
-                  alt="DCS Italia"
-                  className="h-7 w-7 object-contain"
-                />
-                <div className="leading-tight">
-                  <div className="text-[13px] font-bold uppercase tracking-[0.12em] text-yt-text-primary">Monitor DCS Frontline</div>
-                  <div className="text-[10px] uppercase tracking-[0.12em] text-yt-text-secondary">Realtime theater status</div>
-                </div>
-              </button>
+    <>
+      {splashVisible && (
+        <BootSplash
+          key={splashKey}
+          fading={splashFading}
+          preview={splashPreview}
+          status={t('general.bootStatus')}
+          hint={splashPreview ? t('general.bootPreviewHint') : t('general.bootHint')}
+          replayLabel={t('general.bootReplay')}
+          closeLabel={t('general.bootClose')}
+          onReplay={replaySplash}
+          onClose={closeSplashPreview}
+        />
+      )}
 
-              {currentView === 'frontline' && (
-                <div className="hidden lg:flex items-center gap-1.5 rounded-md border border-yt-border/80 bg-[#141b25] px-2 py-1">
-                  <span className="inline-flex items-center gap-1 rounded-sm bg-green-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-green-300">
-                    <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
-                    Live
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-200">
-                    <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
-                    {frontlineSummary.total}
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-300">
-                    <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
-                    {frontlineSummary.RED}
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-300">
-                    <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-                    {frontlineSummary.BLUE}
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-300">
-                    <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-                    {frontlineSummary.NEUTRAL}
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-orange-300">
-                    <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
-                    {frontlineSummary.UNDER_ATTACK}
-                  </span>
-                </div>
-              )}
-            </div>
+      {bootReady && error ? (
+        <div className="min-h-screen bg-yt-bg-primary flex items-center justify-center">
+          <div className="text-center max-w-md px-4">
+            <p className="text-xl text-white mb-4">{t('general.errorTitle')}</p>
+            <InlineError message={error} className="mb-4" />
+            <button
+              onClick={loadData}
+              className="px-6 py-2 bg-yt-accent hover:bg-yt-accent/80 text-white rounded font-bold transition-all"
+            >
+              {t('general.retry')}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
-            <div className="flex items-center gap-2">
+      {!error && bootReady ? (
+    <>
+    <div
+      className={`app-shell h-screen flex flex-col overflow-hidden ${(currentView === 'landing' || currentView === 'lidc') ? 'bg-[#0E0E0E]' : 'bg-yt-bg-primary'}`}
+      aria-hidden={isStorylineOpen || (splashVisible && !bootReady)}
+      {...(isStorylineOpen ? { inert: '' } : {})}
+    >
+      <header className={`app-header${currentView === 'landing' ? ' app-header--landing' : ''}${currentView === 'lidc' ? ' app-header--lidc' : ''}${currentView === 'frontline' ? ' app-header--frontline' : ''}`}>
+        <div className="app-header__inner">
+          <div className="app-header__left">
+            <button
+              type="button"
+              onClick={() => goToView('landing')}
+              className="app-header__brand"
+              title="Home"
+            >
+              <img
+                src={bannerImg}
+                alt="DCS Italia"
+                className="app-header__logo"
+              />
+              <span className="app-header__title">DCS ITALIA</span>
+            </button>
+          </div>
+
+          <CampaignHeaderTabs
+            activeCampaignId={headerActiveCampaignId}
+            onSelectCampaign={handleSelectCampaign}
+            canAccessLidc={showLidc}
+          />
+
+          <div className="app-header__right">
+            {currentView === 'lidc' && (
+              <div id="app-header-debug-slot" className="app-header__debug-slot" />
+            )}
+
+            {currentView === 'lidc' && !isStorylineOpen && (
               <button
                 type="button"
-                onClick={toggleLanguage}
-                className="inline-flex h-[34px] w-[84px] items-center justify-center bg-transparent p-0 transition-opacity hover:opacity-95"
-                role="switch"
-                aria-checked={isItalian}
-                aria-label={isItalian ? 'Switch language to English' : 'Switch language to Italian'}
-                title={isItalian ? 'Switch language to English' : 'Switch language to Italian'}
+                onClick={() => {
+                  storylineReturnViewRef.current = 'lidc';
+                  setIsStorylineOpen(true);
+                }}
+                className="app-header__nav-btn"
+                title={t('lidc.storyline.open')}
+                aria-label={t('lidc.storyline.open')}
               >
-                <span className="relative flex h-7 w-[84px] items-center rounded-md border border-yt-border/80 bg-[#101a29]">
-                  <span
-                    className={`pointer-events-none absolute top-0.5 h-6 w-[38px] rounded-sm border border-yt-accent/50 bg-yt-accent/20 shadow-[0_0_10px_rgba(78,197,255,0.2)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                      isItalian ? 'translate-x-[43px]' : 'translate-x-0.5'
-                    }`}
-                  />
-                  <span className="relative z-10 inline-flex w-1/2 items-center justify-center" aria-hidden="true">
-                    <img src={gbFlagImg} alt="" className="h-2.5 w-4 rounded-[2px] object-cover" />
-                  </span>
-                  <span className="relative z-10 inline-flex w-1/2 items-center justify-center" aria-hidden="true">
-                    <img src={itFlagImg} alt="" className="h-2.5 w-4 rounded-[2px] object-cover" />
-                  </span>
-                </span>
+                <ScrollText className="w-4 h-4" aria-hidden="true" />
               </button>
+            )}
+
+            <button
+              type="button"
+              onClick={toggleLanguage}
+              className="app-header__lang"
+              aria-label={isItalian ? 'Switch language to English' : 'Switch language to Italian'}
+              title={isItalian ? 'Switch language to English' : 'Switch language to Italian'}
+            >
+              <img
+                src={isItalian ? itFlagImg : enFlagImg}
+                alt=""
+                className="app-header__lang-flag"
+                aria-hidden="true"
+              />
+              <span className="app-header__lang-code">{isItalian ? 'IT' : 'EN'}</span>
+              <ChevronDown className="app-header__lang-chevron" aria-hidden="true" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => goToView('changelogs')}
+              className={`app-header__nav-btn${currentView === 'changelogs' ? ' is-active' : ''}`}
+              title="Apri changelog"
+              aria-label="Apri changelog"
+            >
+              <CalendarSync className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => goToView('wiki')}
+              className={`app-header__nav-btn${currentView === 'wiki' ? ' is-active' : ''}`}
+              title="Apri wiki"
+              aria-label="Apri wiki"
+            >
+              <BookOpen className="w-4 h-4" />
+            </button>
+
+            {showAtc && (
               <button
                 type="button"
-                onClick={() => goToView('changelogs')}
-                className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] transition-colors ${
-                  currentView === 'changelogs'
-                    ? 'border-yt-accent bg-yt-accent/20 text-yt-accent'
-                    : 'border-yt-border/80 bg-[#151b25] text-yt-text-primary hover:border-yt-accent hover:text-white'
-                }`}
-                title="Apri changelog"
-                aria-label="Apri changelog"
+                onClick={() => goToView('atc')}
+                className={`app-header__nav-btn${currentView === 'atc' ? ' is-active' : ''}`}
+                title="ATC Strips"
+                aria-label="ATC Strips"
               >
-                <CalendarSync className="w-4 h-4" />
+                <TowerControl className="w-4 h-4" />
               </button>
-              <button
-                type="button"
-                onClick={() => goToView('wiki')}
-                className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] transition-colors ${
-                  currentView === 'wiki'
-                    ? 'border-yt-accent bg-yt-accent/20 text-yt-accent'
-                    : 'border-yt-border/80 bg-[#151b25] text-yt-text-primary hover:border-yt-accent hover:text-white'
-                }`}
-                title="Apri wiki"
-                aria-label="Apri wiki"
-              >
-                <BookOpen className="w-4 h-4" />
-              </button>
-              {showLidc && (
-                <button
-                  type="button"
-                  onClick={() => goToView('lidc')}
-                  className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] transition-colors ${
-                    currentView === 'lidc'
-                      ? 'border-yt-accent bg-yt-accent/20 text-yt-accent'
-                      : 'border-yt-border/80 bg-[#151b25] text-yt-text-primary hover:border-yt-accent hover:text-white'
-                  }`}
-                  title="Apri LIDC"
-                  aria-label="Apri LIDC"
-                >
-                  <Users className="w-4 h-4" />
-                </button>
-              )}
-              {showAtc && (
-                <button
-                  type="button"
-                  onClick={() => goToView('atc')}
-                  className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] transition-colors ${
-                    currentView === 'atc'
-                      ? 'border-yt-accent bg-yt-accent/20 text-yt-accent'
-                      : 'border-yt-border/80 bg-[#151b25] text-yt-text-primary hover:border-yt-accent hover:text-white'
-                  }`}
-                  title="ATC Strips"
-                  aria-label="ATC Strips"
-                >
-                  <TowerControl className="w-4 h-4" />
-                </button>
-              )}
-              <UserMenu onOpenProfile={() => goToView('profile')} />
-            </div>
+            )}
+
+            <UserMenu
+              onOpenProfile={() => goToView('profile')}
+              onOpenPrivacy={() => goToView('privacy')}
+              variant="brand"
+            />
           </div>
         </div>
       </header>
+      {(currentView === 'landing' || currentView === 'frontline') && (
+        <div
+          className={`app-header-fade${currentView === 'landing' ? ' app-header-fade--landing' : ''}${currentView === 'frontline' ? ' app-header-fade--frontline' : ''}`}
+          aria-hidden="true"
+        />
+      )}
 
-      <main className={`flex-1 ${(currentView === 'frontline' || currentView === 'lidc' || currentView === 'atc') ? 'overflow-hidden' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
+      {currentView === 'wiki' || currentView === 'changelogs' || currentView === 'privacy' ? (
+        <div className="wiki-dash-frame">
+          <div className="wiki-dash">
+            <main className="wiki-dash__content">
+              {currentView === 'wiki' && (
+                <WikiPage language={appLanguage} />
+              )}
+              {currentView === 'changelogs' && (
+                <ChangelogPage language={appLanguage} />
+              )}
+              {currentView === 'privacy' && (
+                <PrivacyPage />
+              )}
+            </main>
+            <footer className="app-footer">
+              <p>DCS Italia Warehouse 3.0</p>
+            </footer>
+          </div>
+          <div className="app-wiki-fade" aria-hidden="true" />
+        </div>
+      ) : (
+      <main className={`flex-1 ${(currentView === 'landing' || currentView === 'frontline' || currentView === 'lidc' || currentView === 'atc') ? 'overflow-hidden' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
+        {currentView === 'landing' && (
+          <LandingPage
+            language={appLanguage}
+            selectedCampaignId={selectedCampaignId}
+            onSelectCampaign={setSelectedCampaignId}
+            onOpenCampaign={openCampaignTarget}
+          />
+        )}
         {currentView === 'frontline' && (
           <FrontlineMap
+            language={appLanguage}
+            tacticalMapId={activeTacticalMapId}
             airportsData={Object.values(airports)}
             airportCatalog={airportCatalog}
             airbaseStatus={airbaseStatus}
+            onMapReady={() => setMapReady(true)}
           />
         )}
         {currentView === 'profile' && (
           <UserProfile />
-        )}
-        {currentView === 'changelogs' && (
-          <ChangelogPage language={appLanguage} />
-        )}
-        {currentView === 'wiki' && (
-          <WikiPage language={appLanguage} />
         )}
         {currentView === 'lidc' && showLidc && (
           <LidcPage />
@@ -424,15 +686,34 @@ function App() {
           <AtcStripPage />
         )}
       </main>
-
-      {currentView !== 'frontline' && currentView !== 'lidc' && currentView !== 'atc' && (
+      )}
+      {currentView === 'profile' && (
         <footer className="bg-yt-bg-secondary border-t border-yt-border mt-8">
           <div className="container mx-auto px-4 py-3 text-center text-xs text-yt-text-secondary">
-            <p>DCS Italia Warehouse Viewer v1.0 - Real-time logistics management</p>
+            <p>DCS Italia Warehouse 3.0</p>
           </div>
         </footer>
       )}
     </div>
+    {isStorylineOpen && typeof document !== 'undefined' && createPortal(
+      (
+        <Suspense fallback={(
+          <div className="lidc-storyline-root" aria-busy="true" aria-label={t('lidc.storyline.loading')}>
+            <BootSplash
+              status={t('general.bootStatus')}
+              hint={t('general.bootHint')}
+            />
+          </div>
+        )}
+        >
+          <LidcStorylineRoom onClose={closeStoryline} />
+        </Suspense>
+      ),
+      document.getElementById('lidc-overlay-root') || document.body,
+    )}
+    </>
+      ) : null}
+    </>
   );
 }
 

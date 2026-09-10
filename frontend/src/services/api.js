@@ -288,6 +288,16 @@ export async function acceptFrontlineZone(zoneId, userId) {
 }
 
 /**
+ * Decline / release a frontline zone operation
+ */
+export async function declineFrontlineZone(zoneId, userId) {
+  return fetchAPI(`/frontline-zones/${encodeURIComponent(zoneId)}/decline`, {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  });
+}
+
+/**
  * Get shared activity feed
  */
 export async function getFeed(limit = 200) {
@@ -459,6 +469,15 @@ export async function assignAchievement(payload) {
   return fetchAPI('/achievements/assign', {
     method: 'POST',
     body: JSON.stringify(payload || {}),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Discord guild members (wiki editor only)
+ */
+export async function getDiscordGuildMembers() {
+  return fetchAPI('/discord/guild-members', {
     credentials: 'include',
   });
 }
@@ -639,10 +658,29 @@ export async function uploadWikiMedia(payload) {
 }
 
 /**
- * Get LIDC templates and units catalog
+ * Start DCS account link flow (one-time code)
  */
-export async function getLidcTemplates() {
-  return fetchAPI('/lidc/templates');
+export async function startLidcUcidLink() {
+  return fetchAPI('/lidc/link/start', {
+    method: 'POST',
+    credentials: 'include',
+  });
+}
+
+/**
+ * Get DCS account link status for current user
+ */
+export async function getLidcUcidLinkStatus() {
+  return fetchAPI('/lidc/link/status', {
+    credentials: 'include',
+  });
+}
+
+/**
+ * Get LIDC specializations and units catalog
+ */
+export async function getLidcSpecializations() {
+  return fetchAPI('/lidc/specializations');
 }
 
 /**
@@ -655,10 +693,81 @@ export async function getLidcUsers() {
 }
 
 /**
- * Get current user LIDC state (squadron membership + pending invites)
+ * Get current user LIDC state (squadron membership)
  */
 export async function getLidcMe() {
   return fetchAPI('/lidc/me', {
+    credentials: 'include',
+  });
+}
+
+/**
+ * Get all LIDC squadrons (summary list)
+ */
+export async function getLidcSquadrons() {
+  return fetchAPI('/lidc/squadrons', {
+    credentials: 'include',
+  });
+}
+
+/**
+ * Squadrons and airframes currently present at a LIDC Afghanistan airbase
+ */
+export async function getAirportOccupancy(airportId) {
+  return fetchAPI(`/airports/${encodeURIComponent(airportId)}/occupancy`, {
+    credentials: 'include',
+  });
+}
+
+export async function getHidcLogisticsAlerts() {
+  return fetchAPI('/airports/logistics-alerts', {
+    credentials: 'include',
+  });
+}
+
+export async function purchaseAirportLogistics(airportId, payload) {
+  return fetchAPI(`/airports/${encodeURIComponent(airportId)}/logistics/purchase`, {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+    credentials: 'include',
+  });
+}
+
+export async function updateAirportOrder(airportId, orderId, payload) {
+  return fetchAPI(`/airports/${encodeURIComponent(airportId)}/logistics/orders/${encodeURIComponent(orderId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload || {}),
+    credentials: 'include',
+  });
+}
+
+export async function getLidcAirportOccupancy(baseId) {
+  return fetchAPI(`/lidc/airports/${encodeURIComponent(baseId)}/occupancy`, {
+    credentials: 'include',
+  });
+}
+
+export async function getLidcLogisticsAlerts() {
+  return fetchAPI('/lidc/logistics-alerts', {
+    credentials: 'include',
+  });
+}
+
+/**
+ * Purchase ammunition containers or crates with squadron credits
+ */
+export async function purchaseLidcAirportLogistics(baseId, payload) {
+  return fetchAPI(`/lidc/airports/${encodeURIComponent(baseId)}/logistics/purchase`, {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+    credentials: 'include',
+  });
+}
+
+export async function updateLidcAirportOrder(baseId, orderId, payload) {
+  return fetchAPI(`/lidc/airports/${encodeURIComponent(baseId)}/logistics/orders/${encodeURIComponent(orderId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload || {}),
     credentials: 'include',
   });
 }
@@ -675,10 +784,32 @@ export async function createLidcSquadron(payload) {
 }
 
 /**
+ * Join a LIDC squadron using invite code
+ */
+export async function joinLidcSquadronByInviteCode(inviteCode) {
+  return fetchAPI('/lidc/squadrons/join', {
+    method: 'POST',
+    body: JSON.stringify({ inviteCode }),
+    credentials: 'include',
+  });
+}
+
+/**
  * Get a single LIDC squadron by id
  */
 export async function getLidcSquadron(squadronId) {
   return fetchAPI(`/lidc/squadrons/${encodeURIComponent(squadronId)}`, {
+    credentials: 'include',
+  });
+}
+
+/**
+ * Replace the deck of a squadron (owner only)
+ */
+export async function updateLidcSquadronDeck(squadronId, deck) {
+  return fetchAPI(`/lidc/squadrons/${encodeURIComponent(squadronId)}/deck`, {
+    method: 'PUT',
+    body: JSON.stringify({ deck: deck || {} }),
     credentials: 'include',
   });
 }
@@ -712,6 +843,19 @@ export async function updateLidcMemberRole(squadronId, memberUserId, role) {
 }
 
 /**
+ * Remove a LIDC squadron member (owner only)
+ */
+export async function removeLidcMember(squadronId, memberUserId) {
+  return fetchAPI(
+    `/lidc/squadrons/${encodeURIComponent(squadronId)}/members/${encodeURIComponent(memberUserId)}`,
+    {
+      method: 'DELETE',
+      credentials: 'include',
+    },
+  );
+}
+
+/**
  * Leave a LIDC squadron as the current user
  */
 export async function leaveLidcSquadron(squadronId) {
@@ -732,10 +876,10 @@ export async function deleteLidcSquadron(squadronId) {
 }
 
 /**
- * Update LIDC templates catalog (wiki editor only)
+ * Update LIDC specializations catalog (wiki editor only)
  */
-export async function updateLidcTemplates(payload) {
-  return fetchAPI('/lidc/templates', {
+export async function updateLidcSpecializations(payload) {
+  return fetchAPI('/lidc/specializations', {
     method: 'PUT',
     body: JSON.stringify(payload || {}),
     credentials: 'include',
@@ -771,6 +915,10 @@ export async function getTankerOptions() {
 
 export async function getTankerRoutes() {
   return fetchAPI('/tanker/routes');
+}
+
+export async function getShipPositions() {
+  return fetchAPI('/ship-positions');
 }
 
 export async function spawnTanker(keyword, wp1Lat, wp1Lon, wp2Lat, wp2Lon) {
@@ -809,7 +957,7 @@ export async function retrieveProductionPointCrates(productionPointId, lat, lon,
 }
 
 /**
- * Spawn infantry (INF MANPAD / INF SCOUT) at a clicked point inside a BLUE airport.
+ * Spawn infantry (INF MANPAD / INF SCOUT / INF ASSAULTER) at a clicked point inside a BLUE airport.
  */
 export async function spawnAirportInfantry(airportId, keyword, lat, lon, quantity = 1) {
   return fetchAPI(`/airports/${encodeURIComponent(airportId)}/spawn-infantry`, {
@@ -826,6 +974,17 @@ export async function spawnAirportCrate(airportId, keyword, lat, lon, quantity =
   return fetchAPI(`/airports/${encodeURIComponent(airportId)}/spawn-crate`, {
     method: 'POST',
     body: JSON.stringify({ keyword, lat, lon, quantity }),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Spawn a map right-click asset (CAS, MBT, BOMB, HELISUPPLY, etc.) at the clicked coordinates.
+ */
+export async function spawnMapAction(type, keyword, lat, lon) {
+  return fetchAPI('/map/actions/spawn', {
+    method: 'POST',
+    body: JSON.stringify({ type, keyword, lat, lon }),
     credentials: 'include',
   });
 }
@@ -957,6 +1116,45 @@ export async function cancelAtcHandoff(stripId, { airportId, role, targetBay }) 
   });
 }
 
+/**
+ * Get NOE events (public).
+ */
+export async function getNoeEvents() {
+  return fetchAPI('/noe/events');
+}
+
+/**
+ * Create a NOE event (admin only).
+ */
+export async function createNoeEvent(event) {
+  return fetchAPI('/noe/events', {
+    method: 'POST',
+    body: JSON.stringify(event),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Update a NOE event (admin only).
+ */
+export async function updateNoeEvent(eventId, event) {
+  return fetchAPI(`/noe/events/${encodeURIComponent(eventId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(event),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Delete a NOE event (admin only).
+ */
+export async function deleteNoeEvent(eventId) {
+  return fetchAPI(`/noe/events/${encodeURIComponent(eventId)}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+}
+
 export default {
   getServerTime,
   getAirports,
@@ -987,6 +1185,10 @@ export default {
   getFrontlineZones,
   acceptFrontlineZone,
   getFeed,
+  getNoeEvents,
+  createNoeEvent,
+  updateNoeEvent,
+  deleteNoeEvent,
   getConvoys,
   getDcsar,
   getAirliftPlayers,
@@ -1002,6 +1204,7 @@ export default {
   deleteAchievement,
   getUserAchievements,
   assignAchievement,
+  getDiscordGuildMembers,
   getAchievementsLeaderboard,
   getChangelogs,
   getChangelogDraft,
@@ -1020,16 +1223,22 @@ export default {
   deleteWikiDraft,
   updateWikiPage,
   uploadWikiMedia,
-  getLidcTemplates,
+  getLidcSpecializations,
   getLidcMe,
   getLidcUsers,
+  getLidcSquadrons,
   createLidcSquadron,
+  joinLidcSquadronByInviteCode,
   getLidcSquadron,
+  updateLidcSquadronDeck,
   assignLidcAirframePilot,
   updateLidcMemberRole,
+  removeLidcMember,
   leaveLidcSquadron,
   deleteLidcSquadron,
-  updateLidcTemplates,
+  updateLidcSpecializations,
+  startLidcUcidLink,
+  getLidcUcidLinkStatus,
   getProductionPoints,
   getWebSpawnMarkers,
   getSpawnOptions,
@@ -1038,6 +1247,7 @@ export default {
   requestProductionPointUpgrade,
   spawnAirportInfantry,
   spawnAirportCrate,
+  spawnMapAction,
   spawnTanker,
   getDbuildCatalog,
   getDbuildPlacements,

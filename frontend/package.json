@@ -13,6 +13,8 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "cobe": "^0.6.5",
+    "globe.gl": "^2.46.1",
+    "h3-js": "^4.5.0",
     "jspdf": "^3.0.4",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.555.0",
@@ -30,6 +32,7 @@
   "devDependencies": {
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
+    "@types/three": "^0.183.0",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
     "happy-dom": "^20.10.2",

@@ -3,22 +3,29 @@
 @tailwind utilities;
 
 :root {
-  --app-bg-0: #050a11;
-  --app-bg-1: #0a1320;
-  --app-glow-red: rgba(239, 68, 68, 0.15);
-  --app-glow-blue: rgba(78, 197, 255, 0.12);
+  --app-bg-0: #0F0F0F;
+  --app-bg-1: #151515;
+  --app-glow-red: rgba(239, 68, 68, 0.1);
+  --app-glow-blue: rgba(255, 140, 0, 0.08);
+  --font-sans: "Inter", "Aptos", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --bg-deep: #0F0F0F;
+  --text-bright: #EDEDED;
+  --text: #D4D4D4;
+  --muted: #9A9A9A;
+  --accent: #FF8C00;
 }
 
 body {
   margin: 0;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background:
     radial-gradient(circle at 10% 10%, var(--app-glow-blue), transparent 35%),
     radial-gradient(circle at 85% 0%, var(--app-glow-red), transparent 45%),
     linear-gradient(180deg, var(--app-bg-1) 0%, var(--app-bg-0) 55%);
-  color: #e9f1ff;
+  color: var(--text-bright);
   min-height: 100vh;
 }
 
@@ -33,8 +40,7 @@ body.wiki-showroom-open .app-shell {
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: var(--font-mono);
 }
 
 /* Custom scrollbar */
@@ -44,17 +50,17 @@ code {
 }
 
 ::-webkit-scrollbar-track {
-  background: #09111b;
+  background: #151515;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #223447;
+  background: #3C3C3C;
   border-radius: 9999px;
-  border: 2px solid #09111b;
+  border: 2px solid #151515;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #33516e;
+  background: #4e4e4e;
 }
 
 /* Animations */
@@ -72,7 +78,12 @@ code {
 }
 
 /* Leaflet custom styles */
-.custom-airport-marker {
+.custom-airport-marker,
+.ship-map-icon,
+.production-point-icon,
+.dbuild-map-icon,
+.dcsar-person-icon,
+.crate-cluster-icon {
   background: transparent !important;
   border: none !important;
 }
@@ -84,7 +95,120 @@ code {
 
 /* Ensure map container has proper background */
 .leaflet-container {
-  background: #1e293b;
+  background: #000000;
+}
+
+.leaflet-control-attribution {
+  margin: 0 8px 8px 0 !important;
+  padding: 3px 7px !important;
+  border: none !important;
+  border-radius: 6px !important;
+  background: rgba(15, 15, 15, 0.28) !important;
+  box-shadow: none !important;
+  color: rgba(237, 237, 237, 0.38) !important;
+  font-family: var(--font-sans) !important;
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.04em !important;
+  line-height: 1.3 !important;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.leaflet-control-attribution a {
+  color: rgba(237, 237, 237, 0.45) !important;
+  text-decoration: none !important;
+}
+
+.leaflet-control-attribution a:hover {
+  color: rgba(255, 140, 0, 0.75) !important;
+}
+
+.leaflet-control-attribution:hover {
+  background: rgba(15, 15, 15, 0.48) !important;
+  color: rgba(237, 237, 237, 0.62) !important;
+}
+
+.leaflet-control-attribution .leaflet-attribution-flag {
+  display: none !important;
+}
+
+.airport-marker-icon {
+  background: transparent !important;
+  border: 0 !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  overflow: visible !important;
+}
+
+.airport-marker-icon__inner {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  transform: scale(var(--hidc-airport-icon-scale, 1));
+  transform-origin: 50% 50%;
+}
+
+.airport-marker-icon__inner.is-pulsing::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  border: 1.2px solid rgba(255, 255, 255, 0.95);
+  transform: translate(-50%, -50%) scale(1);
+  animation: lidc-map-order-pulse 1.8s ease-out infinite;
+  pointer-events: none;
+}
+
+.airport-marker-icon__inner--blue.is-pulsing::after {
+  background: rgba(37, 99, 235, 0.22);
+  border-color: #2563eb;
+}
+
+.airport-marker-icon__inner--red.is-pulsing::after {
+  background: rgba(239, 68, 68, 0.22);
+  border-color: #ef4444;
+}
+
+@keyframes lidc-map-order-pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(3.1);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .airport-marker-icon__inner.is-pulsing::after {
+    animation: none;
+    transform: translate(-50%, -50%) scale(2.1);
+    opacity: 0.45;
+  }
+}
+
+.airport-marker-icon__inner--neutral {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 3px rgba(255, 255, 255, 0.5);
+}
+
+.airport-marker-icon__inner--blue {
+  background: #2563eb;
+  box-shadow: 0 0 3px rgba(37, 99, 235, 0.75);
+}
+
+.airport-marker-icon__inner--red {
+  background: #ef4444;
+  box-shadow: 0 0 3px rgba(239, 68, 68, 0.7);
 }
 
 /* MapLibre hover popups (zones/airports/routes): compact dark theme */
@@ -104,4 +228,14 @@ code {
   border-bottom-color: rgba(12, 18, 30, 0.96) !important;
   border-left-color: rgba(12, 18, 30, 0.96) !important;
   border-right-color: rgba(12, 18, 30, 0.96) !important;
+}
+
+/* MapLibre: hide zoom/navigation icons and attribution badge */
+.maplibregl-ctrl-icon,
+.maplibregl-ctrl.maplibregl-ctrl-attrib,
+.maplibregl-ctrl-attrib.maplibregl-compact,
+.maplibregl-ctrl-attrib.maplibregl-compact-show {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }

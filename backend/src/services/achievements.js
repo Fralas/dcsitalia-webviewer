@@ -1,43 +1,11 @@
-import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
 
-const DATA_DIR = path.resolve(process.cwd(), 'data/achievements');
-const CATALOG_FILE = path.join(DATA_DIR, 'catalog.json');
-const AWARDS_FILE = path.join(DATA_DIR, 'awards.json');
-const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const CATALOG_FILE = path.resolve(process.cwd(), 'data/achievements/catalog.json');
+const AWARDS_FILE = path.resolve(process.cwd(), 'data/achievements/awards.json');
+const USERS_FILE = path.resolve(process.cwd(), 'data/achievements/users.json');
 const MAX_IMAGE_URL_LENGTH = 12_000_000;
-
-function ensureStorage() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(CATALOG_FILE)) {
-    fs.writeFileSync(CATALOG_FILE, JSON.stringify([], null, 2), 'utf8');
-  }
-  if (!fs.existsSync(AWARDS_FILE)) {
-    fs.writeFileSync(AWARDS_FILE, JSON.stringify({}, null, 2), 'utf8');
-  }
-  if (!fs.existsSync(USERS_FILE)) {
-    fs.writeFileSync(USERS_FILE, JSON.stringify({}, null, 2), 'utf8');
-  }
-}
-
-function readJson(filePath, fallback) {
-  try {
-    const raw = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(raw);
-  } catch (error) {
-    console.error(`Error reading ${filePath}:`, error.message);
-    return fallback;
-  }
-}
-
-function writeJsonAtomic(filePath, payload) {
-  const tempPath = `${filePath}.tmp`;
-  fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), 'utf8');
-  fs.renameSync(tempPath, filePath);
-}
 
 function sanitizeText(value, maxLen = 300) {
   if (typeof value !== 'string') return '';
@@ -88,17 +56,17 @@ function normalizeAwardEntry(entry, index = 0) {
 }
 
 function readCatalog() {
-  const list = readJson(CATALOG_FILE, []);
+  const list = loadJson(DOC.ACHIEVEMENTS_CATALOG, [], CATALOG_FILE);
   if (!Array.isArray(list)) return [];
   return list.map((entry, index) => normalizeCatalogEntry(entry, index)).filter((entry) => entry.id && entry.name);
 }
 
 function writeCatalog(catalog) {
-  writeJsonAtomic(CATALOG_FILE, (Array.isArray(catalog) ? catalog : []).map((entry, index) => normalizeCatalogEntry(entry, index)));
+  saveJson(DOC.ACHIEVEMENTS_CATALOG, (Array.isArray(catalog) ? catalog : []).map((entry, index) => normalizeCatalogEntry(entry, index)));
 }
 
 function readAwardsMap() {
-  const map = readJson(AWARDS_FILE, {});
+  const map = loadJson(DOC.ACHIEVEMENTS_AWARDS, {}, AWARDS_FILE);
   if (!map || typeof map !== 'object' || Array.isArray(map)) {
     return {};
   }
@@ -115,11 +83,11 @@ function readAwardsMap() {
 }
 
 function writeAwardsMap(awardsMap) {
-  writeJsonAtomic(AWARDS_FILE, awardsMap);
+  saveJson(DOC.ACHIEVEMENTS_AWARDS, awardsMap);
 }
 
 function readUsersMap() {
-  const map = readJson(USERS_FILE, {});
+  const map = loadJson(DOC.ACHIEVEMENTS_USERS, {}, USERS_FILE);
   if (!map || typeof map !== 'object' || Array.isArray(map)) {
     return {};
   }
@@ -134,14 +102,31 @@ function readUsersMap() {
 }
 
 function writeUsersMap(usersMap) {
-  writeJsonAtomic(USERS_FILE, usersMap);
+  saveJson(DOC.ACHIEVEMENTS_USERS, usersMap);
 }
 
 function sanitizeUserId(userId) {
   return sanitizeText(String(userId || ''), 80);
 }
 
-ensureStorage();
+function looksLikeDiscordId(value) {
+  return /^\d{17,20}$/.test(String(value || '').trim());
+}
+
+function isUsefulDisplayName(name, userId) {
+  const safeName = sanitizeText(name || '', 140);
+  const safeUserId = sanitizeUserId(userId);
+  if (!safeName) return false;
+  if (safeUserId && safeName === safeUserId) return false;
+  if (looksLikeDiscordId(safeName)) return false;
+  return true;
+}
+
+function resolveStoredDisplayName(usersMap, userId) {
+  const safeUserId = sanitizeUserId(userId);
+  const stored = sanitizeText(usersMap[safeUserId]?.name || '', 140);
+  return isUsefulDisplayName(stored, safeUserId) ? stored : '';
+}
 
 export function getCatalog() {
   return readCatalog().sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
@@ -269,32 +254,52 @@ export function deleteAchievement(achievementId) {
 }
 
 export function rememberUser({ userId, name }) {
-  const safeUserId = sanitizeUserId(userId);
-  const safeName = sanitizeText(name || '', 140);
-  if (!safeUserId || !safeName) return;
+  rememberUsers([{ userId, name }]);
+}
+
+export function rememberUsers(entries) {
+  const list = Array.isArray(entries) ? entries : [];
+  if (list.length === 0) return;
 
   const usersMap = readUsersMap();
-  usersMap[safeUserId] = normalizeUserRecord({
-    ...(usersMap[safeUserId] || {}),
-    name: safeName,
-    updatedAt: Date.now(),
+  let changed = false;
+
+  list.forEach((entry) => {
+    const safeUserId = sanitizeUserId(entry?.userId);
+    const safeName = sanitizeText(entry?.name || '', 140);
+    if (!safeUserId || !isUsefulDisplayName(safeName, safeUserId)) return;
+    const current = sanitizeText(usersMap[safeUserId]?.name || '', 140);
+    if (current === safeName) return;
+    usersMap[safeUserId] = normalizeUserRecord({
+      ...(usersMap[safeUserId] || {}),
+      name: safeName,
+      updatedAt: Date.now(),
+    });
+    changed = true;
   });
-  writeUsersMap(usersMap);
+
+  if (changed) writeUsersMap(usersMap);
 }
 
 export function getUserDisplayName(userId) {
   const safeUserId = sanitizeUserId(userId);
   if (!safeUserId) return '';
   const usersMap = readUsersMap();
-  return sanitizeText(usersMap[safeUserId]?.name || '', 140);
+  return resolveStoredDisplayName(usersMap, safeUserId);
 }
 
-export function assignAchievement({ userId, userName, achievementId, awardedById, awardedByName }) {
-  const safeUserId = sanitizeUserId(userId);
-  const safeAchievementId = sanitizeText(achievementId || '', 80);
-  if (!safeUserId) {
-    throw new Error('userId is required');
+const MAX_ASSIGN_RECIPIENTS = 200;
+
+export function assignAchievementToUsers({ recipients, achievementId, awardedById, awardedByName }) {
+  const list = Array.isArray(recipients) ? recipients : [];
+  if (list.length === 0) {
+    throw new Error('recipients is required');
   }
+  if (list.length > MAX_ASSIGN_RECIPIENTS) {
+    throw new Error(`Too many recipients (max ${MAX_ASSIGN_RECIPIENTS})`);
+  }
+
+  const safeAchievementId = sanitizeText(achievementId || '', 80);
   if (!safeAchievementId) {
     throw new Error('achievementId is required');
   }
@@ -306,32 +311,83 @@ export function assignAchievement({ userId, userName, achievementId, awardedById
   }
 
   const awardsMap = readAwardsMap();
-  const userAwards = Array.isArray(awardsMap[safeUserId]) ? awardsMap[safeUserId] : [];
-  if (userAwards.some((entry) => entry.achievementId === safeAchievementId)) {
-    throw new Error('Achievement already assigned to this user');
-  }
-
   const awardedAt = Date.now();
-  const newAward = normalizeAwardEntry({
-    id: `award_${awardedAt}_${crypto.randomBytes(4).toString('hex')}`,
-    achievementId: safeAchievementId,
-    awardedAt,
-    awardedBy: {
-      id: sanitizeText(awardedById || '', 80),
-      name: sanitizeText(awardedByName || '', 140),
-    },
+  const awardedBy = {
+    id: sanitizeText(awardedById || '', 80),
+    name: sanitizeText(awardedByName || '', 140),
+  };
+  const assigned = [];
+  const skipped = [];
+  const failed = [];
+  const seen = new Set();
+  const namesToRemember = [];
+
+  list.forEach((recipient) => {
+    const safeUserId = sanitizeUserId(recipient?.userId || recipient?.id);
+    if (!safeUserId) {
+      failed.push({ userId: '', reason: 'invalid userId' });
+      return;
+    }
+    if (seen.has(safeUserId)) {
+      skipped.push({ userId: safeUserId, reason: 'duplicate' });
+      return;
+    }
+    seen.add(safeUserId);
+
+    const userAwards = Array.isArray(awardsMap[safeUserId]) ? awardsMap[safeUserId] : [];
+    if (userAwards.some((entry) => entry.achievementId === safeAchievementId)) {
+      skipped.push({ userId: safeUserId, reason: 'already assigned' });
+      return;
+    }
+
+    const newAward = normalizeAwardEntry({
+      id: `award_${awardedAt}_${crypto.randomBytes(4).toString('hex')}`,
+      achievementId: safeAchievementId,
+      awardedAt,
+      awardedBy,
+    });
+    awardsMap[safeUserId] = [...userAwards, newAward]
+      .sort((a, b) => (Number(b.awardedAt) || 0) - (Number(a.awardedAt) || 0));
+    assigned.push({ userId: safeUserId, award: newAward });
+    namesToRemember.push({
+      userId: safeUserId,
+      name: recipient?.userName || recipient?.name || '',
+    });
   });
 
-  awardsMap[safeUserId] = [...userAwards, newAward]
-    .sort((a, b) => (Number(b.awardedAt) || 0) - (Number(a.awardedAt) || 0));
-  writeAwardsMap(awardsMap);
-
-  rememberUser({ userId: safeUserId, name: userName });
+  if (assigned.length > 0) {
+    writeAwardsMap(awardsMap);
+    namesToRemember.forEach((entry) => rememberUser(entry));
+  }
 
   return {
-    userId: safeUserId,
-    award: newAward,
     achievement: targetAchievement,
+    assigned,
+    skipped,
+    failed,
+  };
+}
+
+export function assignAchievement({ userId, userName, achievementId, awardedById, awardedByName }) {
+  const result = assignAchievementToUsers({
+    recipients: [{ userId, userName }],
+    achievementId,
+    awardedById,
+    awardedByName,
+  });
+  if (result.failed.length > 0) {
+    throw new Error('userId is required');
+  }
+  if (result.skipped.some((entry) => entry.reason === 'already assigned')) {
+    throw new Error('Achievement already assigned to this user');
+  }
+  if (result.assigned.length === 0) {
+    throw new Error('Failed to assign achievement');
+  }
+  return {
+    userId: result.assigned[0].userId,
+    award: result.assigned[0].award,
+    achievement: result.achievement,
   };
 }
 
@@ -374,7 +430,7 @@ export function getLeaderboard(limit = 50) {
       const safeAwards = Array.isArray(awards) ? awards.map((entry, index) => normalizeAwardEntry(entry, index)) : [];
       return {
         userId: safeUserId,
-        displayName: sanitizeText(usersMap[safeUserId]?.name || '', 140),
+        displayName: resolveStoredDisplayName(usersMap, safeUserId),
         achievementCount: safeAwards.length,
         latestAwardedAt: safeAwards.reduce((max, entry) => Math.max(max, Number(entry.awardedAt) || 0), 0),
       };
@@ -396,14 +452,47 @@ export function getLeaderboard(limit = 50) {
   return rows;
 }
 
+export function applyDiscordNamesToLeaderboard(rows, members) {
+  const list = Array.isArray(rows) ? rows : [];
+  const namesById = new Map();
+  (Array.isArray(members) ? members : []).forEach((member) => {
+    const id = sanitizeUserId(member?.id);
+    const name = sanitizeText(member?.name || member?.username || '', 140);
+    if (!id || !isUsefulDisplayName(name, id)) return;
+    namesById.set(id, name);
+  });
+
+  const toRemember = [];
+  const next = list.map((row) => {
+    const userId = sanitizeUserId(row?.userId);
+    const discordName = namesById.get(userId) || '';
+    const storedName = isUsefulDisplayName(row?.displayName, userId) ? sanitizeText(row.displayName, 140) : '';
+    const displayName = discordName || storedName;
+    if (discordName) {
+      toRemember.push({ userId, name: discordName });
+    }
+    return {
+      ...row,
+      userId,
+      displayName,
+    };
+  });
+
+  rememberUsers(toRemember);
+  return next;
+}
+
 export default {
   getCatalog,
   createAchievement,
   updateAchievement,
   deleteAchievement,
   rememberUser,
+  rememberUsers,
   getUserDisplayName,
   assignAchievement,
+  assignAchievementToUsers,
   getUserAchievements,
   getLeaderboard,
+  applyDiscordNamesToLeaderboard,
 };

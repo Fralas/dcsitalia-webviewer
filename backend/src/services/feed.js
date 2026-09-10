@@ -1,8 +1,7 @@
-import fs from 'fs';
 import path from 'path';
+import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
 
-const DATA_DIR = path.resolve(process.cwd(), 'data/historical');
-const FEED_FILE = path.join(DATA_DIR, 'feed.json');
+const FEED_FILE = path.resolve(process.cwd(), 'data/historical/feed.json');
 const WRITE_DELAY_MS = 300;
 const MAX_EVENTS = Number.parseInt(process.env.FEED_MAX_EVENTS || '1000', 10);
 
@@ -10,45 +9,23 @@ let feedCache = [];
 let writeTimer = null;
 let dirty = false;
 
-function ensureStorage() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-
-  if (!fs.existsSync(FEED_FILE)) {
-    fs.writeFileSync(FEED_FILE, JSON.stringify([], null, 2), 'utf-8');
-  }
-}
-
 function readFeed() {
-  try {
-    const raw = fs.readFileSync(FEED_FILE, 'utf-8');
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    console.error('Error reading feed file:', error.message);
-    return [];
-  }
-}
-
-async function writeFeedAtomic(events) {
-  const tempPath = `${FEED_FILE}.tmp`;
-  await fs.promises.writeFile(tempPath, JSON.stringify(events, null, 2), 'utf-8');
-  await fs.promises.rename(tempPath, FEED_FILE);
+  const parsed = loadJson(DOC.HISTORICAL_FEED, [], FEED_FILE);
+  return Array.isArray(parsed) ? parsed : [];
 }
 
 function scheduleWrite() {
   dirty = true;
   if (writeTimer) return;
 
-  writeTimer = setTimeout(async () => {
+  writeTimer = setTimeout(() => {
     writeTimer = null;
     if (!dirty) return;
     dirty = false;
     try {
-      await writeFeedAtomic(feedCache);
+      saveJson(DOC.HISTORICAL_FEED, feedCache);
     } catch (error) {
-      console.error('Error writing feed file:', error.message);
+      console.error('Error writing feed:', error.message);
     }
   }, WRITE_DELAY_MS);
 }
@@ -59,7 +36,6 @@ function sanitizeText(value, fallback = '') {
   return trimmed.length > 0 ? trimmed : fallback;
 }
 
-ensureStorage();
 feedCache = readFeed();
 
 export function getFeedEvents(limit = 200) {

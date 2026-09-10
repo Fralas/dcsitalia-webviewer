@@ -41,8 +41,9 @@ NODE_ENV=production
 PORT=3001
 
 # Security - CHANGE THESE IN PRODUCTION!
-JWT_SECRET=<generate-a-strong-random-secret>
-ADMIN_PASSWORD=<your-secure-admin-password>
+JWT_SECRET=<generate-a-strong-random-secret-min-32-chars>
+SESSION_SECRET=<generate-another-strong-random-secret-min-32-chars>
+ADMIN_PASSWORD_HASH=<bcrypt hash from npm run security:hash-password>
 
 # CORS
 FRONTEND_URL=https://your-production-domain.com
@@ -72,13 +73,15 @@ node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 
 Copy the output to your `JWT_SECRET` in the backend `.env` file.
 
-### 3. Change Admin Password
+### 3. Admin password hash
 
-⚠️ **IMPORTANT**: Change the default admin password in the backend `.env` file:
+Do not store a plaintext admin password in production.
 
 ```bash
-ADMIN_PASSWORD=your-very-secure-password-here
+npm run security:hash-password -- "your-very-secure-password-here"
 ```
+
+Copy the printed bcrypt hash to `ADMIN_PASSWORD_HASH`. Plain `ADMIN_PASSWORD` is rejected when `NODE_ENV=production`.
 
 ### 4. HTTPS/SSL Configuration
 
@@ -156,12 +159,25 @@ Serve the built `dist/` folder with a web server (Nginx, Apache, etc.)
 
 ### 8. Database Backups
 
-The application uses JSON files for data storage. Set up regular backups:
+The application stores mutable state in `data/app.sqlite` (WAL mode). Run an online-consistent snapshot with:
 
 ```bash
-# Add to crontab for daily backups
-0 2 * * * tar -czf /backups/dcs-data-$(date +\%Y\%m\%d).tar.gz /path/to/dcsitalia-webviewer/data
+npm run data:backup
+# optional destination file or directory
+npm run data:backup -- /backups/dcs-app.sqlite
 ```
+
+Restore only while the server is stopped:
+
+```bash
+npm run data:restore -- /path/to/app-backup.sqlite
+```
+
+Imported legacy JSON is moved to `data/legacy-json/` and is not live data. DCS export files (`Export_*.json`, CSV, `frontlineZones.json`) stay in place.
+
+`node:sqlite` is experimental in current Node: pin a Node 22.13+ LTS before upgrading the runtime.
+
+Run a single Node process against a given `SQLITE_PATH`. In-memory caches (map snapshot, ATC board) are not synchronized across multiple processes.
 
 ### 9. Monitoring & Logging
 

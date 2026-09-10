@@ -1,0 +1,102 @@
+.app-inline-error-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.app-inline-error-slot:not(.is-open):not(.is-closing) {
+  height: 0;
+  margin: 0 !important;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.app-inline-error-slot.is-start {
+  justify-content: flex-start;
+}
+
+.app-inline-error-clip {
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  justify-content: inherit;
+}
+
+.app-inline-error {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  max-width: 100%;
+  padding: 7px 12px;
+  border: 1px solid #ff3b3b;
+  border-radius: 999px;
+  background: rgba(255, 28, 28, 0.16);
+  color: #ff4d4d;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: normal;
+  overflow: hidden;
+  transform-origin: center;
+  box-shadow:
+    0 0 0 1px rgba(255, 59, 59, 0.22),
+    0 0 14px rgba(255, 40, 40, 0.45);
+  opacity: 0;
+  clip-path: inset(0 50% 0 50% round 999px);
+}
+
+.app-inline-error-slot.is-compact .app-inline-error {
+  align-items: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.app-inline-error-slot.is-open .app-inline-error {
+  animation: app-inline-error-expand 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.app-inline-error-slot.is-closing .app-inline-error {
+  animation: app-inline-error-collapse 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes app-inline-error-expand {
+  from {
+    opacity: 0;
+    clip-path: inset(0 50% 0 50% round 999px);
+  }
+
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 999px);
+  }
+}
+
+@keyframes app-inline-error-collapse {
+  from {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 999px);
+  }
+
+  to {
+    opacity: 0;
+    clip-path: inset(0 50% 0 50% round 999px);
+  }
+}
+
+.app-inline-error svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  filter: drop-shadow(0 0 6px rgba(255, 60, 60, 0.85));
+}
+
+.app-inline-error-slot.is-compact .app-inline-error svg {
+  margin-top: 0;
+}
+
+.app-inline-error-slot.is-compact .app-inline-error span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

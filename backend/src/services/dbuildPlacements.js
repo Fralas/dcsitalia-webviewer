@@ -1,38 +1,19 @@
-import fs from 'fs';
 import path from 'path';
+import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
 
-const DATA_DIR = path.resolve(process.cwd(), 'data/historical');
-const PLACEMENTS_FILE = path.join(DATA_DIR, 'dbuild_placements.json');
+const PLACEMENTS_FILE = path.resolve(process.cwd(), 'data/historical/dbuild_placements.json');
 
 let placementsCache = [];
 
-function ensureStorage() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(PLACEMENTS_FILE)) {
-    fs.writeFileSync(PLACEMENTS_FILE, JSON.stringify([], null, 2), 'utf-8');
-  }
-}
-
 function readPlacements() {
-  try {
-    const raw = fs.readFileSync(PLACEMENTS_FILE, 'utf-8');
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    console.error('Error reading DBUILD placements file:', error.message);
-    return [];
-  }
+  const parsed = loadJson(DOC.DBUILD_PLACEMENTS, [], PLACEMENTS_FILE);
+  return Array.isArray(parsed) ? parsed : [];
 }
 
 function writePlacementsAtomic(list) {
-  const tempPath = `${PLACEMENTS_FILE}.tmp`;
-  fs.writeFileSync(tempPath, JSON.stringify(list, null, 2), 'utf-8');
-  fs.renameSync(tempPath, PLACEMENTS_FILE);
+  saveJson(DOC.DBUILD_PLACEMENTS, list);
 }
 
-ensureStorage();
 placementsCache = readPlacements();
 
 export function getPlacements() {

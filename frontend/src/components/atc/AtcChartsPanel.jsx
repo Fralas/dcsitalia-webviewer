@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Map, X } from 'lucide-react';
 import * as api from '../../services/api';
 import { t } from '../../utils/locale';
+import InlineError from '../InlineError';
 
 const CHART_BASE = import.meta.env.VITE_SOCKET_URL
   || (typeof window !== 'undefined' ? window.location.origin : '');
@@ -132,7 +133,7 @@ export default function AtcChartsPanel({ airportId, width, onWidthChange, onClos
 
       <div className="atc-charts-panel__viewport">
         {loading && <div className="atc-charts-panel__message">{t('atc.charts.loading')}</div>}
-        {!loading && error && <div className="atc-charts-panel__message atc-charts-panel__message--error">{error}</div>}
+        {!loading && <InlineError message={error} />}
         {!loading && !error && selectedChart && (
           <img
             className="atc-charts-panel__image"

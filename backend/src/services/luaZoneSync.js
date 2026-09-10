@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { DOC, archiveSeedFile, loadJsonIfPresent, saveJson } from '../db/jsonStore.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -266,29 +267,29 @@ function generateZoneName(zoneId) {
 }
 
 function readZoneBuffer(bufferFilePath) {
-  const targetPath = getBufferFilePath(bufferFilePath);
-  if (!fs.existsSync(targetPath)) {
-    return null;
-  }
-
-  try {
-    const raw = fs.readFileSync(targetPath, 'utf8');
-    return JSON.parse(raw);
-  } catch (error) {
-    console.error('[lua] Error reading zone buffer:', error.message);
-    return null;
-  }
+  const seedPath = getBufferFilePath(bufferFilePath);
+  const parsed = loadJsonIfPresent(DOC.LUA_ZONE_BUFFER, seedPath);
+  return parsed && typeof parsed === 'object' ? parsed : null;
 }
 
 function writeZoneBuffer(payload, bufferFilePath) {
-  const targetPath = getBufferFilePath(bufferFilePath);
-  fs.writeFileSync(targetPath, JSON.stringify(payload, null, 2), 'utf8');
-  return targetPath;
+  saveJson(DOC.LUA_ZONE_BUFFER, payload);
+  archiveSeedFile(getBufferFilePath(bufferFilePath));
+  return 'sqlite:lua.zones-buffer';
 }
 
 function writeFrontlineZones(zones) {
   const { outputJsonPath } = getLuaPaths();
-  fs.writeFileSync(outputJsonPath, JSON.stringify(zones, null, 2), 'utf8');
+  const next = JSON.stringify(zones, null, 2);
+  try {
+    if (fs.existsSync(outputJsonPath) && fs.readFileSync(outputJsonPath, 'utf8') === next) {
+      return false;
+    }
+  } catch {
+    // Rewrite if the existing file cannot be read.
+  }
+  fs.writeFileSync(outputJsonPath, next, 'utf8');
+  return true;
 }
 
 function buildZonesFromLua() {
@@ -425,8 +426,14 @@ export function refreshBufferAndSync(bufferFilePath) {
     return buildResult;
   }
 
-  writeFrontlineZones(buildResult.zones);
-  console.log(`[lua] Synced ${buildResult.count} zones to frontlineZones.json`);
+  if (buildResult.skipped) {
+    return buildResult;
+  }
+
+  const wrote = writeFrontlineZones(buildResult.zones);
+  if (wrote) {
+    console.log(`[lua] Synced ${buildResult.count} zones to frontlineZones.json`);
+  }
 
   return buildResult;
 }
@@ -454,13 +461,13 @@ export function initialize(onSync = null, options = {}) {
   console.log(`[lua] Initializing buffered zone sync (interval ${intervalMs}ms)`);
 
   const initialResult = refreshBufferAndSync(bufferFilePath);
-  if (onSync && initialResult.success) {
+  if (onSync && initialResult.success && !initialResult.skipped) {
     onSync(initialResult);
   }
 
   const intervalId = setInterval(() => {
     const result = refreshBufferAndSync(bufferFilePath);
-    if (onSync && result.success) {
+    if (onSync && result.success && !result.skipped) {
       onSync(result);
     }
   }, intervalMs);

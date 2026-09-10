@@ -9,6 +9,7 @@ import socketService from '../../services/socket';
 import { useUser } from '../../contexts/UserContext';
 
 import { t } from '../../utils/locale';
+import InlineError from '../InlineError';
 
 import airports from '../../config/airports';
 
@@ -1091,7 +1092,7 @@ export default function AtcStripPage() {
 
 
 
-      {error && <div className="atc-banner atc-banner--error">{error}</div>}
+      <InlineError message={error} className="atc-banner" />
 
       {!claimedRole && (
 

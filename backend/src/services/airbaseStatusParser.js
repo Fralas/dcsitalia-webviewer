@@ -22,16 +22,17 @@ function parseAirbaseStatus(filePath) {
 
       for (const [airbaseName, rawState] of Object.entries(parsed || {})) {
         const state = String(rawState || '').trim().toLowerCase();
-
-        if (state === 'blue') {
-          airbaseStatus[airbaseName] = true;
-        } else if (state === 'red' || state === 'neutral') {
-          airbaseStatus[airbaseName] = false;
+        if (state === 'blue' || state === 'red' || state === 'neutral') {
+          airbaseStatus[airbaseName] = state;
         }
       }
 
+      const counts = Object.values(airbaseStatus).reduce((acc, state) => {
+        acc[state] = (acc[state] || 0) + 1;
+        return acc;
+      }, {});
       console.log(`Parsed airbase status JSON: ${Object.keys(airbaseStatus).length} airbases found`);
-      console.log(`   Active: ${Object.values(airbaseStatus).filter(v => v).length}, Inactive: ${Object.values(airbaseStatus).filter(v => !v).length}`);
+      console.log(`   Blue: ${counts.blue || 0}, Red: ${counts.red || 0}, Neutral: ${counts.neutral || 0}`);
       return airbaseStatus;
     }
 
@@ -42,12 +43,15 @@ function parseAirbaseStatus(filePath) {
 
     while ((match = pattern.exec(fileContent)) !== null) {
       const airbaseName = match[1];
-      const isActive = match[2] === 'true';
-      airbaseStatus[airbaseName] = isActive;
+      airbaseStatus[airbaseName] = match[2] === 'true' ? 'blue' : 'neutral';
     }
 
+    const counts = Object.values(airbaseStatus).reduce((acc, state) => {
+      acc[state] = (acc[state] || 0) + 1;
+      return acc;
+    }, {});
     console.log(`Parsed airbase status Lua: ${Object.keys(airbaseStatus).length} airbases found`);
-    console.log(`   Active: ${Object.values(airbaseStatus).filter(v => v).length}, Inactive: ${Object.values(airbaseStatus).filter(v => !v).length}`);
+    console.log(`   Blue: ${counts.blue || 0}, Neutral: ${counts.neutral || 0}`);
 
     return airbaseStatus;
   } catch (error) {
@@ -72,7 +76,7 @@ function loadAirbaseStatus() {
  */
 function getActiveAirbases(airbaseStatus) {
   return Object.entries(airbaseStatus)
-    .filter(([_, isActive]) => isActive)
+    .filter(([_, state]) => state === true || state === 'blue')
     .map(([name, _]) => name);
 }
 
@@ -84,7 +88,7 @@ function getActiveAirbases(airbaseStatus) {
  */
 function isAirbaseActive(airbaseStatus, airbaseName) {
   // If airbase not in status file, default to active (for backward compatibility)
-  return airbaseStatus[airbaseName] !== false;
+  return airbaseStatus[airbaseName] === true || airbaseStatus[airbaseName] === 'blue' || airbaseStatus[airbaseName] === undefined;
 }
 
 export {

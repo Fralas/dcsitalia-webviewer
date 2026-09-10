@@ -3,7 +3,6 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
-import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcrypt';
 import chokidar from 'chokidar';
@@ -15,6 +14,12 @@ import session from 'express-session';
 import cookieParser from 'cookie-parser';
 
 import airports, { getAirportById } from './config/airports.config.js';
+import {
+  WEB_MAP_ACTION_OPTIONS,
+  WEB_MAP_ACTION_TYPES,
+  normalizeMapActionCommandType,
+  resolveMapActionOption,
+} from './config/webMapActions.config.js';
 import { isImportantWeapon, getWeaponPriority, getOrderQuantityForWeapon, getWeaponThresholds, getIsoFillForWeapon } from './config/rules.config.js';
 import * as dataBuffer from './services/dataBuffer.js';
 import * as historicalData from './services/historicalData.js';
@@ -24,10 +29,16 @@ import { generateToken } from './utils/jwt.js';
 import { authenticateToken, requireAdmin } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import logger from './utils/logger.js';
+import { getSqlitePath } from './db/client.js';
+import { DOC, loadJson, saveJson } from './db/jsonStore.js';
+import { SqliteSessionStore } from './db/sessionStore.js';
 import * as airbaseStatusParser from './services/airbaseStatusParser.js';
 import * as airbaseStatusManager from './services/airbaseStatusManager.js';
 import * as discordAuth from './services/discordAuth.js';
-import { ATC_DISCORD_IDS, LIDC_DISCORD_IDS, requireFeatureAccess } from './config/featureAccess.js';
+import { canAccessAtc, canAccessLidc, canEditChangelog, canEditWiki, canManageNoe, requireFeatureFlag } from './config/featureAccess.js';
+import { authBypassMiddleware, isAuthBypassEnabled } from './config/authBypass.js';
+import { assertRuntimeSecrets, createHelmetMiddleware, createJsonBodyParser, resolveAdminPasswordHash } from './config/security.js';
+import { optionalPath } from './config/envPaths.js';
 import * as combatMissionDispatch from './services/combatMissionDispatch.js';
 import * as luaZoneSync from './services/luaZoneSync.js';
 import * as activeUsers from './services/activeUsers.js';
@@ -36,10 +47,19 @@ import * as feedService from './services/feed.js';
 import * as dbuildPlacementsService from './services/dbuildPlacements.js';
 import * as convoysService from './services/convoys.js';
 import * as changelogsService from './services/changelogs.js';
+import * as noeEventsService from './services/noeEvents.js';
 import * as changelogTranslator from './services/changelogTranslator.js';
 import * as wikiService from './services/wiki.js';
 import * as achievementsService from './services/achievements.js';
 import * as lidcService from './services/lidcService.js';
+import * as hidcAirportLogistics from './services/hidcAirportLogistics.js';
+import { createDscoreFactionPoints } from './services/dscoreFactionPoints.js';
+import { proxyCartoBasemapTile } from './services/cartoBasemapProxy.js';
+import {
+  LIDC_EXPORT_FILES,
+  exportPendingWarehouseOps,
+  processWarehouseOpsAck,
+} from './services/lidcDcsBridge.js';
 import * as atcStripsService from './services/atcStripsService.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -47,6 +67,7 @@ const __dirname = path.dirname(__filename);
 
 // Load environment variables from backend/.env
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
+assertRuntimeSecrets();
 
 const app = express();
 const httpServer = createServer(app);
@@ -75,7 +96,7 @@ const corsOriginHandler = (origin, callback) => {
     callback(null, true);
     return;
   }
-  callback(new Error(`CORS blocked for origin: ${origin}`));
+  callback(null, false);
 };
 
 const io = new Server(httpServer, {
@@ -86,74 +107,73 @@ const io = new Server(httpServer, {
   }
 });
 
+const dscoreFactionPoints = createDscoreFactionPoints({
+  onChange: (bluePoints) => {
+    io.emit('dscore:updated', { bluePoints });
+  },
+});
+
 const PORT = process.env.PORT || 3001;
 const CONVOY_API_TOKEN = process.env.CONVOY_API_TOKEN || '';
 const DISCORD_GUILD_ID = String(process.env.DISCORD_GUILD_ID || '').trim();
 const DISCORD_BOT_TOKEN = String(process.env.DISCORD_BOT_TOKEN || '').trim();
-const DISCORD_LOGISTICS_ROUTE_ROLE_ID = String(process.env.DISCORD_LOGISTICS_ROUTE_ROLE_ID || '1447684923518484500').trim();
+const DISCORD_LOGISTICS_ROUTE_ROLE_ID = String(process.env.DISCORD_LOGISTICS_ROUTE_ROLE_ID || '').trim();
 const DISCORD_ROLE_CACHE_TTL_MS = 10 * 60 * 1000;
-const CHANGELOG_AUTHOR_IDS = new Set([
-  '153370631772045313',
-  '371212324054237206',
-  '453594416863641600',
-  '675706661570347041',
-  '714087060343881778',
-  '812070579888848988',
-  '1026508512152518708',
-  '1385701793345962035',
-]);
-const WIKI_EDITOR_IDS = new Set([
-  '153370631772045313',
-  '371212324054237206',
-  '453594416863641600',
-  '675706661570347041',
-  '714087060343881778',
-  '812070579888848988',
-  '1026508512152518708',
-  '1385701793345962035',
-]);
 const MAX_CARRIER_SOURCE_DISTANCE_KM = 50;
 const KM_PER_NM = 1.852;
 const MAX_CARRIER_SOURCE_DISTANCE_NM = MAX_CARRIER_SOURCE_DISTANCE_KM / KM_PER_NM;
 // March 13, 2026 17:00 Europe/Rome (CET => 16:00 UTC)
 const LAUNCH_TARGET_UTC_MS = Date.UTC(2026, 2, 13, 16, 0, 0);
-const CONVOY_SYNC_FILE = process.env.CONVOY_SYNC_FILE
-  ? path.resolve(process.env.CONVOY_SYNC_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DRED_GROUND\\Export_Ground_Convoys.json';
-const DCSAR_SYNC_FILE = process.env.DCSAR_SYNC_FILE
-  ? path.resolve(process.env.DCSAR_SYNC_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DMAP\\Export_DCSAR_Positions.json';
-const AIRLIFT_PLAYERS_SYNC_FILE = process.env.AIRLIFT_PLAYERS_SYNC_FILE
-  ? path.resolve(process.env.AIRLIFT_PLAYERS_SYNC_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DRED_AIR\\Export_AirliftPlayers.json';
+const CONVOY_SYNC_FILE = optionalPath('CONVOY_SYNC_FILE');
+const DCSAR_SYNC_FILE = optionalPath('DCSAR_SYNC_FILE');
+const AIRLIFT_PLAYERS_SYNC_FILE = optionalPath('AIRLIFT_PLAYERS_SYNC_FILE');
 
 // Production Points state exported by DCORE (DSCORE_Rigs.lua) for the map.
-const PRODUCTION_POINTS_FILE = process.env.PRODUCTION_POINTS_FILE
-  ? path.resolve(process.env.PRODUCTION_POINTS_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DSCORE\\Export_Production_Points.json';
+const PRODUCTION_POINTS_FILE = optionalPath('PRODUCTION_POINTS_FILE');
+
+function resolveDbridgeDir() {
+  const explicit = [
+    optionalPath('WEB_COMMANDS_FILE'),
+    optionalPath('WEB_COMMANDS_RESULT_FILE'),
+    optionalPath('WEB_SPAWN_MARKERS_FILE'),
+    optionalPath('DBUILD_SITES_FILE'),
+    optionalPath('TANKER_ROUTES_FILE'),
+    optionalPath('SHIP_POSITIONS_FILE'),
+  ].find(Boolean);
+  if (explicit) return path.dirname(explicit);
+
+  const productionPoints = optionalPath('PRODUCTION_POINTS_FILE');
+  if (productionPoints) {
+    return path.join(path.dirname(path.dirname(productionPoints)), 'DBRIDGE');
+  }
+  const dyzoneSource = optionalPath('DYZONE_SOURCE_DIR');
+  if (dyzoneSource) {
+    return path.join(path.dirname(dyzoneSource), 'DBRIDGE');
+  }
+  const airbaseStatus = optionalPath('AIRBASE_STATUS_FILE');
+  if (airbaseStatus) {
+    return path.join(path.dirname(path.dirname(airbaseStatus)), 'DBRIDGE');
+  }
+  return null;
+}
+
+function resolveDbridgeExportFile(envName, fileName) {
+  const explicit = optionalPath(envName);
+  if (explicit) return explicit;
+  const dir = resolveDbridgeDir();
+  return dir ? path.join(dir, fileName) : null;
+}
 
 // Web -> DCORE command bridge (DBRIDGE). The webviewer OWNS the command queue file
 // (append + prune); DCORE owns the result file (read-only here).
-const WEB_COMMANDS_FILE = process.env.WEB_COMMANDS_FILE
-  ? path.resolve(process.env.WEB_COMMANDS_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DBRIDGE\\Export_WebCommands.json';
-
-const WEB_COMMANDS_RESULT_FILE = process.env.WEB_COMMANDS_RESULT_FILE
-  ? path.resolve(process.env.WEB_COMMANDS_RESULT_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DBRIDGE\\Export_WebCommands_Result.json';
-
-// Tracked crate positions exported by DMAS (live until moved/activated in-game).
-const WEB_SPAWN_MARKERS_FILE = process.env.WEB_SPAWN_MARKERS_FILE
-  ? path.resolve(process.env.WEB_SPAWN_MARKERS_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DBRIDGE\\Export_WebSpawn_Markers.json';
-
-const DBUILD_SITES_FILE = process.env.DBUILD_SITES_FILE
-  ? path.resolve(process.env.DBUILD_SITES_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DBRIDGE\\Export_DBUILD_Sites.json';
-
-const TANKER_ROUTES_FILE = process.env.TANKER_ROUTES_FILE
-  ? path.resolve(process.env.TANKER_ROUTES_FILE)
-  : 'C:\\DCS SERVER\\MISSION SCRIPTS\\DCORE\\src\\DBRIDGE\\Export_Tanker_Routes.json';
+// If env vars are omitted, infer DCORE\src\DBRIDGE from other DCORE export paths
+// (same layout as logistics, which can work without WEB_COMMANDS_FILE).
+const WEB_COMMANDS_FILE = resolveDbridgeExportFile('WEB_COMMANDS_FILE', 'Export_WebCommands.json');
+const WEB_COMMANDS_RESULT_FILE = resolveDbridgeExportFile('WEB_COMMANDS_RESULT_FILE', 'Export_WebCommands_Result.json');
+const WEB_SPAWN_MARKERS_FILE = resolveDbridgeExportFile('WEB_SPAWN_MARKERS_FILE', 'Export_WebSpawn_Markers.json');
+const DBUILD_SITES_FILE = resolveDbridgeExportFile('DBUILD_SITES_FILE', 'Export_DBUILD_Sites.json');
+const TANKER_ROUTES_FILE = resolveDbridgeExportFile('TANKER_ROUTES_FILE', 'Export_Tanker_Routes.json');
+const SHIP_POSITIONS_FILE = resolveDbridgeExportFile('SHIP_POSITIONS_FILE', 'Export_Ship_Positions.json');
 
 // Max placement distance from airport center (matches DMAS blue_airbase_radius_m).
 const AIRPORT_SPAWN_RADIUS_M = Number.parseInt(process.env.AIRPORT_SPAWN_RADIUS_M, 10) || 2500;
@@ -171,12 +191,12 @@ const WEB_COMMAND_RESULT_GRACE_MS = Number.parseInt(process.env.WEB_COMMAND_RESU
 const WEB_INFANTRY_OPTIONS = [
   { keyword: 'MANPAD', label: 'MANPAD', cost: 30 },
   { keyword: 'SCOUT', label: 'SCOUT', cost: 20 },
+  { keyword: 'ASSAULTER', label: 'ASSAULTER', cost: 0 },
 ];
 const WEB_CRATE_OPTIONS = [
   { keyword: 'AMMO', label: 'AMMO', cost: 5, group: 'build' },
   { keyword: 'FUEL', label: 'FUEL', cost: 5, group: 'build' },
   { keyword: 'BUILD', label: 'BUILD', cost: 5, group: 'build' },
-  { keyword: 'PPBUILD', label: 'PPBUILD', cost: 20, group: 'build' },
   { keyword: 'HMMWV', label: 'HMMWV', cost: 40, group: 'deployables' },
   { keyword: 'TOW', label: 'TOW', cost: 45, group: 'deployables' },
   { keyword: 'L118', label: 'L118', cost: 30, group: 'deployables' },
@@ -277,18 +297,14 @@ const CSV_DIR = process.env.CSV_DIR
 logger.info(`📁 CSV Directory: ${CSV_DIR}`);
 
 // Airbase status - loaded from airbases_status.lua
-const AIRBASE_STATUS_FILE = process.env.AIRBASE_STATUS_FILE
-  ? path.resolve(process.env.AIRBASE_STATUS_FILE)
-  : 'C:\\Users\\DCS ITALIA\\Saved Games\\DCS.server1\\Score_save\\Warehouse\\airbases_status.lua';
+const AIRBASE_STATUS_FILE = optionalPath('AIRBASE_STATUS_FILE');
 let airbaseStatus = {};
 
-// Security Middleware
-app.use(helmet({
-  contentSecurityPolicy: false,
-  crossOriginOpenerPolicy: false,
-  crossOriginEmbedderPolicy: false,
-  crossOriginResourcePolicy: false
-}));
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
+app.use(createHelmetMiddleware());
 
 // CORS
 app.use(cors({
@@ -296,22 +312,25 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 500, // limit each IP to 500 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// Rate limiting (production only — map polling in dev exceeds typical limits)
+if (process.env.NODE_ENV === 'production') {
+  const limiter = rateLimit({
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 500, // limit each IP to 500 requests per windowMs
+    message: 'Too many requests from this IP, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
 
-app.use(limiter);
-app.use(express.json({ limit: '80mb' }));
+  app.use(limiter);
+}
+app.use(createJsonBodyParser());
 app.use(cookieParser());
 
 // Session configuration
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'dcs-italia-secret-change-in-production',
+  store: new SqliteSessionStore(),
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -321,6 +340,9 @@ app.use(session({
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
   }
 }));
+
+// Temporary local Discord bypass (AUTH_BYPASS_LOCAL + development only)
+app.use(authBypassMiddleware);
 
 // Store current data in memory
 let currentData = {};
@@ -371,6 +393,9 @@ let tankerRoutesSyncSignature = '';
 let tankerRoutes = [];
 let dbuildSitesSyncSignature = '';
 let dbuildSites = [];
+let shipPositionsSyncSignature = '';
+let shipPositions = [];
+let shipPositionsUpdatedAt = null;
 let zoneOperationsById = new Map();
 let hiddenLogisticsRouteAirportIds = new Set();
 const ZONE_OPERATION_TTL_MS = 45 * 60 * 1000;
@@ -399,23 +424,35 @@ async function ensureSessionUserPermissions(req, options = {}) {
   const sessionUser = req?.session?.user;
   if (!sessionUser?.id) return null;
 
+  // Local auth bypass: keep injected permissions, skip Discord role lookup.
+  if (sessionUser.isLocalBypass === true) {
+    return sessionUser;
+  }
+
   const lastResolvedAt = Number(req.session.userPermissionsResolvedAt || 0);
   const cacheValid = !forceRefresh
     && Number.isFinite(lastResolvedAt)
     && (Date.now() - lastResolvedAt) < DISCORD_ROLE_CACHE_TTL_MS
     && typeof sessionUser.canManageLogisticsRouteVisibility === 'boolean'
-    && typeof sessionUser.canEditWiki === 'boolean';
+    && typeof sessionUser.canEditWiki === 'boolean'
+    && typeof sessionUser.canAccessLidc === 'boolean'
+    && typeof sessionUser.canAccessAtc === 'boolean';
 
   if (cacheValid) {
     return sessionUser;
   }
 
   const permissions = await resolveDiscordLogisticsRoutePermission(sessionUser.id);
+  const roleIds = permissions.roleIds;
   req.session.user = {
     ...sessionUser,
-    discordRoleIds: permissions.roleIds,
+    discordRoleIds: roleIds,
     canManageLogisticsRouteVisibility: permissions.canManageLogisticsRouteVisibility,
-    canEditWiki: isWikiEditor(sessionUser.id),
+    canEditWiki: canEditWiki(sessionUser.id, roleIds),
+    canAccessLidc: canAccessLidc(sessionUser.id, roleIds),
+    canAccessAtc: canAccessAtc(sessionUser.id, roleIds),
+    canManageNoe: canManageNoe(sessionUser.id, roleIds),
+    canEditChangelog: canEditChangelog(sessionUser.id, roleIds),
   };
   req.session.userPermissionsResolvedAt = Date.now();
   return req.session.user;
@@ -449,30 +486,19 @@ function normalizeHiddenLogisticsRouteAirportIds(rawValue) {
 }
 
 function persistHiddenLogisticsRouteAirportIds() {
-  const payload = {
+  saveJson(DOC.LOGISTICS_ROUTE_VISIBILITY, {
     hiddenAirportIds: Array.from(hiddenLogisticsRouteAirportIds).sort(),
     updatedAt: new Date().toISOString(),
-  };
-
-  const tempPath = `${LOGISTICS_ROUTE_VISIBILITY_FILE_PATH}.tmp`;
-  fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), 'utf8');
-  fs.renameSync(tempPath, LOGISTICS_ROUTE_VISIBILITY_FILE_PATH);
+  });
 }
 
 function loadHiddenLogisticsRouteAirportIds() {
-  if (!fs.existsSync(LOGISTICS_ROUTE_VISIBILITY_FILE_PATH)) {
-    hiddenLogisticsRouteAirportIds = new Set();
-    persistHiddenLogisticsRouteAirportIds();
-    return;
-  }
-
   try {
-    const raw = fs.readFileSync(LOGISTICS_ROUTE_VISIBILITY_FILE_PATH, 'utf8');
-    const parsed = JSON.parse(raw);
+    const parsed = loadJson(DOC.LOGISTICS_ROUTE_VISIBILITY, { hiddenAirportIds: [] }, LOGISTICS_ROUTE_VISIBILITY_FILE_PATH);
     hiddenLogisticsRouteAirportIds = new Set(normalizeHiddenLogisticsRouteAirportIds(parsed?.hiddenAirportIds));
     persistHiddenLogisticsRouteAirportIds();
   } catch (error) {
-    console.error('Error loading logistics route visibility file:', error.message);
+    console.error('Error loading logistics route visibility:', error.message);
     hiddenLogisticsRouteAirportIds = new Set();
     persistHiddenLogisticsRouteAirportIds();
   }
@@ -571,6 +597,7 @@ function getAirportDisplayName(airportId) {
 const SPAWN_FEED_LABELS = {
   MANPAD: 'MANPAD',
   SCOUT: 'Scout',
+  ASSAULTER: 'Assaulter',
   AMMO: 'Ammo',
   FUEL: 'Fuel',
   BUILD: 'Build',
@@ -850,6 +877,37 @@ function buildWebCommandFeedEvent(command, stored) {
     };
   }
 
+  if (WEB_MAP_ACTION_TYPES.includes(cmdType)) {
+    const keyword = formatSpawnKeywordLabel(command.keyword);
+    if (stored.ok) {
+      return {
+        type: 'dcore.map_action.completed',
+        title: 'Map action completed',
+        message: `${actor} placed ${keyword} on the map`,
+        actor: command.requested_by_id || '',
+        metadata: {
+          command_id: stored.id,
+          keyword: command.keyword,
+          spawn_type: cmdType,
+          ok: true,
+        },
+      };
+    }
+
+    return {
+      type: 'dcore.map_action.failed',
+      title: 'Map action failed',
+      message: `${actor} failed to place ${keyword}: ${stored.message || 'unknown error'}`,
+      actor: command.requested_by_id || '',
+      metadata: {
+        command_id: stored.id,
+        keyword: command.keyword,
+        spawn_type: cmdType,
+        ok: false,
+      },
+    };
+  }
+
   if (cmdType === 'inf_spawn' || cmdType === 'crate_spawn') {
     const airportName = getAirportDisplayName(command.airport_id);
     const keyword = formatSpawnKeywordLabel(command.keyword);
@@ -897,7 +955,7 @@ function buildWebCommandFeedEvent(command, stored) {
 function maybePushWebCommandFeedEvent(command, stored) {
   if (!command || !stored?.id) return;
   const cmdType = stored.type || command.type;
-  if (!['pp_upgrade', 'pp_retrieve', 'inf_spawn', 'crate_spawn', 'dbuild_confirm', 'tanker_spawn'].includes(cmdType)) return;
+  if (!['pp_upgrade', 'pp_retrieve', 'inf_spawn', 'crate_spawn', 'dbuild_confirm', 'tanker_spawn', ...WEB_MAP_ACTION_TYPES].includes(cmdType)) return;
   if (webCommandFeedEmittedIds.has(stored.id)) return;
 
   const event = buildWebCommandFeedEvent(command, stored);
@@ -985,7 +1043,7 @@ function normalizeConvoyEntry(entry) {
 
 function syncConvoysFromFile() {
   try {
-    if (!fs.existsSync(CONVOY_SYNC_FILE)) {
+    if (!CONVOY_SYNC_FILE || !fs.existsSync(CONVOY_SYNC_FILE)) {
       return;
     }
 
@@ -1073,7 +1131,7 @@ function parseDcsarLine(line, index) {
 
 function syncDcsarFromFile() {
   try {
-    if (!fs.existsSync(DCSAR_SYNC_FILE)) return;
+    if (!DCSAR_SYNC_FILE || !fs.existsSync(DCSAR_SYNC_FILE)) return;
 
     const raw = fs.readFileSync(DCSAR_SYNC_FILE, 'utf8');
     if (raw === dcsarSyncSignature) return;
@@ -1145,7 +1203,7 @@ function normalizeAirliftPlayerEntry(entry) {
 
 function syncAirliftPlayersFromFile() {
   try {
-    if (!fs.existsSync(AIRLIFT_PLAYERS_SYNC_FILE)) return;
+    if (!AIRLIFT_PLAYERS_SYNC_FILE || !fs.existsSync(AIRLIFT_PLAYERS_SYNC_FILE)) return;
 
     const raw = fs.readFileSync(AIRLIFT_PLAYERS_SYNC_FILE, 'utf8');
     if (!raw || raw.trim() === '') return;
@@ -1202,7 +1260,7 @@ function normalizeProductionPointEntry(entry) {
 
 function syncProductionPointsFromFile() {
   try {
-    if (!fs.existsSync(PRODUCTION_POINTS_FILE)) return;
+    if (!PRODUCTION_POINTS_FILE || !fs.existsSync(PRODUCTION_POINTS_FILE)) return;
 
     const raw = fs.readFileSync(PRODUCTION_POINTS_FILE, 'utf8');
     if (!raw || raw.trim() === '') return;
@@ -1225,11 +1283,19 @@ function syncProductionPointsFromFile() {
 
 function writeJsonAtomic(targetPath, obj) {
   const tempPath = `${targetPath}.tmp`;
+  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
   fs.writeFileSync(tempPath, JSON.stringify(obj, null, 2), 'utf8');
   fs.renameSync(tempPath, targetPath);
 }
 
 function persistWebCommands() {
+  if (!WEB_COMMANDS_FILE) {
+    const error = new Error(
+      'Web command bridge is not configured. Set WEB_COMMANDS_FILE to DCORE src/DBRIDGE/Export_WebCommands.json.',
+    );
+    error.statusCode = 503;
+    throw error;
+  }
   try {
     writeJsonAtomic(WEB_COMMANDS_FILE, {
       commands: webCommands,
@@ -1237,12 +1303,18 @@ function persistWebCommands() {
     });
   } catch (error) {
     console.error('Failed to persist web commands queue:', error.message);
-    throw error;
+    const wrapped = new Error(`Failed to write spawn queue for DCS: ${error.message}`);
+    wrapped.statusCode = 503;
+    throw wrapped;
   }
 }
 
 function loadWebCommandsQueue() {
   try {
+    if (!WEB_COMMANDS_FILE) {
+      webCommands = [];
+      return;
+    }
     if (!fs.existsSync(WEB_COMMANDS_FILE)) {
       webCommands = [];
       persistWebCommands();
@@ -1275,6 +1347,22 @@ function enqueueWebCommand(command) {
   webCommands.push(command);
   persistWebCommands();
   return command;
+}
+
+function respondWebCommandError(res, error) {
+  const status = Number(error.statusCode) || 503;
+  logger.error('Failed to queue web command', { error: error.message });
+  return res.status(status).json({
+    error: error.message || 'Failed to queue command for DCS',
+  });
+}
+
+function queueAndRespond(res, payload) {
+  try {
+    return respondQueued(res, enqueueWebCommand(payload));
+  } catch (error) {
+    return respondWebCommandError(res, error);
+  }
 }
 
 function haversineMeters(lat1, lon1, lat2, lon2) {
@@ -1386,7 +1474,7 @@ function validateProductionPointRetrieveDistance(pp, lat, lon) {
 
 function syncDbuildSitesFromFile() {
   try {
-    if (!fs.existsSync(DBUILD_SITES_FILE)) return;
+    if (!DBUILD_SITES_FILE || !fs.existsSync(DBUILD_SITES_FILE)) return;
 
     const raw = fs.readFileSync(DBUILD_SITES_FILE, 'utf8');
     if (!raw || raw.trim() === '') return;
@@ -1426,7 +1514,7 @@ function syncDbuildSitesFromFile() {
 
 function syncWebSpawnMarkersFromFile() {
   try {
-    if (!fs.existsSync(WEB_SPAWN_MARKERS_FILE)) return;
+    if (!WEB_SPAWN_MARKERS_FILE || !fs.existsSync(WEB_SPAWN_MARKERS_FILE)) return;
 
     const raw = fs.readFileSync(WEB_SPAWN_MARKERS_FILE, 'utf8');
     if (!raw || raw.trim() === '') return;
@@ -1458,9 +1546,74 @@ function syncWebSpawnMarkersFromFile() {
   }
 }
 
+function inferShipClass(group, explicitClass) {
+  const explicit = String(explicitClass || '').trim().toLowerCase();
+  if (explicit === 'carrier' || explicit === 'helicarrier' || explicit === 'ship') return explicit;
+  const blob = String(group || '').toUpperCase();
+  if (/(LHA|LHD|TARAWA|AMERICA|INVINCIBLE|HERMES|CANBERRA|JUAN.?CARLOS|PORTAELICOTTERI|HELICARRIER|HELOCARRIER)/.test(blob)) {
+    return 'helicarrier';
+  }
+  if (/(CVN|CARRIER|KUZNETSOV|KUZNECOW|STENNIS|FORRESTAL|PORTAEREI)/.test(blob)) {
+    return 'carrier';
+  }
+  return 'ship';
+}
+
+function normalizeShipPositionEntry(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  const lat = Number(entry.lat);
+  const lon = Number(entry.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  const group = String(entry.group || entry.name || entry.id || '').trim();
+  if (!group) return null;
+  const kindRaw = String(entry.kind || '').trim().toLowerCase();
+  const kind = kindRaw === 'blue' || kindRaw === 'allied'
+    ? 'blue'
+    : (kindRaw === 'red' || kindRaw === 'enemy' ? 'red' : 'civilian');
+  const heading = Number(entry.heading);
+  const speed = Number(entry.speed_kts ?? entry.speed);
+  const statusRaw = String(entry.status || '').trim().toLowerCase();
+  const boarded = statusRaw === 'boarded' || entry.boarded === true;
+  return {
+    id: group,
+    group,
+    kind,
+    class: kind === 'civilian' ? 'ship' : inferShipClass(group, entry.class || entry.ship_class || entry.type),
+    status: boarded ? 'boarded' : 'active',
+    lat,
+    lon,
+    heading: Number.isFinite(heading) ? ((heading % 360) + 360) % 360 : null,
+    speed_kts: Number.isFinite(speed) ? speed : null,
+  };
+}
+
+function syncShipPositionsFromFile() {
+  try {
+    if (!SHIP_POSITIONS_FILE || !fs.existsSync(SHIP_POSITIONS_FILE)) return;
+
+    const raw = fs.readFileSync(SHIP_POSITIONS_FILE, 'utf8');
+    if (!raw || raw.trim() === '') return;
+    if (raw === shipPositionsSyncSignature) return;
+    shipPositionsSyncSignature = raw;
+
+    const parsed = JSON.parse(raw);
+    const incoming = Array.isArray(parsed?.ships) ? parsed.ships : (Array.isArray(parsed) ? parsed : []);
+    shipPositions = incoming.map(normalizeShipPositionEntry).filter(Boolean);
+    const updatedAt = Number(parsed?.updatedAt);
+    shipPositionsUpdatedAt = Number.isFinite(updatedAt) ? updatedAt : Date.now();
+
+    io.emit('ship-positions:updated', {
+      ships: shipPositions,
+      updatedAt: shipPositionsUpdatedAt,
+    });
+  } catch (error) {
+    console.error('Failed ship positions sync from file:', error.message);
+  }
+}
+
 function syncTankerRoutesFromFile() {
   try {
-    if (!fs.existsSync(TANKER_ROUTES_FILE)) return;
+    if (!TANKER_ROUTES_FILE || !fs.existsSync(TANKER_ROUTES_FILE)) return;
 
     const raw = fs.readFileSync(TANKER_ROUTES_FILE, 'utf8');
     if (!raw || raw.trim() === '') return;
@@ -1506,9 +1659,106 @@ function syncTankerRoutesFromFile() {
   }
 }
 
+let lidcLinkRequestsSignature = '';
+
+let lidcWarehouseOpsAckSignature = '';
+
+let lidcAirframeStateSignature = '';
+
+function syncLidcAirframeStateFromFile() {
+  try {
+    const stateFile = LIDC_EXPORT_FILES.airframeState;
+    if (!stateFile || !fs.existsSync(stateFile)) return;
+
+    const raw = fs.readFileSync(stateFile, 'utf8');
+    if (!raw || raw.trim() === '') return;
+    if (raw === lidcAirframeStateSignature) return;
+    lidcAirframeStateSignature = raw;
+
+    const parsed = JSON.parse(raw);
+    const incoming = Array.isArray(parsed?.airframes) ? parsed.airframes : [];
+    const result = lidcService.applyAirframeStateFromDcs(incoming);
+    if (result.updated > 0) {
+      io.emit('lidc:updated', {
+        updatedAirframes: result.updated,
+      });
+    }
+  } catch (error) {
+    console.error('Failed LIDC airframe state sync from file:', error.message);
+  }
+}
+
+function syncLidcWarehouseOpsAckFromFile() {
+  try {
+    const ackFile = LIDC_EXPORT_FILES.warehouseOpsAck;
+    if (!ackFile || !fs.existsSync(ackFile)) return;
+
+    const raw = fs.readFileSync(ackFile, 'utf8');
+    if (!raw || raw.trim() === '') return;
+    if (raw === lidcWarehouseOpsAckSignature) return;
+    lidcWarehouseOpsAckSignature = raw;
+
+    const parsed = JSON.parse(raw);
+    const appliedOpIds = Array.isArray(parsed?.appliedOpIds) ? parsed.appliedOpIds : [];
+    const result = processWarehouseOpsAck(appliedOpIds);
+    if (result.applied > 0) {
+      io.emit('lidc:warehouse-ops-updated', { applied: result.applied });
+    }
+  } catch (error) {
+    console.error('Failed LIDC warehouse ops ack sync from file:', error.message);
+  }
+}
+
+function syncLidcLinkRequestsFromFile() {
+  try {
+    const linkRequestsFile = LIDC_EXPORT_FILES.linkRequests;
+    if (!linkRequestsFile || !fs.existsSync(linkRequestsFile)) return;
+
+    const raw = fs.readFileSync(linkRequestsFile, 'utf8');
+    if (!raw || raw.trim() === '') return;
+    if (raw === lidcLinkRequestsSignature) return;
+    lidcLinkRequestsSignature = raw;
+
+    let requests = [];
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        requests = parsed;
+      } else if (Array.isArray(parsed?.requests)) {
+        requests = parsed.requests;
+      }
+    } else {
+      requests = trimmed.split(/\r?\n/).map((line) => {
+        const parts = line.split('|');
+        if (parts.length < 2) return null;
+        return {
+          code: parts[0],
+          ucid: parts[1],
+          name: parts[2] || '',
+          at: Number(parts[3]) || Date.now(),
+        };
+      }).filter(Boolean);
+    }
+
+    if (requests.length === 0) return;
+
+    const result = lidcService.processUcidLinkRequests(requests);
+    if (result.linked.length > 0) {
+      result.linked.forEach((entry) => {
+        io.emit('lidc:linked', entry);
+      });
+      fs.writeFileSync(linkRequestsFile, '', 'utf8');
+      lidcLinkRequestsSignature = '';
+    }
+  } catch (error) {
+    console.error('Failed LIDC link requests sync from file:', error.message);
+  }
+}
+
 function syncWebCommandResultsFromFile() {
   try {
-    if (!fs.existsSync(WEB_COMMANDS_RESULT_FILE)) return;
+    if (!WEB_COMMANDS_RESULT_FILE || !fs.existsSync(WEB_COMMANDS_RESULT_FILE)) return;
 
     const raw = fs.readFileSync(WEB_COMMANDS_RESULT_FILE, 'utf8');
     if (!raw || raw.trim() === '') return;
@@ -1613,6 +1863,7 @@ function persistDcsarToFile(points) {
     })
     .filter(Boolean);
 
+  if (!DCSAR_SYNC_FILE) return;
   fs.writeFileSync(DCSAR_SYNC_FILE, `${lines.join('\n')}${lines.length > 0 ? '\n' : ''}`, 'utf8');
   dcsarSyncSignature = fs.readFileSync(DCSAR_SYNC_FILE, 'utf8');
 }
@@ -1622,6 +1873,11 @@ function persistDcsarToFile(points) {
  */
 function loadAirbaseStatus() {
   try {
+    if (!AIRBASE_STATUS_FILE) {
+      airbaseStatus = {};
+      airbaseStatusManager.updateAirbaseStatus({});
+      return;
+    }
     airbaseStatus = airbaseStatusParser.parseAirbaseStatus(AIRBASE_STATUS_FILE);
     console.log(`🏠 Airbase status loaded: ${Object.keys(airbaseStatus).length} airbases`);
 
@@ -1692,19 +1948,19 @@ function processData(data) {
     if (airportData.data && airportData.data.weapons) {
       historicalData.saveSnapshot(airportId, airportData.data);
 
-      // Check and generate missions (with donor selection)
-      const newMissions = missionGenerator.checkAndGenerateMissions(
-        airportId,
-        airportData.data.weapons,
-        airportDataMap // Pass all airports data for donor selection
-      );
+      if (missionGenerator.AUTO_LOGISTICS_MISSIONS_ENABLED) {
+        const newMissions = missionGenerator.checkAndGenerateMissions(
+          airportId,
+          airportData.data.weapons,
+          airportDataMap
+        );
 
-      if (newMissions.length > 0) {
-        console.log(`🚨 Generated ${newMissions.length} new missions for ${airportData.name}`);
-        // Broadcast new missions to all clients
-        io.emit('missions:updated', {
-          missions: historicalData.getActiveMissions()
-        });
+        if (newMissions.length > 0) {
+          console.log(`🚨 Generated ${newMissions.length} new missions for ${airportData.name}`);
+          io.emit('missions:updated', {
+            missions: historicalData.getActiveMissions()
+          });
+        }
       }
     }
   });
@@ -1719,15 +1975,15 @@ async function loadFromBuffer() {
   if (bufferedData) {
     const bufferedEntries = Object.keys(bufferedData || {}).length;
     if (bufferedEntries > 0) {
-      console.log(`📂 Loaded data from buffer file (${bufferedEntries} airports).`);
+    console.log(`📂 Loaded airport data from SQLite CSV buffer (${bufferedEntries} airports).`);
       return processData(bufferedData);
     }
 
-    console.warn('⚠️  Buffer file is empty. Loading directly from CSV.');
+    console.warn('⚠️  CSV buffer is empty. Loading directly from CSV.');
     return refreshDataFromCsv('buffer-empty');
   }
 
-  console.warn('⚠️  Buffer file missing or unreadable. Loading directly from CSV.');
+  console.warn('⚠️  CSV buffer missing. Loading directly from CSV.');
   return refreshDataFromCsv('buffer-missing');
 }
 
@@ -1848,7 +2104,11 @@ app.get('/api/auth/discord/callback', async (req, res) => {
       globalName: discordUser.global_name || discordUser.username,
       discordRoleIds: [],
       canManageLogisticsRouteVisibility: false,
-      canEditWiki: isWikiEditor(discordUser.id),
+      canEditWiki: canEditWiki(discordUser.id),
+      canAccessLidc: canAccessLidc(discordUser.id),
+      canAccessAtc: canAccessAtc(discordUser.id),
+      canManageNoe: canManageNoe(discordUser.id),
+      canEditChangelog: canEditChangelog(discordUser.id),
     };
 
     await ensureSessionUserPermissions(req, { forceRefresh: true });
@@ -1980,14 +2240,234 @@ app.put('/api/profile', (req, res) => {
   res.json(savedProfile);
 });
 
-app.use('/api/lidc', requireFeatureAccess(LIDC_DISCORD_IDS));
-app.use('/api/atc', requireFeatureAccess(ATC_DISCORD_IDS));
+/**
+ * GET /api/lidc/logistics-alerts
+ * Open order counts per Afghanistan airbase, for theater-map attention markers.
+ */
+app.get('/api/lidc/logistics-alerts', (req, res) => {
+  res.json(lidcService.listAirportOrderAlerts());
+});
 
 /**
- * GET /api/lidc/templates - Get LIDC templates and unit catalog
+ * GET /api/lidc/airports/:baseId/occupancy
+ * Public theater occupancy: squadrons and airframes present at an Afghanistan airbase.
  */
-app.get('/api/lidc/templates', (req, res) => {
-  const catalog = lidcService.getTemplatesCatalog();
+app.get('/api/lidc/airports/:baseId/occupancy', (req, res) => {
+  const occupancy = lidcService.getAirportOccupancy(req.params.baseId, req.session.user?.id);
+  if (!occupancy) {
+    return res.status(404).json({ error: 'Airport not found' });
+  }
+
+  res.json(occupancy);
+});
+
+/**
+ * POST /api/lidc/airports/:baseId/logistics/purchase
+ * Buy ammunition containers or crates with squadron credits.
+ */
+app.post('/api/lidc/airports/:baseId/logistics/purchase', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const result = lidcService.purchaseAirportLogistics({
+      baseId: req.params.baseId,
+      itemId: req.body?.itemId,
+      quantity: req.body?.quantity,
+      items: req.body?.items,
+      userId: req.session.user.id,
+    });
+    return res.json(result);
+  } catch (error) {
+    const message = String(error?.message || 'Failed to purchase logistics');
+    const status = message.toLowerCase().includes('not found') ? 404 : 400;
+    return res.status(status).json({ error: message });
+  }
+});
+
+function getHidcLogisticsContext(req) {
+  const actor = getSessionActor(req);
+  return {
+    userId: actor?.id || req.session?.user?.id || '',
+    userName: actor?.name || '',
+    bluePoints: dscoreFactionPoints.readBluePoints(),
+  };
+}
+
+/**
+ * GET /api/airports/logistics-alerts
+ * Open HIDC order counts per airbase, for map attention markers.
+ */
+app.get('/api/airports/logistics-alerts', (req, res) => {
+  res.json(hidcAirportLogistics.listAirportOrderAlerts());
+});
+
+/**
+ * GET /api/airports/:id/occupancy
+ * HIDC airbase overview + warehouse logistics (BLUE faction points / DSCORE).
+ */
+app.get('/api/airports/:id/occupancy', (req, res) => {
+  const ctx = getHidcLogisticsContext(req);
+  const occupancy = hidcAirportLogistics.getAirportOccupancy(req.params.id, ctx.userId, ctx);
+  if (!occupancy) {
+    return res.status(404).json({ error: 'Airport not found' });
+  }
+  res.json(occupancy);
+});
+
+/**
+ * POST /api/airports/:id/logistics/purchase
+ * Create a HIDC logistics order. Faction points are preview-only; DCORE deducts in-game.
+ */
+app.post('/api/airports/:id/logistics/purchase', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const ctx = getHidcLogisticsContext(req);
+    const result = hidcAirportLogistics.purchaseAirportLogistics({
+      baseId: req.params.id,
+      itemId: req.body?.itemId,
+      quantity: req.body?.quantity,
+      items: req.body?.items,
+      userId: ctx.userId,
+      userName: ctx.userName,
+      bluePoints: ctx.bluePoints,
+    });
+    return res.json(result);
+  } catch (error) {
+    const message = String(error?.message || 'Failed to purchase logistics');
+    const status = message.toLowerCase().includes('not found') ? 404 : 400;
+    return res.status(status).json({ error: message });
+  }
+});
+
+/**
+ * PATCH /api/airports/:id/logistics/orders/:orderId
+ * Accept, unaccept, complete, or edit a HIDC logistics order.
+ */
+app.patch('/api/airports/:id/logistics/orders/:orderId', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const ctx = getHidcLogisticsContext(req);
+    const action = req.body?.action;
+    const result = action
+      ? hidcAirportLogistics.updateAirportOrderStatus({
+          baseId: req.params.id,
+          orderId: req.params.orderId,
+          action,
+          userId: ctx.userId,
+          userName: ctx.userName,
+          bluePoints: ctx.bluePoints,
+        })
+      : hidcAirportLogistics.updateAirportOrder({
+          baseId: req.params.id,
+          orderId: req.params.orderId,
+          items: req.body?.items,
+          userId: ctx.userId,
+          userName: ctx.userName,
+          bluePoints: ctx.bluePoints,
+        });
+    return res.json(result);
+  } catch (error) {
+    const message = String(error?.message || 'Failed to update logistics order');
+    const status = message.toLowerCase().includes('not found') ? 404 : 400;
+    return res.status(status).json({ error: message });
+  }
+});
+
+/**
+ * PATCH /api/lidc/airports/:baseId/logistics/orders/:orderId
+ * Accept, unaccept, complete, or edit a logistics order.
+ */
+app.patch('/api/lidc/airports/:baseId/logistics/orders/:orderId', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const action = req.body?.action;
+    const result = action
+      ? lidcService.updateAirportOrderStatus({
+          baseId: req.params.baseId,
+          orderId: req.params.orderId,
+          action,
+          userId: req.session.user.id,
+        })
+      : lidcService.updateAirportOrder({
+          baseId: req.params.baseId,
+          orderId: req.params.orderId,
+          items: req.body?.items,
+          userId: req.session.user.id,
+        });
+    return res.json(result);
+  } catch (error) {
+    const message = String(error?.message || 'Failed to update order');
+    const status = message.toLowerCase().includes('not found')
+      ? 404
+      : message.toLowerCase().includes('not allowed')
+        ? 403
+        : 400;
+    return res.status(status).json({ error: message });
+  }
+});
+
+async function attachSessionPermissions(req, res, next) {
+  try {
+    if (req.session?.user?.id) {
+      await ensureSessionUserPermissions(req);
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+}
+
+app.use('/api/lidc', attachSessionPermissions, requireFeatureFlag('canAccessLidc'));
+app.use('/api/atc', attachSessionPermissions, requireFeatureFlag('canAccessAtc'));
+
+/**
+ * POST /api/lidc/link/start - Generate one-time DCS account link code
+ */
+app.post('/api/lidc/link/start', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const result = lidcService.startUcidLink(req.session.user.id);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message || 'Failed to start link flow' });
+  }
+});
+
+/**
+ * GET /api/lidc/link/status - Get DCS account link status for current user
+ */
+app.get('/api/lidc/link/status', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const result = lidcService.getUcidLinkStatus(req.session.user.id);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message || 'Failed to read link status' });
+  }
+});
+
+/**
+ * GET /api/lidc/specializations - Get LIDC specializations and unit catalog
+ */
+app.get('/api/lidc/specializations', (req, res) => {
+  const catalog = lidcService.getSpecializationsCatalog();
   res.json(catalog);
 });
 
@@ -2016,6 +2496,18 @@ app.get('/api/lidc/me', (req, res) => {
 });
 
 /**
+ * GET /api/lidc/squadrons - List existing LIDC squadrons
+ */
+app.get('/api/lidc/squadrons', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const squadrons = lidcService.listSquadrons();
+  res.json({ squadrons });
+});
+
+/**
  * POST /api/lidc/squadrons - Create new LIDC squadron (authenticated users only)
  */
 app.post('/api/lidc/squadrons', (req, res) => {
@@ -2040,6 +2532,35 @@ app.post('/api/lidc/squadrons', (req, res) => {
 });
 
 /**
+ * POST /api/lidc/squadrons/join - Join squadron using invite code
+ */
+app.post('/api/lidc/squadrons/join', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const squadron = lidcService.joinSquadronByInviteCode({
+      inviteCode: req.body?.inviteCode,
+      sessionUser: req.session.user,
+    });
+    return res.status(200).json({ squadron });
+  } catch (error) {
+    const message = String(error?.message || 'Failed to join squadron');
+    const lowered = message.toLowerCase();
+    let status = 400;
+    if (lowered.includes('authentication required')) {
+      status = 401;
+    } else if (lowered.includes('already in squadron')) {
+      status = 409;
+    } else if (lowered.includes('not found') || lowered.includes('invalid invite code')) {
+      status = 404;
+    }
+    return res.status(status).json({ error: message });
+  }
+});
+
+/**
  * GET /api/lidc/squadrons/:id - Get a single LIDC squadron by id
  */
 app.get('/api/lidc/squadrons/:id', (req, res) => {
@@ -2047,12 +2568,45 @@ app.get('/api/lidc/squadrons/:id', (req, res) => {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
-  const squadron = lidcService.getSquadronById(req.params.id);
+  const squadron = lidcService.getSquadronById(req.params.id, req.session.user.id);
   if (!squadron) {
     return res.status(404).json({ error: 'Squadron not found' });
   }
 
   res.json({ squadron });
+});
+
+/**
+ * PUT /api/lidc/squadrons/:id/deck - Update squadron deck (owner only)
+ */
+app.put('/api/lidc/squadrons/:id/deck', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const result = lidcService.updateSquadronDeck({
+      squadronId: req.params.id,
+      deck: req.body?.deck || {},
+      actorUserId: req.session.user.id,
+    });
+
+    return res.json(result);
+  } catch (error) {
+    const message = String(error?.message || 'Failed to update squadron deck');
+    const lowered = message.toLowerCase();
+    let status = 400;
+
+    if (lowered.includes('authentication required')) {
+      status = 401;
+    } else if (lowered.includes('not found')) {
+      status = 404;
+    } else if (lowered.includes('only squadron members') || lowered.includes('only the squadron owner')) {
+      status = 403;
+    }
+
+    return res.status(status).json({ error: message });
+  }
 });
 
 /**
@@ -2122,6 +2676,44 @@ app.put('/api/lidc/squadrons/:id/members/:memberId/role', (req, res) => {
       || lowered.includes('only squadron members')
       || lowered.includes('cannot change owner role')
       || lowered.includes('owner cannot change own role')
+    ) {
+      status = 403;
+    }
+
+    return res.status(status).json({ error: message });
+  }
+});
+
+/**
+ * DELETE /api/lidc/squadrons/:id/members/:memberId - Remove a squadron member (owner only)
+ */
+app.delete('/api/lidc/squadrons/:id/members/:memberId', (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const result = lidcService.removeSquadronMember({
+      squadronId: req.params.id,
+      targetUserId: req.params.memberId,
+      actorUserId: req.session.user.id,
+    });
+
+    return res.json(result);
+  } catch (error) {
+    const message = String(error?.message || 'Failed to remove squadron member');
+    const lowered = message.toLowerCase();
+    let status = 400;
+
+    if (lowered.includes('authentication required')) {
+      status = 401;
+    } else if (lowered.includes('not found')) {
+      status = 404;
+    } else if (
+      lowered.includes('only owners')
+      || lowered.includes('only squadron members')
+      || lowered.includes('cannot remove squadron owner')
+      || lowered.includes('cannot remove themselves')
     ) {
       status = 403;
     }
@@ -2201,29 +2793,25 @@ app.delete('/api/lidc/squadrons/:id', (req, res) => {
 });
 
 /**
- * PUT /api/lidc/templates - Update LIDC templates and units (wiki editors only)
+ * PUT /api/lidc/specializations - Update LIDC specializations and units (wiki editors only)
  */
-app.put('/api/lidc/templates', async (req, res) => {
+app.put('/api/lidc/specializations', async (req, res) => {
   if (!req.session.user?.id) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
   const sessionUser = await ensureSessionUserPermissions(req);
   if (!sessionUser?.canEditWiki) {
-    return res.status(403).json({ error: 'Only allowed contributors can edit LIDC templates' });
+    return res.status(403).json({ error: 'Only allowed contributors can edit LIDC specializations' });
   }
 
   try {
-    const updated = lidcService.updateTemplatesCatalog(req.body || {});
+    const updated = lidcService.updateSpecializationsCatalog(req.body || {});
     return res.json(updated);
   } catch (error) {
-    return res.status(400).json({ error: String(error?.message || 'Failed to update templates') });
+    return res.status(400).json({ error: String(error?.message || 'Failed to update specializations') });
   }
 });
-
-function isWikiEditor(sessionUserId) {
-  return WIKI_EDITOR_IDS.has(String(sessionUserId || '').trim());
-}
 
 /**
  * GET /api/achievements/catalog - Public list of all available achievements
@@ -2242,7 +2830,7 @@ app.post('/api/achievements/catalog', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!isWikiEditor(userId)) {
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can manage achievements' });
   }
 
@@ -2272,7 +2860,7 @@ app.put('/api/achievements/catalog/:achievementId', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!isWikiEditor(userId)) {
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can manage achievements' });
   }
 
@@ -2301,7 +2889,7 @@ app.delete('/api/achievements/catalog/:achievementId', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!isWikiEditor(userId)) {
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can manage achievements' });
   }
 
@@ -2330,7 +2918,7 @@ app.get('/api/achievements/users/:userId', (req, res) => {
   if (!targetUserId) {
     return res.status(400).json({ error: 'userId is required' });
   }
-  if (requesterId !== targetUserId && !isWikiEditor(requesterId)) {
+  if (requesterId !== targetUserId && !canEditWiki(requesterId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can inspect other users achievements' });
   }
 
@@ -2346,8 +2934,63 @@ app.get('/api/achievements/users/:userId', (req, res) => {
   });
 });
 
+function parseAchievementRecipients(body) {
+  if (Array.isArray(body?.recipients)) {
+    return body.recipients.map((entry) => ({
+      userId: entry?.userId || entry?.id,
+      userName: entry?.userName || entry?.name,
+    }));
+  }
+  if (Array.isArray(body?.userIds)) {
+    return body.userIds.map((id) => ({ userId: id, userName: '' }));
+  }
+  if (body?.userId) {
+    return [{ userId: body.userId, userName: body.userName }];
+  }
+  return [];
+}
+
 /**
- * POST /api/achievements/assign - Assign achievement to a user (wiki editor only)
+ * GET /api/discord/guild-members - All Discord guild members (wiki editor only)
+ */
+app.get('/api/discord/guild-members', async (req, res) => {
+  const sessionUser = req.session?.user;
+  const userId = sessionUser?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
+    return res.status(403).json({ error: 'Only allowed contributors can list guild members' });
+  }
+  if (!DISCORD_GUILD_ID || !DISCORD_BOT_TOKEN) {
+    return res.status(503).json({ error: 'Discord guild is not configured' });
+  }
+
+  try {
+    const members = await discordAuth.listGuildMembers(DISCORD_GUILD_ID, DISCORD_BOT_TOKEN);
+    return res.json({ members });
+  } catch (error) {
+    const discordStatus = Number(error?.status) || 0;
+    if (discordStatus === 503 && error?.message) {
+      return res.status(503).json({ error: error.message });
+    }
+    if (discordStatus === 401) {
+      return res.status(503).json({
+        error: 'Token bot Discord non valido. Aggiorna DISCORD_BOT_TOKEN (Bot → Reset Token), non l’Application ID.',
+      });
+    }
+    if (discordStatus === 403) {
+      return res.status(503).json({
+        error: 'Il bot Discord non può elencare i membri. Abilita Server Members Intent e verifica che il bot sia nel server.',
+      });
+    }
+    logger.error('Failed to list Discord guild members', { error: error?.message || String(error) });
+    return res.status(502).json({ error: 'Impossibile caricare i membri Discord' });
+  }
+});
+
+/**
+ * POST /api/achievements/assign - Assign achievement to one or more users (wiki editor only)
  */
 app.post('/api/achievements/assign', (req, res) => {
   const sessionUser = req.session?.user;
@@ -2355,17 +2998,35 @@ app.post('/api/achievements/assign', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!isWikiEditor(userId)) {
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can assign achievements' });
   }
 
+  const recipients = parseAchievementRecipients(req.body);
+  const awardedByName = sessionUser.globalName || sessionUser.username || String(userId);
+
   try {
-    const result = achievementsService.assignAchievement({
-      userId: req.body?.userId,
-      userName: req.body?.userName,
+    if (recipients.length === 1) {
+      const result = achievementsService.assignAchievement({
+        userId: recipients[0].userId,
+        userName: recipients[0].userName,
+        achievementId: req.body?.achievementId,
+        awardedById: userId,
+        awardedByName,
+      });
+      return res.status(201).json({
+        ...result,
+        assigned: [{ userId: result.userId, award: result.award }],
+        skipped: [],
+        failed: [],
+      });
+    }
+
+    const result = achievementsService.assignAchievementToUsers({
+      recipients,
       achievementId: req.body?.achievementId,
       awardedById: userId,
-      awardedByName: sessionUser.globalName || sessionUser.username || String(userId),
+      awardedByName,
     });
     return res.status(201).json(result);
   } catch (error) {
@@ -2379,10 +3040,22 @@ app.post('/api/achievements/assign', (req, res) => {
 /**
  * GET /api/achievements/leaderboard - Public leaderboard by achievement count
  */
-app.get('/api/achievements/leaderboard', (req, res) => {
+app.get('/api/achievements/leaderboard', async (req, res) => {
   const rawLimit = Number.parseInt(String(req.query?.limit || ''), 10);
   const limit = Number.isFinite(rawLimit) ? rawLimit : 50;
-  const leaderboard = achievementsService.getLeaderboard(limit);
+  let leaderboard = achievementsService.getLeaderboard(limit);
+
+  if (DISCORD_GUILD_ID && DISCORD_BOT_TOKEN) {
+    try {
+      const members = await discordAuth.listGuildMembers(DISCORD_GUILD_ID, DISCORD_BOT_TOKEN);
+      leaderboard = achievementsService.applyDiscordNamesToLeaderboard(leaderboard, members);
+    } catch (error) {
+      logger.warn('Could not resolve Discord nicknames for leaderboard', {
+        error: error?.message || String(error),
+      });
+    }
+  }
+
   res.json({ leaderboard });
 });
 
@@ -2413,7 +3086,7 @@ app.get('/api/wiki/drafts/:pageId', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!isWikiEditor(userId)) {
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit wiki pages' });
   }
   const draft = wikiService.getDraft(userId, req.params.pageId);
@@ -2428,7 +3101,7 @@ app.put('/api/wiki/drafts/:pageId', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!isWikiEditor(userId)) {
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit wiki pages' });
   }
   const draft = wikiService.saveDraft(userId, req.params.pageId, req.body || {});
@@ -2443,7 +3116,7 @@ app.delete('/api/wiki/drafts/:pageId', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!isWikiEditor(userId)) {
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit wiki pages' });
   }
   wikiService.deleteDraft(userId, req.params.pageId);
@@ -2459,7 +3132,7 @@ app.post('/api/wiki/pages', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!isWikiEditor(userId)) {
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit wiki pages' });
   }
 
@@ -2488,7 +3161,7 @@ app.put('/api/wiki/pages/:pageId', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!isWikiEditor(userId)) {
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit wiki pages' });
   }
 
@@ -2514,7 +3187,7 @@ app.post('/api/wiki/media', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!isWikiEditor(userId)) {
+  if (!canEditWiki(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit wiki pages' });
   }
 
@@ -2554,7 +3227,7 @@ app.get('/api/changelogs/draft', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+  if (!canEditChangelog(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
   }
   const draft = changelogsService.getDraft(userId);
@@ -2569,7 +3242,7 @@ app.put('/api/changelogs/draft', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+  if (!canEditChangelog(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
   }
   const draft = changelogsService.saveDraft(userId, req.body || {});
@@ -2584,7 +3257,7 @@ app.delete('/api/changelogs/draft', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+  if (!canEditChangelog(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
   }
   changelogsService.deleteDraft(userId);
@@ -2599,7 +3272,7 @@ app.post('/api/changelogs/media', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+  if (!canEditChangelog(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
   }
 
@@ -2621,7 +3294,7 @@ app.post('/api/changelogs', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+  if (!canEditChangelog(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
   }
 
@@ -2645,7 +3318,7 @@ app.post('/api/changelogs/translate', async (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+  if (!canEditChangelog(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
   }
 
@@ -2673,7 +3346,7 @@ app.put('/api/changelogs/:postId', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+  if (!canEditChangelog(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
   }
 
@@ -2697,7 +3370,7 @@ app.delete('/api/changelogs/:postId', (req, res) => {
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  if (!CHANGELOG_AUTHOR_IDS.has(String(userId))) {
+  if (!canEditChangelog(userId, req.session?.user?.discordRoleIds)) {
     return res.status(403).json({ error: 'Only allowed contributors can edit changelogs' });
   }
 
@@ -2717,6 +3390,68 @@ app.get('/api/changelogs/media/:fileName', (req, res) => {
     return res.status(404).json({ error: 'Media not found' });
   }
   return res.sendFile(absolutePath);
+});
+
+// ==================== NOE EVENTS ====================
+
+function requireNoeAdmin(req, res) {
+  const userId = req.session?.user?.id;
+  if (!userId) {
+    res.status(401).json({ error: 'Not authenticated' });
+    return null;
+  }
+  if (!canManageNoe(userId, req.session?.user?.discordRoleIds)) {
+    res.status(403).json({ error: 'Only allowed admins can manage NOE events' });
+    return null;
+  }
+  return String(userId);
+}
+
+/**
+ * GET /api/noe/events - List NOE events (public).
+ */
+app.get('/api/noe/events', (req, res) => {
+  const events = noeEventsService.getEvents();
+  res.json({ events });
+});
+
+/**
+ * POST /api/noe/events - Create a NOE event (admin only)
+ */
+app.post('/api/noe/events', (req, res) => {
+  if (!requireNoeAdmin(req, res)) return undefined;
+  try {
+    const event = noeEventsService.createEvent(req.body || {});
+    return res.json({ event });
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'Failed to create event' });
+  }
+});
+
+/**
+ * PUT /api/noe/events/:id - Update a NOE event (admin only)
+ */
+app.put('/api/noe/events/:id', (req, res) => {
+  if (!requireNoeAdmin(req, res)) return undefined;
+  try {
+    const event = noeEventsService.updateEvent(req.params.id, req.body || {});
+    return res.json({ event });
+  } catch (error) {
+    const status = String(error?.message || '').toLowerCase().includes('not found') ? 404 : 400;
+    return res.status(status).json({ error: error.message || 'Failed to update event' });
+  }
+});
+
+/**
+ * DELETE /api/noe/events/:id - Delete a NOE event (admin only)
+ */
+app.delete('/api/noe/events/:id', (req, res) => {
+  if (!requireNoeAdmin(req, res)) return undefined;
+  const removed = noeEventsService.removeEvent(req.params.id);
+  if (!removed) {
+    return res.status(404).json({ error: 'Event not found' });
+  }
+  return res.json({ success: true });
 });
 
 /**
@@ -2805,10 +3540,27 @@ app.get('/api/tanker/options', (req, res) => {
 });
 
 /**
+ * GET /api/map/actions/options - Map right-click spawn catalog (CAS, MBT, BOMB, etc.).
+ */
+app.get('/api/map/actions/options', (req, res) => {
+  res.json({ actions: WEB_MAP_ACTION_OPTIONS });
+});
+
+/**
  * GET /api/tanker/routes - Active tanker racetracks exported by DMAS.
  */
 app.get('/api/tanker/routes', (req, res) => {
   res.json({ routes: tankerRoutes });
+});
+
+/**
+ * GET /api/ship-positions - Civilian and BLUE ship positions exported by DNAVAL.
+ */
+app.get('/api/ship-positions', (req, res) => {
+  res.json({
+    ships: shipPositions,
+    updatedAt: shipPositionsUpdatedAt,
+  });
 });
 
 /**
@@ -2873,7 +3625,7 @@ app.post('/api/production-points/:id/upgrade', (req, res) => {
     return res.status(400).json({ error: 'Production point is already at max level' });
   }
 
-  const command = enqueueWebCommand({
+  queueAndRespond(res, {
     id: randomUUID(),
     type: 'pp_upgrade',
     production_point_id: ppId,
@@ -2885,8 +3637,6 @@ app.post('/api/production-points/:id/upgrade', (req, res) => {
     requested_by_id: actor.id,
     ts: Date.now(),
   });
-
-  respondQueued(res, command);
 });
 
 /**
@@ -2931,7 +3681,7 @@ app.post('/api/production-points/:id/retrieve', (req, res) => {
 
   const quantity = clampRetrieveQuantity(req.body?.quantity, stock);
 
-  const command = enqueueWebCommand({
+  queueAndRespond(res, {
     id: randomUUID(),
     type: 'pp_retrieve',
     production_point_id: ppId,
@@ -2944,8 +3694,6 @@ app.post('/api/production-points/:id/retrieve', (req, res) => {
     requested_by_id: actor.id,
     ts: Date.now(),
   });
-
-  respondQueued(res, command);
 });
 
 function handleSpawnRequest(req, res, kind) {
@@ -2981,7 +3729,7 @@ function handleSpawnRequest(req, res, kind) {
     }
   }
 
-  const command = enqueueWebCommand({
+  queueAndRespond(res, {
     id: randomUUID(),
     type: kind,
     production_point_id: null,
@@ -2994,12 +3742,10 @@ function handleSpawnRequest(req, res, kind) {
     requested_by_id: actor.id,
     ts: Date.now(),
   });
-
-  respondQueued(res, command);
 }
 
 /**
- * POST /api/airports/:id/spawn-infantry - Body { keyword: MANPAD|SCOUT, lat, lon }
+ * POST /api/airports/:id/spawn-infantry - Body { keyword: MANPAD|SCOUT|ASSAULTER, lat, lon }
  */
 app.post('/api/airports/:id/spawn-infantry', (req, res) => {
   handleSpawnRequest(req, res, 'inf_spawn');
@@ -3039,7 +3785,7 @@ app.post('/api/tanker/spawn', (req, res) => {
     return res.status(400).json({ error: distanceCheck.error });
   }
 
-  const command = enqueueWebCommand({
+  queueAndRespond(res, {
     id: randomUUID(),
     type: 'tanker_spawn',
     production_point_id: null,
@@ -3053,8 +3799,42 @@ app.post('/api/tanker/spawn', (req, res) => {
     requested_by_id: actor.id,
     ts: Date.now(),
   });
+});
 
-  respondQueued(res, command);
+/**
+ * POST /api/map/actions/spawn - Body { type: air-asset|ground-asset|..., keyword, lat, lon }
+ */
+app.post('/api/map/actions/spawn', (req, res) => {
+  const actor = getSessionActor(req);
+  if (!actor) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const commandType = normalizeMapActionCommandType(req.body?.type);
+  const keyword = String(req.body?.keyword || '').trim().toUpperCase();
+  const option = resolveMapActionOption(commandType, keyword);
+  if (!option) {
+    return res.status(400).json({ error: 'Invalid map action type or keyword' });
+  }
+
+  const lat = Number(req.body?.lat);
+  const lon = Number(req.body?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return res.status(400).json({ error: 'Valid lat/lon are required' });
+  }
+
+  queueAndRespond(res, {
+    id: randomUUID(),
+    type: commandType,
+    production_point_id: null,
+    airport_id: null,
+    keyword,
+    lat,
+    lon,
+    requested_by: actor.name,
+    requested_by_id: actor.id,
+    ts: Date.now(),
+  });
 });
 
 /**
@@ -3159,20 +3939,25 @@ app.post('/api/dbuild/placements/:id/confirm', (req, res) => {
     return res.status(400).json({ error: 'Only draft placements can be confirmed' });
   }
 
-  const command = enqueueWebCommand({
-    id: randomUUID(),
-    type: 'dbuild_confirm',
-    production_point_id: null,
-    airport_id: null,
-    keyword: null,
-    build_type: placement.build_type,
-    placement_id: placement.id,
-    lat: placement.lat,
-    lon: placement.lon,
-    requested_by: actor.name,
-    requested_by_id: actor.id,
-    ts: Date.now(),
-  });
+  let command;
+  try {
+    command = enqueueWebCommand({
+      id: randomUUID(),
+      type: 'dbuild_confirm',
+      production_point_id: null,
+      airport_id: null,
+      keyword: null,
+      build_type: placement.build_type,
+      placement_id: placement.id,
+      lat: placement.lat,
+      lon: placement.lon,
+      requested_by: actor.name,
+      requested_by_id: actor.id,
+      ts: Date.now(),
+    });
+  } catch (error) {
+    return respondWebCommandError(res, error);
+  }
 
   const updated = dbuildPlacementsService.updatePlacement(placementId, {
     status: 'confirmed',
@@ -3237,6 +4022,11 @@ app.get('/api/time', (req, res) => {
     launchRemainingMs,
   });
 });
+
+/**
+ * GET /api/basemap/carto/:style/:z/:x/:y.png - Proxied Carto raster tiles
+ */
+app.get('/api/basemap/carto/:style/:z/:x/:y', proxyCartoBasemapTile);
 
 /**
  * GET /api/config/airports - Public airport catalog (coordinates + DCS keys)
@@ -3702,6 +4492,59 @@ app.post('/api/frontline-zones/:id/accept', (req, res) => {
       expires_at: expiresAt,
       ttl_minutes: Math.round(ZONE_OPERATION_TTL_MS / 60000),
       tasks: zoneTasks,
+    },
+  });
+
+  res.json({
+    success: true,
+    zone: updatedZone,
+    zones,
+  });
+});
+
+/**
+ * POST /api/frontline-zones/:id/decline - Release a frontline zone operation
+ */
+app.post('/api/frontline-zones/:id/decline', (req, res) => {
+  const zoneId = String(req.params.id || '').trim();
+  const userId = String(req.body?.userId || '').trim();
+
+  if (!zoneId) {
+    return res.status(400).json({ error: 'zone id is required' });
+  }
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  const zonesFromFile = loadFrontlineZonesFromFile();
+  const zone = zonesFromFile.find((entry) => String(entry?.id || '') === zoneId);
+  if (!zone) {
+    return res.status(404).json({ error: 'Zone not found' });
+  }
+
+  const now = Date.now();
+  cleanupExpiredZoneOperations(now);
+  pruneZoneOperationsForMissingZones(zonesFromFile);
+
+  const current = zoneOperationsById.get(zoneId);
+  if (!current || current.user_id !== userId) {
+    return res.status(400).json({ error: 'Zone is not assigned to this user' });
+  }
+
+  zoneOperationsById.delete(zoneId);
+
+  const zones = emitFrontlineUpdate(zonesFromFile);
+  const updatedZone = zones.find((entry) => entry.id === zoneId) || null;
+
+  pushFeedEvent({
+    type: 'zone.operation.declined',
+    title: 'Zone operation declined',
+    message: `${userId} released ${zone.name || zone.id}`,
+    actor: userId,
+    zone_id: zone.id || zoneId,
+    metadata: {
+      zone_id: zone.id || zoneId,
+      declined_by: userId,
     },
   });
 
@@ -4321,6 +5164,7 @@ app.post('/api/airports/:id/create-order', (req, res) => {
     }],
     priority,
     expiryHours: 24,
+    origin: 'user',
   });
   if (!orderId) {
     return res.status(400).json({ error: 'Carrier source routes are limited to 50 km' });
@@ -4518,6 +5362,7 @@ app.post('/api/airports/:id/compose-mission', (req, res) => {
       totalIsoUnits: remainderIso,
       priority: baseMission.priority || 'medium',
       expiryHours: 24,
+      origin: baseMission.origin === 'user' ? 'user' : 'system',
     });
   });
 
@@ -4531,6 +5376,7 @@ app.post('/api/airports/:id/compose-mission', (req, res) => {
     totalIsoUnits,
     priority: bestPriority,
     expiryHours: 24,
+    origin: 'user',
   });
   if (!missionId) {
     return res.status(400).json({ error: 'Carrier source routes are limited to 50 km' });
@@ -4572,6 +5418,16 @@ app.post('/api/airports/:id/compose-mission', (req, res) => {
  * POST /api/debug/generate-orders - Force generation of orders for all airports (requires authentication)
  */
 app.post('/api/debug/generate-orders', authenticateToken, requireAdmin, (req, res) => {
+  if (!missionGenerator.AUTO_LOGISTICS_MISSIONS_ENABLED) {
+    return res.json({
+      success: true,
+      skipped: true,
+      reason: 'Auto logistics mission generation is disabled',
+      totalGenerated: 0,
+      results: [],
+    });
+  }
+
   console.log('🔧 DEBUG: Force generating orders for all airports...');
 
   const results = [];
@@ -4853,6 +5709,13 @@ const watcher = chokidar.watch('*.csv', {
   cwd: CSV_DIR,
   persistent: true,
   ignoreInitial: true,
+  depth: 0,
+  ignored: [
+    '**/node_modules/**',
+    '**/.git/**',
+    '**/frontend/**',
+    '**/dist/**',
+  ],
   awaitWriteFinish: {
     stabilityThreshold: 1000,
     pollInterval: 100
@@ -4869,29 +5732,27 @@ watcher.on('error', (error) => {
   console.error('File watcher error:', error);
 });
 
-// Watch airbase_status.lua file for changes
-const airbaseStatusWatcher = chokidar.watch(AIRBASE_STATUS_FILE, {
-  persistent: true,
-  ignoreInitial: true,
-  awaitWriteFinish: {
-    stabilityThreshold: 1000,
-    pollInterval: 100
-  }
-});
+let airbaseStatusWatcher = null;
+if (AIRBASE_STATUS_FILE) {
+  airbaseStatusWatcher = chokidar.watch(AIRBASE_STATUS_FILE, {
+    persistent: true,
+    ignoreInitial: true,
+    awaitWriteFinish: {
+      stabilityThreshold: 1000,
+      pollInterval: 100
+    }
+  });
 
-airbaseStatusWatcher.on('change', () => {
-  console.log('🏠 Airbase status file changed, reloading...');
+  airbaseStatusWatcher.on('change', () => {
+    console.log('🏠 Airbase status file changed, reloading...');
+    loadAirbaseStatus();
+    scheduleRefresh('airbase-status-change');
+  });
 
-  // Reload airbase status
-  loadAirbaseStatus();
-
-  // Refresh airport data with new active airports list
-  scheduleRefresh('airbase-status-change');
-});
-
-airbaseStatusWatcher.on('error', (error) => {
-  console.error('Airbase status file watcher error:', error);
-});
+  airbaseStatusWatcher.on('error', (error) => {
+    console.error('Airbase status file watcher error:', error);
+  });
+}
 
 // Buffered Lua zone sync (refreshes every 5 minutes by default)
 const luaZoneWatcher = luaZoneSync.initialize((result) => {
@@ -5019,6 +5880,11 @@ setInterval(() => {
   syncWebCommandResultsFromFile();
 }, 2000);
 
+// Poll DSCORE faction score file (same source as the in-game score query)
+setInterval(() => {
+  dscoreFactionPoints.syncFromFile();
+}, 2000);
+
 // Poll tracked crate positions exported by DMAS
 setInterval(() => {
   syncWebSpawnMarkersFromFile();
@@ -5029,10 +5895,40 @@ setInterval(() => {
   syncTankerRoutesFromFile();
 }, 2000);
 
-// Poll DBUILD sites exported by DCORE
+// Poll DBUILD sites exported by DCORE-LIDC
 setInterval(() => {
   syncDbuildSitesFromFile();
 }, 2000);
+
+// Poll ship positions exported by DNAVAL (typically every 5 minutes)
+setInterval(() => {
+  syncShipPositionsFromFile();
+}, 2000);
+
+// Poll LIDC UCID link requests written by DCS hook
+setInterval(() => {
+  syncLidcLinkRequestsFromFile();
+}, 2000);
+
+// Poll LIDC warehouse ops acknowledgments from DLIDC mission module
+setInterval(() => {
+  syncLidcWarehouseOpsAckFromFile();
+}, 2000);
+
+// Poll LIDC airframe state exported by DLIDC mission module
+setInterval(() => {
+  syncLidcAirframeStateFromFile();
+}, 2000);
+
+// Poll logistics order codes redeemed in-game by DLOGISTICS
+setInterval(() => {
+  hidcAirportLogistics.syncDcoreRedeemedOrders();
+}, 2000);
+
+// Refresh LIDC access policy for DCS enforcement
+setInterval(() => {
+  lidcService.exportLidcPolicy();
+}, 30000);
 
 // ==================== START SERVER ====================
 
@@ -5067,13 +5963,23 @@ syncAirliftPlayersFromFile();
 bootstrapWebCommandFeedDedup();
 loadWebCommandsQueue();
 syncProductionPointsFromFile();
+dscoreFactionPoints.syncFromFile();
 syncWebCommandResultsFromFile();
 syncWebSpawnMarkersFromFile();
 syncTankerRoutesFromFile();
 syncDbuildSitesFromFile();
+syncShipPositionsFromFile();
+exportPendingWarehouseOps();
+hidcAirportLogistics.exportHidcLogisticsOrders();
+hidcAirportLogistics.syncDcoreRedeemedOrders();
+syncLidcLinkRequestsFromFile();
+syncLidcWarehouseOpsAckFromFile();
+lidcService.exportLidcAirframeRegistry();
+lidcService.exportLidcPolicy();
+syncLidcAirframeStateFromFile();
 atcStripsService.initAtcStripsService();
 
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, '127.0.0.1', () => {
   const activeAirports = airbaseStatusManager.getActiveAirports();
   logger.info(`
 ╔═══════════════════════════════════════════════════════╗
@@ -5088,20 +5994,39 @@ httpServer.listen(PORT, () => {
 ║   Missions: http://localhost:${PORT}/api/missions    ║
 ╚═══════════════════════════════════════════════════════╝
   `);
+  if (isAuthBypassEnabled()) {
+    logger.warn('AUTH BYPASS LOCAL enabled — Discord login not required in development');
+  }
+  logger.info(`SQLite store: ${getSqlitePath()}`);
+  if (WEB_COMMANDS_FILE) {
+    logger.info(`Web command bridge: ${WEB_COMMANDS_FILE}`);
+  } else {
+    logger.warn('Web command bridge DISABLED: could not resolve DCORE DBRIDGE Export_WebCommands.json');
+  }
+  const dscoreFile = dscoreFactionPoints.getScoreFile();
+  if (dscoreFile) {
+    logger.info(`DSCORE score file: ${dscoreFile} (BLUE ${dscoreFactionPoints.getBluePoints() ?? 'n/a'})`);
+  } else {
+    logger.warn('DSCORE score file DISABLED: set DSCORE_SCORE_FILE to DCORE src/DSCORE/score.json');
+  }
 });
 
 // ==================== ADMIN ENDPOINTS ====================
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const ADMIN_PASSWORD_HASH = resolveAdminPasswordHash();
 
-if (!ADMIN_PASSWORD) {
-  logger.error('⚠️  ADMIN_PASSWORD is not set in environment variables');
-}
+const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Too many admin login attempts, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 /**
  * POST /api/admin/login - Verify admin password and return JWT
  */
-app.post('/api/admin/login', async (req, res) => {
+app.post('/api/admin/login', adminLoginLimiter, async (req, res) => {
   try {
     const { password } = req.body;
 
@@ -5112,9 +6037,15 @@ app.post('/api/admin/login', async (req, res) => {
       });
     }
 
-    // Simple password comparison (in production, use hashed passwords)
-    if (password === ADMIN_PASSWORD) {
-      // Generate JWT token
+    if (!ADMIN_PASSWORD_HASH) {
+      return res.status(503).json({
+        success: false,
+        message: 'Admin login is not configured'
+      });
+    }
+
+    const valid = await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
+    if (valid) {
       const token = generateToken({
         role: 'admin',
         timestamp: Date.now()
@@ -5219,10 +6150,10 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // ==================== GRACEFUL SHUTDOWN ====================
-process.on('SIGTERM', () => {
+function shutdown() {
   console.log('👋 Shutting down gracefully...');
   watcher.close();
-  airbaseStatusWatcher.close();
+  airbaseStatusWatcher?.close();
   if (luaZoneWatcher && typeof luaZoneWatcher.stop === 'function') {
     luaZoneWatcher.stop();
   }
@@ -5230,5 +6161,8 @@ process.on('SIGTERM', () => {
     console.log('✅ Server closed');
     process.exit(0);
   });
-});
+}
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 
