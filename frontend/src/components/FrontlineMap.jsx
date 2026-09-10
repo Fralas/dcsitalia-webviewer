@@ -5719,18 +5719,20 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   }, [airportsData, airportCatalog, airbaseStatus]);
 
   const airportsForMap = useMemo(() => (
-    allMapAirports.map((airport) => {
-      const overlayZone = findNearestZoneForPoint(
-        airport.coordinates.lat,
-        airport.coordinates.lon,
-        validZones,
-      );
-      return {
-        ...airport,
-        coalition: overlayZone?.status === 'RED' ? 'red' : airport.coalition,
-        zoneNumber: overlayZone ? getZoneNumber(overlayZone) : '',
-      };
-    })
+    allMapAirports
+      .filter((airport) => airport.isCarrier !== true)
+      .map((airport) => {
+        const overlayZone = findNearestZoneForPoint(
+          airport.coordinates.lat,
+          airport.coordinates.lon,
+          validZones,
+        );
+        return {
+          ...airport,
+          coalition: overlayZone?.status === 'RED' ? 'red' : airport.coalition,
+          zoneNumber: overlayZone ? getZoneNumber(overlayZone) : '',
+        };
+      })
   ), [allMapAirports, validZones]);
 
   const zoneIdsWithAssignedAirports = useMemo(() => {
@@ -5987,11 +5989,13 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       lon: zone.coordinates.lon,
       size: zone.id === selectedZoneId ? 0.14 : zone.isActive ? 0.1 : 0.07,
     })) : [];
-    const airportPoints = filters.showAirports ? allMapAirports.map((airport) => ({
-      lat: airport.coordinates.lat,
-      lon: airport.coordinates.lon,
-      size: airport.isMainBase ? 0.11 : 0.08,
-    })) : [];
+    const airportPoints = filters.showAirports ? allMapAirports
+      .filter((airport) => airport.isCarrier !== true)
+      .map((airport) => ({
+        lat: airport.coordinates.lat,
+        lon: airport.coordinates.lon,
+        size: airport.isMainBase ? 0.11 : 0.08,
+      })) : [];
     const productionPointMarkers = filters.showProductionPoints
       ? productionPointsForMap.flatMap((pp) => {
         if (!Number.isFinite(pp?.coordinates?.lat) || !Number.isFinite(pp?.coordinates?.lon)) return [];
