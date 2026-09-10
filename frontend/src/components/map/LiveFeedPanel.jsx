@@ -65,12 +65,14 @@ export default function LiveFeedPanel({
   zones,
   combatMissionByZone,
   logisticsMissions,
+  airportLogisticsOrders = [],
   productionPoints,
   dcsarPoints = [],
   airports,
   logisticAirportFocus = null,
   onSelectZone,
   onSelectLogisticsMission,
+  onSelectAirportOrder,
   onSelectProductionPoint,
   onSelectDcsar,
 }) {
@@ -162,12 +164,14 @@ export default function LiveFeedPanel({
               zones={zones}
               combatMissionByZone={combatMissionByZone}
               logisticsMissions={logisticsMissions}
+              airportLogisticsOrders={airportLogisticsOrders}
               productionPoints={productionPoints}
               dcsarPoints={dcsarPoints}
               airports={airports}
               logisticAirportFocus={logisticAirportFocus}
               onSelectZone={onSelectZone}
               onSelectLogisticsMission={onSelectLogisticsMission}
+              onSelectAirportOrder={onSelectAirportOrder}
               onSelectProductionPoint={onSelectProductionPoint}
               onSelectDcsar={onSelectDcsar}
             />

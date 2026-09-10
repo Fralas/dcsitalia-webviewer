@@ -12,6 +12,7 @@ import './MapOperationsPanel.css';
 const PLANE_MISSION_TASKS = ['CAS', 'DEAD', 'SEAD', 'STRIKE', 'CAP'];
 const HELI_MISSION_TASKS = ['CAS', 'DEAD', 'SEAD', 'STRIKE', 'CSAR'];
 const LOGISTIC_AIRCRAFT = ['CH-47F', 'UH-1H', 'Mi-8', 'C-130J'];
+const ROTARY_LOGISTIC_AIRCRAFT = new Set(['CH-47F', 'UH-1H', 'Mi-8']);
 const TABS = [
   { id: 'mission', labelKey: 'map.rightPanel.ops.tabs.mission', icon: MapPin },
   { id: 'logistic', labelKey: 'map.rightPanel.ops.tabs.logistic', icon: Forklift },
@@ -27,6 +28,39 @@ const LANDING_ICON_PATHS = [
   'M2 22h20',
   'M3.77 10.77 2 9l2-4.5 1.1.55c.55.28.9.84.9 1.45s.35 1.17.9 1.45L8 8.5l3-6 1.05.53a2 2 0 0 1 1.09 1.5l.72 5.4a2 2 0 0 0 1.09 1.52l4.42 2.2c.42.22.78.55 1.01.96l.6 1.03c.49.88-.06 1.98-1.06 2.1l-1.18.15c-.47.06-.95-.02-1.37-.24L4.29 11.15a2 2 0 0 1-.52-.38Z',
 ];
+
+function isLogiHubAirport(airport) {
+  return airport?.herculesBase === true;
+}
+
+function getOrderCargoKind(item) {
+  const category = String(item?.category || '').toUpperCase();
+  const kind = String(item?.kind || '').toLowerCase();
+  const id = String(item?.itemId || item?.id || '');
+  if (category === 'CASSA' || kind === 'crate') return 'crate';
+  if (category === 'SCONTAINER' || /^scontainer/i.test(id)) return 'containerSmall';
+  return 'container';
+}
+
+function orderMatchesAircraft(order, aircraft) {
+  if (!ROTARY_LOGISTIC_AIRCRAFT.has(aircraft)) return true;
+  const items = Array.isArray(order?.items) ? order.items : [];
+  if (items.length === 0) return false;
+  return items.every((item) => getOrderCargoKind(item) === 'crate');
+}
+
+function summarizeOrderCargo(order) {
+  const counts = { crate: 0, container: 0, containerSmall: 0 };
+  (Array.isArray(order?.items) ? order.items : []).forEach((item) => {
+    const kind = getOrderCargoKind(item);
+    counts[kind] += Math.max(1, Math.floor(Number(item.quantity) || 0));
+  });
+  const parts = [];
+  if (counts.crate) parts.push(`${counts.crate} ${t('lidc.map.airportWizard.crate')}`);
+  if (counts.container) parts.push(`${counts.container} ${t('lidc.map.airportWizard.container')}`);
+  if (counts.containerSmall) parts.push(`${counts.containerSmall} ${t('lidc.map.airportWizard.smallContainer')}`);
+  return parts.join(', ');
+}
 
 function getZoneNumber(zone) {
   const source = String(zone?.id || zone?.name || '');
@@ -303,16 +337,20 @@ export default function MapOperationsPanel({
   zones = [],
   combatMissionByZone,
   logisticsMissions = [],
+  airportLogisticsOrders = [],
   productionPoints = [],
   dcsarPoints = [],
   airports = [],
   logisticAirportFocus = null,
   onSelectZone,
   onSelectLogisticsMission,
+  onSelectAirportOrder,
   onSelectProductionPoint,
   onSelectDcsar,
 }) {
   void language;
+  void logisticsMissions;
+  void onSelectLogisticsMission;
 
   const [activeTab, setActiveTab] = useState('mission');
   const [aircraftMode, setAircraftMode] = useState('plane');
@@ -363,6 +401,22 @@ export default function MapOperationsPanel({
       .filter((airport) => getCoords(airport))
       .sort((a, b) => getAirportLabel(a).localeCompare(getAirportLabel(b)));
   }, [airports]);
+
+  const logisticHubOptions = useMemo(() => (
+    airportOptions.filter(isLogiHubAirport)
+  ), [airportOptions]);
+
+  const aircraftMatchedOrders = useMemo(() => (
+    (Array.isArray(airportLogisticsOrders) ? airportLogisticsOrders : [])
+      .filter((order) => orderMatchesAircraft(order, logisticAircraft))
+  ), [airportLogisticsOrders, logisticAircraft]);
+
+  const logisticArrivalOptions = useMemo(() => {
+    const destIds = new Set(
+      aircraftMatchedOrders.map((order) => String(order.airport_id)).filter(Boolean),
+    );
+    return airportOptions.filter((airport) => destIds.has(String(airport.id)));
+  }, [airportOptions, aircraftMatchedOrders]);
 
   const filteredAirportOptions = useMemo(() => {
     const filtered = airportOptions.filter((airport) => (
@@ -419,11 +473,17 @@ export default function MapOperationsPanel({
     if (missionAirportId && !airportOptions.some((entry) => entry.id === missionAirportId)) {
       setMissionAirportId('');
     }
-    if (logisticDepartureAirportId && !airportOptions.some((entry) => entry.id === logisticDepartureAirportId)) {
+    if (logisticDepartureAirportId && !logisticHubOptions.some((entry) => entry.id === logisticDepartureAirportId)) {
       setLogisticDepartureAirportId('');
     }
-    if (logisticArrivalAirportId && !airportOptions.some((entry) => entry.id === logisticArrivalAirportId)) {
-      setLogisticArrivalAirportId('');
+    if (logisticArrivalAirportId) {
+      const airportExists = airportOptions.some((entry) => entry.id === logisticArrivalAirportId);
+      const hasLoadedOrders = Array.isArray(airportLogisticsOrders) && airportLogisticsOrders.length > 0;
+      if (!airportExists) {
+        setLogisticArrivalAirportId('');
+      } else if (hasLoadedOrders && !logisticArrivalOptions.some((entry) => entry.id === logisticArrivalAirportId)) {
+        setLogisticArrivalAirportId('');
+      }
     }
     if (productionDepartureAirportId && !airportOptions.some((entry) => entry.id === productionDepartureAirportId)) {
       setProductionDepartureAirportId('');
@@ -436,6 +496,9 @@ export default function MapOperationsPanel({
     }
   }, [
     airportOptions,
+    logisticHubOptions,
+    logisticArrivalOptions,
+    airportLogisticsOrders,
     missionAirportId,
     logisticDepartureAirportId,
     logisticArrivalAirportId,
@@ -526,18 +589,14 @@ export default function MapOperationsPanel({
     const departureCoords = getCoords(logisticDepartureAirport);
     const hasDeparture = Boolean(departureCoords && logisticDepartureAirportId);
 
-    const airportRows = logisticsMissions
-      .map((mission) => {
-        const destination = airports.find((entry) => entry.id === mission.airport_id);
+    const airportRows = aircraftMatchedOrders
+      .map((order) => {
+        const destination = airports.find((entry) => String(entry.id) === String(order.airport_id));
         const destinationCoords = getCoords(destination);
         if (!destinationCoords) return null;
 
-        const source = airports.find((entry) => entry.id === mission.source_airport_id);
-        const sourceCoords = getCoords(source);
-        if (!sourceCoords) return null;
-
         if (logisticDistanceMode === 'arrival') {
-          if (logisticArrivalAirportId && String(mission.airport_id) !== String(logisticArrivalAirportId)) {
+          if (logisticArrivalAirportId && String(order.airport_id) !== String(logisticArrivalAirportId)) {
             return null;
           }
         } else if (hasDeparture) {
@@ -550,17 +609,19 @@ export default function MapOperationsPanel({
           if (distanceFromDeparture > logisticRangeNm) return null;
         }
 
-        const distanceNm = haversineNm(
-          sourceCoords.lat,
-          sourceCoords.lon,
-          destinationCoords.lat,
-          destinationCoords.lon,
-        );
+        const distanceNm = hasDeparture
+          ? haversineNm(
+            departureCoords.lat,
+            departureCoords.lon,
+            destinationCoords.lat,
+            destinationCoords.lon,
+          )
+          : null;
 
         return {
-          kind: 'airport',
-          mission,
-          source,
+          kind: 'order',
+          order,
+          source: logisticDepartureAirport,
           destination,
           distanceNm,
         };
@@ -600,7 +661,7 @@ export default function MapOperationsPanel({
 
     return sortByDistance([...airportRows, ...airdropRows]);
   }, [
-    logisticsMissions,
+    aircraftMatchedOrders,
     airports,
     zones,
     combatMissionByZone,
@@ -815,7 +876,7 @@ export default function MapOperationsPanel({
               ariaLabel={t('map.rightPanel.ops.departure')}
               options={[
                 { value: '', label: t('map.rightPanel.ops.departure') },
-                ...airportOptions.map((airport) => ({
+                ...logisticHubOptions.map((airport) => ({
                   value: airport.id,
                   label: getAirportLabel(airport),
                 })),
@@ -846,7 +907,7 @@ export default function MapOperationsPanel({
               ariaLabel={t('map.rightPanel.ops.arrival')}
               options={[
                 { value: '', label: t('map.rightPanel.ops.arrival') },
-                ...airportOptions.map((airport) => ({
+                ...logisticArrivalOptions.map((airport) => ({
                   value: airport.id,
                   label: getAirportLabel(airport),
                 })),
@@ -1041,20 +1102,25 @@ export default function MapOperationsPanel({
 
               return (
                 <button
-                  key={row.mission.id}
+                  key={row.order.id}
                   type="button"
                   className="map-ops-section__row"
-                  onClick={() => onSelectLogisticsMission?.(row.mission)}
+                  onClick={() => onSelectAirportOrder?.(row.order)}
                 >
                   <div className="map-ops-section__row-top">
                     <span className="map-ops-section__row-title">
-                      {getAirportLabel(row.source)} → {getAirportLabel(row.destination)}
+                      {row.source
+                        ? `${getAirportLabel(row.source)} → ${getAirportLabel(row.destination)}`
+                        : getAirportLabel(row.destination)}
                     </span>
                     <span className="map-ops-section__row-meta">{formatRowDistance(row.distanceNm)}</span>
                   </div>
                   <div className="map-ops-section__row-sub">
-                    {getMissionStatusLabel(row.mission.status)}
-                    {row.mission.weapon_id ? ` • ${row.mission.weapon_id.split('.').pop()}` : ''}
+                    {[
+                      row.order.code,
+                      getMissionStatusLabel(row.order.status),
+                      summarizeOrderCargo(row.order),
+                    ].filter(Boolean).join(' • ')}
                   </div>
                 </button>
               );

@@ -47,6 +47,12 @@ function resolveScoreFile() {
   if (productionPoints) {
     return path.join(path.dirname(productionPoints), 'score.json');
   }
+
+  const logisticsOrders = optionalPath('HIDC_LOGISTICS_ORDERS_FILE');
+  if (logisticsOrders) {
+    return path.join(path.dirname(logisticsOrders), 'score.json');
+  }
+
   return null;
 }
 

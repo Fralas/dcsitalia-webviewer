@@ -1527,6 +1527,7 @@ function normalizeBaseOrders(rawOrders) {
           return {
             itemId: catalogItem.id,
             kind: catalogItem.kind,
+            category: catalogItem.category,
             name: catalogItem.name,
             destination: catalogItem.destination,
             quantity,

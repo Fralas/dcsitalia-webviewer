@@ -6003,6 +6003,12 @@ httpServer.listen(PORT, '127.0.0.1', () => {
   } else {
     logger.warn('Web command bridge DISABLED: could not resolve DCORE DBRIDGE Export_WebCommands.json');
   }
+  const dscoreFile = dscoreFactionPoints.getScoreFile();
+  if (dscoreFile) {
+    logger.info(`DSCORE score file: ${dscoreFile} (BLUE ${dscoreFactionPoints.getBluePoints() ?? 'n/a'})`);
+  } else {
+    logger.warn('DSCORE score file DISABLED: set DSCORE_SCORE_FILE to DCORE src/DSCORE/score.json');
+  }
 });
 
 // ==================== ADMIN ENDPOINTS ====================

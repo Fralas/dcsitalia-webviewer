@@ -163,7 +163,11 @@ function occupancyAirport(airport) {
   return {
     id: airport.id,
     name: airport.displayName || airport.name,
-    subtitle: airport.isCarrier ? 'CARRIER' : (airport.isHeliport ? 'HELIPORT' : 'AIRPORT'),
+    subtitle: airport.isCarrier
+      ? 'CARRIER'
+      : (airport.isHeliport
+        ? 'HELIPORT'
+        : (airport.herculesBase ? 'LOGI HUB' : 'AIRPORT')),
     lat: airport.coordinates?.lat,
     lon: airport.coordinates?.lon,
     icao: airport.icao || '',
@@ -235,17 +239,25 @@ function toDcoreOrder(airport, order, catalogById) {
 export function listAirportOrderAlerts() {
   const store = readBaseLogisticsStore();
   const orders = {};
+  const list = [];
 
   Object.entries(store.bases && typeof store.bases === 'object' ? store.bases : {}).forEach(([baseId, logistics]) => {
     const id = sanitizeText(baseId, 120);
     if (!id) return;
-    const orderCount = normalizeBaseOrders(logistics?.orders)
-      .filter((order) => sanitizeText(order.status, 20).toLowerCase() !== 'completed')
-      .length;
-    if (orderCount > 0) orders[id] = orderCount;
+    const airport = getAirportById(id);
+    const visible = normalizeBaseOrders(logistics?.orders)
+      .filter((order) => sanitizeText(order.status, 20).toLowerCase() !== 'completed');
+    if (visible.length > 0) orders[id] = visible.length;
+    visible.forEach((order) => {
+      list.push({
+        ...order,
+        airport_id: id,
+        airport_name: airport?.displayName || airport?.name || id,
+      });
+    });
   });
 
-  return { orders };
+  return { orders, list };
 }
 
 export function exportHidcLogisticsOrders() {

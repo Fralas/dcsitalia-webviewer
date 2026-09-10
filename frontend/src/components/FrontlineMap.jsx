@@ -5101,6 +5101,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   const [airportWizardTab, setAirportWizardTab] = useState('');
   const [blueFactionPointsTick, setBlueFactionPointsTick] = useState(0);
   const [airportOrderAlerts, setAirportOrderAlerts] = useState({});
+  const [airportLogisticsOrders, setAirportLogisticsOrders] = useState([]);
   const [selectedLogisticsMission, setSelectedLogisticsMission] = useState(null);
   const [selectedContainerIds, setSelectedContainerIds] = useState([]);
   const [composingMission, setComposingMission] = useState(false);
@@ -5703,6 +5704,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
         isCarrier: runtimeAirport.isCarrier ?? configAirport.isCarrier,
         isHeliport: runtimeAirport.isHeliport ?? configAirport.isHeliport,
         isAlwaysActive: runtimeAirport.isAlwaysActive ?? configAirport.isAlwaysActive,
+        herculesBase: runtimeAirport.herculesBase ?? configAirport.herculesBase,
         isActive: runtimeAirport.isActive ?? configAirport.isActive,
       };
     });
@@ -6193,7 +6195,11 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     return {
       id: selectedAirport.id,
       name: selectedAirport.displayName || selectedAirport.name,
-      subtitle: selectedAirport.isCarrier ? 'CARRIER' : (selectedAirport.isHeliport ? 'HELIPORT' : 'AIRPORT'),
+      subtitle: selectedAirport.isCarrier
+        ? 'CARRIER'
+        : (selectedAirport.isHeliport
+          ? 'HELIPORT'
+          : (selectedAirport.herculesBase ? 'LOGI HUB' : 'AIRPORT')),
       lat: selectedAirport.coordinates?.lat,
       lon: selectedAirport.coordinates?.lon,
       coordinates: selectedAirport.coordinates,
@@ -6229,7 +6235,17 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       .then((occupancy) => {
         if (cancelled) return;
         setAirportOccupancy(occupancy);
-        const nextCount = Array.isArray(occupancy?.orders) ? occupancy.orders.length : 0;
+        const nextOrders = Array.isArray(occupancy?.orders) ? occupancy.orders : [];
+        const nextCount = nextOrders.length;
+        setAirportLogisticsOrders((prev) => {
+          const others = prev.filter((order) => String(order.airport_id) !== String(selectedAirportId));
+          const mapped = nextOrders.map((order) => ({
+            ...order,
+            airport_id: selectedAirportId,
+            airport_name: occupancy?.airport?.name || selectedAirportId,
+          }));
+          return [...mapped, ...others];
+        });
         setAirportOrderAlerts((prev) => {
           const next = { ...prev };
           if (nextCount > 0) {
@@ -6263,7 +6279,17 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       orders: result?.orders || prev?.orders,
     }));
     if (!selectedAirportId) return;
-    const nextCount = Array.isArray(result?.orders) ? result.orders.length : 0;
+    const nextOrders = Array.isArray(result?.orders) ? result.orders : [];
+    const nextCount = nextOrders.length;
+    setAirportLogisticsOrders((prev) => {
+      const others = prev.filter((order) => String(order.airport_id) !== String(selectedAirportId));
+      const mapped = nextOrders.map((order) => ({
+        ...order,
+        airport_id: selectedAirportId,
+        airport_name: result?.airport?.name || selectedAirportId,
+      }));
+      return [...mapped, ...others];
+    });
     setAirportOrderAlerts((prev) => {
       const next = { ...prev };
       if (nextCount > 0) {
@@ -6282,7 +6308,10 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       try {
         const result = await getHidcLogisticsAlerts();
         if (!mounted) return;
-        setAirportOrderAlerts(result?.orders && typeof result.orders === 'object' ? result.orders : {});
+        setAirportOrderAlerts(result?.orders && typeof result.orders === 'object' && !Array.isArray(result.orders)
+          ? result.orders
+          : {});
+        setAirportLogisticsOrders(Array.isArray(result?.list) ? result.list : []);
       } catch {
         if (!mounted) return;
       }
@@ -7370,6 +7399,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                 zones={validZones}
                 combatMissionByZone={combatMissionByZone}
                 logisticsMissions={filteredLogisticsMissions}
+                airportLogisticsOrders={airportLogisticsOrders}
                 productionPoints={productionPointsForMap}
                 dcsarPoints={dcsarPoints}
                 airports={validAirports}
@@ -7378,6 +7408,13 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                 onSelectLogisticsMission={(mission) => {
                   setSelectedLogisticsMission(mission);
                   if (mission?.airport_id) setSelectedAirportId(mission.airport_id);
+                }}
+                onSelectAirportOrder={(order) => {
+                  if (order?.airport_id) {
+                    setSelectedAirportId(order.airport_id);
+                    setAirportWizardTab('overview');
+                  }
+                  setSelectedLogisticsMission(null);
                 }}
                 onSelectProductionPoint={setSelectedProductionPointId}
                 onSelectDcsar={(point) => setSelectedDcsarId(point?.id || null)}
