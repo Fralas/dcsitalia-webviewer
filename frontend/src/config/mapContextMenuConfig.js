@@ -54,6 +54,7 @@ export const MAP_CONTEXT_MENU_ROOT = {
             { id: 'cap', label: 'CAP', subtitle: 'F-15C', icon: 'plane', action: { type: 'air-asset', keyword: 'CAP' } },
             { id: 'ewar', label: 'EWAR', subtitle: 'F-18C', icon: 'radio', action: { type: 'air-asset', keyword: 'EWAR' } },
             { id: 'drone', label: 'DRONE', subtitle: 'MQ9', icon: 'drone', action: { type: 'air-asset', keyword: 'DRONE' } },
+            { id: 'asw', label: 'ASW', subtitle: 'ANTI-SUB', icon: 'anchor', action: { type: 'air-asset', keyword: 'ASW' } },
           ],
         },
       ],

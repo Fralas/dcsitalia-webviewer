@@ -22,6 +22,7 @@ export const WEB_MAP_ACTION_OPTIONS = [
   { type: 'air_asset', keyword: 'CAP', label: 'CAP', cost: null },
   { type: 'air_asset', keyword: 'EWAR', label: 'EWAR', cost: null },
   { type: 'air_asset', keyword: 'DRONE', label: 'DRONE', cost: null },
+  { type: 'air_asset', keyword: 'ASW', label: 'ASW', cost: null },
 
   { type: 'ground_asset', keyword: 'MBT', label: 'MBT', cost: 90 },
   { type: 'ground_asset', keyword: 'LAV25', label: 'LAV25', cost: 90 },
