@@ -6,7 +6,7 @@
   --privacy-font: "Inter", "Aptos", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 
   max-width: 720px;
-  margin: 0 auto 48px;
+  margin: 0 auto;
   padding: 8px 4px 24px;
   color: var(--privacy-text);
   font-family: var(--privacy-font);

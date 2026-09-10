@@ -3,7 +3,7 @@ import path from 'path';
 import { getAirportById } from '../config/airports.config.js';
 import { optionalPath } from '../config/envPaths.js';
 import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
-import { writeJsonAtomic } from './lidcDcsBridge.js';
+import { readJsonFile, writeJsonAtomic } from './lidcDcsBridge.js';
 import {
   buildShopPurchaseLines,
   createDefaultBaseLogistics,
@@ -32,6 +32,15 @@ function resolveDcoreOrdersFile() {
   const webCommands = optionalPath('WEB_COMMANDS_FILE');
   if (webCommands) return path.join(path.dirname(webCommands), 'Export_WebLogistics_Orders.json');
 
+  return null;
+}
+
+function resolveDcoreRedeemedFile() {
+  const explicit = optionalPath('HIDC_LOGISTICS_REDEEMED_FILE');
+  if (explicit) return explicit;
+
+  const ordersFile = resolveDcoreOrdersFile();
+  if (ordersFile) return path.join(path.dirname(ordersFile), 'Export_WebLogistics_Redeemed.json');
   return null;
 }
 
@@ -161,15 +170,36 @@ function occupancyAirport(airport) {
   };
 }
 
+function inferItemCategory(itemId, kind, catalogItem) {
+  const category = sanitizeText(catalogItem?.category, 20).toUpperCase();
+  if (category === 'CONTAINER' || category === 'SCONTAINER' || category === 'CASSA') {
+    return category;
+  }
+  const id = sanitizeText(itemId, 80);
+  if (/^scontainer/i.test(id)) return 'SCONTAINER';
+  if (/^crate/i.test(id) || sanitizeText(kind, 40).toLowerCase() === 'crate') return 'CASSA';
+  return 'CONTAINER';
+}
+
+function lineWeightLbs(line, catalogItem) {
+  const stored = Math.max(0, Math.floor(Number(line?.weightLbs) || 0));
+  if (stored > 0) return stored;
+  const quantity = Math.max(0, Math.floor(Number(line?.quantity) || 0));
+  return Math.max(0, Math.floor(Number(catalogItem?.weightLbs) || 0)) * quantity;
+}
+
 function toDcoreOrderItem(line, catalogById) {
   const catalogItem = catalogById.get(sanitizeText(line?.itemId, 80));
+  const quantity = Math.max(0, Math.floor(Number(line?.quantity) || 0));
   return {
     item_id: sanitizeText(line?.itemId, 80),
     name: sanitizeText(line?.name || catalogItem?.name, 120),
+    category: inferItemCategory(line?.itemId, line?.kind || catalogItem?.kind, catalogItem),
     kind: sanitizeText(line?.kind || catalogItem?.kind, 40),
     destination: sanitizeText(line?.destination || catalogItem?.destination, 40),
-    quantity: Math.max(0, Math.floor(Number(line?.quantity) || 0)),
+    quantity,
     cost: Math.max(0, Math.floor(Number(line?.cost) || 0)),
+    weight_lbs: lineWeightLbs(line, catalogItem),
     contents: Array.isArray(catalogItem?.contents)
       ? catalogItem.contents.map((entry) => ({
         label: sanitizeText(entry?.label, 80),
@@ -180,6 +210,8 @@ function toDcoreOrderItem(line, catalogById) {
 }
 
 function toDcoreOrder(airport, order, catalogById) {
+  const items = (Array.isArray(order?.items) ? order.items : []).map((line) => toDcoreOrderItem(line, catalogById));
+  const totalWeightLbs = items.reduce((sum, item) => sum + (Number(item.weight_lbs) || 0), 0);
   return {
     code: sanitizeText(order?.code, 12).toUpperCase(),
     id: sanitizeText(order?.id, 120),
@@ -190,12 +222,13 @@ function toDcoreOrder(airport, order, catalogById) {
     lat: Number.isFinite(airport.coordinates?.lat) ? airport.coordinates.lat : null,
     lon: Number.isFinite(airport.coordinates?.lon) ? airport.coordinates.lon : null,
     cost: Math.max(0, Math.floor(Number(order?.cost) || 0)),
+    total_weight_lbs: totalWeightLbs,
     created_at: Number(order?.createdAt) || Date.now(),
     created_by: sanitizeText(order?.createdByUserName || order?.squadronName, 120),
     created_by_id: sanitizeText(order?.createdByUserId, 80),
     accepted_at: Number(order?.acceptedAt) || 0,
     accepted_by_id: sanitizeText(order?.acceptedByUserId, 80),
-    items: (Array.isArray(order?.items) ? order.items : []).map((line) => toDcoreOrderItem(line, catalogById)),
+    items,
   };
 }
 
@@ -242,6 +275,59 @@ export function exportHidcLogisticsOrders() {
   }
 
   return targetPath;
+}
+
+const appliedDcoreRedeemCodes = new Set();
+
+export function syncDcoreRedeemedOrders() {
+  const targetPath = resolveDcoreRedeemedFile();
+  if (!targetPath) return 0;
+
+  const payload = readJsonFile(targetPath, { redeemed: [] }) || { redeemed: [] };
+  const rows = Array.isArray(payload.redeemed) ? payload.redeemed : [];
+  if (rows.length === 0) return 0;
+
+  const store = readBaseLogisticsStore();
+  let changed = 0;
+
+  rows.forEach((row) => {
+    const code = sanitizeText(row?.code, 12).toUpperCase();
+    const orderId = sanitizeText(row?.id, 120);
+    if (!code || appliedDcoreRedeemCodes.has(code)) return;
+
+    Object.entries(store.bases || {}).forEach(([baseId, logistics]) => {
+      const orders = normalizeBaseOrders(logistics?.orders);
+      const index = orders.findIndex((order) => {
+        const orderCode = sanitizeText(order?.code, 12).toUpperCase();
+        const status = sanitizeText(order?.status, 20).toLowerCase();
+        if (status === 'completed') return false;
+        if (orderId && sanitizeText(order?.id, 120) === orderId) return true;
+        return orderCode === code;
+      });
+      if (index < 0) return;
+
+      orders[index] = {
+        ...orders[index],
+        status: 'completed',
+        completedAt: Number(row?.redeemed_at) || Date.now(),
+        completedByUserId: 'dcore',
+        redeemedHub: sanitizeText(row?.hub, 80),
+      };
+      store.bases[baseId] = {
+        ...logistics,
+        orders,
+      };
+      changed += 1;
+      appliedDcoreRedeemCodes.add(code);
+    });
+  });
+
+  if (changed > 0) {
+    writeBaseLogisticsStore(store);
+    exportHidcLogisticsOrders();
+  }
+
+  return changed;
 }
 
 export function getAirportOccupancy(baseId, actorUserId = '', options = {}) {

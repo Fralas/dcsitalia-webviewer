@@ -114,15 +114,14 @@
 }
 
 .map-ops-section__toolbar--mission {
-  justify-content: center;
-  padding-left: 42px;
+  justify-content: flex-start;
 }
 
 .map-ops-section__toolbar-cluster {
   display: flex;
   flex-wrap: nowrap;
   align-items: stretch;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 8px;
   min-width: 0;
 }

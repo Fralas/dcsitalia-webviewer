@@ -250,6 +250,16 @@ const VEHICLES = [
     image: scoutImg,
   },
   {
+    id: 'assaulter',
+    category: { en: 'GROUND', it: 'GROUND' },
+    name: 'ASSAULTER',
+    description: {
+      en: 'Rifle infantry team for close assault and embark aboard helicopters or ships. Targets: enemy infantry, light positions, and boarding actions. Weapon: small arms, direct fire. Feature: Helicopter transportable.',
+      it: 'Squadra di fanteria d\'assalto per combattimento ravvicinato e imbarco su elicotteri o navi. Bersagli: fanteria nemica, postazioni leggere, azioni di boarding. Arma: armi individuali, tiro diretto. Caratteristica: trasportabile su elicottero.',
+    },
+    image: scoutImg,
+  },
+  {
     id: 'hmmwv',
     category: { en: 'SCOUT', it: 'SCOUT' },
     name: 'HMMWV',

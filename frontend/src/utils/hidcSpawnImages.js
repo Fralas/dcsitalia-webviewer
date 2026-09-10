@@ -10,6 +10,7 @@ import towImg from '../../img/wiki/veh/TOW.png';
 const SPAWN_IMAGES = {
   MANPAD: manpadImg,
   SCOUT: scoutImg,
+  ASSAULTER: scoutImg,
   AMMO: ammoCrateImg,
   FUEL: fuelCrateImg,
   BUILD: buildCrateImg,

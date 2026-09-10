@@ -567,6 +567,7 @@ const SHIP_COLOR_BOARDED = '#22c55e';
 const SPAWN_BANNER_DISPLAY_NAMES = {
   MANPAD: 'MANPAD',
   SCOUT: 'Scout',
+  ASSAULTER: 'Assaulter',
   AMMO: 'Ammo',
   FUEL: 'Fuel',
   BUILD: 'Build',
@@ -673,7 +674,7 @@ const SPAWN_MENU_SECTIONS = [
     titleKey: 'lidc.map.airportWizard.spawn.infantry',
     kindKey: 'lidc.map.airportWizard.spawn.kindInfantry',
     spawnType: 'inf_spawn',
-    keywords: ['MANPAD', 'SCOUT'],
+    keywords: ['MANPAD', 'SCOUT', 'ASSAULTER'],
   },
   {
     id: 'build',
@@ -6197,6 +6198,9 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       lon: selectedAirport.coordinates?.lon,
       coordinates: selectedAirport.coordinates,
       icao: selectedAirport.icao,
+      coalition: selectedAirport.coalition === 'blue' || selectedAirport.coalition === 'red'
+        ? selectedAirport.coalition
+        : 'neutral',
     };
   }, [selectedAirport]);
   const selectedAirportIsBlue = selectedAirport?.coalition === 'blue';
@@ -7021,6 +7025,11 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       if (response?.commandId) {
         pendingCommandIdsRef.current.add(response.commandId);
       }
+      showCommandToast({
+        ok: true,
+        message: `Spawn order sent (${quantity}x ${keyword}). Waiting for DCS...`,
+        balance: null,
+      });
       setSpawnMode(null);
     } catch (error) {
       console.error('Failed to submit spawn command:', error);
@@ -7103,6 +7112,11 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       if (response?.commandId) {
         pendingCommandIdsRef.current.add(response.commandId);
       }
+      showCommandToast({
+        ok: true,
+        message: `Spawn order sent (${keyword}). Waiting for DCS...`,
+        balance: null,
+      });
     } catch (error) {
       console.error('Failed to submit map action:', error);
       showCommandToast({ ok: false, message: error.message || 'Failed to send map action.', balance: null });

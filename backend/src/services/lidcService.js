@@ -76,12 +76,63 @@ function shopImageKey(category) {
   return 'container_blue_mid';
 }
 
+function shopCostForCategory(category) {
+  if (category === 'SCONTAINER') return 2;
+  if (category === 'CASSA') return 1;
+  return 4;
+}
+
+const LOGISTICS_SHOP_WEIGHTS_LBS = Object.freeze({
+  'Container AA_New': 39764,
+  'Container AA_Old': 37036,
+  'Container_AG_GPS 1': 89925,
+  'Container_AG_GPS 2': 99591,
+  'Container_AG_LGB 1': 29892,
+  'Container_AG_Glide 1': 28462,
+  'Container_AG_Cruise 1': 38592,
+  'Container_AG_Maverick 1': 49260,
+  'Container_AG_Maverick 2': 59357,
+  'Container_AG_Hellfire': 62329,
+  'Container_AG_SEAD1': 30975,
+  'Container_AG_Rockets': 82684,
+  'Container_ASW': 55874,
+  'SContainer_AG_Heli': 49450,
+  'SContainer_GPS_1': 65662,
+  'Container_AG_Rus': 60737,
+  'Crate_120': 3102,
+  'Crate_9X': 2660,
+  'Crate_GBU38': 3109,
+  'Crate_GBU54': 3109,
+  'Crate_CBU105': 3042,
+  'Crate_AGM65D': 3090,
+  'Crate_AGM65F': 3128,
+  'Crate_AGM114K': 1427,
+  'Crate_AGM114L': 1543,
+  'Crate_AGM88': 3070,
+  'Crate_Hydra': 1575,
+  'Crate_APKWS': 472,
+  'Crate_Ataka': 1559,
+  'Crate_S8FP2': 1575,
+});
+
+function shopWeightLbs(id) {
+  return Math.max(0, Math.floor(Number(LOGISTICS_SHOP_WEIGHTS_LBS[id]) || 0));
+}
+
+function shopLineWeightLbs(catalogItem, quantity, storedWeight = 0) {
+  const stored = Math.max(0, Math.floor(Number(storedWeight) || 0));
+  if (stored > 0) return stored;
+  const qty = Math.max(0, Math.floor(Number(quantity) || 0));
+  return Math.max(0, Math.floor(Number(catalogItem?.weightLbs) || 0)) * qty;
+}
+
 function defineShopPreset({ category, id, name, destination, contents }) {
   const parsedContents = Object.freeze(parseShopContents(contents));
   const kind = category === 'CASSA' ? 'crate' : 'container';
   const totalQuantity = parsedContents.reduce((sum, entry) => sum + Math.max(0, Number(entry.quantity) || 0), 0);
   return Object.freeze({
     id,
+    category,
     kind,
     imageKey: shopImageKey(category),
     name,
@@ -89,7 +140,8 @@ function defineShopPreset({ category, id, name, destination, contents }) {
     contents: parsedContents,
     total: totalQuantity,
     types: parsedContents.filter((entry) => (Number(entry.quantity) || 0) > 0).length,
-    cost: kind === 'container' ? totalQuantity * 30 : totalQuantity * 72,
+    cost: shopCostForCategory(category),
+    weightLbs: shopWeightLbs(id),
     transport: Object.freeze(kind === 'crate' ? ['aircraft', 'helicopter'] : ['aircraft']),
   });
 }
@@ -1427,6 +1479,7 @@ function summarizeLogistics(logistics) {
 function listLogisticsShop() {
   return LOGISTICS_SHOP_CATALOG.map((item) => ({
     id: item.id,
+    category: item.category,
     kind: item.kind,
     imageKey: item.imageKey,
     name: item.name,
@@ -1435,6 +1488,7 @@ function listLogisticsShop() {
     total: item.total,
     types: item.types,
     cost: item.cost,
+    weightLbs: item.weightLbs,
     transport: [...item.transport],
   }));
 }
@@ -1477,6 +1531,7 @@ function normalizeBaseOrders(rawOrders) {
             destination: catalogItem.destination,
             quantity,
             cost: cost || catalogItem.cost * quantity,
+            weightLbs: shopLineWeightLbs(catalogItem, quantity, line?.weightLbs),
           };
         })
         .filter(Boolean);
@@ -1498,6 +1553,7 @@ function normalizeBaseOrders(rawOrders) {
         status: normalizeOrderStatus(order?.status),
         items,
         cost: items.reduce((sum, line) => sum + Number(line.cost || 0), 0),
+        weightLbs: items.reduce((sum, line) => sum + Number(line.weightLbs || 0), 0),
       };
     })
     .filter(Boolean)
@@ -1598,6 +1654,7 @@ function buildShopPurchaseLines(rawItems) {
       destination: catalogItem.destination,
       quantity: qty,
       cost: lineCost,
+      weightLbs: shopLineWeightLbs(catalogItem, qty),
     });
   });
 

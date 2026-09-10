@@ -12,6 +12,7 @@ import {
   Plus,
   Search,
   Shield,
+  Weight,
   Trash2,
   Undo2,
   X,
@@ -21,6 +22,7 @@ import ammoContainerImage from '../../img/crates/container_blue_mid.png';
 import ammoHeliContainerImage from '../../img/crates/container_green_small.png';
 import ammoCrateImage from '../../img/crates/ammo_crate.webp';
 import { formatLidcAirportLabel, getLidcAirportById } from '../config/lidcAfghanistanAirports';
+import { resolveAirportTypeCoalition } from '../utils/airportStatus';
 import * as api from '../services/api';
 import { t } from '../utils/locale';
 import { getLidcUnitImageUrl } from '../utils/lidcUnitImages';
@@ -76,6 +78,7 @@ function ShopCard({ item, canAdd, onAdd }) {
   const imageUrl = shopImageFor(item);
   const contents = contentsLabel(item);
   const isCrate = item.kind === 'crate';
+  const weightLabel = formatWeightLbs(item.weightLbs);
 
   return (
     <button
@@ -95,6 +98,12 @@ function ShopCard({ item, canAdd, onAdd }) {
       <strong>{displayShopText(item.name)}</strong>
       <em>{shopKindLabel(item)}</em>
       <p>{contents}</p>
+      {weightLabel ? (
+        <span className="lidc-airport-wizard-shop-card__weight">
+          <Weight size={12} />
+          {weightLabel}
+        </span>
+      ) : null}
       <span className="lidc-airport-wizard-shop-card__cost">
         <Coins size={14} />
         {formatStock(item.cost)}
@@ -152,6 +161,26 @@ function formatMgrs(lat, lon) {
 
 function formatStock(value) {
   return Number(value || 0).toLocaleString();
+}
+
+function formatWeightLbs(weightLbs) {
+  const value = Math.max(0, Math.floor(Number(weightLbs) || 0));
+  if (value < 1) return '';
+  return `${value.toLocaleString()} lb`;
+}
+
+function lineWeightLbs(item, quantity = 1, storedWeight = 0) {
+  const stored = Math.max(0, Math.floor(Number(storedWeight) || 0));
+  if (stored > 0) return stored;
+  return Math.max(0, Math.floor(Number(item?.weightLbs) || 0)) * Math.max(0, Math.floor(Number(quantity) || 0));
+}
+
+function orderWeightLbs(order, shopById) {
+  const stored = Math.max(0, Math.floor(Number(order?.weightLbs) || 0));
+  if (stored > 0) return stored;
+  return (Array.isArray(order?.items) ? order.items : []).reduce((sum, item) => (
+    sum + lineWeightLbs(shopById?.get?.(item.itemId), item.quantity, item.weightLbs)
+  ), 0);
 }
 
 const FUEL_LOW_RATIO = 0.2;
@@ -215,6 +244,7 @@ export default function LidcAirportWizard({
   const [editingOrderId, setEditingOrderId] = useState('');
   const [orderBusyId, setOrderBusyId] = useState('');
   const catalogAirport = getLidcAirportById(airport?.id) || occupancy?.airport || airport;
+  const typeCoalition = resolveAirportTypeCoalition(airport, occupancy?.airport, catalogAirport);
   const airportLat = catalogAirport?.lat ?? catalogAirport?.coordinates?.lat;
   const airportLon = catalogAirport?.lon ?? catalogAirport?.coordinates?.lon;
   const squadrons = Array.isArray(occupancy?.squadrons) ? occupancy.squadrons : [];
@@ -248,6 +278,7 @@ export default function LidcAirportWizard({
           item,
           quantity: qty,
           cost: item.cost * qty,
+          weightLbs: lineWeightLbs(item, qty),
         };
       })
       .filter(Boolean);
@@ -255,6 +286,10 @@ export default function LidcAirportWizard({
 
   const cartTotal = useMemo(
     () => cartLines.reduce((sum, line) => sum + line.cost, 0),
+    [cartLines],
+  );
+  const cartWeightLbs = useMemo(
+    () => cartLines.reduce((sum, line) => sum + Number(line.weightLbs || 0), 0),
     [cartLines],
   );
   const spendBudget = editingOrder
@@ -279,6 +314,7 @@ export default function LidcAirportWizard({
     ? cartLines
     : (editingOrder ? [] : cartLinesSnapshot.current);
   const visibleCartTotal = visibleCartLines.reduce((sum, line) => sum + line.cost, 0);
+  const visibleCartWeightLbs = visibleCartLines.reduce((sum, line) => sum + Number(line.weightLbs || 0), 0);
   const visibleCartCount = visibleCartLines.length;
   const editingEmptyCart = Boolean(editingOrder) && cartLines.length === 0;
 
@@ -444,7 +480,7 @@ export default function LidcAirportWizard({
       >
         <header className="lidc-airport-wizard-head">
           <div>
-            <span className="lidc-occupancy-panel__type">{catalogAirport?.subtitle}</span>
+            <span className={`lidc-occupancy-panel__type${typeCoalition ? ` lidc-occupancy-panel__type--${typeCoalition}` : ''}`}>{catalogAirport?.subtitle}</span>
             <h2>{catalogAirport?.name}</h2>
             <p>{t('lidc.map.airportWizard.subtitle')}</p>
           </div>
@@ -536,6 +572,7 @@ export default function LidcAirportWizard({
                 {orders.map((order) => {
                   const isAccepted = order.status === 'accepted';
                   const busy = orderBusyId === order.id;
+                  const orderWeightLabel = formatWeightLbs(orderWeightLbs(order, shopById));
                   return (
                     <article
                       key={order.id}
@@ -603,7 +640,10 @@ export default function LidcAirportWizard({
                               )}
                             </div>
                           )}
-                          <strong>{formatStock(order.cost)}</strong>
+                          <div className="lidc-airport-wizard-order-totals">
+                            <strong>{formatStock(order.cost)}</strong>
+                            {orderWeightLabel ? <span>{orderWeightLabel}</span> : null}
+                          </div>
                         </div>
                       </header>
                       <div className="lidc-airport-wizard-order-items">
@@ -758,7 +798,10 @@ export default function LidcAirportWizard({
                 <img src={shopImageFor(line.item)} alt="" draggable={false} />
                 <div>
                   <strong>{displayShopText(line.item.name)}</strong>
-                  <span>{shopKindLabel(line.item)}</span>
+                  <span>
+                    {shopKindLabel(line.item)}
+                    {formatWeightLbs(line.weightLbs) ? ` · ${formatWeightLbs(line.weightLbs)}` : ''}
+                  </span>
                 </div>
                 <div className="lidc-airport-wizard-cart__qty">
                   <button
@@ -788,6 +831,12 @@ export default function LidcAirportWizard({
               <span>{t('lidc.map.airportWizard.cartTotal')}</span>
               <strong>{formatStock(cartLines.length > 0 ? cartTotal : visibleCartTotal)}</strong>
             </div>
+            {(cartLines.length > 0 ? cartWeightLbs : visibleCartWeightLbs) > 0 && (
+              <div>
+                <span>{t('lidc.map.airportWizard.cartWeight')}</span>
+                <strong className="is-weight">{formatWeightLbs(cartLines.length > 0 ? cartWeightLbs : visibleCartWeightLbs)}</strong>
+              </div>
+            )}
             {editingEmptyCart ? (
               <button
                 type="button"

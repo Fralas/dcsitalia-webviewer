@@ -1,5 +1,6 @@
 import { ChevronRight, Helicopter, Loader2, Plane, X } from 'lucide-react';
 import { formatLidcAirportLabel } from '../config/lidcAfghanistanAirports';
+import { resolveAirportTypeCoalition } from '../utils/airportStatus';
 import { t } from '../utils/locale';
 import InlineError from './InlineError';
 
@@ -58,6 +59,7 @@ export default function LidcAirportPresencePanel({
     : Math.max(0, Math.floor(Number(fuelAlertCount) || 0));
   const orderBadge = formatBadgeCount(orderCount);
   const fuelBadge = formatBadgeCount(fuelCount);
+  const typeCoalition = resolveAirportTypeCoalition(airport, occupancy?.airport);
 
   return (
     <aside
@@ -68,7 +70,7 @@ export default function LidcAirportPresencePanel({
     >
       <header className="lidc-occupancy-panel__head">
         <div className="lidc-occupancy-panel__identity">
-          <span className="lidc-occupancy-panel__type">{airport?.subtitle}</span>
+          <span className={`lidc-occupancy-panel__type${typeCoalition ? ` lidc-occupancy-panel__type--${typeCoalition}` : ''}`}>{airport?.subtitle}</span>
           <h3 className="lidc-occupancy-panel__name">{airport?.name}</h3>
         </div>
         <button

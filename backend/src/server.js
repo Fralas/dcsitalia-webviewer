@@ -131,39 +131,48 @@ const AIRLIFT_PLAYERS_SYNC_FILE = optionalPath('AIRLIFT_PLAYERS_SYNC_FILE');
 // Production Points state exported by DCORE (DSCORE_Rigs.lua) for the map.
 const PRODUCTION_POINTS_FILE = optionalPath('PRODUCTION_POINTS_FILE');
 
-// Web -> DCORE command bridge (DBRIDGE). The webviewer OWNS the command queue file
-// (append + prune); DCORE owns the result file (read-only here).
-const WEB_COMMANDS_FILE = optionalPath('WEB_COMMANDS_FILE');
+function resolveDbridgeDir() {
+  const explicit = [
+    optionalPath('WEB_COMMANDS_FILE'),
+    optionalPath('WEB_COMMANDS_RESULT_FILE'),
+    optionalPath('WEB_SPAWN_MARKERS_FILE'),
+    optionalPath('DBUILD_SITES_FILE'),
+    optionalPath('TANKER_ROUTES_FILE'),
+    optionalPath('SHIP_POSITIONS_FILE'),
+  ].find(Boolean);
+  if (explicit) return path.dirname(explicit);
 
-const WEB_COMMANDS_RESULT_FILE = optionalPath('WEB_COMMANDS_RESULT_FILE');
-
-// Tracked crate positions exported by DMAS (live until moved/activated in-game).
-const WEB_SPAWN_MARKERS_FILE = optionalPath('WEB_SPAWN_MARKERS_FILE');
-
-const DBUILD_SITES_FILE = optionalPath('DBUILD_SITES_FILE');
-
-const TANKER_ROUTES_FILE = optionalPath('TANKER_ROUTES_FILE');
-
-function resolveDbridgeExportFile(envName, fileName) {
-  const explicit = optionalPath(envName);
-  if (explicit) return explicit;
-  const sibling = WEB_SPAWN_MARKERS_FILE || DBUILD_SITES_FILE || TANKER_ROUTES_FILE || WEB_COMMANDS_FILE;
-  if (sibling) return path.join(path.dirname(sibling), fileName);
   const productionPoints = optionalPath('PRODUCTION_POINTS_FILE');
   if (productionPoints) {
-    return path.join(path.dirname(path.dirname(productionPoints)), 'DBRIDGE', fileName);
+    return path.join(path.dirname(path.dirname(productionPoints)), 'DBRIDGE');
   }
   const dyzoneSource = optionalPath('DYZONE_SOURCE_DIR');
   if (dyzoneSource) {
-    return path.join(path.dirname(dyzoneSource), 'DBRIDGE', fileName);
+    return path.join(path.dirname(dyzoneSource), 'DBRIDGE');
   }
   const airbaseStatus = optionalPath('AIRBASE_STATUS_FILE');
   if (airbaseStatus) {
-    return path.join(path.dirname(path.dirname(airbaseStatus)), 'DBRIDGE', fileName);
+    return path.join(path.dirname(path.dirname(airbaseStatus)), 'DBRIDGE');
   }
   return null;
 }
 
+function resolveDbridgeExportFile(envName, fileName) {
+  const explicit = optionalPath(envName);
+  if (explicit) return explicit;
+  const dir = resolveDbridgeDir();
+  return dir ? path.join(dir, fileName) : null;
+}
+
+// Web -> DCORE command bridge (DBRIDGE). The webviewer OWNS the command queue file
+// (append + prune); DCORE owns the result file (read-only here).
+// If env vars are omitted, infer DCORE\src\DBRIDGE from other DCORE export paths
+// (same layout as logistics, which can work without WEB_COMMANDS_FILE).
+const WEB_COMMANDS_FILE = resolveDbridgeExportFile('WEB_COMMANDS_FILE', 'Export_WebCommands.json');
+const WEB_COMMANDS_RESULT_FILE = resolveDbridgeExportFile('WEB_COMMANDS_RESULT_FILE', 'Export_WebCommands_Result.json');
+const WEB_SPAWN_MARKERS_FILE = resolveDbridgeExportFile('WEB_SPAWN_MARKERS_FILE', 'Export_WebSpawn_Markers.json');
+const DBUILD_SITES_FILE = resolveDbridgeExportFile('DBUILD_SITES_FILE', 'Export_DBUILD_Sites.json');
+const TANKER_ROUTES_FILE = resolveDbridgeExportFile('TANKER_ROUTES_FILE', 'Export_Tanker_Routes.json');
 const SHIP_POSITIONS_FILE = resolveDbridgeExportFile('SHIP_POSITIONS_FILE', 'Export_Ship_Positions.json');
 
 // Max placement distance from airport center (matches DMAS blue_airbase_radius_m).
@@ -182,6 +191,7 @@ const WEB_COMMAND_RESULT_GRACE_MS = Number.parseInt(process.env.WEB_COMMAND_RESU
 const WEB_INFANTRY_OPTIONS = [
   { keyword: 'MANPAD', label: 'MANPAD', cost: 30 },
   { keyword: 'SCOUT', label: 'SCOUT', cost: 20 },
+  { keyword: 'ASSAULTER', label: 'ASSAULTER', cost: 0 },
 ];
 const WEB_CRATE_OPTIONS = [
   { keyword: 'AMMO', label: 'AMMO', cost: 5, group: 'build' },
@@ -587,6 +597,7 @@ function getAirportDisplayName(airportId) {
 const SPAWN_FEED_LABELS = {
   MANPAD: 'MANPAD',
   SCOUT: 'Scout',
+  ASSAULTER: 'Assaulter',
   AMMO: 'Ammo',
   FUEL: 'Fuel',
   BUILD: 'Build',
@@ -1272,12 +1283,19 @@ function syncProductionPointsFromFile() {
 
 function writeJsonAtomic(targetPath, obj) {
   const tempPath = `${targetPath}.tmp`;
+  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
   fs.writeFileSync(tempPath, JSON.stringify(obj, null, 2), 'utf8');
   fs.renameSync(tempPath, targetPath);
 }
 
 function persistWebCommands() {
-  if (!WEB_COMMANDS_FILE) return;
+  if (!WEB_COMMANDS_FILE) {
+    const error = new Error(
+      'Web command bridge is not configured. Set WEB_COMMANDS_FILE to DCORE src/DBRIDGE/Export_WebCommands.json.',
+    );
+    error.statusCode = 503;
+    throw error;
+  }
   try {
     writeJsonAtomic(WEB_COMMANDS_FILE, {
       commands: webCommands,
@@ -1285,7 +1303,9 @@ function persistWebCommands() {
     });
   } catch (error) {
     console.error('Failed to persist web commands queue:', error.message);
-    throw error;
+    const wrapped = new Error(`Failed to write spawn queue for DCS: ${error.message}`);
+    wrapped.statusCode = 503;
+    throw wrapped;
   }
 }
 
@@ -1327,6 +1347,22 @@ function enqueueWebCommand(command) {
   webCommands.push(command);
   persistWebCommands();
   return command;
+}
+
+function respondWebCommandError(res, error) {
+  const status = Number(error.statusCode) || 503;
+  logger.error('Failed to queue web command', { error: error.message });
+  return res.status(status).json({
+    error: error.message || 'Failed to queue command for DCS',
+  });
+}
+
+function queueAndRespond(res, payload) {
+  try {
+    return respondQueued(res, enqueueWebCommand(payload));
+  } catch (error) {
+    return respondWebCommandError(res, error);
+  }
 }
 
 function haversineMeters(lat1, lon1, lat2, lon2) {
@@ -3589,7 +3625,7 @@ app.post('/api/production-points/:id/upgrade', (req, res) => {
     return res.status(400).json({ error: 'Production point is already at max level' });
   }
 
-  const command = enqueueWebCommand({
+  queueAndRespond(res, {
     id: randomUUID(),
     type: 'pp_upgrade',
     production_point_id: ppId,
@@ -3601,8 +3637,6 @@ app.post('/api/production-points/:id/upgrade', (req, res) => {
     requested_by_id: actor.id,
     ts: Date.now(),
   });
-
-  respondQueued(res, command);
 });
 
 /**
@@ -3647,7 +3681,7 @@ app.post('/api/production-points/:id/retrieve', (req, res) => {
 
   const quantity = clampRetrieveQuantity(req.body?.quantity, stock);
 
-  const command = enqueueWebCommand({
+  queueAndRespond(res, {
     id: randomUUID(),
     type: 'pp_retrieve',
     production_point_id: ppId,
@@ -3660,8 +3694,6 @@ app.post('/api/production-points/:id/retrieve', (req, res) => {
     requested_by_id: actor.id,
     ts: Date.now(),
   });
-
-  respondQueued(res, command);
 });
 
 function handleSpawnRequest(req, res, kind) {
@@ -3697,7 +3729,7 @@ function handleSpawnRequest(req, res, kind) {
     }
   }
 
-  const command = enqueueWebCommand({
+  queueAndRespond(res, {
     id: randomUUID(),
     type: kind,
     production_point_id: null,
@@ -3710,12 +3742,10 @@ function handleSpawnRequest(req, res, kind) {
     requested_by_id: actor.id,
     ts: Date.now(),
   });
-
-  respondQueued(res, command);
 }
 
 /**
- * POST /api/airports/:id/spawn-infantry - Body { keyword: MANPAD|SCOUT, lat, lon }
+ * POST /api/airports/:id/spawn-infantry - Body { keyword: MANPAD|SCOUT|ASSAULTER, lat, lon }
  */
 app.post('/api/airports/:id/spawn-infantry', (req, res) => {
   handleSpawnRequest(req, res, 'inf_spawn');
@@ -3755,7 +3785,7 @@ app.post('/api/tanker/spawn', (req, res) => {
     return res.status(400).json({ error: distanceCheck.error });
   }
 
-  const command = enqueueWebCommand({
+  queueAndRespond(res, {
     id: randomUUID(),
     type: 'tanker_spawn',
     production_point_id: null,
@@ -3769,8 +3799,6 @@ app.post('/api/tanker/spawn', (req, res) => {
     requested_by_id: actor.id,
     ts: Date.now(),
   });
-
-  respondQueued(res, command);
 });
 
 /**
@@ -3795,7 +3823,7 @@ app.post('/api/map/actions/spawn', (req, res) => {
     return res.status(400).json({ error: 'Valid lat/lon are required' });
   }
 
-  const command = enqueueWebCommand({
+  queueAndRespond(res, {
     id: randomUUID(),
     type: commandType,
     production_point_id: null,
@@ -3807,8 +3835,6 @@ app.post('/api/map/actions/spawn', (req, res) => {
     requested_by_id: actor.id,
     ts: Date.now(),
   });
-
-  respondQueued(res, command);
 });
 
 /**
@@ -3913,20 +3939,25 @@ app.post('/api/dbuild/placements/:id/confirm', (req, res) => {
     return res.status(400).json({ error: 'Only draft placements can be confirmed' });
   }
 
-  const command = enqueueWebCommand({
-    id: randomUUID(),
-    type: 'dbuild_confirm',
-    production_point_id: null,
-    airport_id: null,
-    keyword: null,
-    build_type: placement.build_type,
-    placement_id: placement.id,
-    lat: placement.lat,
-    lon: placement.lon,
-    requested_by: actor.name,
-    requested_by_id: actor.id,
-    ts: Date.now(),
-  });
+  let command;
+  try {
+    command = enqueueWebCommand({
+      id: randomUUID(),
+      type: 'dbuild_confirm',
+      production_point_id: null,
+      airport_id: null,
+      keyword: null,
+      build_type: placement.build_type,
+      placement_id: placement.id,
+      lat: placement.lat,
+      lon: placement.lon,
+      requested_by: actor.name,
+      requested_by_id: actor.id,
+      ts: Date.now(),
+    });
+  } catch (error) {
+    return respondWebCommandError(res, error);
+  }
 
   const updated = dbuildPlacementsService.updatePlacement(placementId, {
     status: 'confirmed',
@@ -5889,6 +5920,11 @@ setInterval(() => {
   syncLidcAirframeStateFromFile();
 }, 2000);
 
+// Poll logistics order codes redeemed in-game by DLOGISTICS
+setInterval(() => {
+  hidcAirportLogistics.syncDcoreRedeemedOrders();
+}, 2000);
+
 // Refresh LIDC access policy for DCS enforcement
 setInterval(() => {
   lidcService.exportLidcPolicy();
@@ -5935,6 +5971,7 @@ syncDbuildSitesFromFile();
 syncShipPositionsFromFile();
 exportPendingWarehouseOps();
 hidcAirportLogistics.exportHidcLogisticsOrders();
+hidcAirportLogistics.syncDcoreRedeemedOrders();
 syncLidcLinkRequestsFromFile();
 syncLidcWarehouseOpsAckFromFile();
 lidcService.exportLidcAirframeRegistry();
@@ -5961,6 +5998,11 @@ httpServer.listen(PORT, '127.0.0.1', () => {
     logger.warn('AUTH BYPASS LOCAL enabled — Discord login not required in development');
   }
   logger.info(`SQLite store: ${getSqlitePath()}`);
+  if (WEB_COMMANDS_FILE) {
+    logger.info(`Web command bridge: ${WEB_COMMANDS_FILE}`);
+  } else {
+    logger.warn('Web command bridge DISABLED: could not resolve DCORE DBRIDGE Export_WebCommands.json');
+  }
 });
 
 // ==================== ADMIN ENDPOINTS ====================

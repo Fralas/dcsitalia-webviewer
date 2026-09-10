@@ -957,7 +957,7 @@ export async function retrieveProductionPointCrates(productionPointId, lat, lon,
 }
 
 /**
- * Spawn infantry (INF MANPAD / INF SCOUT) at a clicked point inside a BLUE airport.
+ * Spawn infantry (INF MANPAD / INF SCOUT / INF ASSAULTER) at a clicked point inside a BLUE airport.
  */
 export async function spawnAirportInfantry(airportId, keyword, lat, lon, quantity = 1) {
   return fetchAPI(`/airports/${encodeURIComponent(airportId)}/spawn-infantry`, {

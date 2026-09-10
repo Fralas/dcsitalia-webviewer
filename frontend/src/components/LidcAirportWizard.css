@@ -314,6 +314,12 @@
   font-size: 16px;
 }
 
+.lidc-airport-wizard-cart footer strong.is-weight {
+  color: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
 .lidc-airport-wizard-cart footer .lidc-btn {
   display: inline-flex;
   align-items: center;
@@ -326,6 +332,18 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
+}
+
+.lidc-airport-wizard-head .lidc-occupancy-panel__type--blue {
+  color: #3b82f6;
+}
+
+.lidc-airport-wizard-head .lidc-occupancy-panel__type--red {
+  color: #ef4444;
+}
+
+.lidc-airport-wizard-head .lidc-occupancy-panel__type--neutral {
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .lidc-airport-wizard-head h2 {
@@ -587,9 +605,24 @@
   flex-shrink: 0;
 }
 
-.lidc-airport-wizard-order-tools strong {
+.lidc-airport-wizard-order-totals {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.lidc-airport-wizard-order-tools strong,
+.lidc-airport-wizard-order-totals strong {
   color: var(--lidc-accent-gold);
   font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lidc-airport-wizard-order-totals span {
+  color: var(--lidc-mute);
+  font-size: 10px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
@@ -604,6 +637,7 @@
   gap: 2px;
 }
 
+.lidc-airport-wizard-order-actions + .lidc-airport-wizard-order-totals,
 .lidc-airport-wizard-order-actions + strong {
   padding-left: 10px;
   border-left: 1px solid rgba(255, 255, 255, 0.12);
@@ -922,12 +956,25 @@
   -webkit-line-clamp: 2;
 }
 
+.lidc-airport-wizard-shop-card__weight {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 6px;
+  color: var(--lidc-mute);
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
 .lidc-airport-wizard-shop-card__cost {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
-  margin-top: 6px;
+  margin-top: 4px;
   color: var(--lidc-accent-gold);
   font-size: 13px;
   font-weight: 800;

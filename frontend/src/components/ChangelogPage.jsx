@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarSync, GitPullRequestCreateArrow, ImagePlus, Languages, Loader2, Pencil, Plus, Save, Trash2, Upload, Video, X } from 'lucide-react';
+import { CalendarSync, ImagePlus, Languages, Loader2, Pencil, Plus, Save, Trash2, Upload, Video, X } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import * as api from '../services/api';
 import InlineError from './InlineError';
+import './ChangelogPage.css';
 
 const ALLOWED_AUTHOR_IDS = new Set([
   '153370631772045313',
@@ -27,21 +28,96 @@ const CONTRIBUTORS = [
 ];
 
 const TAGS = {
-  NEW: {
-    label: 'New',
-    editorClass: 'border-green-500/40 bg-green-500/15 text-green-300',
+  NEW: { label: 'New', tone: 'new' },
+  UPD: { label: 'Upd', tone: 'upd' },
+  FIX: { label: 'Fix', tone: 'fix' },
+  WIP: { label: 'WIP', tone: 'wip' },
+};
+
+const UI_COPY = {
+  en: {
+    kicker: 'Release notes',
+    title: 'Changelog',
+    lede: 'Campaign updates, fixes, and work in progress.',
+    composer: 'Composer',
+    composerNew: 'New changelog entry.',
+    composerEdit: 'Editing a published entry.',
+    openEditor: 'New entry',
+    closeEditor: 'Close editor',
+    draftReady: 'Draft ready',
+    titleIt: 'Italian title',
+    titleEn: 'English title',
+    titlePlaceholder: 'Changelog title',
+    titleEnPlaceholder: 'English title',
+    rowIt: 'Italian',
+    rowEn: 'English',
+    rowPlaceholder: 'Italian row (markdown)',
+    rowEnPlaceholder: 'English row (markdown)',
+    addRow: 'Add row',
+    removeRow: 'Remove',
+    contributors: 'Contributors',
+    media: 'Inline media',
+    mediaHint: 'Place the cursor in an IT/EN row. Each upload is inserted at that point.',
+    uploadMedia: 'Upload media',
+    insert: 'Insert',
+    remove: 'Remove',
+    translateEn: 'Translate EN',
+    publish: 'Publish',
+    update: 'Update',
+    cancelEdit: 'Cancel edit',
+    deleteDraft: 'Delete draft',
+    readonly: 'This account is read-only for changelogs.',
+    loading: 'Loading changelog...',
+    empty: 'No changelog published yet.',
+    feed: 'Published',
+    feedSubtitle: 'All published campaign notes.',
+    by: 'by',
+    edit: 'Edit',
+    delete: 'Delete',
+    close: 'Close',
+    confirmDelete: 'Delete this changelog?',
   },
-  UPD: {
-    label: 'Upd',
-    editorClass: 'border-blue-500/40 bg-blue-500/15 text-blue-300',
-  },
-  FIX: {
-    label: 'Fix',
-    editorClass: 'border-orange-500/40 bg-orange-500/15 text-orange-300',
-  },
-  WIP: {
-    label: 'WIP',
-    editorClass: 'border-yellow-500/40 bg-yellow-500/15 text-yellow-300',
+  it: {
+    kicker: 'Note di rilascio',
+    title: 'Changelog',
+    lede: 'Aggiornamenti di campagna, correzioni e lavori in corso.',
+    composer: 'Composizione',
+    composerNew: 'Nuova voce changelog.',
+    composerEdit: 'Modifica di una voce pubblicata.',
+    openEditor: 'Nuova voce',
+    closeEditor: 'Chiudi editor',
+    draftReady: 'Bozza pronta',
+    titleIt: 'Titolo italiano',
+    titleEn: 'Titolo inglese',
+    titlePlaceholder: 'Titolo changelog',
+    titleEnPlaceholder: 'English title',
+    rowIt: 'Italiano',
+    rowEn: 'Inglese',
+    rowPlaceholder: 'Riga IT (markdown)',
+    rowEnPlaceholder: 'English row (markdown)',
+    addRow: 'Aggiungi riga',
+    removeRow: 'Rimuovi',
+    contributors: 'Contributor',
+    media: 'Media nel testo',
+    mediaHint: 'Posiziona il cursore in una riga IT/EN: ogni upload viene inserito nel punto scelto.',
+    uploadMedia: 'Carica media',
+    insert: 'Inserisci',
+    remove: 'Rimuovi',
+    translateEn: 'Traduci EN',
+    publish: 'Pubblica',
+    update: 'Aggiorna',
+    cancelEdit: 'Annulla modifica',
+    deleteDraft: 'Elimina bozza',
+    readonly: 'Account in sola lettura per i changelog.',
+    loading: 'Caricamento changelog...',
+    empty: 'Nessun changelog pubblicato.',
+    feed: 'Pubblicati',
+    feedSubtitle: 'Tutte le note di campagna pubblicate.',
+    by: 'di',
+    edit: 'Modifica',
+    delete: 'Elimina',
+    close: 'Chiudi',
+    confirmDelete: 'Confermi eliminazione di questo changelog?',
   },
 };
 
@@ -66,11 +142,18 @@ function readLocalDraft(userId) {
   }
 }
 
-function formatDate(timestamp) {
+function formatEntryStamp(timestamp, locale) {
   try {
-    return new Date(timestamp).toLocaleString('it-IT');
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) {
+      return { day: '-', time: '' };
+    }
+    return {
+      day: date.toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase(),
+      time: date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }),
+    };
   } catch {
-    return '-';
+    return { day: '-', time: '' };
   }
 }
 
@@ -149,16 +232,16 @@ function renderInlineMarkdown(text) {
   let out = escapeHtml(text);
   out = out.replace(/!video\[([^\]]*)\]\(([^)\s]+)\)/g, (_match, _alt, rawUrl) => {
     if (!isSafeMediaUrl(rawUrl)) return '[invalid-video-url]';
-    return `<video src="${rawUrl}" controls class="my-2 w-full max-h-80 rounded border border-yt-border/60 bg-black/40"></video>`;
+    return `<video src="${rawUrl}" controls></video>`;
   });
   out = out.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_match, altText, rawUrl) => {
     if (!isSafeMediaUrl(rawUrl)) return '[invalid-image-url]';
-    return `<img src="${rawUrl}" alt="${altText || 'image'}" loading="lazy" class="my-2 w-full max-h-96 object-contain rounded border border-yt-border/60 bg-black/20" />`;
+    return `<img src="${rawUrl}" alt="${altText || 'image'}" loading="lazy" />`;
   });
-  out = out.replace(/`([^`]+)`/g, '<code class="rounded bg-black/35 px-1 py-0.5">$1</code>');
+  out = out.replace(/`([^`]+)`/g, '<code>$1</code>');
   out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   out = out.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-  out = out.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer" class="text-yt-accent underline">$1</a>');
+  out = out.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
   return out;
 }
 
@@ -190,7 +273,7 @@ function renderMarkdownBlock(markdown) {
     if (heading) {
       closeLists();
       const level = heading[1].length;
-      html.push(`<h${level} class="font-bold mt-1 mb-1">${renderInlineMarkdown(heading[2])}</h${level}>`);
+      html.push(`<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`);
       return;
     }
 
@@ -201,7 +284,7 @@ function renderMarkdownBlock(markdown) {
         inOl = false;
       }
       if (!inUl) {
-        html.push('<ul class="list-disc ml-5 space-y-1">');
+        html.push('<ul>');
         inUl = true;
       }
       html.push(`<li>${renderInlineMarkdown(ul[1])}</li>`);
@@ -215,7 +298,7 @@ function renderMarkdownBlock(markdown) {
         inUl = false;
       }
       if (!inOl) {
-        html.push('<ol class="list-decimal ml-5 space-y-1">');
+        html.push('<ol>');
         inOl = true;
       }
       html.push(`<li>${renderInlineMarkdown(ol[1])}</li>`);
@@ -270,6 +353,8 @@ export default function ChangelogPage({ language = 'en' }) {
   const activeEditorRef = useRef(null);
   const pendingCaretRef = useRef(null);
   const viewLanguage = language === 'it' ? 'it' : 'en';
+  const ui = UI_COPY[viewLanguage] || UI_COPY.en;
+  const dateLocale = viewLanguage === 'it' ? 'it-IT' : 'en-US';
 
   const contributorsById = useMemo(() => {
     const map = new Map();
@@ -636,7 +721,7 @@ export default function ChangelogPage({ language = 'en' }) {
 
   const deletePost = async (postId) => {
     if (!canEdit || !postId) return;
-    if (!window.confirm('Confermi eliminazione di questo changelog?')) return;
+    if (!window.confirm(ui.confirmDelete)) return;
     try {
       await api.deleteChangelog(postId);
       setPosts((prev) => prev.filter((post) => post.id !== postId));
@@ -659,87 +744,93 @@ export default function ChangelogPage({ language = 'en' }) {
   };
 
   return (
-    <div className="max-w-6xl mx-auto w-full space-y-4">
-      <div className="bg-yt-bg-secondary/85 rounded-2xl border border-yt-border/70 p-4 shadow-[0_14px_30px_rgba(0,0,0,0.35)] backdrop-blur-sm">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-yt-accent/20 ring-1 ring-yt-accent/30">
-              <CalendarSync className="w-5 h-5 text-yt-accent" />
-            </div>
-            <div>
-              <h2 className="text-xl font-extrabold tracking-[0.05em] text-yt-text-primary">Changelogs</h2>
-            </div>
-          </div>
-          {canEdit && (
-            <div className="text-[11px] text-yt-text-secondary">
-              <span className="inline-flex items-center gap-1 rounded border border-yt-border px-2 py-1">
-                <Save className="w-3.5 h-3.5" />
-                {saveStatus || 'Bozza pronta'}
-              </span>
-            </div>
-          )}
+    <div className="changelog">
+      <header className="changelog__masthead">
+        <div>
+          <p className="changelog__kicker">{ui.kicker}</p>
+          <h1 className="changelog__title">{ui.title}</h1>
+          <p className="changelog__lede">{ui.lede}</p>
         </div>
-      </div>
+        {canEdit && (
+          <span className="changelog__status">
+            <Save />
+            {saveStatus || ui.draftReady}
+          </span>
+        )}
+      </header>
 
       {canEdit && (
-        <div className="bg-yt-bg-secondary/85 rounded-2xl border border-yt-border/70 p-4 shadow-[0_10px_26px_rgba(0,0,0,0.3)]">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-xs uppercase tracking-[0.1em] text-yt-text-secondary">
-              {editingPostId ? 'Modifica changelog' : 'Nuovo post changelog'}
+        <section className="changelog__section">
+          <div className="changelog__section-head">
+            <div>
+              <h2 className="changelog__section-title">{ui.composer}</h2>
+              <p className="changelog__section-subtitle">
+                {editingPostId ? ui.composerEdit : ui.composerNew}
+              </p>
             </div>
             <button
               type="button"
               onClick={() => setEditorOpen((prev) => !prev)}
-              className="inline-flex items-center gap-1 rounded border border-yt-border px-2 py-1 text-xs text-yt-text-primary hover:border-yt-accent"
-              title={editorOpen ? 'Chiudi editor changelog' : 'Apri editor changelog'}
-              aria-label={editorOpen ? 'Chiudi editor changelog' : 'Apri editor changelog'}
+              className="changelog-btn"
+              title={editorOpen ? ui.closeEditor : ui.openEditor}
+              aria-label={editorOpen ? ui.closeEditor : ui.openEditor}
             >
-              <GitPullRequestCreateArrow className={`h-4 w-4 transition-transform ${editorOpen ? 'rotate-180' : ''}`} />
+              {editorOpen ? <X /> : <Plus />}
+              {editorOpen ? ui.closeEditor : ui.openEditor}
             </button>
           </div>
 
           {editorOpen && (
-            <div className="mt-3 space-y-3">
-              <input
-                type="text"
-                value={draft.title}
-                onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
-                placeholder="Titolo changelog"
-                className="w-full rounded-lg border border-yt-border bg-yt-bg-tertiary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
-              />
-              <input
-                type="text"
-                value={draft.titleEn}
-                onChange={(event) => setDraft((prev) => ({ ...prev, titleEn: event.target.value }))}
-                placeholder="English title (translation)"
-                className="w-full rounded-lg border border-yt-border bg-yt-bg-tertiary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
-              />
+            <div className="changelog-editor">
+              <div className="changelog-titles">
+                <label>
+                  <p className="changelog-label changelog-label--accent">{ui.titleIt}</p>
+                  <input
+                    type="text"
+                    value={draft.title}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
+                    placeholder={ui.titlePlaceholder}
+                    className="changelog-input"
+                  />
+                </label>
+                <label>
+                  <p className="changelog-label">{ui.titleEn}</p>
+                  <input
+                    type="text"
+                    value={draft.titleEn}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, titleEn: event.target.value }))}
+                    placeholder={ui.titleEnPlaceholder}
+                    className="changelog-input"
+                  />
+                </label>
+              </div>
 
-              <div className="rounded-xl border border-yt-border/80 bg-yt-bg-tertiary p-2">
-                <div className="space-y-2">
-                  {draft.rows.map((row) => {
-                    const style = TAGS[row.tag] || TAGS.UPD;
-                    return (
-                      <div key={row.id} className="flex items-start gap-2 border-b border-yt-border/40 pb-2 last:border-b-0 last:pb-0">
-                        <div className="flex w-[92px] shrink-0 flex-col gap-1">
-                          <select
-                            value={row.tag}
-                            onChange={(event) => updateRow(row.id, { tag: event.target.value })}
-                            className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] ${style.editorClass}`}
-                          >
-                            {Object.entries(TAGS).map(([value, tag]) => (
-                              <option key={value} value={value}>{tag.label}</option>
-                            ))}
-                          </select>
-                          <button
-                            type="button"
-                            onClick={() => removeRow(row.id)}
-                            className="inline-flex items-center justify-center gap-1 rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-300"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            Rimuovi
-                          </button>
-                        </div>
+              <div className="changelog-rows">
+                {draft.rows.map((row) => {
+                  const style = TAGS[row.tag] || TAGS.UPD;
+                  return (
+                    <div key={row.id} className="changelog-row">
+                      <div className="changelog-row__meta">
+                        <select
+                          value={row.tag}
+                          onChange={(event) => updateRow(row.id, { tag: event.target.value })}
+                          className={`changelog-select changelog-select--${style.tone}`}
+                        >
+                          {Object.entries(TAGS).map(([value, tag]) => (
+                            <option key={value} value={value}>{tag.label}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => removeRow(row.id)}
+                          className="changelog-btn changelog-btn--danger"
+                        >
+                          <Trash2 />
+                          {ui.removeRow}
+                        </button>
+                      </div>
+                      <label>
+                        <p className="changelog-label">{ui.rowIt}</p>
                         <textarea
                           rows={3}
                           value={row.text}
@@ -749,9 +840,12 @@ export default function ChangelogPage({ language = 'en' }) {
                           onClick={() => syncActiveEditorSelection(row.id, 'text')}
                           onSelect={() => syncActiveEditorSelection(row.id, 'text')}
                           onKeyUp={() => syncActiveEditorSelection(row.id, 'text')}
-                          placeholder="Testo riga IT (supporto markdown)"
-                          className="w-full rounded border border-yt-border/80 bg-yt-bg-primary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                          placeholder={ui.rowPlaceholder}
+                          className="changelog-textarea"
                         />
+                      </label>
+                      <label>
+                        <p className="changelog-label">{ui.rowEn}</p>
                         <textarea
                           rows={3}
                           value={row.textEn || ''}
@@ -761,92 +855,83 @@ export default function ChangelogPage({ language = 'en' }) {
                           onClick={() => syncActiveEditorSelection(row.id, 'textEn')}
                           onSelect={() => syncActiveEditorSelection(row.id, 'textEn')}
                           onKeyUp={() => syncActiveEditorSelection(row.id, 'textEn')}
-                          placeholder="English row translation (markdown supported)"
-                          className="w-full rounded border border-yt-border/80 bg-yt-bg-primary px-3 py-2 text-sm text-yt-text-primary outline-none focus:border-yt-accent"
+                          placeholder={ui.rowEnPlaceholder}
+                          className="changelog-textarea"
                         />
-                      </div>
-                    );
-                  })}
-                </div>
-                <button
-                  type="button"
-                  onClick={addRow}
-                  className="mt-2 inline-flex items-center gap-1 rounded border border-yt-border px-2 py-1 text-xs text-yt-text-primary hover:border-yt-accent"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Aggiungi Riga
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+              <div>
+                <button type="button" onClick={addRow} className="changelog-btn">
+                  <Plus />
+                  {ui.addRow}
                 </button>
               </div>
 
-              <div className="space-y-2">
-                <div className="text-xs uppercase tracking-[0.08em] text-yt-text-secondary">Tag contributor</div>
-                <div className="flex flex-wrap gap-2">
+              <div>
+                <p className="changelog-label">{ui.contributors}</p>
+                <div className="changelog-chips">
                   {CONTRIBUTORS.map((entry) => (
-                    <label key={entry.id} className="inline-flex items-center gap-2 rounded border border-yt-border bg-yt-bg-tertiary px-2 py-1 text-xs text-yt-text-primary">
-                      <input
-                        type="checkbox"
-                        checked={draft.contributorIds.includes(entry.id)}
-                        onChange={() => toggleContributor(entry.id)}
-                      />
-                      {entry.label}
-                    </label>
+                    <button
+                      key={entry.id}
+                      type="button"
+                      className={`changelog-chip${draft.contributorIds.includes(entry.id) ? ' is-on' : ''}`}
+                      onClick={() => toggleContributor(entry.id)}
+                      aria-pressed={draft.contributorIds.includes(entry.id)}
+                    >
+                      @{entry.label}
+                    </button>
                   ))}
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-xs uppercase tracking-[0.08em] text-yt-text-secondary">
-                  <Upload className="w-3.5 h-3.5" />
-                  Media inline nel testo
-                </div>
-                <div className="text-xs text-yt-text-secondary">
-                  Posiziona il cursore in una riga IT/EN: ogni upload viene inserito nel punto scelto dentro il testo.
-                </div>
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded border border-yt-border px-3 py-2 text-xs text-yt-text-primary hover:border-yt-accent">
-                  {busyUpload ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
-                  Carica Media
+              <div>
+                <p className="changelog-label">{ui.media}</p>
+                <p className="changelog-hint">{ui.mediaHint}</p>
+                <label className="changelog-btn">
+                  {busyUpload ? <Loader2 className="animate-spin" /> : <ImagePlus />}
+                  {ui.uploadMedia}
                   <input
                     type="file"
-                    className="hidden"
                     accept="image/*,video/*"
                     multiple
                     onChange={(event) => uploadFiles(Array.from(event.target.files || []))}
                   />
                 </label>
                 {draft.attachments.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div className="changelog-media">
                     {draft.attachments.map((attachment) => (
-                      <div key={attachment.id} className="rounded border border-yt-border/70 bg-yt-bg-primary p-2">
+                      <div key={attachment.id} className="changelog-media__item">
                         {attachment.type === 'image' ? (
                           <img
                             src={attachment.url}
                             alt={attachment.fileName || attachment.id}
-                            className="w-full max-h-52 object-contain rounded cursor-zoom-in"
                             onClick={() => openFullscreenMedia(attachment)}
                           />
                         ) : (
                           <video
                             src={attachment.url}
                             controls
-                            className="w-full max-h-52 rounded cursor-zoom-in"
                             onClick={() => openFullscreenMedia(attachment)}
                           />
                         )}
-                        <div className="mt-2 flex items-center justify-between gap-2">
-                          <span className="text-xs text-yt-text-secondary truncate">
-                            {attachment.type === 'video' ? <Video className="inline w-3.5 h-3.5 mr-1" /> : null}
+                        <div className="changelog-media__bar">
+                          <span className="changelog-media__name">
+                            {attachment.type === 'video' ? <Video /> : <Upload />}
                             {attachment.fileName || attachment.id}
                           </span>
-                          <div className="flex items-center gap-1">
+                          <div className="changelog-entry__tools">
                             <button
                               type="button"
                               onClick={() => {
                                 insertMediaInEditor(attachment);
                                 setSaveStatus('Media inserito nel testo');
                               }}
-                              className="rounded border border-yt-border px-2 py-1 text-xs text-yt-text-primary hover:border-yt-accent"
+                              className="changelog-btn"
                             >
-                              Inserisci
+                              {ui.insert}
                             </button>
                             <button
                               type="button"
@@ -856,9 +941,9 @@ export default function ChangelogPage({ language = 'en' }) {
                                   attachments: prev.attachments.filter((item) => item.id !== attachment.id),
                                 }));
                               }}
-                              className="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-300"
+                              className="changelog-btn changelog-btn--danger"
                             >
-                              Rimuovi
+                              {ui.remove}
                             </button>
                           </div>
                         </div>
@@ -868,7 +953,7 @@ export default function ChangelogPage({ language = 'en' }) {
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 pt-1">
+              <div className="changelog-actions">
                 <button
                   type="button"
                   onClick={async () => {
@@ -885,138 +970,138 @@ export default function ChangelogPage({ language = 'en' }) {
                     }
                   }}
                   disabled={translating}
-                  className="inline-flex items-center gap-1 rounded border border-blue-500/35 bg-blue-500/10 px-3 py-2 text-sm text-blue-300 disabled:opacity-60"
+                  className="changelog-btn"
                 >
-                  {translating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Languages className="w-4 h-4" />}
-                  Traduci EN
+                  {translating ? <Loader2 className="animate-spin" /> : <Languages />}
+                  {ui.translateEn}
                 </button>
                 <button
                   type="button"
                   onClick={publishPost}
                   disabled={publishing || translating}
-                  className="inline-flex items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/15 px-3 py-2 text-sm text-emerald-300 disabled:opacity-60"
+                  className="changelog-btn changelog-btn--primary"
                 >
-                  {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarSync className="w-4 h-4" />}
-                  {editingPostId ? 'Aggiorna Changelog' : 'Pubblica Changelog'}
+                  {publishing ? <Loader2 className="animate-spin" /> : <CalendarSync />}
+                  {editingPostId ? ui.update : ui.publish}
                 </button>
                 {editingPostId && (
-                  <button
-                    type="button"
-                    onClick={cancelEditing}
-                    className="inline-flex items-center gap-1 rounded border border-yt-border px-3 py-2 text-sm text-yt-text-primary"
-                  >
-                    <X className="w-4 h-4" />
-                    Annulla Modifica
+                  <button type="button" onClick={cancelEditing} className="changelog-btn changelog-btn--ghost">
+                    <X />
+                    {ui.cancelEdit}
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={clearDraft}
-                  className="inline-flex items-center gap-1 rounded border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Elimina Bozza
+                <button type="button" onClick={clearDraft} className="changelog-btn changelog-btn--danger">
+                  <Trash2 />
+                  {ui.deleteDraft}
                 </button>
               </div>
             </div>
           )}
-        </div>
+        </section>
       )}
 
       {!canEdit && user && (
-        <div className="rounded-xl border border-yt-border/80 bg-yt-bg-secondary/80 p-3 text-sm text-yt-text-secondary">
-          Account in sola lettura per i changelog.
-        </div>
+        <p className="changelog-notice">{ui.readonly}</p>
       )}
 
-      <InlineError message={error} className="mb-3" />
+      <InlineError message={error} align="start" />
 
-      <div className="space-y-3 pb-4">
+      <section className="changelog__section changelog__section--feed">
+        <div className="changelog__section-head">
+          <div>
+            <h2 className="changelog__section-title">{ui.feed}</h2>
+            <p className="changelog__section-subtitle">{ui.feedSubtitle}</p>
+          </div>
+        </div>
+
         {loadingPosts && (
-          <div className="text-sm text-yt-text-secondary">Caricamento changelog...</div>
+          <p className="changelog-empty">{ui.loading}</p>
         )}
 
         {!loadingPosts && posts.length === 0 && (
-          <div className="rounded-xl border border-yt-border/80 bg-yt-bg-secondary/70 p-4 text-sm text-yt-text-secondary">
-            Nessun changelog pubblicato.
-          </div>
+          <p className="changelog-empty">{ui.empty}</p>
         )}
 
-        {posts.map((post) => (
-          <article key={post.id} className="rounded-2xl border border-yt-border/70 bg-yt-bg-secondary/85 p-4 shadow-[0_10px_26px_rgba(0,0,0,0.3)]">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-lg font-bold text-yt-text-primary">
-                {viewLanguage === 'en' ? (post.titleEn || post.title) : post.title}
-              </h3>
-              <div className="flex items-center gap-2">
-                <div className="text-xs text-yt-text-secondary">{formatDate(post.createdAt)}</div>
-                {canEdit && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => startEditingPost(post)}
-                      className="inline-flex items-center gap-1 rounded border border-yt-border px-2 py-1 text-xs text-yt-text-primary hover:border-yt-accent"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                      Modifica
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deletePost(post.id)}
-                      className="inline-flex items-center gap-1 rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-300"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      Elimina
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-            <div className="text-xs text-yt-text-secondary mt-1">
-              by {post.author?.name || post.author?.id || 'Unknown'}
-            </div>
-
-            <div className="mt-3 rounded-xl border border-yt-border/70 bg-yt-bg-secondary p-3 space-y-2">
-              {(Array.isArray(post.rows) ? post.rows : []).map((row) => {
-                const style = TAGS[row.tag] || TAGS.UPD;
-                return (
-                  <div key={`${post.id}_${row.id}`} className="flex items-start gap-3 border-b border-yt-border/40 pb-2 last:border-b-0 last:pb-0">
-                    <div className={`mt-0.5 inline-flex w-[44px] shrink-0 justify-center rounded border px-1.5 py-0 text-[10px] font-bold uppercase tracking-[0.06em] ${style.editorClass}`}>
-                      {style.label}
-                    </div>
-                    <div
-                      className="text-sm text-yt-text-primary prose prose-invert prose-sm max-w-none"
-                      dangerouslySetInnerHTML={{ __html: renderMarkdownBlock(viewLanguage === 'en' ? (row.textEn || row.text) : row.text) }}
-                    />
+        <div className="changelog-feed">
+          {posts.map((post) => {
+              const stamp = formatEntryStamp(post.createdAt, dateLocale);
+              return (
+                <article key={post.id} className="changelog-entry">
+                  <div className="changelog-entry__stamp">
+                    <span className="changelog-entry__day">{stamp.day}</span>
+                    <span className="changelog-entry__time">{stamp.time}</span>
                   </div>
-                );
-              })}
-            </div>
+                  <div>
+                    <div className="changelog-entry__head">
+                      <h3 className="changelog-entry__title">
+                        {viewLanguage === 'en' ? (post.titleEn || post.title) : post.title}
+                      </h3>
+                      {canEdit && (
+                        <div className="changelog-entry__tools">
+                          <button type="button" onClick={() => startEditingPost(post)} className="changelog-btn">
+                            <Pencil />
+                            {ui.edit}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deletePost(post.id)}
+                            className="changelog-btn changelog-btn--danger"
+                          >
+                            <Trash2 />
+                            {ui.delete}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <p className="changelog-entry__by">
+                      {ui.by} {post.author?.name || post.author?.id || 'Unknown'}
+                    </p>
 
-            {Array.isArray(post.contributorIds) && post.contributorIds.length > 0 && (
-              <div className="mt-3 text-xs text-yt-text-secondary">
-                Contributors: {post.contributorIds.map((id) => `@${contributorsById.get(id) || id}`).join(', ')}
-              </div>
-            )}
-          </article>
-        ))}
-      </div>
+                    <div className="changelog-entry__rows">
+                      {(Array.isArray(post.rows) ? post.rows : []).map((row) => {
+                        const style = TAGS[row.tag] || TAGS.UPD;
+                        return (
+                          <div key={`${post.id}_${row.id}`} className="changelog-change">
+                            <span className={`changelog-tag changelog-tag--${style.tone}`}>
+                              {style.label}
+                            </span>
+                            <div
+                              className="changelog-md"
+                              dangerouslySetInnerHTML={{ __html: renderMarkdownBlock(viewLanguage === 'en' ? (row.textEn || row.text) : row.text) }}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {Array.isArray(post.contributorIds) && post.contributorIds.length > 0 && (
+                      <p className="changelog-entry__people">
+                        <strong>{ui.contributors}</strong>
+                        {post.contributorIds.map((id) => `@${contributorsById.get(id) || id}`).join('  ')}
+                      </p>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+        </div>
+      </section>
 
       {fullscreenMedia && (
-        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/90 p-4" onClick={() => setFullscreenMedia(null)}>
+        <div className="changelog-overlay" onClick={() => setFullscreenMedia(null)}>
           <button
             type="button"
             onClick={() => setFullscreenMedia(null)}
-            className="absolute right-4 top-4 inline-flex items-center gap-1 rounded border border-white/30 bg-black/40 px-3 py-2 text-sm text-white"
+            className="changelog-btn changelog-overlay__close"
           >
-            <X className="h-4 w-4" />
-            Chiudi
+            <X />
+            {ui.close}
           </button>
-          <div className="max-h-[95vh] max-w-[95vw]" onClick={(event) => event.stopPropagation()}>
+          <div className="changelog-overlay__media" onClick={(event) => event.stopPropagation()}>
             {fullscreenMedia.type === 'video' ? (
-              <video src={fullscreenMedia.url} controls autoPlay className="max-h-[95vh] max-w-[95vw] rounded" />
+              <video src={fullscreenMedia.url} controls autoPlay />
             ) : (
-              <img src={fullscreenMedia.url} alt={fullscreenMedia.fileName} className="max-h-[95vh] max-w-[95vw] object-contain rounded" />
+              <img src={fullscreenMedia.url} alt={fullscreenMedia.fileName} />
             )}
           </div>
         </div>

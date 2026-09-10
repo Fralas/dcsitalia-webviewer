@@ -66,6 +66,18 @@
   text-transform: uppercase;
 }
 
+.lidc-occupancy-panel__type--blue {
+  color: #3b82f6;
+}
+
+.lidc-occupancy-panel__type--red {
+  color: #ef4444;
+}
+
+.lidc-occupancy-panel__type--neutral {
+  color: rgba(255, 255, 255, 0.92);
+}
+
 .lidc-occupancy-panel__name {
   margin: 4px 0 0;
   font-size: 18px;

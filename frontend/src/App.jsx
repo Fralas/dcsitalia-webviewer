@@ -636,6 +636,27 @@ function App() {
         />
       )}
 
+      {currentView === 'wiki' || currentView === 'changelogs' || currentView === 'privacy' ? (
+        <div className="wiki-dash-frame">
+          <div className="wiki-dash">
+            <main className="wiki-dash__content">
+              {currentView === 'wiki' && (
+                <WikiPage language={appLanguage} />
+              )}
+              {currentView === 'changelogs' && (
+                <ChangelogPage language={appLanguage} />
+              )}
+              {currentView === 'privacy' && (
+                <PrivacyPage />
+              )}
+            </main>
+            <footer className="app-footer">
+              <p>DCS Italia Warehouse 3.0</p>
+            </footer>
+          </div>
+          <div className="app-wiki-fade" aria-hidden="true" />
+        </div>
+      ) : (
       <main className={`flex-1 ${(currentView === 'landing' || currentView === 'frontline' || currentView === 'lidc' || currentView === 'atc') ? 'overflow-hidden' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
         {currentView === 'landing' && (
           <LandingPage
@@ -658,15 +679,6 @@ function App() {
         {currentView === 'profile' && (
           <UserProfile />
         )}
-        {currentView === 'changelogs' && (
-          <ChangelogPage language={appLanguage} />
-        )}
-        {currentView === 'wiki' && (
-          <WikiPage language={appLanguage} />
-        )}
-        {currentView === 'privacy' && (
-          <PrivacyPage />
-        )}
         {currentView === 'lidc' && showLidc && (
           <LidcPage />
         )}
@@ -674,8 +686,8 @@ function App() {
           <AtcStripPage />
         )}
       </main>
-
-      {currentView !== 'landing' && currentView !== 'frontline' && currentView !== 'lidc' && currentView !== 'atc' && (
+      )}
+      {currentView === 'profile' && (
         <footer className="bg-yt-bg-secondary border-t border-yt-border mt-8">
           <div className="container mx-auto px-4 py-3 text-center text-xs text-yt-text-secondary">
             <p>DCS Italia Warehouse 3.0</p>

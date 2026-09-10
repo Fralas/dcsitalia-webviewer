@@ -66,6 +66,17 @@ export function normalizeAirportCoalition(value) {
   return 'neutral';
 }
 
+export function resolveAirportTypeCoalition(...sources) {
+  for (const source of sources) {
+    const raw = typeof source === 'string' ? source : source?.coalition;
+    const state = String(raw || '').trim().toLowerCase();
+    if (state === 'blue' || state === 'blu') return 'blue';
+    if (state === 'red' || state === 'rosso') return 'red';
+    if (state === 'neutral' || state === 'neutrale' || state === 'white') return 'neutral';
+  }
+  return '';
+}
+
 export function getAirportCoalition(airport, airbaseStatus = null) {
   const hasStatusFile = airbaseStatus && Object.keys(airbaseStatus).length > 0;
   if (hasStatusFile) {

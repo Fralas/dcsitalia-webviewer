@@ -173,6 +173,7 @@
 
 .live-feed-card--feed .live-feed-card__title {
   font-size: 13px;
+  padding-left: calc(12px * var(--lf-item-scale));
 }
 
 .live-feed-card__toggle {
