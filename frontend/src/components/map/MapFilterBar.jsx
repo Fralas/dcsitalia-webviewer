@@ -1,4 +1,4 @@
-import { Ambulance, Blend, Factory, Forklift, Satellite } from 'lucide-react';
+import { Ambulance, Blend, Factory, Forklift, Satellite, Ship } from 'lucide-react';
 import './MapFilterBar.css';
 
 const FILTER_ITEMS = [
@@ -6,6 +6,7 @@ const FILTER_ITEMS = [
   { key: 'showLogistics', icon: Forklift, label: 'Logistics', title: 'Logistics' },
   { key: 'showDcsar', icon: Ambulance, label: 'CSAR', title: 'CSAR' },
   { key: 'showProductionPoints', icon: Factory, label: 'Production Points', title: 'Production Points' },
+  { key: 'showShips', icon: Ship, label: 'Ships', title: 'Ships' },
 ];
 
 export default function MapFilterBar({

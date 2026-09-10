@@ -917,6 +917,10 @@ export async function getTankerRoutes() {
   return fetchAPI('/tanker/routes');
 }
 
+export async function getShipPositions() {
+  return fetchAPI('/ship-positions');
+}
+
 export async function spawnTanker(keyword, wp1Lat, wp1Lon, wp2Lat, wp2Lon) {
   return fetchAPI('/tanker/spawn', {
     method: 'POST',

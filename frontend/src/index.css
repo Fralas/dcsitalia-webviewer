@@ -78,7 +78,12 @@ code {
 }
 
 /* Leaflet custom styles */
-.custom-airport-marker {
+.custom-airport-marker,
+.ship-map-icon,
+.production-point-icon,
+.dbuild-map-icon,
+.dcsar-person-icon,
+.crate-cluster-icon {
   background: transparent !important;
   border: none !important;
 }

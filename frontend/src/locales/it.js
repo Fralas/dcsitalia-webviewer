@@ -1196,6 +1196,16 @@ export default {
         stock: 'Scorte {{count}}',
         airdropUnit: 'Airdrop unit'
       }
+    },
+    ships: {
+      alliedShip: 'Nave alleata',
+      alliedCarrier: 'Portaerei alleata',
+      alliedHelicarrier: 'Portaelicotteri alleata',
+      enemyShip: 'Nave nemica',
+      enemyCarrier: 'Portaerei nemica',
+      enemyHelicarrier: 'Portaelicotteri nemica',
+      unknown: 'Nave sconosciuta',
+      controlled: 'Nave controllata'
     }
   },
   weaponChart: {

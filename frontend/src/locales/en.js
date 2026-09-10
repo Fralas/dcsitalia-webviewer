@@ -1196,6 +1196,16 @@ export default {
         stock: 'Stock {{count}}',
         airdropUnit: 'Airdrop unit'
       }
+    },
+    ships: {
+      alliedShip: 'Allied ship',
+      alliedCarrier: 'Allied aircraft carrier',
+      alliedHelicarrier: 'Allied helicopter carrier',
+      enemyShip: 'Enemy ship',
+      enemyCarrier: 'Enemy aircraft carrier',
+      enemyHelicarrier: 'Enemy helicopter carrier',
+      unknown: 'Unknown ship',
+      controlled: 'Controlled ship'
     }
   },
   weaponChart: {

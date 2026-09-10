@@ -144,6 +144,28 @@ const DBUILD_SITES_FILE = optionalPath('DBUILD_SITES_FILE');
 
 const TANKER_ROUTES_FILE = optionalPath('TANKER_ROUTES_FILE');
 
+function resolveDbridgeExportFile(envName, fileName) {
+  const explicit = optionalPath(envName);
+  if (explicit) return explicit;
+  const sibling = WEB_SPAWN_MARKERS_FILE || DBUILD_SITES_FILE || TANKER_ROUTES_FILE || WEB_COMMANDS_FILE;
+  if (sibling) return path.join(path.dirname(sibling), fileName);
+  const productionPoints = optionalPath('PRODUCTION_POINTS_FILE');
+  if (productionPoints) {
+    return path.join(path.dirname(path.dirname(productionPoints)), 'DBRIDGE', fileName);
+  }
+  const dyzoneSource = optionalPath('DYZONE_SOURCE_DIR');
+  if (dyzoneSource) {
+    return path.join(path.dirname(dyzoneSource), 'DBRIDGE', fileName);
+  }
+  const airbaseStatus = optionalPath('AIRBASE_STATUS_FILE');
+  if (airbaseStatus) {
+    return path.join(path.dirname(path.dirname(airbaseStatus)), 'DBRIDGE', fileName);
+  }
+  return null;
+}
+
+const SHIP_POSITIONS_FILE = resolveDbridgeExportFile('SHIP_POSITIONS_FILE', 'Export_Ship_Positions.json');
+
 // Max placement distance from airport center (matches DMAS blue_airbase_radius_m).
 const AIRPORT_SPAWN_RADIUS_M = Number.parseInt(process.env.AIRPORT_SPAWN_RADIUS_M, 10) || 2500;
 const PP_RETRIEVE_RADIUS_M = Number.parseInt(process.env.PP_RETRIEVE_RADIUS_M, 10) || 500;
@@ -361,6 +383,9 @@ let tankerRoutesSyncSignature = '';
 let tankerRoutes = [];
 let dbuildSitesSyncSignature = '';
 let dbuildSites = [];
+let shipPositionsSyncSignature = '';
+let shipPositions = [];
+let shipPositionsUpdatedAt = null;
 let zoneOperationsById = new Map();
 let hiddenLogisticsRouteAirportIds = new Set();
 const ZONE_OPERATION_TTL_MS = 45 * 60 * 1000;
@@ -1482,6 +1507,71 @@ function syncWebSpawnMarkersFromFile() {
     });
   } catch (error) {
     console.error('Failed web spawn markers sync from file:', error.message);
+  }
+}
+
+function inferShipClass(group, explicitClass) {
+  const explicit = String(explicitClass || '').trim().toLowerCase();
+  if (explicit === 'carrier' || explicit === 'helicarrier' || explicit === 'ship') return explicit;
+  const blob = String(group || '').toUpperCase();
+  if (/(LHA|LHD|TARAWA|AMERICA|INVINCIBLE|HERMES|CANBERRA|JUAN.?CARLOS|PORTAELICOTTERI|HELICARRIER|HELOCARRIER)/.test(blob)) {
+    return 'helicarrier';
+  }
+  if (/(CVN|CARRIER|KUZNETSOV|KUZNECOW|STENNIS|FORRESTAL|PORTAEREI)/.test(blob)) {
+    return 'carrier';
+  }
+  return 'ship';
+}
+
+function normalizeShipPositionEntry(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  const lat = Number(entry.lat);
+  const lon = Number(entry.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  const group = String(entry.group || entry.name || entry.id || '').trim();
+  if (!group) return null;
+  const kindRaw = String(entry.kind || '').trim().toLowerCase();
+  const kind = kindRaw === 'blue' || kindRaw === 'allied'
+    ? 'blue'
+    : (kindRaw === 'red' || kindRaw === 'enemy' ? 'red' : 'civilian');
+  const heading = Number(entry.heading);
+  const speed = Number(entry.speed_kts ?? entry.speed);
+  const statusRaw = String(entry.status || '').trim().toLowerCase();
+  const boarded = statusRaw === 'boarded' || entry.boarded === true;
+  return {
+    id: group,
+    group,
+    kind,
+    class: kind === 'civilian' ? 'ship' : inferShipClass(group, entry.class || entry.ship_class || entry.type),
+    status: boarded ? 'boarded' : 'active',
+    lat,
+    lon,
+    heading: Number.isFinite(heading) ? ((heading % 360) + 360) % 360 : null,
+    speed_kts: Number.isFinite(speed) ? speed : null,
+  };
+}
+
+function syncShipPositionsFromFile() {
+  try {
+    if (!SHIP_POSITIONS_FILE || !fs.existsSync(SHIP_POSITIONS_FILE)) return;
+
+    const raw = fs.readFileSync(SHIP_POSITIONS_FILE, 'utf8');
+    if (!raw || raw.trim() === '') return;
+    if (raw === shipPositionsSyncSignature) return;
+    shipPositionsSyncSignature = raw;
+
+    const parsed = JSON.parse(raw);
+    const incoming = Array.isArray(parsed?.ships) ? parsed.ships : (Array.isArray(parsed) ? parsed : []);
+    shipPositions = incoming.map(normalizeShipPositionEntry).filter(Boolean);
+    const updatedAt = Number(parsed?.updatedAt);
+    shipPositionsUpdatedAt = Number.isFinite(updatedAt) ? updatedAt : Date.now();
+
+    io.emit('ship-positions:updated', {
+      ships: shipPositions,
+      updatedAt: shipPositionsUpdatedAt,
+    });
+  } catch (error) {
+    console.error('Failed ship positions sync from file:', error.message);
   }
 }
 
@@ -3425,6 +3515,16 @@ app.get('/api/map/actions/options', (req, res) => {
  */
 app.get('/api/tanker/routes', (req, res) => {
   res.json({ routes: tankerRoutes });
+});
+
+/**
+ * GET /api/ship-positions - Civilian and BLUE ship positions exported by DNAVAL.
+ */
+app.get('/api/ship-positions', (req, res) => {
+  res.json({
+    ships: shipPositions,
+    updatedAt: shipPositionsUpdatedAt,
+  });
 });
 
 /**
@@ -5769,6 +5869,11 @@ setInterval(() => {
   syncDbuildSitesFromFile();
 }, 2000);
 
+// Poll ship positions exported by DNAVAL (typically every 5 minutes)
+setInterval(() => {
+  syncShipPositionsFromFile();
+}, 2000);
+
 // Poll LIDC UCID link requests written by DCS hook
 setInterval(() => {
   syncLidcLinkRequestsFromFile();
@@ -5827,6 +5932,7 @@ syncWebCommandResultsFromFile();
 syncWebSpawnMarkersFromFile();
 syncTankerRoutesFromFile();
 syncDbuildSitesFromFile();
+syncShipPositionsFromFile();
 exportPendingWarehouseOps();
 hidcAirportLogistics.exportHidcLogisticsOrders();
 syncLidcLinkRequestsFromFile();

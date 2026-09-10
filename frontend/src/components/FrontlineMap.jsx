@@ -24,7 +24,7 @@ import airports from '../config/airports';
 import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
 import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
-import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, declineFrontlineZone, getAirliftPlayers, getAirportOccupancy, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getHidcLogisticsAlerts, getLogisticsRouteVisibility, getMissions, getServerTime, getTankerOptions, getTankerRoutes, purchaseAirportLogistics, setAirportLogisticsRoutePriority, getProductionPoints, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate, spawnMapAction, spawnTanker, updateAirportOrder } from '../services/api';
+import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, declineFrontlineZone, getAirliftPlayers, getAirportOccupancy, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getHidcLogisticsAlerts, getLogisticsRouteVisibility, getMissions, getServerTime, getTankerOptions, getTankerRoutes, purchaseAirportLogistics, setAirportLogisticsRoutePriority, getProductionPoints, getShipPositions, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate, spawnMapAction, spawnTanker, updateAirportOrder } from '../services/api';
 import ZoneMissionCard from './map/ZoneMissionCard';
 import LiveFeedPanel from './map/LiveFeedPanel';
 import MapFilterBar from './map/MapFilterBar';
@@ -40,6 +40,8 @@ import './map/HidcAirportLogistics.css';
 import { buildIsoContainerPlan, formatIsoUnits } from '../utils/isoLoad';
 import { getHidcSpawnImageUrl } from '../utils/hidcSpawnImages';
 import { t } from '../utils/locale';
+import enLocale from '../locales/en';
+import itLocale from '../locales/it';
 import { useUser } from '../contexts/UserContext';
 import { CARTO_DARK_NOLABELS_TILE_URL } from '../config/cartoBasemap';
 
@@ -81,6 +83,10 @@ const MAPLIBRE_CRATE_BOXES_IMAGE_ID = 'crate-boxes-icon';
 const MAPLIBRE_PP_FACTORY_WHITE_IMAGE_ID = 'pp-factory-white';
 const MAPLIBRE_PP_FACTORY_BLUE_IMAGE_ID = 'pp-factory-blue';
 const MAPLIBRE_PP_FACTORY_RED_IMAGE_ID = 'pp-factory-red';
+const MAPLIBRE_SHIP_BLUE_IMAGE_ID = 'ship-icon-blue';
+const MAPLIBRE_SHIP_RED_IMAGE_ID = 'ship-icon-red';
+const MAPLIBRE_SHIP_CIVILIAN_IMAGE_ID = 'ship-icon-civilian';
+const MAPLIBRE_SHIP_BOARDED_IMAGE_ID = 'ship-icon-boarded';
 const CRATE_CLUSTER_RADIUS_M = 20;
 const DBUILD_SITE_MATCH_RADIUS_M = 150;
 
@@ -121,6 +127,7 @@ const DEFAULT_MAP_FILTERS = {
   showAirliftPlayers: true,
   showDcsar: true,
   showProductionPoints: true,
+  showShips: true,
 };
 
 function readStoredMapViewPrefs() {
@@ -545,6 +552,17 @@ const MAP_ICON_CRATE_SIZE = 22;
 const MAP_ICON_CRATE_FRAME = 28;
 const MAPLIBRE_PP_ICON_SIZE = 1.2;
 const MAPLIBRE_CRATE_ICON_SIZE = 1.02;
+const MAP_ICON_SHIP_SIZE = 18;
+const MAP_ICON_SHIP_FRAME = 24;
+const MAPLIBRE_SHIP_ICON_SIZE = ['interpolate', ['linear'], ['zoom'], 5, 0.95, 7, 1.2, 10, 1.55];
+const SHIP_KIND_BLUE = 'blue';
+const SHIP_KIND_RED = 'red';
+const SHIP_KIND_CIVILIAN = 'civilian';
+const SHIP_KIND_BOARDED = 'boarded';
+const SHIP_COLOR_BLUE = '#60a5fa';
+const SHIP_COLOR_RED = '#ef4444';
+const SHIP_COLOR_CIVILIAN = '#f4f4f5';
+const SHIP_COLOR_BOARDED = '#22c55e';
 
 const SPAWN_BANNER_DISPLAY_NAMES = {
   MANPAD: 'MANPAD',
@@ -1208,6 +1226,101 @@ function createProductionPointIcon(pp, selected = false) {
     html,
     className: 'production-point-icon',
     iconSize: [MAP_ICON_PP_FRAME, MAP_ICON_PP_FRAME],
+    iconAnchor: [anchor, anchor],
+  });
+}
+
+function isShipBoarded(ship) {
+  const status = String(ship?.status || '').trim().toLowerCase();
+  return status === 'boarded' || ship?.boarded === true;
+}
+
+function getShipKind(kind) {
+  const raw = String(kind || '').trim().toLowerCase();
+  if (raw === SHIP_KIND_BLUE || raw === 'allied') return SHIP_KIND_BLUE;
+  if (raw === SHIP_KIND_RED || raw === 'enemy') return SHIP_KIND_RED;
+  if (raw === SHIP_KIND_BOARDED) return SHIP_KIND_BOARDED;
+  return SHIP_KIND_CIVILIAN;
+}
+
+function getShipClass(ship) {
+  if (getShipKind(ship?.kind) === SHIP_KIND_CIVILIAN) return 'ship';
+  const explicit = String(ship?.class || '').trim().toLowerCase();
+  if (explicit === 'carrier' || explicit === 'helicarrier' || explicit === 'ship') return explicit;
+  const blob = String(ship?.group || ship?.id || '').toUpperCase();
+  if (/(LHA|LHD|TARAWA|AMERICA|INVINCIBLE|HERMES|CANBERRA|JUAN.?CARLOS|PORTAELICOTTERI|HELICARRIER|HELOCARRIER)/.test(blob)) {
+    return 'helicarrier';
+  }
+  if (/(CVN|CARRIER|KUZNETSOV|KUZNECOW|STENNIS|FORRESTAL|PORTAEREI)/.test(blob)) {
+    return 'carrier';
+  }
+  return 'ship';
+}
+
+function getShipIconKind(ship) {
+  if (isShipBoarded(ship)) return SHIP_KIND_BOARDED;
+  return getShipKind(ship?.kind);
+}
+
+function getShipColor(kind) {
+  const resolved = getShipKind(kind);
+  if (resolved === SHIP_KIND_BOARDED) return SHIP_COLOR_BOARDED;
+  if (resolved === SHIP_KIND_BLUE) return SHIP_COLOR_BLUE;
+  if (resolved === SHIP_KIND_RED) return SHIP_COLOR_RED;
+  return SHIP_COLOR_CIVILIAN;
+}
+
+function getShipLabelKey(ship) {
+  if (isShipBoarded(ship)) return 'map.ships.controlled';
+  const kind = getShipKind(ship?.kind);
+  if (kind === SHIP_KIND_CIVILIAN) return 'map.ships.unknown';
+  const shipClass = getShipClass(ship);
+  const side = kind === SHIP_KIND_BLUE ? 'allied' : 'enemy';
+  const cls = shipClass === 'carrier' ? 'Carrier' : (shipClass === 'helicarrier' ? 'Helicarrier' : 'Ship');
+  return `map.ships.${side}${cls}`;
+}
+
+function formatShipHoverLabel(ship, language = 'it') {
+  const key = getShipLabelKey(ship);
+  const dict = language === 'en' ? enLocale : itLocale;
+  const value = key.split('.').reduce((acc, part) => (acc && acc[part] !== undefined ? acc[part] : undefined), dict);
+  return typeof value === 'string' ? value : t(key);
+}
+
+function buildShipSvgMarkup(kind) {
+  const color = getShipColor(kind);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+    <path d="M16 2.8 L24.4 13.4 L22.6 29.2 L9.4 29.2 L7.6 13.4 Z" fill="none" stroke="#0b1220" stroke-width="4.2" stroke-linejoin="round"/>
+    <path d="M16 2.8 L24.4 13.4 L22.6 29.2 L9.4 29.2 L7.6 13.4 Z" fill="${color}" stroke="#f8fafc" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M16 9.4 L18.8 15.4 L18.2 22.6 L13.8 22.6 L13.2 15.4 Z" fill="#0b1220" fill-opacity="0.38"/>
+    <circle cx="16" cy="13.2" r="1.25" fill="#0b1220"/>
+  </svg>`;
+}
+
+async function ensureMapLibreShipIconImages(map) {
+  const defs = [
+    { id: MAPLIBRE_SHIP_BLUE_IMAGE_ID, kind: SHIP_KIND_BLUE },
+    { id: MAPLIBRE_SHIP_RED_IMAGE_ID, kind: SHIP_KIND_RED },
+    { id: MAPLIBRE_SHIP_CIVILIAN_IMAGE_ID, kind: SHIP_KIND_CIVILIAN },
+    { id: MAPLIBRE_SHIP_BOARDED_IMAGE_ID, kind: SHIP_KIND_BOARDED },
+  ];
+  for (const def of defs) {
+    if (map.hasImage(def.id)) continue;
+    const image = await loadSvgAsImage(buildShipSvgMarkup(def.kind));
+    map.addImage(def.id, image, { pixelRatio: 2 });
+  }
+}
+
+function createShipMapIcon(ship) {
+  const heading = Number(ship?.heading);
+  const rotation = Number.isFinite(heading) ? heading : 0;
+  const html = `<div style="width:${MAP_ICON_SHIP_FRAME}px;height:${MAP_ICON_SHIP_FRAME}px;display:flex;align-items:center;justify-content:center;transform:rotate(${rotation}deg);transform-origin:50% 50%;pointer-events:none;filter:drop-shadow(0 0 3px rgba(0,0,0,0.8))">${buildShipSvgMarkup(getShipIconKind(ship))}</div>`;
+
+  const anchor = MAP_ICON_SHIP_FRAME / 2;
+  return divIcon({
+    html,
+    className: 'ship-map-icon',
+    iconSize: [MAP_ICON_SHIP_FRAME, MAP_ICON_SHIP_FRAME],
     iconAnchor: [anchor, anchor],
   });
 }
@@ -1889,6 +2002,9 @@ function FlatMapView({
   showProductionPoints,
   selectedProductionPointId,
   onProductionPointSelect,
+  ships,
+  showShips,
+  language = 'it',
   spawnPlacementActive,
   onSpawnPlace,
   spawnAirportCenter,
@@ -2273,6 +2389,21 @@ function FlatMapView({
           );
         })}
 
+        {showShips && (ships || []).map((ship) => {
+          if (!Number.isFinite(ship?.lat) || !Number.isFinite(ship?.lon)) return null;
+          return (
+            <Marker
+              key={`ship-${ship.id || ship.group}`}
+              position={[ship.lat, ship.lon]}
+              icon={createShipMapIcon(ship)}
+            >
+              <Tooltip direction="top" offset={[0, -10]} opacity={0.95}>
+                {formatShipHoverLabel(ship, language)}
+              </Tooltip>
+            </Marker>
+          );
+        })}
+
         {placementActive && placementCenter && Number.isFinite(placementCenter.lat) && Number.isFinite(placementCenter.lon) && (
           <Circle
             center={[placementCenter.lat, placementCenter.lon]}
@@ -2427,6 +2558,9 @@ function MapLibreFlatMapView({
   showProductionPoints,
   selectedProductionPointId,
   onProductionPointSelect,
+  ships,
+  showShips,
+  language = 'it',
   spawnPlacementActive,
   onSpawnPlace,
   spawnAirportCenter,
@@ -2804,6 +2938,50 @@ function MapLibreFlatMapView({
     const source = map.getSource('production-points-src');
     if (!source?.setData) return false;
     source.setData(fcProductionPointsRef.current);
+    return true;
+  }, []);
+
+  const fcShips = useMemo(() => ({
+    type: 'FeatureCollection',
+    features: !showShips ? [] : (ships || []).flatMap((ship) => {
+      if (!Number.isFinite(ship?.lat) || !Number.isFinite(ship?.lon)) return [];
+      const heading = Number(ship.heading);
+      return [{
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [ship.lon, ship.lat],
+        },
+        properties: {
+          id: ship.id || ship.group || '',
+          name: formatShipHoverLabel(ship, language),
+          kind: getShipKind(ship.kind),
+          iconKind: getShipIconKind(ship),
+          boarded: isShipBoarded(ship) ? 1 : 0,
+          heading: Number.isFinite(heading) ? heading : 0,
+        },
+      }];
+    }),
+  }), [ships, showShips, language]);
+
+  const fcShipsRef = useRef(fcShips);
+  fcShipsRef.current = fcShips;
+
+  const applyShipSourceData = useCallback((map) => {
+    if (!map) return false;
+    const source = map.getSource('ships-src');
+    if (!source?.setData) return false;
+    source.setData(fcShipsRef.current);
+    if (map.getLayer('ships-layer')) {
+      map.setLayoutProperty('ships-layer', 'icon-image', [
+        'match',
+        ['get', 'iconKind'],
+        SHIP_KIND_BOARDED, MAPLIBRE_SHIP_BOARDED_IMAGE_ID,
+        SHIP_KIND_BLUE, MAPLIBRE_SHIP_BLUE_IMAGE_ID,
+        SHIP_KIND_RED, MAPLIBRE_SHIP_RED_IMAGE_ID,
+        MAPLIBRE_SHIP_CIVILIAN_IMAGE_ID,
+      ]);
+    }
     return true;
   }, []);
 
@@ -3531,6 +3709,11 @@ function MapLibreFlatMapView({
       } catch (error) {
         console.error('Failed to initialize production point icon images:', error);
       }
+      try {
+        await ensureMapLibreShipIconImages(map);
+      } catch (error) {
+        console.error('Failed to initialize ship icon images:', error);
+      }
 
       addGeoSource('grid-src', fcGrid);
       addGeoSource('logistics-src', fcLogistics);
@@ -3542,6 +3725,7 @@ function MapLibreFlatMapView({
       addGeoSource('zones-src', fcZones);
       addGeoSource('airports-src', fcAirports);
       addGeoSource('production-points-src', fcProductionPoints);
+      addGeoSource('ships-src', fcShips);
 
       const initThreeOverlay = () => {
         const overlay = domesOverlayRef.current;
@@ -3933,6 +4117,54 @@ function MapLibreFlatMapView({
       });
 
       applyProductionPointSourceData(map);
+      applyShipSourceData(map);
+
+      map.addLayer({
+        id: 'ships-layer',
+        type: 'symbol',
+        source: 'ships-src',
+        layout: {
+          'icon-image': [
+            'match',
+            ['get', 'iconKind'],
+            SHIP_KIND_BOARDED, MAPLIBRE_SHIP_BOARDED_IMAGE_ID,
+            SHIP_KIND_BLUE, MAPLIBRE_SHIP_BLUE_IMAGE_ID,
+            SHIP_KIND_RED, MAPLIBRE_SHIP_RED_IMAGE_ID,
+            MAPLIBRE_SHIP_CIVILIAN_IMAGE_ID,
+          ],
+          'icon-size': MAPLIBRE_SHIP_ICON_SIZE,
+          'icon-rotate': ['to-number', ['get', 'heading']],
+          'icon-rotation-alignment': 'map',
+          'icon-pitch-alignment': 'viewport',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+        },
+      });
+
+      map.addLayer({
+        id: 'ships-hit-layer',
+        type: 'circle',
+        source: 'ships-src',
+        paint: {
+          'circle-radius': 16,
+          'circle-color': '#000000',
+          'circle-opacity': 0.001,
+        },
+      });
+
+      map.on('mousemove', 'ships-hit-layer', (event) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const feature = event?.features?.[0];
+        const name = feature?.properties?.name || 'Ship';
+        showHoverPopup(
+          event.lngLat,
+          `<div style="font-size:11px;font-weight:600;">${name}</div>`
+        );
+      });
+      map.on('mouseleave', 'ships-hit-layer', () => {
+        if (!placementActive) map.getCanvas().style.cursor = '';
+        hideHoverPopup();
+      });
 
       addGeoSource('crate-clusters-src', fcCrateClusters);
       addGeoSource('spawn-radius-src', fcSpawnRadius);
@@ -4489,6 +4721,31 @@ function MapLibreFlatMapView({
     const map = mapRef.current;
     if (!map) return undefined;
 
+    const applyVisibility = () => {
+      const visibility = showShips ? 'visible' : 'none';
+      if (map.getLayer('ships-layer')) {
+        map.setLayoutProperty('ships-layer', 'visibility', visibility);
+      }
+      if (map.getLayer('ships-hit-layer')) {
+        map.setLayoutProperty('ships-hit-layer', 'visibility', visibility);
+      }
+    };
+
+    if (map.isStyleLoaded()) {
+      applyVisibility();
+      return undefined;
+    }
+
+    map.once('load', applyVisibility);
+    return () => {
+      map.off('load', applyVisibility);
+    };
+  }, [showShips]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return undefined;
+
     const syncProductionPoints = () => {
       applyProductionPointSourceData(map);
     };
@@ -4503,6 +4760,25 @@ function MapLibreFlatMapView({
       map.off('load', syncProductionPoints);
     };
   }, [fcProductionPoints, applyProductionPointSourceData]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return undefined;
+
+    const syncShips = () => {
+      applyShipSourceData(map);
+    };
+
+    if (map.isStyleLoaded()) {
+      syncShips();
+      return undefined;
+    }
+
+    map.once('load', syncShips);
+    return () => {
+      map.off('load', syncShips);
+    };
+  }, [fcShips, applyShipSourceData]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -4890,6 +5166,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   const [mapContextMenu, setMapContextMenu] = useState(null);
   const [tankerOptions, setTankerOptions] = useState([]);
   const [tankerRoutes, setTankerRoutes] = useState([]);
+  const [shipPositions, setShipPositions] = useState([]);
   const [tankerMode, setTankerMode] = useState(null);
   const [confirmingDbuildId, setConfirmingDbuildId] = useState(null);
   const mapSectionRef = useRef(null);
@@ -5094,7 +5371,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   // Initial load of Production Points + spawn catalog (DCORE bridge)
   useEffect(() => {
     let cancelled = false;
-    Promise.allSettled([getProductionPoints(), getSpawnOptions(), getTankerOptions(), getTankerRoutes(), getWebSpawnMarkers(), getDbuildCatalog(), getDbuildPlacements()]).then(([ppResult, optionsResult, tankerOptionsResult, tankerRoutesResult, markersResult, dbuildCatalogResult, dbuildPlacementsResult]) => {
+    Promise.allSettled([getProductionPoints(), getSpawnOptions(), getTankerOptions(), getTankerRoutes(), getShipPositions(), getWebSpawnMarkers(), getDbuildCatalog(), getDbuildPlacements()]).then(([ppResult, optionsResult, tankerOptionsResult, tankerRoutesResult, shipPositionsResult, markersResult, dbuildCatalogResult, dbuildPlacementsResult]) => {
       if (cancelled) return;
       if (ppResult.status === 'fulfilled') {
         const list = ppResult.value?.productionPoints || ppResult.value;
@@ -5113,6 +5390,10 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       if (tankerRoutesResult.status === 'fulfilled' && tankerRoutesResult.value) {
         const list = tankerRoutesResult.value?.routes || tankerRoutesResult.value;
         if (Array.isArray(list)) setTankerRoutes(list);
+      }
+      if (shipPositionsResult.status === 'fulfilled' && shipPositionsResult.value) {
+        const list = shipPositionsResult.value?.ships || shipPositionsResult.value;
+        if (Array.isArray(list)) setShipPositions(list);
       }
       if (markersResult.status === 'fulfilled' && markersResult.value) {
         const list = markersResult.value?.markers || markersResult.value;
@@ -5149,6 +5430,11 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     const unsubscribeTankerRoutes = socketService.on('tanker-routes:updated', (data) => {
       const list = data?.routes || data;
       if (Array.isArray(list)) setTankerRoutes(list);
+    });
+
+    const unsubscribeShipPositions = socketService.on('ship-positions:updated', (data) => {
+      const list = data?.ships || data;
+      if (Array.isArray(list)) setShipPositions(list);
     });
 
     const unsubscribeDbuildPlacements = socketService.on('dbuild-placements:updated', (data) => {
@@ -5191,6 +5477,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       unsubscribePp && unsubscribePp();
       unsubscribeMarkers && unsubscribeMarkers();
       unsubscribeTankerRoutes && unsubscribeTankerRoutes();
+      unsubscribeShipPositions && unsubscribeShipPositions();
       unsubscribeDbuildPlacements && unsubscribeDbuildPlacements();
       unsubscribeDbuildSites && unsubscribeDbuildSites();
       unsubscribeResult && unsubscribeResult();
@@ -5715,8 +6002,14 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
         }];
       })
       : [];
-    return [...zonePoints, ...airportPoints, ...productionPointMarkers];
-  }, [zonesForMap, allMapAirports, productionPointsForMap, selectedZoneId, selectedProductionPointId, filters.showAto, filters.showAirports, filters.showProductionPoints]);
+    const shipMarkers = filters.showShips
+      ? (shipPositions || []).flatMap((ship) => {
+        if (!Number.isFinite(ship?.lat) || !Number.isFinite(ship?.lon)) return [];
+        return [{ lat: ship.lat, lon: ship.lon, size: 0.08 }];
+      })
+      : [];
+    return [...zonePoints, ...airportPoints, ...productionPointMarkers, ...shipMarkers];
+  }, [zonesForMap, allMapAirports, productionPointsForMap, selectedZoneId, selectedProductionPointId, filters.showAto, filters.showAirports, filters.showProductionPoints, filters.showShips, shipPositions]);
 
   const zoneTheaterCenter = useMemo(() => {
     if (validZones.length === 0) return null;
@@ -6955,6 +7248,9 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       showProductionPoints={filters.showProductionPoints}
                       selectedProductionPointId={selectedProductionPointId}
                       onProductionPointSelect={handleProductionPointSelect}
+                      ships={shipPositions}
+                      showShips={filters.showShips}
+                      language={language}
                       spawnPlacementActive={Boolean(spawnMode)}
                       onSpawnPlace={handleSpawnPlace}
                       spawnAirportCenter={spawnAirportCenter}
@@ -7008,6 +7304,9 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       showProductionPoints={filters.showProductionPoints}
                       selectedProductionPointId={selectedProductionPointId}
                       onProductionPointSelect={handleProductionPointSelect}
+                      ships={shipPositions}
+                      showShips={filters.showShips}
+                      language={language}
                       spawnPlacementActive={Boolean(spawnMode)}
                       onSpawnPlace={handleSpawnPlace}
                       spawnAirportCenter={spawnAirportCenter}
