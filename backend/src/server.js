@@ -396,6 +396,7 @@ let dbuildSites = [];
 let shipPositionsSyncSignature = '';
 let shipPositions = [];
 let shipPositionsUpdatedAt = null;
+let shipPositionsEmptyStreak = 0;
 let zoneOperationsById = new Map();
 let hiddenLogisticsRouteAirportIds = new Set();
 const ZONE_OPERATION_TTL_MS = 45 * 60 * 1000;
@@ -1594,11 +1595,22 @@ function syncShipPositionsFromFile() {
     const raw = fs.readFileSync(SHIP_POSITIONS_FILE, 'utf8');
     if (!raw || raw.trim() === '') return;
     if (raw === shipPositionsSyncSignature) return;
-    shipPositionsSyncSignature = raw;
 
     const parsed = JSON.parse(raw);
     const incoming = Array.isArray(parsed?.ships) ? parsed.ships : (Array.isArray(parsed) ? parsed : []);
-    shipPositions = incoming.map(normalizeShipPositionEntry).filter(Boolean);
+    const nextShips = incoming.map(normalizeShipPositionEntry).filter(Boolean);
+
+    // DNAVAL rewrites the export in place. A single empty/partial snapshot must not
+    // wipe the last good positions (refresh during that window would show no ships).
+    if (nextShips.length === 0 && shipPositions.length > 0) {
+      shipPositionsEmptyStreak += 1;
+      if (shipPositionsEmptyStreak < 2) return;
+    } else {
+      shipPositionsEmptyStreak = 0;
+    }
+
+    shipPositionsSyncSignature = raw;
+    shipPositions = nextShips;
     const updatedAt = Number(parsed?.updatedAt);
     shipPositionsUpdatedAt = Number.isFinite(updatedAt) ? updatedAt : Date.now();
 
@@ -5682,6 +5694,10 @@ io.on('connection', (socket) => {
   });
   socket.emit('tanker-routes:updated', {
     routes: tankerRoutes,
+  });
+  socket.emit('ship-positions:updated', {
+    ships: shipPositions,
+    updatedAt: shipPositionsUpdatedAt,
   });
   socket.emit('dbuild-placements:updated', {
     placements: enrichDbuildPlacements(dbuildPlacementsService.getPlacements()),

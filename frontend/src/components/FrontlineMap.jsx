@@ -4766,20 +4766,32 @@ function MapLibreFlatMapView({
     const map = mapRef.current;
     if (!map) return undefined;
 
+    let cancelled = false;
+    let retryId = 0;
+    let attempts = 0;
+
     const syncShips = () => {
-      applyShipSourceData(map);
+      if (cancelled) return;
+      if (applyShipSourceData(map)) return;
+      // `load` / isStyleLoaded can fire while ship icons are still awaiting,
+      // before `ships-src` exists. Retry until the source is added.
+      if (attempts >= 80) return;
+      attempts += 1;
+      retryId = window.setTimeout(syncShips, 100);
     };
 
     if (map.isStyleLoaded()) {
       syncShips();
-      return undefined;
+    } else {
+      map.once('load', syncShips);
     }
 
-    map.once('load', syncShips);
     return () => {
+      cancelled = true;
+      window.clearTimeout(retryId);
       map.off('load', syncShips);
     };
-  }, [fcShips, applyShipSourceData]);
+  }, [fcShips, applyShipSourceData, mapInstance]);
 
   useEffect(() => {
     const map = mapRef.current;
