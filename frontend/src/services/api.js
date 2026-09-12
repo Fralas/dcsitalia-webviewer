@@ -903,7 +903,7 @@ export async function getWebSpawnMarkers() {
 }
 
 /**
- * Get the catalog of web-initiated spawns (infantry + crate keywords/costs).
+ * Get the catalog of web-initiated spawns (infantry + crate + DBUILD bundle keywords/costs).
  */
 export async function getSpawnOptions() {
   return fetchAPI('/spawn-options');
@@ -968,10 +968,21 @@ export async function spawnAirportInfantry(airportId, keyword, lat, lon, quantit
 }
 
 /**
- * Spawn a crate (CRATE BUILD/AMMO/FUEL, slingload HMMWV/L118/...) at a clicked point inside a BLUE airport.
+ * Spawn a crate (CRATE BUILD/AMMO/FUEL/TRUNKS, slingload HMMWV/L118/...) at a clicked point inside a BLUE airport.
  */
 export async function spawnAirportCrate(airportId, keyword, lat, lon, quantity = 1) {
   return fetchAPI(`/airports/${encodeURIComponent(airportId)}/spawn-crate`, {
+    method: 'POST',
+    body: JSON.stringify({ keyword, lat, lon, quantity }),
+    credentials: 'include',
+  });
+}
+
+/**
+ * Spawn a DBUILD crate bundle (all crates required to build FARP/NASAMS/...).
+ */
+export async function spawnAirportCrateBundle(airportId, keyword, lat, lon, quantity = 1) {
+  return fetchAPI(`/airports/${encodeURIComponent(airportId)}/spawn-crate-bundle`, {
     method: 'POST',
     body: JSON.stringify({ keyword, lat, lon, quantity }),
     credentials: 'include',
@@ -1247,6 +1258,7 @@ export default {
   requestProductionPointUpgrade,
   spawnAirportInfantry,
   spawnAirportCrate,
+  spawnAirportCrateBundle,
   spawnMapAction,
   spawnTanker,
   getDbuildCatalog,

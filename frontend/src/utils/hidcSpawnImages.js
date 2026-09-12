@@ -1,6 +1,7 @@
 import ammoCrateImg from '../../img/crates/ammo_crate.webp';
 import buildCrateImg from '../../img/crates/build_crate.webp';
 import fuelCrateImg from '../../img/crates/fuel_crate.png';
+import trunksCrateImg from '../../img/crates/trunks_crate.webp';
 import hmmwvImg from '../../img/wiki/veh/HMMWV.png';
 import l118Img from '../../img/wiki/veh/L118.png';
 import manpadImg from '../../img/wiki/veh/MANPAD.png';
@@ -14,6 +15,7 @@ const SPAWN_IMAGES = {
   AMMO: ammoCrateImg,
   FUEL: fuelCrateImg,
   BUILD: buildCrateImg,
+  TRUNKS: trunksCrateImg,
   HMMWV: hmmwvImg,
   TOW: towImg,
   L118: l118Img,
