@@ -197,6 +197,7 @@ const WEB_CRATE_OPTIONS = [
   { keyword: 'AMMO', label: 'AMMO', cost: 5, group: 'build' },
   { keyword: 'FUEL', label: 'FUEL', cost: 5, group: 'build' },
   { keyword: 'BUILD', label: 'BUILD', cost: 5, group: 'build' },
+  { keyword: 'TRUNKS', label: 'TRUNKS', cost: 20, group: 'build' },
   { keyword: 'HMMWV', label: 'HMMWV', cost: 40, group: 'deployables' },
   { keyword: 'TOW', label: 'TOW', cost: 45, group: 'deployables' },
   { keyword: 'L118', label: 'L118', cost: 30, group: 'deployables' },
@@ -602,6 +603,7 @@ const SPAWN_FEED_LABELS = {
   AMMO: 'Ammo',
   FUEL: 'Fuel',
   BUILD: 'Build',
+  TRUNKS: 'Trunks',
   HMMWV: 'HMMWV',
   TOW: 'TOW',
   L118: 'L118',
@@ -3764,7 +3766,7 @@ app.post('/api/airports/:id/spawn-infantry', (req, res) => {
 });
 
 /**
- * POST /api/airports/:id/spawn-crate - Body { keyword: BUILD|AMMO|FUEL|HMMWV|L118|..., lat, lon }
+ * POST /api/airports/:id/spawn-crate - Body { keyword: BUILD|AMMO|FUEL|TRUNKS|HMMWV|L118|..., lat, lon }
  */
 app.post('/api/airports/:id/spawn-crate', (req, res) => {
   handleSpawnRequest(req, res, 'crate_spawn');

@@ -571,6 +571,7 @@ const SPAWN_BANNER_DISPLAY_NAMES = {
   AMMO: 'Ammo',
   FUEL: 'Fuel',
   BUILD: 'Build',
+  TRUNKS: 'Trunks',
   HMMWV: 'HMMWV',
   TOW: 'TOW',
   L118: 'L118',
@@ -681,7 +682,7 @@ const SPAWN_MENU_SECTIONS = [
     titleKey: 'lidc.map.airportWizard.spawn.buildCrates',
     kindKey: 'lidc.map.airportWizard.spawn.kindCrate',
     spawnType: 'crate_spawn',
-    keywords: ['AMMO', 'FUEL', 'BUILD'],
+    keywords: ['AMMO', 'FUEL', 'BUILD', 'TRUNKS'],
   },
   {
     id: 'deployables',

@@ -401,6 +401,7 @@ export default {
           AMMO: 'Cassa munizioni',
           FUEL: 'Cassa carburante',
           BUILD: 'Cassa costruzione',
+          TRUNKS: 'Cassa tronchi',
           HMMWV: 'Cassa HMMWV (gancio)',
           TOW: 'Cassa TOW (gancio)',
           L118: 'Cassa L118 (gancio)',

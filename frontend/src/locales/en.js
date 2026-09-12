@@ -401,6 +401,7 @@ export default {
           AMMO: 'Ammunition crate',
           FUEL: 'Fuel crate',
           BUILD: 'Construction crate',
+          TRUNKS: 'Trunks crate',
           HMMWV: 'Slingload HMMWV crate',
           TOW: 'Slingload TOW crate',
           L118: 'Slingload L118 crate',
