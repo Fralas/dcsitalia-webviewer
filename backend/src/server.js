@@ -290,6 +290,32 @@ const DBUILD_CATALOG = [
 
 const DBUILD_TYPE_IDS = new Set(DBUILD_CATALOG.map((entry) => entry.id));
 
+function crateKeywordCost(keyword) {
+  const option = WEB_CRATE_OPTIONS.find((entry) => entry.keyword === keyword);
+  return Number(option?.cost) || DBUILD_CRATE_FP_COST;
+}
+
+function countCrateContents(requiredCategories) {
+  if (!requiredCategories || typeof requiredCategories !== 'object') return 0;
+  return Object.values(requiredCategories).reduce((sum, count) => (
+    sum + Math.max(0, Math.floor(Number(count) || 0))
+  ), 0);
+}
+
+const WEB_CRATE_BUNDLE_OPTIONS = DBUILD_CATALOG.map((entry) => ({
+  keyword: `${entry.keyword}_DBUILD`,
+  label: `${entry.keyword} DBUILD`,
+  cost: Object.entries(entry.required_categories || {}).reduce((sum, [keyword, count]) => (
+    sum + (Math.max(0, Number(count) || 0) * crateKeywordCost(keyword))
+  ), 0),
+  group: 'dbuild_bundles',
+  build_type: entry.id,
+  contents: { ...entry.required_categories },
+  category_order: [...(entry.category_order || [])],
+  crate_count: countCrateContents(entry.required_categories),
+}));
+const WEB_CRATE_BUNDLE_KEYWORDS = new Set(WEB_CRATE_BUNDLE_OPTIONS.map((o) => o.keyword));
+
 // CSV Directory - configurable via environment variable
 const CSV_DIR = process.env.CSV_DIR
   ? path.resolve(process.env.CSV_DIR)
@@ -608,6 +634,11 @@ const SPAWN_FEED_LABELS = {
   TOW: 'TOW',
   L118: 'L118',
   TACAN: 'TACAN',
+  MORTAR_DBUILD: 'MORTAR DBUILD',
+  EWR_DBUILD: 'EWR DBUILD',
+  NASAMS_DBUILD: 'NASAMS DBUILD',
+  RAPIER_DBUILD: 'RAPIER DBUILD',
+  FARP_DBUILD: 'FARP DBUILD',
 };
 
 function formatSpawnKeywordLabel(keyword) {
@@ -636,9 +667,9 @@ function getDbuildCatalogEntry(buildType) {
 
 function estimateDbuildFpCost(requiredCategories) {
   if (!requiredCategories || typeof requiredCategories !== 'object') return 0;
-  return Object.values(requiredCategories).reduce((sum, count) => {
+  return Object.entries(requiredCategories).reduce((sum, [keyword, count]) => {
     const qty = Number(count) || 0;
-    return sum + (qty * DBUILD_CRATE_FP_COST);
+    return sum + (qty * crateKeywordCost(keyword));
   }, 0);
 }
 
@@ -911,7 +942,7 @@ function buildWebCommandFeedEvent(command, stored) {
     };
   }
 
-  if (cmdType === 'inf_spawn' || cmdType === 'crate_spawn') {
+  if (cmdType === 'inf_spawn' || cmdType === 'crate_spawn' || cmdType === 'crate_bundle') {
     const airportName = getAirportDisplayName(command.airport_id);
     const keyword = formatSpawnKeywordLabel(command.keyword);
     const qty = clampSpawnQuantity(command.quantity);
@@ -958,7 +989,7 @@ function buildWebCommandFeedEvent(command, stored) {
 function maybePushWebCommandFeedEvent(command, stored) {
   if (!command || !stored?.id) return;
   const cmdType = stored.type || command.type;
-  if (!['pp_upgrade', 'pp_retrieve', 'inf_spawn', 'crate_spawn', 'dbuild_confirm', 'tanker_spawn', ...WEB_MAP_ACTION_TYPES].includes(cmdType)) return;
+  if (!['pp_upgrade', 'pp_retrieve', 'inf_spawn', 'crate_spawn', 'crate_bundle', 'dbuild_confirm', 'tanker_spawn', ...WEB_MAP_ACTION_TYPES].includes(cmdType)) return;
   if (webCommandFeedEmittedIds.has(stored.id)) return;
 
   const event = buildWebCommandFeedEvent(command, stored);
@@ -1432,6 +1463,23 @@ function offsetLatLon(lat, lon, distanceM, bearingDeg) {
 
 function buildSpawnPlacementPositions(lat, lon, quantity) {
   const qty = clampSpawnQuantity(quantity);
+  const positions = [];
+  for (let index = 0; index < qty; index += 1) {
+    positions.push(
+      index === 0
+        ? { lat, lon }
+        : offsetLatLon(lat, lon, SPAWN_OFFSET_METERS * index, SPAWN_OFFSET_BEARING_DEG)
+    );
+  }
+  return positions;
+}
+
+function getCrateBundleOption(keyword) {
+  return WEB_CRATE_BUNDLE_OPTIONS.find((entry) => entry.keyword === keyword) || null;
+}
+
+function buildBundlePlacementPositions(lat, lon, crateCount) {
+  const qty = Math.max(1, Math.floor(Number(crateCount) || 0));
   const positions = [];
   for (let index = 0; index < qty; index += 1) {
     positions.push(
@@ -3543,6 +3591,7 @@ app.get('/api/spawn-options', (req, res) => {
   res.json({
     infantry: WEB_INFANTRY_OPTIONS,
     crate: WEB_CRATE_OPTIONS,
+    bundles: WEB_CRATE_BUNDLE_OPTIONS,
   });
 });
 
@@ -3770,6 +3819,67 @@ app.post('/api/airports/:id/spawn-infantry', (req, res) => {
  */
 app.post('/api/airports/:id/spawn-crate', (req, res) => {
   handleSpawnRequest(req, res, 'crate_spawn');
+});
+
+function handleCrateBundleRequest(req, res) {
+  const actor = getSessionActor(req);
+  if (!actor) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const airportId = String(req.params.id || '').trim();
+  const airport = getAirportById(airportId);
+  if (!airport) {
+    return res.status(404).json({ error: 'Airport not found' });
+  }
+
+  const keyword = String(req.body?.keyword || '').trim().toUpperCase();
+  const bundle = getCrateBundleOption(keyword);
+  if (!keyword || !bundle || !WEB_CRATE_BUNDLE_KEYWORDS.has(keyword)) {
+    return res.status(400).json({ error: 'Invalid keyword for crate_bundle' });
+  }
+
+  const lat = Number(req.body?.lat);
+  const lon = Number(req.body?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return res.status(400).json({ error: 'Valid lat/lon are required' });
+  }
+
+  const quantity = clampSpawnQuantity(req.body?.quantity);
+  const crateCount = Math.max(0, Number(bundle.crate_count) || 0) * quantity;
+  if (crateCount < 1) {
+    return res.status(400).json({ error: 'DBUILD bundle has no crates' });
+  }
+
+  const placementPositions = buildBundlePlacementPositions(lat, lon, crateCount);
+  for (const position of placementPositions) {
+    const distanceCheck = validateAirportSpawnDistance(airport, position.lat, position.lon);
+    if (!distanceCheck.ok) {
+      return res.status(400).json({ error: distanceCheck.error });
+    }
+  }
+
+  queueAndRespond(res, {
+    id: randomUUID(),
+    type: 'crate_bundle',
+    production_point_id: null,
+    airport_id: airportId,
+    keyword,
+    build_type: bundle.build_type,
+    lat,
+    lon,
+    quantity,
+    requested_by: actor.name,
+    requested_by_id: actor.id,
+    ts: Date.now(),
+  });
+}
+
+/**
+ * POST /api/airports/:id/spawn-crate-bundle - Body { keyword: FARP_DBUILD|..., lat, lon, quantity }
+ */
+app.post('/api/airports/:id/spawn-crate-bundle', (req, res) => {
+  handleCrateBundleRequest(req, res);
 });
 
 /**

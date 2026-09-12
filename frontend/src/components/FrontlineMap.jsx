@@ -24,7 +24,7 @@ import airports from '../config/airports';
 import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
 import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
-import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, declineFrontlineZone, getAirliftPlayers, getAirportOccupancy, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getHidcLogisticsAlerts, getLogisticsRouteVisibility, getMissions, getServerTime, getTankerOptions, getTankerRoutes, purchaseAirportLogistics, setAirportLogisticsRoutePriority, getProductionPoints, getShipPositions, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate, spawnMapAction, spawnTanker, updateAirportOrder } from '../services/api';
+import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, declineFrontlineZone, getAirliftPlayers, getAirportOccupancy, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getHidcLogisticsAlerts, getLogisticsRouteVisibility, getMissions, getServerTime, getTankerOptions, getTankerRoutes, purchaseAirportLogistics, setAirportLogisticsRoutePriority, getProductionPoints, getShipPositions, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate, spawnAirportCrateBundle, spawnMapAction, spawnTanker, updateAirportOrder } from '../services/api';
 import ZoneMissionCard from './map/ZoneMissionCard';
 import LiveFeedPanel from './map/LiveFeedPanel';
 import MapFilterBar from './map/MapFilterBar';
@@ -576,6 +576,11 @@ const SPAWN_BANNER_DISPLAY_NAMES = {
   TOW: 'TOW',
   L118: 'L118',
   TACAN: 'TACAN',
+  MORTAR_DBUILD: 'MORTAR DBUILD',
+  EWR_DBUILD: 'EWR DBUILD',
+  NASAMS_DBUILD: 'NASAMS DBUILD',
+  RAPIER_DBUILD: 'RAPIER DBUILD',
+  FARP_DBUILD: 'FARP DBUILD',
 };
 
 function formatSpawnBannerName(keyword) {
@@ -691,11 +696,33 @@ const SPAWN_MENU_SECTIONS = [
     spawnType: 'crate_spawn',
     keywords: ['HMMWV', 'TOW', 'L118', 'TACAN'],
   },
+  {
+    id: 'dbuildBundles',
+    titleKey: 'lidc.map.airportWizard.spawn.dbuildBundles',
+    kindKey: 'lidc.map.airportWizard.spawn.kindBundle',
+    spawnType: 'crate_bundle',
+    keywords: ['MORTAR_DBUILD', 'EWR_DBUILD', 'NASAMS_DBUILD', 'RAPIER_DBUILD', 'FARP_DBUILD'],
+  },
 ];
+
+function formatBundleContents(option) {
+  const contents = option?.contents && typeof option.contents === 'object' ? option.contents : {};
+  const order = Array.isArray(option?.category_order) && option.category_order.length > 0
+    ? option.category_order
+    : Object.keys(contents);
+  return order
+    .map((keyword) => {
+      const qty = Math.max(0, Math.floor(Number(contents[keyword]) || 0));
+      return qty > 0 ? `${qty}× ${keyword}` : null;
+    })
+    .filter(Boolean)
+    .join(' · ');
+}
 
 function SpawnAssetCard({ keyword, option, kindKey, spawnType, selected, onSelect, language = 'en' }) {
   const imageUrl = getHidcSpawnImageUrl(keyword);
-  const blurb = t(`lidc.map.airportWizard.spawn.${keyword}`);
+  const bundleBlurb = spawnType === 'crate_bundle' ? formatBundleContents(option) : '';
+  const blurb = bundleBlurb || t(`lidc.map.airportWizard.spawn.${keyword}`);
   const kind = t(kindKey);
   const cost = Number(option?.cost) || 0;
 
@@ -767,6 +794,15 @@ function offsetLatLon(lat, lon, distanceM, bearingDeg) {
 
 function buildSpawnPlacementPositions(lat, lon, quantity) {
   const qty = Math.max(1, Math.min(SPAWN_QUANTITY_MAX, Math.floor(Number(quantity)) || 1));
+  return Array.from({ length: qty }, (_, index) => (
+    index === 0
+      ? { lat, lon }
+      : offsetLatLon(lat, lon, SPAWN_OFFSET_METERS * index, SPAWN_OFFSET_BEARING_DEG)
+  ));
+}
+
+function buildBundlePlacementPositions(lat, lon, crateCount) {
+  const qty = Math.max(1, Math.floor(Number(crateCount) || 0));
   return Array.from({ length: qty }, (_, index) => (
     index === 0
       ? { lat, lon }
@@ -5167,8 +5203,8 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   // DCORE bridge state (Production Points + web-initiated spawns)
   const [productionPoints, setProductionPoints] = useState([]);
   const [selectedProductionPointId, setSelectedProductionPointId] = useState(null);
-  const [spawnOptions, setSpawnOptions] = useState({ infantry: [], crate: [] });
-  // spawnMode: { airportId, type: 'inf_spawn'|'crate_spawn', keyword, label } | null
+  const [spawnOptions, setSpawnOptions] = useState({ infantry: [], crate: [], bundles: [] });
+  // spawnMode: { airportId, type: 'inf_spawn'|'crate_spawn'|'crate_bundle', keyword, label } | null
   const [spawnMode, setSpawnMode] = useState(null);
   // retrieveMode: { ppId, quantity } | null
   const [retrieveMode, setRetrieveMode] = useState(null);
@@ -5396,6 +5432,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
         setSpawnOptions({
           infantry: Array.isArray(optionsResult.value.infantry) ? optionsResult.value.infantry : [],
           crate: Array.isArray(optionsResult.value.crate) ? optionsResult.value.crate : [],
+          bundles: Array.isArray(optionsResult.value.bundles) ? optionsResult.value.bundles : [],
         });
       }
       if (tankerOptionsResult.status === 'fulfilled' && tankerOptionsResult.value) {
@@ -5471,7 +5508,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       if (!pendingCommandIdsRef.current.has(data.id)) return;
       pendingCommandIdsRef.current.delete(data.id);
 
-      const isSpawn = data.type === 'inf_spawn' || data.type === 'crate_spawn';
+      const isSpawn = data.type === 'inf_spawn' || data.type === 'crate_spawn' || data.type === 'crate_bundle';
       const isDbuild = data.type === 'dbuild_confirm';
       if ((isSpawn || isDbuild) && data.ok === true) return;
 
@@ -6346,6 +6383,9 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     (spawnOptions.crate || []).forEach((option) => {
       if (option?.keyword) map.set(option.keyword, option);
     });
+    (spawnOptions.bundles || []).forEach((option) => {
+      if (option?.keyword) map.set(option.keyword, option);
+    });
     return map;
   }, [spawnOptions]);
   const selectedAirportRoutesHidden = selectedAirportId ? hiddenLogisticsRouteAirportIds.has(String(selectedAirportId)) : false;
@@ -6904,6 +6944,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       label: option.keyword || option.label,
       cost: option.cost,
       quantity: 1,
+      crateCount: Number(option.crate_count) || 0,
     });
     setSelectedProductionPointId(null);
     setRetrieveMode(null);
@@ -7045,7 +7086,12 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     const quantity = Math.max(1, Math.min(SPAWN_QUANTITY_MAX, Math.floor(Number(spawnMode.quantity)) || 1));
     const airport = airportsById.get(airportId);
     const airportCoords = airport?.coordinates;
-    const placementPositions = buildSpawnPlacementPositions(lat, lon, quantity);
+    const crateCount = type === 'crate_bundle'
+      ? Math.max(1, (Number(spawnMode.crateCount) || 0) * quantity)
+      : quantity;
+    const placementPositions = type === 'crate_bundle'
+      ? buildBundlePlacementPositions(lat, lon, crateCount)
+      : buildSpawnPlacementPositions(lat, lon, quantity);
     if (airportCoords && Number.isFinite(airportCoords.lat) && Number.isFinite(airportCoords.lon)) {
       for (const position of placementPositions) {
         const distanceM = haversineMeters(airportCoords.lat, airportCoords.lon, position.lat, position.lon);
@@ -7062,7 +7108,11 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
 
     setSubmittingCommand(true);
     try {
-      const submit = type === 'inf_spawn' ? spawnAirportInfantry : spawnAirportCrate;
+      const submit = type === 'inf_spawn'
+        ? spawnAirportInfantry
+        : type === 'crate_bundle'
+          ? spawnAirportCrateBundle
+          : spawnAirportCrate;
       const response = await submit(airportId, keyword, lat, lon, quantity);
       if (response?.commandId) {
         pendingCommandIdsRef.current.add(response.commandId);
@@ -7567,6 +7617,9 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                   </div>
                   <div className="mt-1 text-[11px] text-white/70">
                     Total {(spawnMode.cost || 0) * (spawnMode.quantity || 1)} fp
+                    {spawnMode.type === 'crate_bundle' && spawnMode.crateCount
+                      ? ` • ${(spawnMode.crateCount || 0) * (spawnMode.quantity || 1)} crates`
+                      : ''}
                     {' • '}
                     {SPAWN_OFFSET_METERS} m spacing
                     {' • '}
