@@ -114,6 +114,7 @@ const dscoreFactionPoints = createDscoreFactionPoints({
 });
 
 const PORT = process.env.PORT || 3001;
+const LISTEN_HOST = process.env.LISTEN_HOST || '0.0.0.0';
 const CONVOY_API_TOKEN = process.env.CONVOY_API_TOKEN || '';
 const DISCORD_GUILD_ID = String(process.env.DISCORD_GUILD_ID || '').trim();
 const DISCORD_BOT_TOKEN = String(process.env.DISCORD_BOT_TOKEN || '').trim();
@@ -5995,7 +5996,7 @@ lidcService.exportLidcPolicy();
 syncLidcAirframeStateFromFile();
 atcStripsService.initAtcStripsService();
 
-httpServer.listen(PORT, '127.0.0.1', () => {
+httpServer.listen(PORT, LISTEN_HOST, () => {
   const activeAirports = airbaseStatusManager.getActiveAirports();
   logger.info(`
 ╔═══════════════════════════════════════════════════════╗

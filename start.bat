@@ -20,8 +20,11 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3001.*LISTENING"') do taskk
 timeout /t 2 /nobreak >nul
 
 echo.
-echo  Frontend: http://localhost:3000
-echo  Backend:  http://localhost:3001
+echo  Locale:   http://localhost:3000
+echo  Esterno:  http://warehouse.dcs-italia.it:3000
+echo.
+echo  IMPORTANTE: usa http con :3000
+echo  https://warehouse.dcs-italia.it (senza porta) = router Fritz, non il sito
 echo.
 echo  Premi Ctrl+C per fermare il server.
 echo.

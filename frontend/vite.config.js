@@ -28,8 +28,13 @@ export default defineConfig({
   },
   assetsInclude: ['**/*.glb', '**/*.gltf'],
   server: {
+    host: '0.0.0.0',
     port: 3000,
     strictPort: true,
+    allowedHosts: [
+      'warehouse.dcs-italia.it',
+      '.dcs-italia.it',
+    ],
     watch: {
       // The backend (luaZoneSync) rewrites this data file every ~30s with live
       // frontline zones. It lives in src/ only as a build-time bootstrap default;
