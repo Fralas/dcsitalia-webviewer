@@ -5007,9 +5007,10 @@ function MapLibreFlatMapView({
     if (!map || !focusCoordinates || !focusTargetKey) return;
     if (Date.now() < userCameraLockUntilRef.current) return;
 
-    const nextLat = Number(focusCoordinates.lat);
-    const nextLon = Number(focusCoordinates.lon);
-    if (!Number.isFinite(nextLat) || !Number.isFinite(nextLon)) return;
+    const normalizedFocus = normalizeMapCoordinates(focusCoordinates);
+    if (!normalizedFocus) return;
+    const nextLat = normalizedFocus.lat;
+    const nextLon = normalizedFocus.lon;
 
     const previous = lastAutoFocusRef.current;
     if (
@@ -6025,10 +6026,13 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     return filteredLogisticsMissions.filter((mission) => !hiddenLogisticsRouteAirportIds.has(String(mission.airport_id)));
   }, [filteredLogisticsMissions, hiddenLogisticsRouteAirportIds]);
 
-  const focusedZone = useMemo(
-    () => (selectedZoneId ? filteredZones.find((zone) => zone.id === selectedZoneId) || validZones.find((zone) => zone.id === selectedZoneId) || null : null),
-    [selectedZoneId, filteredZones, validZones]
-  );
+  const focusedZone = useMemo(() => {
+    if (!selectedZoneId) return null;
+    const wanted = String(selectedZoneId);
+    return filteredZones.find((zone) => String(zone.id) === wanted)
+      || validZones.find((zone) => String(zone.id) === wanted)
+      || null;
+  }, [selectedZoneId, filteredZones, validZones]);
 
   const airportsById = useMemo(() => {
     const map = new Map();
@@ -6111,8 +6115,13 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
 
   const selectedAirportCenter = useMemo(() => {
     if (!selectedAirportId) return null;
-    return airportsById.get(selectedAirportId)?.coordinates || null;
-  }, [selectedAirportId, airportsById]);
+    const wanted = String(selectedAirportId);
+    const airport = allMapAirports.find((item) => String(item?.id) === wanted)
+      || airportsById.get(selectedAirportId)
+      || airportsById.get(wanted)
+      || null;
+    return normalizeMapCoordinates(airport?.coordinates);
+  }, [selectedAirportId, allMapAirports, airportsById]);
 
   const retrievePpCenter = useMemo(() => {
     if (!retrieveMode) return null;
@@ -6122,7 +6131,13 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
 
   const mapMaxZoom = (spawnMode || retrieveMode || tankerMode || selectedAirportId) ? MAP_ZOOM_AIRPORT_MAX : MAP_ZOOM_DEFAULT_MAX;
 
-  const tacticalFocusCoordinates = spawnAirportCenter || retrievePpCenter || selectedAirportCenter || selectedDcsarFocus || theaterFocus || focusedZone?.coordinates || null;
+  const tacticalFocusCoordinates = spawnAirportCenter
+    || retrievePpCenter
+    || selectedAirportCenter
+    || selectedDcsarFocus
+    || normalizeMapCoordinates(focusedZone?.coordinates)
+    || theaterFocus
+    || null;
   const tacticalFocusTargetKey = spawnMode
     ? `spawn:${spawnMode.airportId}`
     : retrieveMode
