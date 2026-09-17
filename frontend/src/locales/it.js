@@ -1200,6 +1200,37 @@ export default {
         neutral: 'Neutrale',
         stock: 'Scorte {{count}}',
         airdropUnit: 'Airdrop unit'
+      },
+      zoneCard: {
+        selectZone: 'Seleziona zona',
+        filterAria: 'Filtra zone per stato',
+        owner: 'Proprietario',
+        lastChange: 'Ultimo cambio',
+        dms: 'DMS',
+        mgrs: 'MGRS',
+        task: 'Task',
+        surrounded: 'Adiacenti',
+        noTasks: 'Nessun task',
+        accept: 'Accetta missione',
+        accepting: 'Accettazione...',
+        decline: 'Rifiuta missione',
+        declining: 'Rifiuto...',
+        hintNoTasks: 'Questa zona non ha task disponibili.',
+        hintAssigned: 'Questa zona è già assegnata a un altro pilota.',
+        hintLimit: 'Puoi accettare al massimo 2 zone.',
+        status: {
+          blue: 'Blu',
+          red: 'Rosso',
+          neutral: 'Neutrale',
+          attack: 'Sotto attacco'
+        },
+        filter: {
+          all: 'Tutte le zone',
+          BLUE: 'Zone blu',
+          RED: 'Zone rosse',
+          NEUTRAL: 'Zone neutrali',
+          UNDER_ATTACK: 'Sotto attacco'
+        }
       }
     },
     ships: {

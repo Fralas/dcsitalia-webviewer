@@ -1200,6 +1200,37 @@ export default {
         neutral: 'Neutral',
         stock: 'Stock {{count}}',
         airdropUnit: 'Airdrop unit'
+      },
+      zoneCard: {
+        selectZone: 'Select zone',
+        filterAria: 'Filter zones by status',
+        owner: 'Owner',
+        lastChange: 'Last change',
+        dms: 'DMS',
+        mgrs: 'MGRS',
+        task: 'Task',
+        surrounded: 'Surrounded',
+        noTasks: 'No tasks',
+        accept: 'Accept mission',
+        accepting: 'Accepting...',
+        decline: 'Decline mission',
+        declining: 'Declining...',
+        hintNoTasks: 'This zone has no available tasks.',
+        hintAssigned: 'This zone is currently assigned to another pilot.',
+        hintLimit: 'You can accept at most 2 zones.',
+        status: {
+          blue: 'Blue',
+          red: 'Red',
+          neutral: 'Neutral',
+          attack: 'Under attack'
+        },
+        filter: {
+          all: 'All zones',
+          BLUE: 'Blue zones',
+          RED: 'Red zones',
+          NEUTRAL: 'Neutral zones',
+          UNDER_ATTACK: 'Under attack'
+        }
       }
     },
     ships: {
