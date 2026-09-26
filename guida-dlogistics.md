@@ -124,6 +124,7 @@ Nell’elenco, l’icona dell’aereo indica il C-130. Se c’è anche l’icona
 | Container_AG_Maverick 2 | AGM-65E ×30 · AGM-65K ×28 |
 | Container_AG_Hellfire | AGM-114L ×200 · AGM-114K ×188 |
 | Container_AG_SEAD1 | AGM-88C ×10 · AGM-122 ×5 |
+| Container_AG_SEAD2 | AGM-88C ×3 · ADM-141A ×12 |
 | Container_AG_Rockets | Hydra 70 ×500 · APKWS ×167 |
 | Container_ASW | AGM-84D ×28 |
 | Container_AG_Rus | 9M120 ×100 · S-8 ×252 |
@@ -143,12 +144,17 @@ Nell’elenco, l’icona dell’aereo indica il C-130. Se c’è anche l’icona
 | Crate_9X | AIM-9X ×14 |
 | Crate_GBU38 | GBU-38 ×5 |
 | Crate_GBU54 | GBU-54 ×5 |
+| Crate_GBU31 | GBU-31 ×5 |
 | Crate_CBU105 | CBU-105 ×3 |
+| Crate_CBU103 | CBU-103 ×3 |
 | Crate_AGM65D | AGM-65D ×6 |
 | Crate_AGM65F | AGM-65F ×4 |
 | Crate_AGM114K | AGM-114K ×14 |
 | Crate_AGM114L | AGM-114L ×14 |
 | Crate_AGM88 | AGM-88C ×3 |
+| Crate_ADM141A | ADM-141A ×10 |
+| Crate_AGM154A | AGM-154A ×3 |
+| Crate_AGM154C | AGM-154C ×3 |
 | Crate_Hydra | Hydra 70 ×14 |
 | Crate_APKWS | APKWS ×14 |
 | Crate_Ataka | 9M120 ×14 |

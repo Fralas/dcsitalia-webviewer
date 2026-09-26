@@ -94,6 +94,7 @@ const LOGISTICS_SHOP_WEIGHTS_LBS = Object.freeze({
   'Container_AG_Maverick 2': 59357,
   'Container_AG_Hellfire': 62329,
   'Container_AG_SEAD1': 30975,
+  'Container_AG_SEAD2': 29196,
   'Container_AG_Rockets': 82684,
   'Container_ASW': 55874,
   'SContainer_AG_Heli': 49450,
@@ -103,12 +104,17 @@ const LOGISTICS_SHOP_WEIGHTS_LBS = Object.freeze({
   'Crate_9X': 2660,
   'Crate_GBU38': 3109,
   'Crate_GBU54': 3109,
+  'Crate_GBU31': 3029,
   'Crate_CBU105': 3042,
+  'Crate_CBU103': 3042,
   'Crate_AGM65D': 3090,
   'Crate_AGM65F': 3128,
   'Crate_AGM114K': 1427,
   'Crate_AGM114L': 1543,
   'Crate_AGM88': 3070,
+  'Crate_ADM141A': 3968,
+  'Crate_AGM154A': 3055,
+  'Crate_AGM154C': 3055,
   'Crate_Hydra': 1575,
   'Crate_APKWS': 472,
   'Crate_Ataka': 1559,
@@ -192,6 +198,10 @@ const LOGISTICS_SHOP_CATALOG = Object.freeze([
     contents: 'AGM_88C x10; AGM_122 x5',
   }),
   defineShopPreset({
+    category: 'CONTAINER', id: 'Container_AG_SEAD2', name: 'Container_AG_SEAD2', destination: 'AEREI',
+    contents: 'AGM_88C x3; ADM_141A x12',
+  }),
+  defineShopPreset({
     category: 'CONTAINER', id: 'Container_AG_Rockets', name: 'Container_AG_Rockets', destination: 'AEREI',
     contents: 'Hydra_70_M151HE x500; APKWS M282 x167',
   }),
@@ -228,8 +238,16 @@ const LOGISTICS_SHOP_CATALOG = Object.freeze([
     contents: 'GBU_54 x5',
   }),
   defineShopPreset({
+    category: 'CASSA', id: 'Crate_GBU31', name: 'Crate_GBU31', destination: 'ELICOTTERI',
+    contents: 'GBU_31 x5',
+  }),
+  defineShopPreset({
     category: 'CASSA', id: 'Crate_CBU105', name: 'Crate_CBU105', destination: 'ELICOTTERI',
     contents: 'CBU_105 x3',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_CBU103', name: 'Crate_CBU103', destination: 'ELICOTTERI',
+    contents: 'CBU_103 x3',
   }),
   defineShopPreset({
     category: 'CASSA', id: 'Crate_AGM65D', name: 'Crate_AGM65D', destination: 'ELICOTTERI',
@@ -250,6 +268,18 @@ const LOGISTICS_SHOP_CATALOG = Object.freeze([
   defineShopPreset({
     category: 'CASSA', id: 'Crate_AGM88', name: 'Crate_AGM88', destination: 'ELICOTTERI',
     contents: 'AGM_88C x3',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_ADM141A', name: 'Crate_ADM141A', destination: 'ELICOTTERI',
+    contents: 'ADM_141A x10',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_AGM154A', name: 'Crate_AGM154A', destination: 'ELICOTTERI',
+    contents: 'AGM_154A x3',
+  }),
+  defineShopPreset({
+    category: 'CASSA', id: 'Crate_AGM154C', name: 'Crate_AGM154C', destination: 'ELICOTTERI',
+    contents: 'AGM_154C x3',
   }),
   defineShopPreset({
     category: 'CASSA', id: 'Crate_Hydra', name: 'Crate_Hydra', destination: 'ELICOTTERI',
