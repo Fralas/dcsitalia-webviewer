@@ -54,6 +54,7 @@ import * as achievementsService from './services/achievements.js';
 import * as lidcService from './services/lidcService.js';
 import * as hidcAirportLogistics from './services/hidcAirportLogistics.js';
 import { createDscoreFactionPoints } from './services/dscoreFactionPoints.js';
+import { createHidcCampaign } from './services/hidcCampaign.js';
 import { proxyCartoBasemapTile } from './services/cartoBasemapProxy.js';
 import {
   LIDC_EXPORT_FILES,
@@ -2302,6 +2303,17 @@ app.put('/api/profile', (req, res) => {
   const savedProfile = userProfiles.saveProfile(req.session.user.id, req.body);
   res.json(savedProfile);
 });
+
+// HIDC: link account DCS, esperienza piloti, votazioni regione attiva (services/hidcCampaign.js).
+const hidcCampaign = createHidcCampaign({
+  dbridgeDir: WEB_COMMANDS_FILE ? path.dirname(WEB_COMMANDS_FILE) : resolveDbridgeDir(),
+  enqueueWebCommand,
+  hasWebCommand: (id) => webCommands.some((cmd) => cmd?.id === id),
+  getWebCommandResult: (id) => webCommandResultsById.get(id) || null,
+  emit: (event, payload) => io.emit(event, payload),
+});
+hidcCampaign.registerRoutes(app);
+setInterval(() => hidcCampaign.tick(), 15 * 1000);
 
 /**
  * GET /api/lidc/logistics-alerts

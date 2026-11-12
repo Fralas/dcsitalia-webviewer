@@ -1,0 +1,266 @@
+/* Region vote card — same glass surface / pill controls as .live-feed-card */
+
+.hidc-vote {
+  --hv-hairline: rgba(255, 255, 255, 0.16);
+  --hv-fill: rgba(255, 255, 255, 0.04);
+  --hv-fill-hover: rgba(255, 255, 255, 0.08);
+  --hv-gold: #ffbb00;
+  --hv-accent: #ff8c00;
+  --hv-blue: #4aa3ff;
+  --hv-red: #ef4444;
+  --hv-mute: #7d8187;
+
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 1000;
+  width: 300px;
+  max-width: calc(100vw - 40px);
+  box-sizing: border-box;
+  border: 1px solid var(--hv-hairline);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(18, 18, 18, 0.94) 0%, rgba(10, 10, 10, 0.9) 100%);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: #ffffff;
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+}
+
+.hidc-vote.is-collapsed {
+  width: auto;
+}
+
+/* Narrow viewports: the centered MapFilterBar would overlap the card's right edge. */
+@media (max-width: 1180px) {
+  .hidc-vote {
+    top: 72px;
+  }
+}
+
+.hidc-vote__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hidc-vote__head:hover {
+  background: var(--hv-fill);
+}
+
+.hidc-vote__head-copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hidc-vote__kicker,
+.hidc-vote__label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--hv-accent);
+}
+
+.hidc-vote__title {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.hidc-vote__title-from {
+  font-weight: 400;
+  color: var(--hv-mute);
+}
+
+.hidc-vote__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(255, 187, 0, 0.16);
+  color: var(--hv-gold);
+}
+
+.hidc-vote__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 14px 14px;
+  border-top: 1px solid var(--hv-hairline);
+  padding-top: 12px;
+}
+
+.hidc-vote__msg {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--hv-mute);
+}
+
+.hidc-vote__msg.is-warn {
+  color: #fca5a5;
+}
+
+.hidc-vote__ballot,
+.hidc-vote__form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hidc-vote__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hidc-vote__label {
+  color: var(--hv-gold);
+}
+
+.hidc-vote__time {
+  font-family: GeistMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--hv-mute);
+}
+
+.hidc-vote__proposal {
+  margin: 0;
+  font-size: 13px;
+  color: #dadbdf;
+}
+
+.hidc-vote__proposal strong {
+  color: #ffffff;
+}
+
+.hidc-vote__by {
+  color: var(--hv-mute);
+}
+
+.hidc-vote__bar {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.55);
+  overflow: hidden;
+}
+
+.hidc-vote__bar-yes {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: var(--hv-blue);
+  transition: width 0.25s ease;
+}
+
+.hidc-vote__counts {
+  font-size: 11px;
+  color: var(--hv-mute);
+}
+
+.hidc-vote__counts span:first-child {
+  color: var(--hv-blue);
+}
+
+.hidc-vote__counts span:last-child {
+  color: var(--hv-red);
+}
+
+.hidc-vote__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.hidc-vote__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--hv-hairline);
+  border-radius: 999px;
+  background: var(--hv-fill);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.hidc-vote__btn:hover:not(:disabled) {
+  background: var(--hv-fill-hover);
+}
+
+.hidc-vote__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.hidc-vote__btn--yes.is-active {
+  border-color: var(--hv-blue);
+  background: rgba(74, 163, 255, 0.16);
+  color: #bfdbfe;
+}
+
+.hidc-vote__btn--no.is-active {
+  border-color: var(--hv-red);
+  background: rgba(239, 68, 68, 0.16);
+  color: #fecaca;
+}
+
+.hidc-vote__btn--primary {
+  border-color: #ffffff;
+  background: #ffffff;
+  color: #0a0a0a;
+}
+
+.hidc-vote__btn--primary:hover:not(:disabled) {
+  background: #fafaf7;
+}
+
+.hidc-vote__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--hv-mute);
+}
+
+.hidc-vote__field select {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--hv-hairline);
+  border-radius: 999px;
+  background: rgba(10, 10, 10, 0.9);
+  color: #ffffff;
+  font-size: 12px;
+}
+
+.hidc-vote__last {
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--hv-hairline);
+  font-size: 11px;
+  color: var(--hv-mute);
+}

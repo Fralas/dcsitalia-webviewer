@@ -1,0 +1,121 @@
+/* Uses the .profile tokens (--profile-*) of UserProfile.css */
+
+.pilot-card {
+  padding-bottom: 22px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid var(--profile-border);
+}
+
+.pilot-card__level-tag {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--profile-accent);
+}
+
+.pilot-card__copy {
+  margin: 0 0 14px;
+  max-width: 640px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--profile-dim);
+}
+
+.pilot-card__code-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.pilot-card__code {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 140, 0, 0.48);
+  background: var(--profile-accent-soft);
+}
+
+.pilot-card__code-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--profile-dim);
+}
+
+.pilot-card__code-value {
+  font-family: GeistMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--profile-accent);
+}
+
+.pilot-card__linked {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pilot-card__ident {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--profile-accent);
+}
+
+.pilot-card__callsign {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--profile-text);
+}
+
+.pilot-card__xp {
+  max-width: 520px;
+}
+
+.pilot-card__xp-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--profile-dim);
+}
+
+.pilot-card__xp-head span:first-child {
+  color: var(--profile-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.pilot-card__bar {
+  height: 6px;
+  border: 1px solid var(--profile-border);
+  background: var(--profile-surface);
+}
+
+.pilot-card__bar span {
+  display: block;
+  height: 100%;
+  background: var(--profile-accent);
+  transition: width 0.3s ease;
+}
+
+.pilot-card__stats {
+  display: flex;
+  gap: 28px;
+}
+
+.pilot-card__stats .profile__stat {
+  text-align: left;
+}
+
+.pilot-card__msg {
+  margin: 12px 0 0;
+}

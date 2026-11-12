@@ -5233,3 +5233,390 @@ body.lidc-deck-expanded-open {
   overflow-y: auto;
   padding-right: 6px;
 }
+
+/* ---- LIDC points of interest (POI) pointers ---- */
+
+.lidc-map-poi {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.lidc-map-poi__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.lidc-map-poi__line {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.lidc-map-poi__group.is-active .lidc-map-poi__line {
+  stroke: var(--poi-accent, #ffffff);
+}
+
+.lidc-map-poi__group.is-dimmed {
+  opacity: 0.62;
+}
+
+.lidc-map-poi__group.is-dimmed .lidc-map-poi__line {
+  stroke-dasharray: 3 2.5;
+}
+
+.lidc-map-poi__dot {
+  fill: var(--poi-accent, #ffffff);
+  stroke: rgba(0, 0, 0, 0.55);
+}
+
+.lidc-map-poi__hit {
+  fill: transparent;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.lidc-map-poi__label {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 0 0 2px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.lidc-map-poi__label-type {
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  line-height: 1.1;
+  color: var(--poi-accent, #ffffff);
+  text-transform: uppercase;
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.7);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.lidc-map-poi__label-name {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.88);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.lidc-map-poi__label.is-active .lidc-map-poi__label-name {
+  color: #ffffff;
+}
+
+.lidc-map-poi__card {
+  position: absolute;
+  z-index: 5;
+  box-sizing: border-box;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 10px 12px 11px;
+  border-left: 3px solid var(--poi-accent, #ffffff);
+  border-radius: 6px;
+  background: rgba(10, 10, 12, 0.94);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+}
+
+.lidc-map-poi__card-kicker {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--poi-accent, #ffffff);
+  margin-bottom: 3px;
+}
+
+.lidc-map-poi__card-title {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #ffffff;
+  margin-bottom: 2px;
+}
+
+.lidc-map-poi__card-meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 6px;
+}
+
+.lidc-map-poi__card-desc {
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.lidc-map-poi__card-source {
+  display: inline-block;
+  margin-top: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--poi-accent, #ffffff);
+  text-decoration: none;
+}
+
+.lidc-map-poi__card-source:hover {
+  text-decoration: underline;
+}
+
+/* ---- POI legend / filters ---- */
+
+.lidc-poi-legend {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.lidc-poi-legend__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 6px;
+  background: rgba(10, 10, 12, 0.88);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  order: 2;
+}
+
+.lidc-poi-legend__buttons {
+  display: flex;
+  gap: 6px;
+  order: 2;
+}
+
+.lidc-poi-legend__toggle:hover {
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.lidc-poi-legend__toggle.is-active {
+  border-color: #ffbb00;
+  color: #ffbb00;
+}
+
+.lidc-poi-legend__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: conic-gradient(#E32C2C, #E8A013, #38BDF8, #A78BFA, #E32C2C);
+}
+
+.lidc-poi-legend__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 210px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(10, 10, 12, 0.94);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+  order: 1;
+}
+
+.lidc-poi-legend__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+  cursor: pointer;
+}
+
+.lidc-poi-legend__row input {
+  accent-color: #ffbb00;
+  cursor: pointer;
+}
+
+.lidc-poi-legend__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex: none;
+}
+
+/* ---- LIDC region labels (province numbers from the .miz) ---- */
+
+.lidc-region-labels {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.lidc-region-labels__label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 1px 6px;
+  border: 1px solid rgba(255, 209, 102, 0.55);
+  border-radius: 999px;
+  background: rgba(10, 10, 12, 0.72);
+  color: #ffd166;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+/* ---- LIDC POI badges (macro areas / regions / merged clusters) ---- */
+
+.lidc-poi-badge {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 2px solid rgba(255, 209, 102, 0.9);
+  border-radius: 999px;
+  background: rgba(10, 10, 12, 0.9);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  transform: translate(-50%, -50%);
+  cursor: zoom-in;
+  pointer-events: auto;
+  font-family: inherit;
+}
+
+.lidc-poi-badge:hover {
+  border-color: #ffffff;
+}
+
+.lidc-poi-badge--macro {
+  min-width: 76px;
+  min-height: 56px;
+  border-width: 2.5px;
+}
+
+.lidc-poi-badge--merged,
+.lidc-poi-badge--merged-macro {
+  border-style: dashed;
+}
+
+.lidc-poi-badge__name {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ffd166;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.lidc-poi-badge__count {
+  font-size: 16px;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.1;
+}
+
+.lidc-poi-badge--macro .lidc-poi-badge__count {
+  font-size: 20px;
+}
+
+.lidc-map-poi__faint {
+  fill: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+}
+
+.lidc-poi-focus {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 6;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 209, 102, 0.55);
+  border-radius: 6px;
+  background: rgba(10, 10, 12, 0.88);
+  color: #ffd166;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  cursor: zoom-out;
+  pointer-events: auto;
+  font-family: inherit;
+}
+
+.lidc-poi-focus:hover {
+  border-color: #ffd166;
+  color: #ffffff;
+}
+
+.lidc-map-poi__cluster-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.lidc-map-poi__cluster-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.lidc-map-poi__cluster-row-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex: none;
+}
+
+.lidc-map-poi__cluster-row-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lidc-map-poi__card-hint {
+  margin-top: 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}

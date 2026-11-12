@@ -1,0 +1,85 @@
+/* Debug tool card: reuses the .hidc-vote glass surface, docked bottom-center. */
+
+.hidc-vote.hidc-front-debug {
+  top: auto;
+  left: 20px;
+  bottom: 20px;
+  width: 340px;
+  border-style: dashed;
+}
+
+.hidc-front-debug__head {
+  cursor: default;
+}
+
+.hidc-front-debug__head .hidc-vote__btn {
+  flex-shrink: 0;
+  min-height: 28px;
+  padding: 0 10px;
+}
+
+.hidc-front-debug__head:hover {
+  background: transparent;
+}
+
+.hidc-front-debug .hidc-vote__kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.hidc-front-debug__selects {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.hidc-front-debug__zones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hidc-front-debug__zone {
+  min-width: 42px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--hv-hairline);
+  border-radius: 999px;
+  background: var(--hv-fill);
+  color: #ffffff;
+  font-family: GeistMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.hidc-front-debug__zone.is-red {
+  border-color: rgba(239, 68, 68, 0.6);
+  color: #fca5a5;
+}
+
+.hidc-front-debug__zone.is-under_attack {
+  border-color: rgba(255, 140, 0, 0.7);
+  color: #ffc285;
+}
+
+.hidc-front-debug__zone.is-blue {
+  border-color: rgba(74, 163, 255, 0.7);
+  color: #bfdbfe;
+}
+
+.hidc-front-debug__zone.is-override {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.hidc-front-debug__actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.hidc-front-debug__stats {
+  font-family: GeistMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.04em;
+}

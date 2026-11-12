@@ -33,6 +33,10 @@ import ProductionPointPanel from './map/ProductionPointPanel';
 import ProductionPointRetrieveBanner from './map/ProductionPointRetrieveBanner';
 import HidcMapAirportHoverPointer from './map/HidcMapAirportHoverPointer';
 import HidcMapZoneNumberLabels from './map/HidcMapZoneNumberLabels';
+import HidcRegionBorders from './map/HidcRegionBorders';
+import HidcRegionVotePanel from './map/HidcRegionVotePanel';
+import HidcFrontDebugPanel, { readHidcDebugFlag } from './map/HidcFrontDebugPanel';
+import useHidcCampaign from '../utils/useHidcCampaign';
 import LidcAirportPresencePanel from './LidcAirportPresencePanel';
 import LidcAirportWizard from './LidcAirportWizard';
 import './map/AirportSpawnPanel.css';
@@ -2620,6 +2624,11 @@ function MapLibreFlatMapView({
   mapMaxZoom,
   orderAlerts = {},
   onMapReady,
+  hidcCampaign = null,
+  showRegionBorders = false,
+  hidcZones = [],
+  hidcZoneOverrides = null,
+  onHidcFrontStats,
 }) {
   const MIN_PITCH = 0;
   const MAX_PITCH = 85;
@@ -5105,6 +5114,15 @@ function MapLibreFlatMapView({
         className="pointer-events-none absolute inset-0 z-[6] h-full w-full"
       />
       <HidcMapAirportHoverPointer map={mapInstance} airport={hoveredAirport} />
+      {showRegionBorders && (
+        <HidcRegionBorders
+          map={mapInstance}
+          campaign={hidcCampaign}
+          zones={hidcZones}
+          zoneStatusOverrides={hidcZoneOverrides}
+          onFrontStats={onHidcFrontStats}
+        />
+      )}
       <HidcMapZoneNumberLabels
         map={mapInstance}
         zones={zones}
@@ -5119,6 +5137,20 @@ function MapLibreFlatMapView({
 export default function FrontlineMap({ language = 'en', tacticalMapId, airportsData, airportCatalog = [], airbaseStatus = {}, onMapReady }) {
   const tacticalMap = getTacticalMapByCampaignId(tacticalMapId) || getDefaultTacticalMap();
   const startInTacticalMode = tacticalMap?.startInTacticalMode === true;
+  // Region borders / active region vote exist only for the Syria DCORE campaign.
+  const isSyriaCampaign = tacticalMap?.campaignId === 'hidc-modern-syria';
+  const { campaign: hidcCampaign, setCampaign: setHidcCampaign } = useHidcCampaign();
+  // Front line debug tool (?hidcDebug=1): client-side override of active/base region and zone statuses.
+  const [hidcDebugEnabled] = useState(readHidcDebugFlag);
+  const [hidcDebug, setHidcDebug] = useState(null);
+  const [hidcFrontStats, setHidcFrontStats] = useState(null);
+  const hidcMapCampaign = useMemo(() => {
+    if (!hidcDebug) return hidcCampaign;
+    return {
+      ...(hidcCampaign || {}),
+      focus: { ...(hidcCampaign?.focus || {}), target: hidcDebug.target || null, from: hidcDebug.from || null },
+    };
+  }, [hidcCampaign, hidcDebug]);
   const onMapReadyRef = useRef(onMapReady);
   onMapReadyRef.current = onMapReady;
   const notifyMapReady = useCallback(() => {
@@ -5717,6 +5749,15 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     () => zones.filter((zone) => zone.coordinates && Number.isFinite(zone.coordinates.lat) && Number.isFinite(zone.coordinates.lon)),
     [zones]
   );
+
+  // Live zone statuses by canonical id (front line debug tool).
+  const hidcLiveZoneStatus = useMemo(() => {
+    const out = {};
+    validZones.forEach((zone) => {
+      if (zone?.id) out[normalizeZoneId(zone.id)] = zone.status;
+    });
+    return out;
+  }, [validZones]);
 
   const zoneCoordinatesByName = useMemo(
     () => buildZoneCoordinatesByName(validZones),
@@ -7397,6 +7438,11 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       tankerRoutes={tankerRoutes}
                       orderAlerts={airportOrderAlerts}
                       onMapReady={notifyMapReady}
+                      hidcCampaign={hidcMapCampaign}
+                      showRegionBorders={isSyriaCampaign}
+                      hidcZones={validZones}
+                      hidcZoneOverrides={hidcDebug?.overrides || null}
+                      onHidcFrontStats={setHidcFrontStats}
                     />
                   ) : (
                     <FlatMapView
@@ -7466,6 +7512,24 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                   current === BASEMAP_MODE_SATELLITE ? BASEMAP_MODE_DARK : BASEMAP_MODE_SATELLITE
                 ))}
               />
+
+              {isSyriaCampaign && (
+                <HidcRegionVotePanel
+                  campaign={hidcCampaign}
+                  onCampaignChange={setHidcCampaign}
+                  language={language}
+                />
+              )}
+
+              {isSyriaCampaign && hidcDebugEnabled && (
+                <HidcFrontDebugPanel
+                  liveCampaign={hidcCampaign}
+                  liveZoneStatus={hidcLiveZoneStatus}
+                  debug={hidcDebug}
+                  onChange={setHidcDebug}
+                  stats={hidcFrontStats}
+                />
+              )}
 
               <LiveFeedPanel
                 language={language}

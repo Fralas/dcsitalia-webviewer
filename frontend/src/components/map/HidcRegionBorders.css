@@ -1,0 +1,52 @@
+.hidc-region-labels {
+  position: absolute;
+  inset: 0;
+  z-index: 830;
+  pointer-events: none !important;
+}
+
+.hidc-region-labels__label {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transform: translate(-50%, -50%);
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+}
+
+.hidc-region-labels__name {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.hidc-region-labels__tag {
+  padding: 2px 8px 3px;
+  border-radius: 999px;
+  background: rgba(12, 14, 16, 0.6);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.hidc-region-labels__label--active .hidc-region-labels__name,
+.hidc-region-labels__label--active .hidc-region-labels__tag {
+  color: #f87171;
+}
+
+.hidc-region-labels__label--from .hidc-region-labels__name,
+.hidc-region-labels__label--from .hidc-region-labels__tag {
+  color: #93c5fd;
+}
+
+.hidc-region-labels__label--vote .hidc-region-labels__name,
+.hidc-region-labels__label--vote .hidc-region-labels__tag {
+  color: #ffbb00;
+}

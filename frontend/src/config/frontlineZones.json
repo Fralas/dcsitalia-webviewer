@@ -28,8 +28,8 @@
       "lat": 31.521137,
       "lon": 34.599214
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -39,8 +39,8 @@
       "lat": 31.029334,
       "lon": 34.704211
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -61,8 +61,8 @@
       "lat": 31.255071,
       "lon": 34.792472
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -72,8 +72,8 @@
       "lat": 31.807578,
       "lon": 34.653753
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -83,8 +83,8 @@
       "lat": 31.609824,
       "lon": 34.769462
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -138,8 +138,8 @@
       "lat": 31.065999,
       "lon": 35.037224
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -171,8 +171,8 @@
       "lat": 31.541058,
       "lon": 35.10365
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -193,8 +193,8 @@
       "lat": 31.896423,
       "lon": 35.008207
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -204,8 +204,8 @@
       "lat": 32.313542,
       "lon": 34.876796
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -215,8 +215,8 @@
       "lat": 32.185511,
       "lon": 34.999261
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -226,8 +226,8 @@
       "lat": 31.78085,
       "lon": 35.233413
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -237,7 +237,7 @@
       "lat": 31.900475,
       "lon": 35.204955
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -281,7 +281,7 @@
       "lat": 32.219708,
       "lon": 35.264408
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -292,8 +292,8 @@
       "lat": 31.086885,
       "lon": 35.698375
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -314,8 +314,8 @@
       "lat": 32.462407,
       "lon": 35.29583
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -325,16 +325,16 @@
       "lat": 31.310812,
       "lon": 35.743829
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
     "id": "zone_032",
     "name": "Zone 032",
     "coordinates": {
-      "lat": 32.596345,
-      "lon": 35.233472
+      "lat": 32.595059,
+      "lon": 35.228003
     },
     "status": "BLUE",
     "isActive": false,
@@ -347,8 +347,8 @@
       "lat": 31.894974,
       "lon": 35.616822
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -380,8 +380,8 @@
       "lat": 31.720964,
       "lon": 35.798955
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -402,8 +402,8 @@
       "lat": 32.045219,
       "lon": 35.724042
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -413,8 +413,8 @@
       "lat": 32.49446,
       "lon": 35.503947
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -424,7 +424,7 @@
       "lat": 32.151417,
       "lon": 35.703139
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -457,8 +457,8 @@
       "lat": 32.809763,
       "lon": 35.422791
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -479,8 +479,8 @@
       "lat": 32.783947,
       "lon": 35.511308
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -490,8 +490,8 @@
       "lat": 33.162019,
       "lon": 35.209302
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -501,8 +501,8 @@
       "lat": 32.278563,
       "lon": 35.893282
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -512,7 +512,7 @@
       "lat": 33.266312,
       "lon": 35.220221
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -534,7 +534,7 @@
       "lat": 32.549202,
       "lon": 35.856663
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -545,8 +545,8 @@
       "lat": 33.129699,
       "lon": 35.43099
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -556,7 +556,7 @@
       "lat": 32.073387,
       "lon": 36.085479
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -567,8 +567,8 @@
       "lat": 32.024006,
       "lon": 36.143292
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -578,7 +578,7 @@
       "lat": 31.78398,
       "lon": 36.221645
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -600,7 +600,7 @@
       "lat": 32.75471,
       "lon": 35.89336
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -611,7 +611,7 @@
       "lat": 32.565857,
       "lon": 36.008268
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -622,8 +622,8 @@
       "lat": 32.473895,
       "lon": 36.058434
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -644,7 +644,7 @@
       "lat": 33.381674,
       "lon": 35.480718
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -655,7 +655,7 @@
       "lat": 32.183865,
       "lon": 36.310789
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -677,7 +677,7 @@
       "lat": 33.560191,
       "lon": 35.378173
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -688,8 +688,8 @@
       "lat": 33.356821,
       "lon": 35.588509
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -710,8 +710,8 @@
       "lat": 32.293125,
       "lon": 36.331369
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -721,8 +721,8 @@
       "lat": 31.572887,
       "lon": 36.572531
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -732,8 +732,8 @@
       "lat": 32.566148,
       "lon": 36.248258
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -754,8 +754,8 @@
       "lat": 33.659116,
       "lon": 35.433447
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -765,8 +765,8 @@
       "lat": 33.178786,
       "lon": 35.896876
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -776,7 +776,7 @@
       "lat": 33.054287,
       "lon": 36.002442
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -787,8 +787,8 @@
       "lat": 32.822354,
       "lon": 36.163096
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -809,8 +809,8 @@
       "lat": 31.906945,
       "lon": 36.584371
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -864,8 +864,8 @@
       "lat": 33.669304,
       "lon": 35.604521
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -875,8 +875,8 @@
       "lat": 32.516908,
       "lon": 36.477964
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -886,8 +886,8 @@
       "lat": 33.080034,
       "lon": 36.187816
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -919,8 +919,8 @@
       "lat": 32.306922,
       "lon": 36.632259
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -941,7 +941,7 @@
       "lat": 33.27635,
       "lon": 36.085301
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -952,7 +952,7 @@
       "lat": 33.625283,
       "lon": 35.781048
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -985,8 +985,8 @@
       "lat": 33.577389,
       "lon": 35.849628
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -1029,8 +1029,8 @@
       "lat": 33.371217,
       "lon": 36.10245
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -1073,8 +1073,8 @@
       "lat": 33.258663,
       "lon": 36.271363
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -1084,8 +1084,8 @@
       "lat": 32.634685,
       "lon": 36.649072
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -1095,7 +1095,7 @@
       "lat": 32.494709,
       "lon": 36.718242
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -1128,8 +1128,8 @@
       "lat": 33.978469,
       "lon": 35.653627
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -1139,8 +1139,8 @@
       "lat": 33.770282,
       "lon": 35.898519
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -1150,7 +1150,7 @@
       "lat": 33.817625,
       "lon": 35.865079
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -1161,8 +1161,8 @@
       "lat": 33.876267,
       "lon": 35.803277
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -1183,8 +1183,8 @@
       "lat": 32.845106,
       "lon": 36.62392
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -1194,7 +1194,7 @@
       "lat": 34.036847,
       "lon": 35.697064
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -1293,8 +1293,8 @@
       "lat": 33.723426,
       "lon": 36.099143
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -1315,8 +1315,8 @@
       "lat": 34.145144,
       "lon": 35.648212
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -1360,8 +1360,12 @@
       "lon": 34.048876
     },
     "status": "RED",
-    "isActive": false,
-    "tasks": []
+    "isActive": true,
+    "tasks": [
+      "SEAD",
+      "DEAD",
+      "CAS"
+    ]
   },
   {
     "id": "zone_126",
@@ -1425,8 +1429,8 @@
       "lat": 32.51984,
       "lon": 36.961948
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -1447,8 +1451,8 @@
       "lat": 34.083054,
       "lon": 35.855716
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -1458,8 +1462,8 @@
       "lat": 33.810698,
       "lon": 36.157524
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -1524,8 +1528,8 @@
       "lat": 31.350696,
       "lon": 37.31737
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -1612,7 +1616,7 @@
       "lat": 33.417538,
       "lon": 36.689242
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -1623,8 +1627,8 @@
       "lat": 34.007041,
       "lon": 36.199134
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -1656,7 +1660,7 @@
       "lat": 33.610913,
       "lon": 36.578624
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -1667,7 +1671,7 @@
       "lat": 34.123435,
       "lon": 36.129965
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -1678,8 +1682,8 @@
       "lat": 34.251416,
       "lon": 36.000743
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -1689,8 +1693,8 @@
       "lat": 33.735309,
       "lon": 36.530047
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -1700,8 +1704,8 @@
       "lat": 34.431918,
       "lon": 35.843763
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -1711,7 +1715,7 @@
       "lat": 33.645143,
       "lon": 36.688045
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -1722,7 +1726,7 @@
       "lat": 33.608486,
       "lon": 36.748931
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -1744,7 +1748,7 @@
       "lat": 33.742426,
       "lon": 36.698825
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -1755,7 +1759,7 @@
       "lat": 34.195396,
       "lon": 36.361094
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -1777,7 +1781,7 @@
       "lat": 33.961369,
       "lon": 36.658251
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -1810,8 +1814,8 @@
       "lat": 34.399019,
       "lon": 36.390695
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -1844,8 +1848,12 @@
       "lon": 34.381665
     },
     "status": "RED",
-    "isActive": false,
-    "tasks": []
+    "isActive": true,
+    "tasks": [
+      "SEAD",
+      "DEAD",
+      "CAS"
+    ]
   },
   {
     "id": "zone_170",
@@ -1854,7 +1862,7 @@
       "lat": 34.369406,
       "lon": 36.507573
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -1865,7 +1873,7 @@
       "lat": 34.152397,
       "lon": 36.74803
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -1909,8 +1917,8 @@
       "lat": 33.679777,
       "lon": 37.218663
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -1942,8 +1950,8 @@
       "lat": 34.356812,
       "lon": 36.789576
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -1997,11 +2005,9 @@
       "lat": 35.185323,
       "lon": 35.954515
     },
-    "status": "RED",
-    "isActive": true,
-    "tasks": [
-      "CAS"
-    ]
+    "status": "BLUE",
+    "isActive": false,
+    "tasks": []
   },
   {
     "id": "zone_184",
@@ -2032,8 +2038,8 @@
       "lat": 34.230412,
       "lon": 37.235647
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -2076,7 +2082,7 @@
       "lat": 35.39541,
       "lon": 35.953819
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -2098,12 +2104,9 @@
       "lat": 35.332449,
       "lon": 36.086403
     },
-    "status": "RED",
-    "isActive": true,
-    "tasks": [
-      "DEAD",
-      "CAS"
-    ]
+    "status": "BLUE",
+    "isActive": false,
+    "tasks": []
   },
   {
     "id": "zone_193",
@@ -2112,7 +2115,7 @@
       "lat": 35.530678,
       "lon": 35.79252
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -2145,7 +2148,7 @@
       "lat": 35.456096,
       "lon": 36.056448
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -2178,7 +2181,7 @@
       "lat": 35.66969,
       "lon": 35.790862
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -2200,8 +2203,8 @@
       "lat": 34.154766,
       "lon": 37.612149
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -2244,7 +2247,7 @@
       "lat": 35.837145,
       "lon": 35.839042
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -2277,7 +2280,7 @@
       "lat": 35.690233,
       "lon": 36.137486
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -2299,8 +2302,8 @@
       "lat": 34.231066,
       "lon": 37.811456
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -2321,7 +2324,7 @@
       "lat": 35.902917,
       "lon": 36.063598
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -2376,7 +2379,7 @@
       "lat": 35.821389,
       "lon": 36.336397
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -2388,12 +2391,8 @@
       "lon": 36.667394
     },
     "status": "RED",
-    "isActive": true,
-    "tasks": [
-      "SEAD",
-      "DEAD",
-      "CAS"
-    ]
+    "isActive": false,
+    "tasks": []
   },
   {
     "id": "zone_219",
@@ -2446,8 +2445,8 @@
       "lat": 35.318867,
       "lon": 37.206206
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -2457,11 +2456,9 @@
       "lat": 34.603285,
       "lon": 37.900954
     },
-    "status": "UNDER_ATTACK",
-    "isActive": true,
-    "tasks": [
-      "SEAD"
-    ]
+    "status": "BLUE",
+    "isActive": false,
+    "tasks": []
   },
   {
     "id": "zone_225",
@@ -2481,8 +2478,8 @@
       "lat": 33.306811,
       "lon": 38.706005
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -2492,7 +2489,7 @@
       "lat": 35.817773,
       "lon": 36.609521
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -2503,8 +2500,8 @@
       "lat": 32.724857,
       "lon": 38.96782
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -2547,7 +2544,7 @@
       "lat": 36.011962,
       "lon": 36.66012
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -2591,7 +2588,7 @@
       "lat": 35.861471,
       "lon": 36.80804
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -2624,7 +2621,7 @@
       "lat": 35.593808,
       "lon": 37.250214
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -2647,12 +2644,8 @@
       "lon": 37.097729
     },
     "status": "RED",
-    "isActive": true,
-    "tasks": [
-      "SEAD",
-      "DEAD",
-      "CAS"
-    ]
+    "isActive": false,
+    "tasks": []
   },
   {
     "id": "zone_242",
@@ -2661,7 +2654,7 @@
       "lat": 35.974663,
       "lon": 36.781107
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -2837,7 +2830,7 @@
       "lat": 35.984091,
       "lon": 37.159568
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -2870,7 +2863,7 @@
       "lat": 35.780134,
       "lon": 37.499785
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -3244,13 +3237,9 @@
       "lat": 35.502548,
       "lon": 38.439656
     },
-    "status": "RED",
-    "isActive": true,
-    "tasks": [
-      "SEAD",
-      "DEAD",
-      "CAS"
-    ]
+    "status": "BLUE",
+    "isActive": false,
+    "tasks": []
   },
   {
     "id": "zone_296",
@@ -3325,13 +3314,9 @@
       "lat": 35.088758,
       "lon": 38.914262
     },
-    "status": "RED",
-    "isActive": true,
-    "tasks": [
-      "SEAD",
-      "DEAD",
-      "CAS"
-    ]
+    "status": "BLUE",
+    "isActive": false,
+    "tasks": []
   },
   {
     "id": "zone_303",
@@ -3439,7 +3424,7 @@
       "lat": 35.755545,
       "lon": 38.57045
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -3472,7 +3457,7 @@
       "lat": 35.820839,
       "lon": 38.54243
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -3483,7 +3468,7 @@
       "lat": 35.683762,
       "lon": 38.69124
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -3527,7 +3512,7 @@
       "lat": 35.894514,
       "lon": 38.620564
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -3780,7 +3765,7 @@
       "lat": 35.774206,
       "lon": 39.396982
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -3824,7 +3809,7 @@
       "lat": 35.756684,
       "lon": 39.611649
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -3846,7 +3831,7 @@
       "lat": 35.604751,
       "lon": 39.818577
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -3879,7 +3864,7 @@
       "lat": 35.421552,
       "lon": 40.052791
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -3890,7 +3875,7 @@
       "lat": 35.34073,
       "lon": 40.121658
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -3901,7 +3886,7 @@
       "lat": 35.287198,
       "lon": 40.179685
     },
-    "status": "RED",
+    "status": "BLUE",
     "isActive": false,
     "tasks": []
   },
@@ -3934,13 +3919,9 @@
       "lat": 35.014618,
       "lon": 40.453583
     },
-    "status": "RED",
-    "isActive": true,
-    "tasks": [
-      "SEAD",
-      "DEAD",
-      "CAS"
-    ]
+    "status": "BLUE",
+    "isActive": false,
+    "tasks": []
   },
   {
     "id": "zone_358",

@@ -1280,3 +1280,51 @@ export default {
   releaseAtcRole,
   cancelAtcHandoff,
 };
+
+// ==================== HIDC pilot / campaign ====================
+
+/** Current user's DCS pilot link, XP and level */
+export async function getHidcPilotProfile() {
+  return fetchAPI('/hidc/pilot/me');
+}
+
+/** Generate (or reuse) the HIDC-XXXXXX chat code */
+export async function startHidcPilotLink() {
+  return fetchAPI('/hidc/pilot/link/start', { method: 'POST' });
+}
+
+/** Ask the Discord bot to DM the link code */
+export async function sendHidcPilotLinkByDiscord() {
+  return fetchAPI('/hidc/pilot/link/discord', { method: 'POST' });
+}
+
+/** Remove the DCS account link */
+export async function unlinkHidcPilot() {
+  return fetchAPI('/hidc/pilot/link', { method: 'DELETE' });
+}
+
+/** Top pilots by XP */
+export async function getHidcPilotLeaderboard() {
+  return fetchAPI('/hidc/pilots/leaderboard');
+}
+
+/** Active region, candidates, region status and current vote */
+export async function getHidcCampaign() {
+  return fetchAPI('/hidc/campaign');
+}
+
+/** Propose a vote to change the active region */
+export async function proposeHidcRegionVote(target, from) {
+  return fetchAPI('/hidc/campaign/votes', {
+    method: 'POST',
+    body: JSON.stringify({ target, from }),
+  });
+}
+
+/** Vote yes/no on the open region vote */
+export async function castHidcRegionBallot(voteId, choice) {
+  return fetchAPI(`/hidc/campaign/votes/${encodeURIComponent(voteId)}/ballot`, {
+    method: 'POST',
+    body: JSON.stringify({ choice }),
+  });
+}

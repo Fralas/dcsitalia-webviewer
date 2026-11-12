@@ -5,6 +5,7 @@ import { useUser } from '../contexts/UserContext';
 import * as api from '../services/api';
 import InlineError from './InlineError';
 import PatchViewer from './PatchViewer';
+import HidcPilotCard from './HidcPilotCard';
 import { loadSeenAwards, rememberAwardKeys } from '../utils/achievementSeen';
 import './UserProfile.css';
 
@@ -517,6 +518,8 @@ export default function UserProfile() {
           </div>
         </div>
       </header>
+
+      <HidcPilotCard userId={user.id} />
 
       <div className="profile__layout">
         <section className="profile__board">
