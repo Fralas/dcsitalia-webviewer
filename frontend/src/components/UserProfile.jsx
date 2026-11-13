@@ -1,13 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Award, ChevronDown, Loader2, Pencil, Trash2, Upload, User as UserIcon } from 'lucide-react';
+import { Award, ChevronDown, Loader2, Pencil, Trash2, Upload } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useUser } from '../contexts/UserContext';
 import * as api from '../services/api';
 import InlineError from './InlineError';
 import PatchViewer from './PatchViewer';
-import HidcPilotCard from './HidcPilotCard';
+import PilotHero from './profile/PilotHero';
+import CareerLadder from './profile/CareerLadder';
+import ServiceRecord from './profile/ServiceRecord';
+import CampaignBrief from './profile/CampaignBrief';
+import XpRules from './profile/XpRules';
+import CombatRecord from './profile/CombatRecord';
+import Logbook from './profile/Logbook';
+import { getPilotRank } from '../config/pilotRanks';
+import useHidcPilot from '../utils/useHidcPilot';
 import { loadSeenAwards, rememberAwardKeys } from '../utils/achievementSeen';
 import './UserProfile.css';
+import './profile/ProfilePage.css';
 
 function formatDate(timestamp) {
   if (!Number.isFinite(timestamp)) return '-';
@@ -83,6 +92,8 @@ export default function UserProfile() {
   const patchViewerOpenRef = useRef(false);
   const awardsReadyForUserRef = useRef(null);
 
+  const pilot = useHidcPilot(user?.id);
+  const [boardTab, setBoardTab] = useState('pilots');
   const canManageAchievements = Boolean(user?.canEditWiki);
   const displayName = user?.globalName || user?.username || '';
   const avatarUrl = user?.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png` : null;
@@ -286,7 +297,7 @@ export default function UserProfile() {
 
   if (!user) {
     return (
-      <div className="profile">
+      <div className="profile pf">
         <div className="profile__gate">
           <p className="profile__gate-kicker">Profilo</p>
           <p>Accedi con Discord per vedere il profilo.</p>
@@ -295,7 +306,10 @@ export default function UserProfile() {
     );
   }
 
-  const ownLeaderboardEntry = leaderboard.find((entry) => String(entry?.userId || '') === String(user?.id || ''));
+  const pilotLeaderboard = pilot.leaderboard || [];
+  const ownPilotIndex = pilotLeaderboard.findIndex((entry) => String(entry?.discordId || '') === String(user?.id || ''));
+  const pilotLevel = pilot.profile?.level?.level ?? 0;
+  const pilotLinked = Boolean(pilot.profile?.linked);
 
   const handleCreateAchievement = async (event) => {
     event.preventDefault();
@@ -491,39 +505,32 @@ export default function UserProfile() {
     && visibleMemberIds.every((id) => selectedAssignIds.includes(id));
 
   return (
-    <div className="profile">
-      <header className="profile__id">
-        <div className="profile__avatar">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt="" />
-          ) : (
-            <div className="profile__avatar-fallback">
-              <UserIcon className="h-7 w-7" />
-            </div>
-          )}
-        </div>
-        <div className="profile__id-copy">
-          <p className="profile__kicker">Profilo</p>
-          <h1 className="profile__name">{displayName}</h1>
-          <p className="profile__meta">{user.username ? `@${user.username}` : user.id}</p>
-        </div>
-        <div className="profile__stats">
-          <div className="profile__stat">
-            <span className="profile__stat-value">{userAchievements.length}</span>
-            <span className="profile__stat-label">Patch</span>
-          </div>
-          <div className="profile__stat">
-            <span className="profile__stat-value">{ownLeaderboardEntry?.position || '—'}</span>
-            <span className="profile__stat-label">Classifica</span>
-          </div>
-        </div>
-      </header>
+    <div className="profile pf">
+      <PilotHero
+        user={user}
+        displayName={displayName}
+        avatarUrl={avatarUrl}
+        pilot={pilot}
+      />
 
-      <HidcPilotCard userId={user.id} />
-
-      <div className="profile__layout">
-        <section className="profile__board">
+      <div className="pf-layout">
+        <section className="pf-col">
           <div className="profile__section-head">
+            <h2 className="profile__section-title">Carriera</h2>
+            <span className="pf-hint">Livello 0–100</span>
+          </div>
+          <CareerLadder level={pilotLevel} linked={pilotLinked} />
+        </section>
+
+        <section className="profile__board">
+          <ServiceRecord
+            profile={pilot.profile}
+            patchCount={userAchievements.length}
+            boardPosition={ownPilotIndex >= 0 ? ownPilotIndex + 1 : null}
+          />
+          <CombatRecord combat={pilot.profile?.combat} />
+
+          <div className={`profile__section-head${pilotLinked ? ' pf-after-block' : ''}`}>
             <h2 className="profile__section-title">Riconoscimenti</h2>
           </div>
 
@@ -567,296 +574,347 @@ export default function UserProfile() {
               ))}
             </div>
           )}
+
+          <CampaignBrief />
+
+          {canManageAchievements && (
+            <section className="profile__ops">
+              <button
+                type="button"
+                className="profile__ops-toggle"
+                onClick={() => setManagementOpen((prev) => !prev)}
+                aria-expanded={managementOpen}
+              >
+                Gestione
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${managementOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {managementOpen && (
+                <div className="profile-ops">
+                  <div className="profile-ops__tabs" role="tablist">
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={opsMode === 'assign'}
+                      className={`profile-ops__tab${opsMode === 'assign' ? ' is-active' : ''}`}
+                      onClick={() => setOpsMode('assign')}
+                    >
+                      Assegna
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={opsMode === 'create'}
+                      className={`profile-ops__tab${opsMode === 'create' ? ' is-active' : ''}`}
+                      onClick={() => setOpsMode('create')}
+                    >
+                      Nuova
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={opsMode === 'edit'}
+                      className={`profile-ops__tab${opsMode === 'edit' ? ' is-active' : ''}`}
+                      onClick={() => setOpsMode('edit')}
+                    >
+                      Modifica
+                    </button>
+                  </div>
+
+                  {opsMode === 'assign' && (
+                    <form onSubmit={handleAssignAchievement} className="profile-ops__form">
+                      <label className="profile-ops__label">
+                        Patch
+                        <select
+                          value={assignAchievementId}
+                          onChange={(event) => setAssignAchievementId(event.target.value)}
+                          className="profile-input"
+                        >
+                          {catalog.length === 0 ? (
+                            <option value="">Nessuna patch</option>
+                          ) : (
+                            catalog.map((entry) => (
+                              <option key={entry.id} value={entry.id}>{entry.name}</option>
+                            ))
+                          )}
+                        </select>
+                      </label>
+                      <label className="profile-ops__label">
+                        Piloti
+                        <input
+                          type="search"
+                          value={memberSearch}
+                          onChange={(event) => setMemberSearch(event.target.value)}
+                          placeholder="Cerca nome o username"
+                          className="profile-input"
+                        />
+                      </label>
+                      <div className="profile-member-toolbar">
+                        <span>{selectedAssignIds.length} selezionati</span>
+                        <button
+                          type="button"
+                          className="profile-member-link"
+                          disabled={visibleMemberIds.length === 0}
+                          onClick={() => {
+                            if (allVisibleSelected) {
+                              setSelectedAssignIds((prev) => prev.filter((id) => !visibleMemberIds.includes(id)));
+                              return;
+                            }
+                            setSelectedAssignIds((prev) => Array.from(new Set([...prev, ...visibleMemberIds])));
+                          }}
+                        >
+                          {allVisibleSelected ? 'Deseleziona visibili' : 'Seleziona visibili'}
+                        </button>
+                        <button
+                          type="button"
+                          className="profile-member-link"
+                          disabled={selectedAssignIds.length === 0}
+                          onClick={() => setSelectedAssignIds([])}
+                        >
+                          Nessuno
+                        </button>
+                      </div>
+                      <div className="profile-member-list" role="listbox" aria-multiselectable="true">
+                        {guildMembersLoading && (
+                          <p className="profile-msg">Caricamento membri Discord…</p>
+                        )}
+                        {!guildMembersLoading && guildMembersError && (
+                          <p className="profile-msg is-warn">{guildMembersError}</p>
+                        )}
+                        {!guildMembersLoading && !guildMembersError && visibleMembers.length === 0 && (
+                          <p className="profile-msg">Nessun membro trovato.</p>
+                        )}
+                        {!guildMembersLoading && visibleMembers.map((entry) => {
+                          const selected = selectedAssignIds.includes(entry.id);
+                          return (
+                            <label
+                              key={entry.id}
+                              className={`profile-member${selected ? ' is-selected' : ''}`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selected}
+                                onChange={() => toggleAssignMember(entry.id)}
+                              />
+                              <span className="profile-member__name">{entry.name}</span>
+                              {entry.username ? (
+                                <span className="profile-member__user">@{entry.username}</span>
+                              ) : null}
+                            </label>
+                          );
+                        })}
+                      </div>
+                      {assignStatus && (
+                        <p className={`profile-msg${assignStatus.startsWith('Assegnata') || assignStatus.includes('successo') ? ' is-ok' : ' is-warn'}`}>
+                          {assignStatus}
+                        </p>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={assigningAchievement || catalog.length === 0 || selectedAssignIds.length === 0}
+                        className="profile-btn"
+                      >
+                        {assigningAchievement && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                        {selectedAssignIds.length > 1
+                          ? `Assegna a ${selectedAssignIds.length}`
+                          : 'Assegna'}
+                      </button>
+                    </form>
+                  )}
+
+                  {opsMode === 'create' && (
+                    <form onSubmit={handleCreateAchievement} className="profile-ops__form profile-ops__form--split">
+                      <label className="profile-file profile-file--drop">
+                        {newAchievementImageUrl ? (
+                          <img src={newAchievementImageUrl} alt="" />
+                        ) : (
+                          <span>
+                            <Upload className="h-4 w-4" />
+                            Immagine
+                          </span>
+                        )}
+                        <input type="file" accept="image/*" className="hidden" onChange={handleImageFilePick} />
+                      </label>
+                      <div className="profile-ops__fields">
+                        <input
+                          type="text"
+                          value={newAchievementName}
+                          onChange={(event) => setNewAchievementName(event.target.value)}
+                          placeholder="Nome"
+                          className="profile-input"
+                        />
+                        <textarea
+                          rows={2}
+                          value={newAchievementDescription}
+                          onChange={(event) => setNewAchievementDescription(event.target.value)}
+                          placeholder="Descrizione"
+                          className="profile-textarea"
+                        />
+                        {createStatus && (
+                          <p className={`profile-msg${createStatus.includes('successo') ? ' is-ok' : ' is-warn'}`}>
+                            {createStatus}
+                          </p>
+                        )}
+                        <button type="submit" disabled={creatingAchievement} className="profile-btn">
+                          {creatingAchievement && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                          Crea
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {opsMode === 'edit' && (
+                    <form onSubmit={handleUpdateAchievement} className="profile-ops__form profile-ops__form--split">
+                      <label className="profile-file profile-file--drop">
+                        {editAchievementImageUrl ? (
+                          <img src={editAchievementImageUrl} alt="" />
+                        ) : (
+                          <span>
+                            <Upload className="h-4 w-4" />
+                            Immagine
+                          </span>
+                        )}
+                        <input type="file" accept="image/*" className="hidden" onChange={handleEditImageFilePick} />
+                      </label>
+                      <div className="profile-ops__fields">
+                        <select
+                          value={editAchievementId}
+                          onChange={(event) => setEditAchievementId(event.target.value)}
+                          className="profile-input"
+                        >
+                          {catalog.length === 0 ? (
+                            <option value="">Nessuna patch</option>
+                          ) : (
+                            catalog.map((entry) => (
+                              <option key={entry.id} value={entry.id}>{entry.name}</option>
+                            ))
+                          )}
+                        </select>
+                        <input
+                          type="text"
+                          value={editAchievementName}
+                          onChange={(event) => setEditAchievementName(event.target.value)}
+                          placeholder="Nome"
+                          className="profile-input"
+                        />
+                        <textarea
+                          rows={2}
+                          value={editAchievementDescription}
+                          onChange={(event) => setEditAchievementDescription(event.target.value)}
+                          placeholder="Descrizione"
+                          className="profile-textarea"
+                        />
+                        {editStatus && (
+                          <p className={`profile-msg${editStatus.includes('successo') || editStatus.includes('Rimossi') ? ' is-ok' : ' is-warn'}`}>
+                            {editStatus}
+                          </p>
+                        )}
+                        <div className="profile-actions">
+                          <button
+                            type="submit"
+                            disabled={editingAchievement || deletingAchievement || catalog.length === 0}
+                            className="profile-btn"
+                          >
+                            {editingAchievement ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Pencil className="h-3.5 w-3.5" />}
+                            Salva
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleDeleteAchievement}
+                            disabled={editingAchievement || deletingAchievement || catalog.length === 0}
+                            className="profile-btn profile-btn--danger"
+                          >
+                            {deletingAchievement ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                            Elimina
+                          </button>
+                        </div>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
         </section>
 
         <aside className="profile__standings">
           <div className="profile__section-head">
             <h2 className="profile__section-title">Classifica</h2>
           </div>
-          {leaderboard.length === 0 ? (
-            <p className="profile__empty">Nessun dato.</p>
-          ) : (
-            <div className="profile__standings-list">
-              {leaderboard.slice(0, 12).map((entry) => {
-                const isSelf = String(entry?.userId || '') === String(user?.id || '');
-                const rowName = normalizeUserName(entry?.displayName, entry?.userId);
-                const position = Number(entry?.position || 0);
-                return (
-                  <div
-                    key={`${entry?.userId || 'user'}-${entry?.position || 0}`}
-                    className={`profile__standings-row${isSelf ? ' is-self' : ''}`}
-                  >
-                    <span className={`profile__standings-pos${position > 0 && position <= 3 ? ' is-top' : ''}`}>
-                      {entry?.position || '—'}
-                    </span>
-                    <span className="profile__standings-name">{isSelf ? `${rowName} · tu` : rowName}</span>
-                    <span className="profile__standings-count">{entry?.achievementCount || 0}</span>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="profile-ops__tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={boardTab === 'pilots'}
+              className={`profile-ops__tab${boardTab === 'pilots' ? ' is-active' : ''}`}
+              onClick={() => setBoardTab('pilots')}
+            >
+              Piloti
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={boardTab === 'patches'}
+              className={`profile-ops__tab${boardTab === 'patches' ? ' is-active' : ''}`}
+              onClick={() => setBoardTab('patches')}
+            >
+              Patch
+            </button>
+          </div>
+
+          {boardTab === 'pilots' && (
+            pilotLeaderboard.length === 0 ? (
+              <p className="profile__empty">Nessun pilota collegato.</p>
+            ) : (
+              <div className="profile__standings-list">
+                {pilotLeaderboard.map((entry, index) => {
+                  const isSelf = String(entry?.discordId || '') === String(user?.id || '');
+                  const rank = getPilotRank(entry?.level);
+                  return (
+                    <div key={entry.discordId || index} className={`profile__standings-row pf-standings-row${isSelf ? ' is-self' : ''}`}>
+                      <span className={`profile__standings-pos${index < 3 ? ' is-top' : ''}`}>{index + 1}</span>
+                      <span className="pf-standings-who">
+                        <span className="profile__standings-name">{isSelf ? `${entry.name} · tu` : entry.name}</span>
+                        <span className="pf-standings-rank">{rank.fullName}</span>
+                      </span>
+                      <span className="profile__standings-count">{rank.level}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )
           )}
+
+          {boardTab === 'patches' && (
+            leaderboard.length === 0 ? (
+              <p className="profile__empty">Nessun dato.</p>
+            ) : (
+              <div className="profile__standings-list">
+                {leaderboard.slice(0, 12).map((entry) => {
+                  const isSelf = String(entry?.userId || '') === String(user?.id || '');
+                  const rowName = normalizeUserName(entry?.displayName, entry?.userId);
+                  const position = Number(entry?.position || 0);
+                  return (
+                    <div
+                      key={`${entry?.userId || 'user'}-${entry?.position || 0}`}
+                      className={`profile__standings-row${isSelf ? ' is-self' : ''}`}
+                    >
+                      <span className={`profile__standings-pos${position > 0 && position <= 3 ? ' is-top' : ''}`}>
+                        {entry?.position || '—'}
+                      </span>
+                      <span className="profile__standings-name">{isSelf ? `${rowName} · tu` : rowName}</span>
+                      <span className="profile__standings-count">{entry?.achievementCount || 0}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          )}
+
+          <Logbook combat={pilot.profile?.combat} />
+          <XpRules rules={pilot.profile?.rules} minProposerLevel={pilot.profile?.minProposerLevel} />
         </aside>
       </div>
-
-      {canManageAchievements && (
-        <section className="profile__ops">
-          <button
-            type="button"
-            className="profile__ops-toggle"
-            onClick={() => setManagementOpen((prev) => !prev)}
-            aria-expanded={managementOpen}
-          >
-            Gestione
-            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${managementOpen ? 'rotate-180' : ''}`} />
-          </button>
-
-          {managementOpen && (
-            <div className="profile-ops">
-              <div className="profile-ops__tabs" role="tablist">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={opsMode === 'assign'}
-                  className={`profile-ops__tab${opsMode === 'assign' ? ' is-active' : ''}`}
-                  onClick={() => setOpsMode('assign')}
-                >
-                  Assegna
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={opsMode === 'create'}
-                  className={`profile-ops__tab${opsMode === 'create' ? ' is-active' : ''}`}
-                  onClick={() => setOpsMode('create')}
-                >
-                  Nuova
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={opsMode === 'edit'}
-                  className={`profile-ops__tab${opsMode === 'edit' ? ' is-active' : ''}`}
-                  onClick={() => setOpsMode('edit')}
-                >
-                  Modifica
-                </button>
-              </div>
-
-              {opsMode === 'assign' && (
-                <form onSubmit={handleAssignAchievement} className="profile-ops__form">
-                  <label className="profile-ops__label">
-                    Patch
-                    <select
-                      value={assignAchievementId}
-                      onChange={(event) => setAssignAchievementId(event.target.value)}
-                      className="profile-input"
-                    >
-                      {catalog.length === 0 ? (
-                        <option value="">Nessuna patch</option>
-                      ) : (
-                        catalog.map((entry) => (
-                          <option key={entry.id} value={entry.id}>{entry.name}</option>
-                        ))
-                      )}
-                    </select>
-                  </label>
-                  <label className="profile-ops__label">
-                    Piloti
-                    <input
-                      type="search"
-                      value={memberSearch}
-                      onChange={(event) => setMemberSearch(event.target.value)}
-                      placeholder="Cerca nome o username"
-                      className="profile-input"
-                    />
-                  </label>
-                  <div className="profile-member-toolbar">
-                    <span>{selectedAssignIds.length} selezionati</span>
-                    <button
-                      type="button"
-                      className="profile-member-link"
-                      disabled={visibleMemberIds.length === 0}
-                      onClick={() => {
-                        if (allVisibleSelected) {
-                          setSelectedAssignIds((prev) => prev.filter((id) => !visibleMemberIds.includes(id)));
-                          return;
-                        }
-                        setSelectedAssignIds((prev) => Array.from(new Set([...prev, ...visibleMemberIds])));
-                      }}
-                    >
-                      {allVisibleSelected ? 'Deseleziona visibili' : 'Seleziona visibili'}
-                    </button>
-                    <button
-                      type="button"
-                      className="profile-member-link"
-                      disabled={selectedAssignIds.length === 0}
-                      onClick={() => setSelectedAssignIds([])}
-                    >
-                      Nessuno
-                    </button>
-                  </div>
-                  <div className="profile-member-list" role="listbox" aria-multiselectable="true">
-                    {guildMembersLoading && (
-                      <p className="profile-msg">Caricamento membri Discord…</p>
-                    )}
-                    {!guildMembersLoading && guildMembersError && (
-                      <p className="profile-msg is-warn">{guildMembersError}</p>
-                    )}
-                    {!guildMembersLoading && !guildMembersError && visibleMembers.length === 0 && (
-                      <p className="profile-msg">Nessun membro trovato.</p>
-                    )}
-                    {!guildMembersLoading && visibleMembers.map((entry) => {
-                      const selected = selectedAssignIds.includes(entry.id);
-                      return (
-                        <label
-                          key={entry.id}
-                          className={`profile-member${selected ? ' is-selected' : ''}`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selected}
-                            onChange={() => toggleAssignMember(entry.id)}
-                          />
-                          <span className="profile-member__name">{entry.name}</span>
-                          {entry.username ? (
-                            <span className="profile-member__user">@{entry.username}</span>
-                          ) : null}
-                        </label>
-                      );
-                    })}
-                  </div>
-                  {assignStatus && (
-                    <p className={`profile-msg${assignStatus.startsWith('Assegnata') || assignStatus.includes('successo') ? ' is-ok' : ' is-warn'}`}>
-                      {assignStatus}
-                    </p>
-                  )}
-                  <button
-                    type="submit"
-                    disabled={assigningAchievement || catalog.length === 0 || selectedAssignIds.length === 0}
-                    className="profile-btn"
-                  >
-                    {assigningAchievement && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                    {selectedAssignIds.length > 1
-                      ? `Assegna a ${selectedAssignIds.length}`
-                      : 'Assegna'}
-                  </button>
-                </form>
-              )}
-
-              {opsMode === 'create' && (
-                <form onSubmit={handleCreateAchievement} className="profile-ops__form profile-ops__form--split">
-                  <label className="profile-file profile-file--drop">
-                    {newAchievementImageUrl ? (
-                      <img src={newAchievementImageUrl} alt="" />
-                    ) : (
-                      <span>
-                        <Upload className="h-4 w-4" />
-                        Immagine
-                      </span>
-                    )}
-                    <input type="file" accept="image/*" className="hidden" onChange={handleImageFilePick} />
-                  </label>
-                  <div className="profile-ops__fields">
-                    <input
-                      type="text"
-                      value={newAchievementName}
-                      onChange={(event) => setNewAchievementName(event.target.value)}
-                      placeholder="Nome"
-                      className="profile-input"
-                    />
-                    <textarea
-                      rows={2}
-                      value={newAchievementDescription}
-                      onChange={(event) => setNewAchievementDescription(event.target.value)}
-                      placeholder="Descrizione"
-                      className="profile-textarea"
-                    />
-                    {createStatus && (
-                      <p className={`profile-msg${createStatus.includes('successo') ? ' is-ok' : ' is-warn'}`}>
-                        {createStatus}
-                      </p>
-                    )}
-                    <button type="submit" disabled={creatingAchievement} className="profile-btn">
-                      {creatingAchievement && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                      Crea
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {opsMode === 'edit' && (
-                <form onSubmit={handleUpdateAchievement} className="profile-ops__form profile-ops__form--split">
-                  <label className="profile-file profile-file--drop">
-                    {editAchievementImageUrl ? (
-                      <img src={editAchievementImageUrl} alt="" />
-                    ) : (
-                      <span>
-                        <Upload className="h-4 w-4" />
-                        Immagine
-                      </span>
-                    )}
-                    <input type="file" accept="image/*" className="hidden" onChange={handleEditImageFilePick} />
-                  </label>
-                  <div className="profile-ops__fields">
-                    <select
-                      value={editAchievementId}
-                      onChange={(event) => setEditAchievementId(event.target.value)}
-                      className="profile-input"
-                    >
-                      {catalog.length === 0 ? (
-                        <option value="">Nessuna patch</option>
-                      ) : (
-                        catalog.map((entry) => (
-                          <option key={entry.id} value={entry.id}>{entry.name}</option>
-                        ))
-                      )}
-                    </select>
-                    <input
-                      type="text"
-                      value={editAchievementName}
-                      onChange={(event) => setEditAchievementName(event.target.value)}
-                      placeholder="Nome"
-                      className="profile-input"
-                    />
-                    <textarea
-                      rows={2}
-                      value={editAchievementDescription}
-                      onChange={(event) => setEditAchievementDescription(event.target.value)}
-                      placeholder="Descrizione"
-                      className="profile-textarea"
-                    />
-                    {editStatus && (
-                      <p className={`profile-msg${editStatus.includes('successo') || editStatus.includes('Rimossi') ? ' is-ok' : ' is-warn'}`}>
-                        {editStatus}
-                      </p>
-                    )}
-                    <div className="profile-actions">
-                      <button
-                        type="submit"
-                        disabled={editingAchievement || deletingAchievement || catalog.length === 0}
-                        className="profile-btn"
-                      >
-                        {editingAchievement ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Pencil className="h-3.5 w-3.5" />}
-                        Salva
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleDeleteAchievement}
-                        disabled={editingAchievement || deletingAchievement || catalog.length === 0}
-                        className="profile-btn profile-btn--danger"
-                      >
-                        {deletingAchievement ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                        Elimina
-                      </button>
-                    </div>
-                  </div>
-                </form>
-              )}
-            </div>
-          )}
-        </section>
-      )}
 
       {pendingClaim && (
         <div className="profile-claim">

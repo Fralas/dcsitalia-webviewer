@@ -1,0 +1,711 @@
+/*
+ * Full-width profile. Same language as UserProfile.css: flat surfaces, square corners,
+ * 1px --profile-border lines, uppercase micro labels, single orange accent. Only layout and
+ * the new elements (rank, XP bar, career list, link code) are defined here.
+ */
+
+.profile.pf {
+  display: flex;
+  flex-direction: column;
+  max-width: none;
+  min-height: 100%;
+  margin: 0;
+  padding: 28px clamp(16px, 3vw, 48px) 28px;
+}
+
+/* ---------------------------------------------------------------- header */
+
+.pf-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px 40px;
+  padding-bottom: 22px;
+  margin-bottom: 26px;
+  border-bottom: 1px solid var(--profile-border);
+}
+
+.pf-head__id {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.pf-head__link {
+  flex: 1;
+  max-width: 720px;
+  padding-left: 32px;
+  border-left: 1px solid var(--profile-border);
+}
+
+.pf-head__msg {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.pf-unlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--profile-dim);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.pf-unlink:hover:not(:disabled) {
+  color: var(--profile-text);
+}
+
+/* link flow */
+
+.pf-link__copy {
+  margin: 0 0 12px;
+  max-width: 560px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--profile-dim);
+}
+
+.pf-code {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.pf-code__box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 140, 0, 0.48);
+  background: var(--profile-accent-soft);
+}
+
+.pf-code__label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--profile-dim);
+}
+
+.pf-code__value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--profile-accent);
+}
+
+/* ---------------------------------------------------------------- body */
+
+/* Columns fill the remaining viewport height, separated by full-height hairlines. */
+.pf-layout {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 300px minmax(0, 1fr) 320px;
+  gap: 0;
+  align-items: stretch;
+}
+
+.pf-layout > * {
+  min-width: 0;
+  padding: 0 28px;
+}
+
+.pf-layout > *:first-child {
+  padding-left: 0;
+}
+
+.pf-layout > *:last-child {
+  padding-right: 0;
+}
+
+.pf-layout > * + * {
+  border-left: 1px solid var(--profile-border);
+}
+
+/* Staff tools live inside the Riconoscimenti column (hidden for regular users). */
+.profile.pf .profile__ops {
+  margin-top: 28px;
+}
+
+.pf-hint {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--profile-dim);
+}
+
+/* stacked blocks in the middle / right columns */
+
+.pf-block {
+  margin-top: 30px;
+}
+
+.pf-block:first-child {
+  margin-top: 0;
+}
+
+.profile__section-head.pf-after-block {
+  margin-top: 34px;
+}
+
+/* road to the next rank */
+
+.pf-track {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 22px;
+}
+
+.pf-track__end {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pf-track__end.is-next {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.pf-track__end.is-next svg {
+  opacity: 0.45;
+}
+
+.pf-track__rank {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pf-track__rank strong {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--profile-text);
+}
+
+.pf-track__end.is-next .pf-track__rank strong {
+  font-size: 13px;
+  color: var(--profile-dim);
+}
+
+.pf-track__rank small {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--profile-accent);
+}
+
+.pf-track__end.is-next .pf-track__rank small {
+  color: var(--profile-dim);
+}
+
+.pf-track__line {
+  position: relative;
+  display: flex;
+  gap: 4px;
+  padding-bottom: 22px;
+}
+
+.pf-track__seg {
+  flex: 1;
+  height: 6px;
+  background: var(--profile-surface);
+  border: 1px solid var(--profile-border);
+}
+
+.pf-track__seg i {
+  display: block;
+  height: 100%;
+  background: var(--profile-accent);
+}
+
+.pf-track__seg.is-current {
+  border-color: rgba(255, 140, 0, 0.6);
+}
+
+.pf-track__caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--profile-dim);
+}
+
+/* XP ring + figures */
+
+.pf-service {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 36px;
+  margin-top: 28px;
+}
+
+.pf-service__xp {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.pf-donut {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.pf-donut svg {
+  display: block;
+}
+
+.pf-donut__center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.pf-donut__center strong {
+  font-size: 24px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.pf-donut__center small {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--profile-dim);
+}
+
+.pf-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pf-legend li {
+  display: grid;
+  grid-template-columns: 10px auto;
+  column-gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--profile-muted);
+}
+
+.pf-legend i {
+  width: 10px;
+  height: 10px;
+}
+
+.pf-legend span {
+  grid-column: 2;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--profile-dim);
+}
+
+.is-flight {
+  background: var(--profile-accent);
+}
+
+.is-sortie {
+  background: #8a5a20;
+}
+
+.pf-figures {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 22px 0;
+  margin: 0;
+  padding-left: 32px;
+  border-left: 1px solid var(--profile-border);
+}
+
+.pf-figures > div {
+  min-width: 0;
+  padding-right: 16px;
+}
+
+.pf-figures dt {
+  margin-bottom: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--profile-dim);
+}
+
+.pf-figures dd {
+  margin: 0;
+  overflow: hidden;
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pf-legend li.is-zero {
+  opacity: 0.4;
+}
+
+.pf-figures--flat {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding-left: 0;
+  border-left: 0;
+}
+
+/* horizontal bars (aircraft time, weapon hit rate) */
+
+.pf-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pf-bars__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 5px;
+  font-size: 13px;
+}
+
+.pf-bars__name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--profile-muted);
+}
+
+.pf-bars__value {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--profile-dim);
+}
+
+.pf-bars__track {
+  height: 4px;
+  background: #262626;
+}
+
+.pf-bars__track span {
+  display: block;
+  height: 100%;
+  background: var(--profile-accent);
+}
+
+.pf-bars__track.is-rate span {
+  background: #8a5a20;
+}
+
+/* campaign */
+
+.pf-war {
+  display: grid;
+  grid-template-columns: auto minmax(60px, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+}
+
+.pf-war__side {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 12px;
+  border-left: 3px solid #60a5fa;
+}
+
+.pf-war__side.is-red {
+  align-items: flex-end;
+  padding: 0 12px 0 0;
+  border-left: 0;
+  border-right: 3px solid #ef4444;
+}
+
+.pf-war__label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--profile-dim);
+}
+
+.pf-war__region {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.pf-war__side.is-blue .pf-war__region {
+  color: #60a5fa;
+}
+
+.pf-war__side.is-red .pf-war__region {
+  color: #ef4444;
+}
+
+.pf-war__front {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pf-war__line {
+  flex: 1;
+  height: 0;
+  border-top: 1px dashed var(--profile-border);
+}
+
+.pf-war__icon {
+  width: 16px;
+  height: 16px;
+  color: var(--profile-accent);
+}
+
+.pf-control {
+  margin-top: 22px;
+}
+
+.pf-control__bar {
+  display: flex;
+  gap: 2px;
+  height: 4px;
+}
+
+.pf-control__bar .is-blue {
+  background: #3b82f6;
+}
+
+.pf-control__bar .is-red {
+  background: #b91c1c;
+}
+
+.pf-control__legend {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--profile-dim);
+}
+
+.pf-control__legend .is-blue {
+  color: #60a5fa;
+}
+
+.pf-control__legend .is-red {
+  color: #ef4444;
+}
+
+.pf-note {
+  margin: 18px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--profile-muted);
+}
+
+.pf-note__accent {
+  color: var(--profile-accent);
+}
+
+.pf-rules {
+  border-top: 1px solid var(--profile-border);
+}
+
+.pf-rules__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid #2a2a2a;
+  font-size: 13px;
+  color: var(--profile-muted);
+}
+
+.pf-rules__value {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--profile-accent);
+}
+
+/* career list: same rows as the standings */
+
+.pf-ladder {
+  border-top: 1px solid var(--profile-border);
+}
+
+.pf-ladder__row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid #2a2a2a;
+  font-size: 13px;
+}
+
+.pf-ladder__row.is-locked {
+  color: var(--profile-dim);
+}
+
+.pf-ladder__row.is-locked svg {
+  opacity: 0.35;
+}
+
+.pf-ladder__row.is-current {
+  color: var(--profile-accent);
+}
+
+.pf-ladder__name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pf-ladder__range {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--profile-dim);
+}
+
+.pf-ladder__row.is-current .pf-ladder__range {
+  color: var(--profile-accent);
+}
+
+/* pilots standings: name + rank under it */
+
+.pf-standings-row {
+  align-items: center;
+}
+
+.pf-standings-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pf-standings-rank {
+  overflow: hidden;
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--profile-dim);
+}
+
+.profile.pf .profile__standings-list {
+  margin-top: 0;
+}
+
+.profile.pf .profile-ops__tabs {
+  margin-bottom: 0;
+}
+
+/* ---------------------------------------------------------------- responsive */
+
+@media (max-width: 1500px) {
+  .pf-service {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  .pf-figures {
+    padding: 22px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--profile-border);
+  }
+}
+
+@media (max-width: 1280px) {
+  .pf-layout {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+
+  .profile.pf .pf-layout > .profile__standings {
+    grid-column: 1 / -1;
+    margin-top: 26px;
+    padding: 22px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--profile-border);
+  }
+}
+
+@media (max-width: 860px) {
+  .pf-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pf-head__link {
+    flex-basis: 100%;
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .pf-layout > *,
+  .profile.pf .pf-layout > .profile__standings {
+    padding: 0;
+    border-left: 0;
+  }
+
+  .pf-layout > * + * {
+    margin-top: 26px;
+    padding-top: 22px;
+    border-top: 1px solid var(--profile-border);
+  }
+
+  .pf-track {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .pf-track__end.is-next {
+    display: none;
+  }
+
+  .pf-figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

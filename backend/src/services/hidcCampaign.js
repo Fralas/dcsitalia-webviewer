@@ -7,6 +7,10 @@
  *   - Export_DCampaign_Focus.json     DMAP_Focus.lua: active region, BLUE attack region, candidates (read-only)
  *   - Export_DRegion_Status.json      DMAP_Region.lua: region -> "blue" | "red" (read-only)
  * A passed vote is applied through the DBRIDGE command queue (type "focus_vote").
+ *
+ * When DCSServerBot is configured (deps.serverBot, DCSSB_DATABASE_URL) it replaces the first two:
+ * the Discord link comes from the bot's /linkme (players.discord_id) and XP is computed here from
+ * its statistics table (slot time + landed sorties), with the same level curve as DBRIDGE_Pilots.
  */
 import fs from 'fs';
 import path from 'path';
@@ -24,9 +28,14 @@ function envInt(name, fallback) {
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
+function envIntOrZero(name, fallback) {
+  const value = Number.parseInt(process.env[name], 10);
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
 export const VOTE_RULES = Object.freeze({
   minProposerLevel: envInt('HIDC_VOTE_MIN_LEVEL', 5),
-  minVoterLevel: envInt('HIDC_VOTE_MIN_VOTER_LEVEL', 1),
+  minVoterLevel: envIntOrZero('HIDC_VOTE_MIN_VOTER_LEVEL', 0),
   durationMs: envInt('HIDC_VOTE_DURATION_MIN', 720) * 60 * 1000,
   minVotes: envInt('HIDC_VOTE_MIN_VOTES', 3),
   cooldownMs: envInt('HIDC_VOTE_COOLDOWN_MIN', 60) * 60 * 1000,
@@ -64,6 +73,7 @@ function readJsonFile(targetPath, fallback = null) {
  * @param {(id: string) => boolean} deps.hasWebCommand
  * @param {(id: string) => object|null} deps.getWebCommandResult
  * @param {(event: string, payload: object) => void} deps.emit
+ * @param {object} [deps.serverBot]  createDcsServerBot() instance (optional)
  */
 export function createHidcCampaign(deps) {
   const dbridgeDir = deps.dbridgeDir || null;
@@ -82,6 +92,36 @@ export function createHidcCampaign(deps) {
   const voteChannelId = String(process.env.HIDC_VOTE_CHANNEL_ID || '').trim();
   const siteUrl = String(process.env.FRONTEND_URL || '').trim();
   let linkRequestsSignature = '';
+  const serverBot = deps.serverBot?.enabled ? deps.serverBot : null;
+
+  // XP rules used with DCSServerBot (DCORE exports its own rules in Export_Pilot_Stats.json).
+  const botRules = {
+    xp_per_flight_minute: envIntOrZero('HIDC_XP_PER_MINUTE', 1),
+    xp_per_sortie: envIntOrZero('HIDC_XP_PER_SORTIE', 10),
+    level_max: envInt('HIDC_LEVEL_MAX', 100),
+    level_xp_base: envInt('HIDC_LEVEL_XP_BASE', 30),
+    level_xp_exp: Number.parseFloat(process.env.HIDC_LEVEL_XP_EXP) > 0 ? Number.parseFloat(process.env.HIDC_LEVEL_XP_EXP) : 1.5,
+    source: 'dcsserverbot',
+  };
+  // Same curve as DBRIDGE_Pilots.lua: floor(base * L^exp), L = 0..max.
+  const botThresholds = Array.from({ length: botRules.level_max + 1 }, (_, level) => (
+    Math.floor(botRules.level_xp_base * level ** botRules.level_xp_exp)
+  ));
+
+  function botXp(entry) {
+    const totals = entry?.totals;
+    if (!totals) return { xp: 0, flightXp: 0, sortieXp: 0, sorties: 0 };
+    const sorties = Math.min(totals.takeoffs, totals.landings);
+    const flightXp = Math.floor(totals.playtimeSec / 60) * botRules.xp_per_flight_minute;
+    const sortieXp = sorties * botRules.xp_per_sortie;
+    return { xp: flightXp + sortieXp, flightXp, sortieXp, sorties };
+  }
+
+  function linkDisabledError() {
+    const error = new Error('Il collegamento DCS si fa con /linkme di DCSServerBot sul Discord.');
+    error.status = 409;
+    return error;
+  }
 
   // ---------------------------------------------------------------- storage
 
@@ -123,6 +163,17 @@ export function createHidcCampaign(deps) {
   // ---------------------------------------------------------------- DCORE exports
 
   function readStats() {
+    if (serverBot) {
+      const snap = serverBot.getSnapshot();
+      return {
+        pilots: {},
+        thresholds: botThresholds,
+        rules: botRules,
+        updatedAt: snap.updatedAt,
+        available: Boolean(snap.ok),
+        source: 'dcsserverbot',
+      };
+    }
     const parsed = readJsonFile(files.stats, null);
     const thresholds = Array.isArray(parsed?.level_thresholds) && parsed.level_thresholds.length > 0
       ? parsed.level_thresholds.map((value) => Number(value) || 0)
@@ -136,23 +187,63 @@ export function createHidcCampaign(deps) {
     };
   }
 
+  // Livelli 0-based: thresholds[i] = XP minima del livello i (0 = recluta), come DBRIDGE_Pilots.lua.
   function levelInfo(xp, thresholds) {
-    let level = 1;
+    let level = 0;
     thresholds.forEach((minXp, index) => {
-      if (xp >= minXp) level = index + 1;
+      if (xp >= minXp) level = index;
     });
-    const currentMin = thresholds[level - 1] || 0;
-    const nextMin = level < thresholds.length ? thresholds[level] : null;
+    const currentMin = thresholds[level] || 0;
+    const nextMin = level + 1 < thresholds.length ? thresholds[level + 1] : null;
     return {
       level,
       xp,
       levelXp: currentMin,
       nextLevelXp: nextMin,
-      maxLevel: thresholds.length,
+      maxLevel: thresholds.length - 1,
+    };
+  }
+
+  function botPilot(discordId, stats) {
+    const entry = serverBot.getPilot(discordId);
+    if (!entry) return { link: null, stats: null, level: null, combat: null };
+    const xp = botXp(entry);
+    return {
+      link: { ucid: entry.ucids[0], ucids: entry.ucids, name: entry.name, linkedAt: null, source: 'dcsserverbot' },
+      stats: {
+        name: entry.name,
+        flightSec: entry.totals.playtimeSec,
+        sorties: xp.sorties,
+        lastSeen: entry.lastFlight ? Math.floor(entry.lastFlight / 1000) : (entry.lastSeen ? Math.floor(entry.lastSeen / 1000) : null),
+        flightXp: xp.flightXp,
+        sortieXp: xp.sortieXp,
+      },
+      level: levelInfo(xp.xp, stats.thresholds),
+      combat: {
+        takeoffs: entry.totals.takeoffs,
+        landings: entry.totals.landings,
+        kills: entry.totals.kills,
+        pvp: entry.totals.pvp,
+        deaths: entry.totals.deaths,
+        ejections: entry.totals.ejections,
+        crashes: entry.totals.crashes,
+        teamkills: entry.totals.teamkills,
+        killsBy: {
+          planes: entry.totals.killsPlanes,
+          helicopters: entry.totals.killsHelicopters,
+          sams: entry.totals.killsSams,
+          ground: entry.totals.killsGround,
+          ships: entry.totals.killsShips,
+        },
+        aircraft: entry.aircraft.slice(0, 8),
+        weapons: entry.weapons.slice(0, 8),
+        traps: entry.traps,
+      },
     };
   }
 
   function pilotForUser(discordId, stats = readStats()) {
+    if (serverBot) return botPilot(discordId, stats);
     const link = readLinks()[discordId] || null;
     if (!link?.ucid) return { link: null, stats: null, level: null };
     const row = stats.pilots[link.ucid] || null;
@@ -254,6 +345,12 @@ export function createHidcCampaign(deps) {
   }
 
   function getLinkState(discordId) {
+    if (serverBot) {
+      const entry = serverBot.getPilot(discordId);
+      return entry
+        ? { linked: true, link: { name: entry.name || null, linkedAt: null } }
+        : { linked: false, pending: null };
+    }
     const link = readLinks()[discordId] || null;
     if (link?.ucid) return { linked: true, link: { name: link.name || null, linkedAt: link.linkedAt || null } };
     const pending = Object.entries(readCodes()).find(([, entry]) => entry?.discordId === discordId);
@@ -264,6 +361,7 @@ export function createHidcCampaign(deps) {
   }
 
   function startLink(discordId) {
+    if (serverBot) throw linkDisabledError();
     const state = getLinkState(discordId);
     if (state.linked) return state;
     if (state.pending) return state;
@@ -276,6 +374,7 @@ export function createHidcCampaign(deps) {
   }
 
   async function sendLinkCodeByDiscord(discordId) {
+    if (serverBot) throw linkDisabledError();
     const state = startLink(discordId);
     if (state.linked) return { sent: false, linked: true };
     if (!botToken) {
@@ -299,6 +398,7 @@ export function createHidcCampaign(deps) {
   }
 
   function unlink(discordId) {
+    if (serverBot) throw linkDisabledError();
     const links = readLinks();
     if (!links[discordId]) return false;
     delete links[discordId];
@@ -403,8 +503,8 @@ export function createHidcCampaign(deps) {
       error.status = 403;
       throw error;
     }
-    if ((pilot.level?.level || 1) < minLevel) {
-      const error = new Error(`Serve almeno il livello ${minLevel} (attuale ${pilot.level?.level || 1}).`);
+    if ((pilot.level?.level ?? 0) < minLevel) {
+      const error = new Error(`Serve almeno il livello ${minLevel} (attuale ${pilot.level?.level ?? 0}).`);
       error.status = 403;
       throw error;
     }
@@ -604,17 +704,35 @@ export function createHidcCampaign(deps) {
     const pilot = pilotForUser(user.id, stats);
     return {
       ...getLinkState(user.id),
+      linkSource: serverBot ? 'dcsserverbot' : 'hidc',
       statsAvailable: stats.available,
       stats: pilot.stats,
       level: pilot.level || levelInfo(0, stats.thresholds),
       rules: stats.rules,
-      botAvailable: Boolean(botToken),
+      combat: pilot.combat || null,
+      botAvailable: Boolean(botToken) && !serverBot,
       minProposerLevel: VOTE_RULES.minProposerLevel,
     };
   }
 
   function getLeaderboard(limit = 10) {
     const stats = readStats();
+    if (serverBot) {
+      return serverBot.listPilots()
+        .map((entry) => {
+          const { xp } = botXp(entry);
+          return {
+            discordId: entry.discordId,
+            name: entry.name || entry.discordId,
+            xp,
+            level: levelInfo(xp, stats.thresholds).level,
+            flightSec: entry.totals.playtimeSec,
+          };
+        })
+        .filter((row) => row.xp > 0)
+        .sort((a, b) => b.xp - a.xp)
+        .slice(0, limit);
+    }
     const links = readLinks();
     return Object.entries(links)
       .map(([discordId, link]) => {
@@ -679,7 +797,11 @@ export function createHidcCampaign(deps) {
     app.delete('/api/hidc/pilot/link', (req, res) => {
       const user = requireUser(req, res);
       if (!user) return;
-      res.json({ unlinked: unlink(user.id) });
+      try {
+        res.json({ unlinked: unlink(user.id) });
+      } catch (error) {
+        sendError(res, error);
+      }
     });
 
     app.get('/api/hidc/pilots/leaderboard', (req, res) => {
@@ -720,7 +842,8 @@ export function createHidcCampaign(deps) {
   }
 
   function tick() {
-    syncLinkRequests();
+    if (serverBot) serverBot.tick();
+    else syncLinkRequests();
     tickVotes();
   }
 
@@ -729,7 +852,7 @@ export function createHidcCampaign(deps) {
     registerRoutes,
     tick,
     // test hooks
-    _internals: { proposeVote, castBallot, tickVotes, syncLinkRequests, startLink, getCampaignState, getPilotProfile, levelInfo },
+    _internals: { botThresholds, botXp, proposeVote, castBallot, tickVotes, syncLinkRequests, startLink, getCampaignState, getPilotProfile, levelInfo },
   };
 }
 

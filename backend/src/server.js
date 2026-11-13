@@ -55,6 +55,7 @@ import * as lidcService from './services/lidcService.js';
 import * as hidcAirportLogistics from './services/hidcAirportLogistics.js';
 import { createDscoreFactionPoints } from './services/dscoreFactionPoints.js';
 import { createHidcCampaign } from './services/hidcCampaign.js';
+import { createDcsServerBot } from './services/dcsServerBot.js';
 import { proxyCartoBasemapTile } from './services/cartoBasemapProxy.js';
 import {
   LIDC_EXPORT_FILES,
@@ -2305,7 +2306,17 @@ app.put('/api/profile', (req, res) => {
 });
 
 // HIDC: link account DCS, esperienza piloti, votazioni regione attiva (services/hidcCampaign.js).
+// Con DCSSB_DATABASE_URL link e statistiche arrivano da DCSServerBot (services/dcsServerBot.js).
+const dcsServerBot = createDcsServerBot();
+if (dcsServerBot.enabled) {
+  dcsServerBot.refresh().then((snap) => {
+    console.log(snap.ok
+      ? `DCSServerBot: ${Object.keys(snap.byDiscord).length} piloti collegati`
+      : `DCSServerBot non raggiungibile: ${snap.error}`);
+  });
+}
 const hidcCampaign = createHidcCampaign({
+  serverBot: dcsServerBot,
   dbridgeDir: WEB_COMMANDS_FILE ? path.dirname(WEB_COMMANDS_FILE) : resolveDbridgeDir(),
   enqueueWebCommand,
   hasWebCommand: (id) => webCommands.some((cmd) => cmd?.id === id),

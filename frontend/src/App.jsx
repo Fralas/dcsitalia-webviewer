@@ -657,7 +657,7 @@ function App() {
           <div className="app-wiki-fade" aria-hidden="true" />
         </div>
       ) : (
-      <main className={`flex-1 ${(currentView === 'landing' || currentView === 'frontline' || currentView === 'lidc' || currentView === 'atc') ? 'overflow-hidden' : 'container mx-auto px-4 py-4 overflow-y-auto'}`}>
+      <main className={`flex-1 ${(currentView === 'landing' || currentView === 'frontline' || currentView === 'lidc' || currentView === 'atc') ? 'overflow-hidden' : (currentView === 'profile' ? 'min-h-0 overflow-y-auto' : 'container mx-auto px-4 py-4 overflow-y-auto')}`}>
         {currentView === 'landing' && (
           <LandingPage
             language={appLanguage}
@@ -686,13 +686,6 @@ function App() {
           <AtcStripPage />
         )}
       </main>
-      )}
-      {currentView === 'profile' && (
-        <footer className="bg-yt-bg-secondary border-t border-yt-border mt-8">
-          <div className="container mx-auto px-4 py-3 text-center text-xs text-yt-text-secondary">
-            <p>DCS Italia Warehouse 3.0</p>
-          </div>
-        </footer>
       )}
     </div>
     {isStorylineOpen && typeof document !== 'undefined' && createPortal(
