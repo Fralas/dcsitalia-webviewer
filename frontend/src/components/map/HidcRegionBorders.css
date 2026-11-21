@@ -50,3 +50,12 @@
 .hidc-region-labels__label--vote .hidc-region-labels__tag {
   color: #ffbb00;
 }
+
+/* "In votazione" / "Scelta": plain small caption, no pill or outline. */
+.hidc-region-labels__label--vote .hidc-region-labels__tag {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, Loader2, Play, Vote } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Loader2, Play } from 'lucide-react';
 import { castHidcRegionBallot, startHidcRegionVote } from '../../services/api';
 import './HidcRegionVotePanel.css';
 
@@ -13,7 +13,7 @@ const COPY = {
     from: 'da',
     conquered: (r) => `${r} conquistata! Scegli dove attaccare ora.`,
     pick: 'Scegli la regione da attaccare e da dove partire.',
-    startedBy: (n) => `Avviata da ${n} per cambiare la regione attiva.`,
+    startedBy: (n) => `Avviata da: ${n}`,
     current: 'Attuale',
     start: 'Avvia votazione',
     startHint: 'Proponi di cambiare la regione attiva: tutti i piloti votano dove attaccare e da dove partire.',
@@ -47,7 +47,7 @@ const COPY = {
     from: 'from',
     conquered: (r) => `${r} captured! Choose where to attack next.`,
     pick: 'Pick the region to attack and where to attack from.',
-    startedBy: (n) => `Started by ${n} to change the active region.`,
+    startedBy: (n) => `Started by: ${n}`,
     current: 'Current',
     start: 'Start vote',
     startHint: 'Propose a change of active region: every pilot votes where to attack and where from.',
@@ -189,7 +189,6 @@ export default function HidcRegionVotePanel({ campaign, onCampaignChange, langua
           </span>
         </span>
         {open && <span className="hidc-vote__time">{formatRemaining(vote.endsAt - now)}</span>}
-        {(open || vote?.status === 'passed') && <span className="hidc-vote__badge"><Vote className="h-3 w-3" /></span>}
         {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
       </button>
 

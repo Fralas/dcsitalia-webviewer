@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import './HidcMapZoneNumberLabels.css';
 
-const ZONE_NUMBER_MIN_ZOOM = 11;
+// All zone numbers show from this zoom (was 11: now visible from further out).
+const ZONE_NUMBER_MIN_ZOOM = 9;
+// Font size grows from this zoom, so close-up labels keep their old size.
+const ZONE_NUMBER_FONT_BASE_ZOOM = 11;
 const DOME_HEIGHT_METERS = 1000 * 0.28;
 const LABEL_GAP_PX = 8;
 
@@ -80,7 +83,7 @@ function buildFrames(map, engine, zones, selectedZoneId, hoveredZoneId) {
   if (!width || !height) return [];
 
   const fontSize = showAll
-    ? 11 + Math.min(5, Math.max(0, zoom - ZONE_NUMBER_MIN_ZOOM) * 1.2)
+    ? 11 + Math.min(5, Math.max(0, zoom - ZONE_NUMBER_FONT_BASE_ZOOM) * 1.2)
     : 13;
 
   return visibleZones.flatMap((zone) => {
