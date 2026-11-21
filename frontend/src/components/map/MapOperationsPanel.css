@@ -861,6 +861,15 @@
 
 .hidc-mission__type {
   flex-shrink: 0;
+  box-sizing: border-box;
+  height: 16px;
+  min-height: 16px;
+  justify-content: center;
+  /* letter-spacing adds space after the last letter: take it back on the right so the word is centred */
+  padding: 0 calc(6px - 0.08em) 0 6px;
+  line-height: 1;
+  /* centre the capitals themselves, not the font line box */
+  text-box: trim-both cap alphabetic;
 }
 
 .hidc-mission__type--sead { color: #c4b5fd; background: rgba(167, 139, 250, 0.14); }

@@ -892,6 +892,8 @@ export default function MapOperationsPanel({
         })}
       </div>
 
+      {/* HIDC: missions only, no departure / radius / aircraft filters (type filters stay in the side drawer). */}
+      {!(activeTab === 'mission' && hidcMissions) && (
       <div className={`map-ops-section__toolbar${activeTab === 'mission' ? ' map-ops-section__toolbar--mission' : ''}`}>
         {activeTab === 'logistic' && (
             <OpsSelect
@@ -1091,6 +1093,7 @@ export default function MapOperationsPanel({
           <RotateCcw strokeWidth={2} />
         </button>
       </div>
+      )}
 
       <div className={`map-ops-section__results${activeTab === 'mission' ? ' map-ops-section__results--mission' : ''}`}>
       <div className="map-ops-section__list">
