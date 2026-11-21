@@ -2329,6 +2329,9 @@ const hidcCampaign = createHidcCampaign({
   emit: (event, payload) => io.emit(event, payload),
   getZones: () => loadFrontlineZonesFromFile(),
   pushFeed: (event) => pushFeedEvent(event),
+  getActiveAirports: () => airbaseStatusManager.getActiveAirports(),
+  getAirportStock: (airportId) => currentData[airportId]?.data?.weapons || [],
+  readBluePoints: () => dscoreFactionPoints.readBluePoints(),
 });
 hidcCampaign.registerRoutes(app);
 setInterval(() => hidcCampaign.tick(), 15 * 1000);

@@ -1051,3 +1051,429 @@
 @keyframes hidc-mission-spin {
   to { transform: rotate(360deg); }
 }
+
+/* ---- HIDC AI logistics (HidcAirliftPanel.jsx) ---- */
+.hidc-airlift-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.hidc-airlift-bar__hint {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ops-mute);
+}
+
+.hidc-airlift-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--ops-pill);
+  background: var(--ops-gold);
+  color: #111111;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.hidc-airlift-primary:hover:not(:disabled) {
+  background: #ffd24d;
+}
+
+.hidc-airlift-primary:disabled {
+  background: var(--ops-fill-active);
+  color: var(--ops-mute);
+  cursor: not-allowed;
+}
+
+.hidc-airlift-primary svg,
+.hidc-airlift-form__note svg {
+  width: 13px;
+  height: 13px;
+}
+
+.hidc-airlift-row .map-ops-section__row-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hidc-airlift-row .map-ops-section__row-title svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--ops-mute);
+}
+
+.hidc-airlift-row.is-mine {
+  box-shadow: inset 2px 0 0 var(--ops-gold);
+}
+
+.hidc-airlift-row--site {
+  background: rgba(245, 158, 11, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.3);
+}
+
+.hidc-airlift-row--site .map-ops-section__row-title svg {
+  color: #fbbf24;
+}
+
+.hidc-airlift-chip {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: var(--ops-pill);
+  background: var(--ops-fill-active);
+  color: var(--ops-mute);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.hidc-airlift-chip--enroute { background: rgba(59, 130, 246, 0.16); color: #93c5fd; }
+.hidc-airlift-chip--delivered { background: rgba(74, 222, 128, 0.14); color: #86efac; }
+.hidc-airlift-chip--crashed { background: rgba(245, 158, 11, 0.16); color: #fcd34d; }
+.hidc-airlift-chip--refused,
+.hidc-airlift-chip--failed { background: rgba(239, 68, 68, 0.14); color: #fca5a5; }
+
+/* form */
+.hidc-airlift-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 10px;
+  border-radius: var(--ops-row-radius);
+  background: var(--ops-row);
+}
+
+.hidc-airlift-form__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.hidc-airlift-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ops-fill);
+  color: var(--ops-mute);
+  cursor: pointer;
+}
+
+.hidc-airlift-icon-btn:hover {
+  background: var(--ops-fill-active);
+  color: #ffffff;
+}
+
+.hidc-airlift-icon-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.hidc-airlift-form__aircraft {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.hidc-airlift-aircraft {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--ops-fill);
+  color: #ffffff;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px transparent;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.hidc-airlift-aircraft svg {
+  grid-row: 1 / span 2;
+  width: 18px;
+  height: 18px;
+  color: var(--ops-mute);
+}
+
+.hidc-airlift-aircraft__name {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.hidc-airlift-aircraft__meta {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ops-mute);
+}
+
+.hidc-airlift-aircraft:hover:not(:disabled) {
+  background: var(--ops-fill-hover);
+}
+
+.hidc-airlift-aircraft.is-active {
+  background: rgba(255, 187, 0, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 187, 0, 0.55);
+}
+
+.hidc-airlift-aircraft.is-active svg {
+  color: var(--ops-gold);
+}
+
+.hidc-airlift-aircraft.is-locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.hidc-airlift-form__route {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hidc-airlift-form__route .hidc-airlift-select {
+  min-width: 0;
+  width: 100%;
+}
+
+.hidc-airlift-form__route .map-ops-section__select-trigger {
+  width: 100%;
+}
+
+.hidc-airlift-form__note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ops-mute);
+}
+
+.hidc-airlift-form__cargo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hidc-airlift-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--ops-pill);
+  background: var(--ops-fill);
+  color: var(--ops-mute);
+}
+
+.hidc-airlift-search svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.hidc-airlift-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.hidc-airlift-stock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: none;
+}
+
+.hidc-airlift-stock::-webkit-scrollbar {
+  display: none;
+}
+
+.hidc-airlift-stock li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 2px 4px 2px 10px;
+  border-radius: 10px;
+  background: var(--ops-fill);
+}
+
+.hidc-airlift-stock li.is-selected {
+  background: rgba(255, 187, 0, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 187, 0, 0.35);
+}
+
+.hidc-airlift-stock__name {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hidc-airlift-stock__have {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ops-mute);
+  font-variant-numeric: tabular-nums;
+}
+
+.hidc-airlift-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.hidc-airlift-stepper button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ops-fill-active);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.hidc-airlift-stepper button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.hidc-airlift-stepper svg {
+  width: 10px;
+  height: 10px;
+}
+
+.hidc-airlift-stepper input {
+  width: 42px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  outline: none;
+  background: rgba(0, 0, 0, 0.35);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.hidc-airlift-stepper input::-webkit-outer-spin-button,
+.hidc-airlift-stepper input::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+.hidc-airlift-stock__max {
+  min-width: 40px;
+  height: 20px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--ops-pill);
+  background: transparent;
+  color: var(--ops-gold);
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.hidc-airlift-stock__max:hover {
+  background: rgba(255, 187, 0, 0.12);
+}
+
+.hidc-airlift-form__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--ops-hairline);
+}
+
+.hidc-airlift-form__sum {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.hidc-airlift-form__sum strong {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ops-gold);
+}
+
+.hidc-airlift-form__sum span {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ops-mute);
+}
+
+.hidc-airlift-form__sum span.is-bad {
+  color: #fca5a5;
+}
+
+.hidc-airlift-error {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #fca5a5;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.hidc-airlift-form .spin,
+.hidc-airlift-primary .spin {
+  animation: hidc-mission-spin 0.9s linear infinite;
+}

@@ -24,6 +24,7 @@ import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
 import { optionalPath } from '../config/envPaths.js';
 import * as discordAuth from './discordAuth.js';
 import { createHidcMissions } from './hidcMissions.js';
+import { createHidcAirLift } from './hidcAirLift.js';
 
 const LINK_CODE_PATTERN = /^HIDC-[A-Z0-9]{6}$/;
 const LINK_CODE_TTL_MS = 15 * 60 * 1000;
@@ -57,6 +58,15 @@ export const VOTE_RULES = Object.freeze({
 
 const HISTORY_LIMIT = 20;
 
+// Test only: force a pilot level per Discord id, "id:level,id:level" (e.g. to try the C-130 at level 25).
+// Ignored in production.
+const LEVEL_OVERRIDES = process.env.NODE_ENV === 'production'
+  ? new Map()
+  : new Map(String(process.env.HIDC_LEVEL_OVERRIDES || '').split(',')
+    .map((entry) => entry.split(':').map((part) => part.trim()))
+    .filter(([id, level]) => id && Number.isFinite(Number.parseInt(level, 10)))
+    .map(([id, level]) => [id, Number.parseInt(level, 10)]));
+
 function sanitizeText(value, maxLen = 120) {
   if (typeof value !== 'string' && typeof value !== 'number') return '';
   return String(value).trim().slice(0, maxLen);
@@ -89,6 +99,9 @@ function readJsonFile(targetPath, fallback = null) {
  * @param {object} [deps.serverBot]  createDcsServerBot() instance (optional)
  * @param {() => Array} [deps.getZones]  frontline zones (id, status, tasks) for the missions
  * @param {(event: object) => void} [deps.pushFeed]  site activity feed
+ * @param {() => Array} [deps.getActiveAirports]  BLUE airports (AI logistics missions)
+ * @param {(airportId: string) => Array} [deps.getAirportStock]  warehouse rows of an airport
+ * @param {() => number|null} [deps.readBluePoints]
  */
 export function createHidcCampaign(deps) {
   const dbridgeDir = deps.dbridgeDir || null;
@@ -104,6 +117,8 @@ export function createHidcCampaign(deps) {
       || (dcoreSrcDir ? path.join(dcoreSrcDir, 'DMAP', 'Export_DCampaign_Focus.json') : null),
     regionStatus: optionalPath('HIDC_REGION_STATUS_FILE')
       || (dcoreSrcDir ? path.join(dcoreSrcDir, 'DMAP', 'Export_DRegion_Status.json') : null),
+    airlift: optionalPath('HIDC_AIRLIFT_STATE_FILE')
+      || (dbridgeDir ? path.join(dbridgeDir, 'Export_AirLift.json') : null),
   };
   const botToken = String(process.env.DISCORD_BOT_TOKEN || '').trim();
   const voteChannelId = String(process.env.HIDC_VOTE_CHANNEL_ID || '').trim();
@@ -234,6 +249,14 @@ export function createHidcCampaign(deps) {
     return found ? out : { deliveries: 0, kg: 0, km: 0, tkm: 0, last: null, bestKm: 0, bestKg: 0, bestAt: null };
   }
 
+  /** XP lifted to the threshold of a forced test level (HIDC_LEVEL_OVERRIDES). */
+  function withLevelOverride(discordId, xp, thresholds) {
+    const forced = LEVEL_OVERRIDES.get(String(discordId || ''));
+    if (forced == null) return xp;
+    const level = Math.max(0, Math.min(forced, thresholds.length - 1));
+    return Math.max(xp, thresholds[level] || 0);
+  }
+
   // Livelli 0-based: thresholds[i] = XP minima del livello i (0 = recluta), come DBRIDGE_Pilots.lua.
   function levelInfo(xp, thresholds) {
     let level = 0;
@@ -268,7 +291,7 @@ export function createHidcCampaign(deps) {
         missionXp: missionXp.total,
         missionsCompleted: missionXp.completed,
       },
-      level: levelInfo(xp.xp + missionXp.total, stats.thresholds),
+      level: levelInfo(withLevelOverride(discordId, xp.xp + missionXp.total, stats.thresholds), stats.thresholds),
       combat: {
         takeoffs: entry.totals.takeoffs,
         landings: entry.totals.landings,
@@ -325,7 +348,7 @@ export function createHidcCampaign(deps) {
           missionsCompleted: missionXp.completed,
         }
         : { name: link.name || null, flightSec: 0, sorties: 0, lastSeen: null, missionXp: missionXp.total, missionsCompleted: missionXp.completed },
-      level: levelInfo(xp, stats.thresholds),
+      level: levelInfo(withLevelOverride(discordId, xp, stats.thresholds), stats.thresholds),
     };
   }
 
@@ -884,6 +907,23 @@ export function createHidcCampaign(deps) {
     pushFeed: deps.pushFeed,
   });
 
+  // AI logistics missions (tab Logistica): CH-47 / C-130 flown by DCORE DBRIDGE_AirLift.lua.
+  const airlift = createHidcAirLift({
+    stateFile: files.airlift,
+    getActiveAirports: () => (typeof deps.getActiveAirports === 'function' ? deps.getActiveAirports() : []),
+    getAirportStock: (airportId) => (typeof deps.getAirportStock === 'function' ? deps.getAirportStock(airportId) : []),
+    readBluePoints: () => (typeof deps.readBluePoints === 'function' ? deps.readBluePoints() : null),
+    requirePilot: (user, minLevel, action) => requirePilot(user, minLevel, action),
+    levelOf: (user) => {
+      const pilot = pilotForUser(user.id);
+      return pilot?.link ? (pilot.level?.level ?? 0) : null;
+    },
+    enqueueWebCommand: deps.enqueueWebCommand,
+    getWebCommandResult: deps.getWebCommandResult,
+    emit: deps.emit,
+    pushFeed: deps.pushFeed,
+  });
+
   // ---------------------------------------------------------------- state for UI
 
   function getCampaignState(user) {
@@ -1053,6 +1093,21 @@ export function createHidcCampaign(deps) {
       }
     });
 
+    app.get('/api/hidc/airlift', (req, res) => {
+      res.json(airlift.getPublicState(req.session?.user || null));
+    });
+
+    app.post('/api/hidc/airlift', (req, res) => {
+      const user = requireUser(req, res);
+      if (!user) return;
+      try {
+        airlift.order(user, req.body || {});
+        res.json(airlift.getPublicState(user));
+      } catch (error) {
+        sendError(res, error);
+      }
+    });
+
     app.post('/api/hidc/missions/:missionId/accept', (req, res) => {
       const user = requireUser(req, res);
       if (!user) return;
@@ -1098,6 +1153,7 @@ export function createHidcCampaign(deps) {
     else syncLinkRequests();
     tickVotes();
     missions.tick();
+    airlift.tick();
   }
 
   return {
@@ -1106,6 +1162,7 @@ export function createHidcCampaign(deps) {
     tick,
     // test hooks
     missions,
+    airlift,
     _internals: { botThresholds, botXp, startVote, castBallot, tickVotes, voteWinner, syncLinkRequests, startLink, getCampaignState, getPilotProfile, levelInfo },
   };
 }

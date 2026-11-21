@@ -22,6 +22,7 @@ export const DOC = Object.freeze({
   HIDC_PILOT_LINK_CODES: 'hidc.pilot-link-codes',
   HIDC_REGION_VOTES: 'hidc.region-votes',
   HIDC_MISSIONS: 'hidc.missions',
+  HIDC_AIRLIFT: 'hidc.airlift',
   LIDC_WAREHOUSE_OPS: 'lidc.warehouse-ops',
   ATC_BOARD: 'atc.board',
   ATC_HISTORY: 'atc.history',

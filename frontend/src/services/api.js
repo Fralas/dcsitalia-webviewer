@@ -1309,6 +1309,15 @@ export async function getHidcPilotLeaderboard() {
 }
 
 /** Active region, candidates, region status and current vote */
+// HIDC AI logistics missions (CH-47 / C-130 between two BLUE airports) and crash sites.
+export async function getHidcAirlift() {
+  return fetchAPI('/hidc/airlift');
+}
+
+export async function orderHidcAirlift(order) {
+  return fetchAPI('/hidc/airlift', { method: 'POST', body: JSON.stringify(order) });
+}
+
 // HIDC missions (SEAD / DEAD / CAS / LOGISTICS per zone): accept, abandon. Both return the campaign state.
 export async function acceptHidcMission(missionId) {
   return fetchAPI(`/hidc/missions/${encodeURIComponent(missionId)}/accept`, { method: 'POST', body: JSON.stringify({}) });

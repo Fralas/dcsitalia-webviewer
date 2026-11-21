@@ -36,6 +36,7 @@ import HidcMapZoneNumberLabels from './map/HidcMapZoneNumberLabels';
 import HidcRegionBorders from './map/HidcRegionBorders';
 import HidcRegionVotePanel from './map/HidcRegionVotePanel';
 import HidcFrontDebugPanel, { readHidcDebugFlag } from './map/HidcFrontDebugPanel';
+import useHidcAirlift from '../utils/useHidcAirlift';
 import useHidcCampaign from '../utils/useHidcCampaign';
 import LidcAirportPresencePanel from './LidcAirportPresencePanel';
 import LidcAirportWizard from './LidcAirportWizard';
@@ -2666,6 +2667,8 @@ function MapLibreFlatMapView({
   orderAlerts = {},
   onMapReady,
   hidcCampaign = null,
+  airliftSites = [],
+  onAirliftSiteSelect,
   showRegionBorders = false,
   hidcZones = [],
   hidcZoneOverrides = null,
@@ -2918,6 +2921,31 @@ function MapLibreFlatMapView({
       }];
     }),
   }), [dcsarPoints, showDcsar]);
+
+  // HIDC AI logistics crash sites: site marker + the crates still on the ground (services/hidcAirLift.js).
+  const airliftSitesByIdRef = useRef(new Map());
+  const fcAirliftSites = useMemo(() => {
+    airliftSitesByIdRef.current = new Map();
+    return {
+      type: 'FeatureCollection',
+      features: (airliftSites || []).flatMap((site) => {
+        const lat = Number(site?.lat);
+        const lon = Number(site?.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return [];
+        airliftSitesByIdRef.current.set(String(site.id), site);
+        return [
+          { type: 'Feature', geometry: { type: 'Point', coordinates: [lon, lat] }, properties: { kind: 'site', id: String(site.id) } },
+          ...(site.crates || []).map((crate, index) => ({
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [Number(crate.lon), Number(crate.lat)] },
+            properties: { kind: 'crate', id: `${site.id}:${index}` },
+          })),
+        ];
+      }),
+    };
+  }, [airliftSites]);
+  const fcAirliftSitesRef = useRef(fcAirliftSites);
+  fcAirliftSitesRef.current = fcAirliftSites;
 
   const fcDcsarPoints = useMemo(() => {
     dcsarByIdRef.current = new Map();
@@ -3772,6 +3800,7 @@ function MapLibreFlatMapView({
       addGeoSource('airlift-players-src', fcAirliftPlayers);
       addGeoSource('dcsar-links-src', fcDcsarLinks);
       addGeoSource('dcsar-points-src', fcDcsarPoints);
+      addGeoSource('airlift-sites-src', fcAirliftSitesRef.current);
       addGeoSource('zones-src', fcZones);
       addGeoSource('zone-areas-src', fcZoneAreas);
       addGeoSource('airports-src', fcAirports);
@@ -4109,6 +4138,48 @@ function MapLibreFlatMapView({
           'circle-radius': 14,
           'circle-color': '#000000',
           'circle-opacity': 0.001,
+        },
+      });
+
+      // ---- HIDC AI logistics crash sites (crates to recover) ----
+      map.addLayer({
+        id: 'airlift-site-halo',
+        type: 'circle',
+        source: 'airlift-sites-src',
+        filter: ['==', ['get', 'kind'], 'site'],
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 9, 10, 18, 14, 46],
+          'circle-color': '#f59e0b',
+          'circle-opacity': 0.16,
+          'circle-stroke-color': '#fbbf24',
+          'circle-stroke-width': 1.5,
+          'circle-stroke-opacity': 0.85,
+          'circle-pitch-alignment': 'map',
+        },
+      });
+      map.addLayer({
+        id: 'airlift-site-crates',
+        type: 'circle',
+        source: 'airlift-sites-src',
+        filter: ['==', ['get', 'kind'], 'crate'],
+        minzoom: 10,
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 14, 4],
+          'circle-color': '#fde68a',
+          'circle-stroke-color': '#78350f',
+          'circle-stroke-width': 1,
+        },
+      });
+      map.addLayer({
+        id: 'airlift-site-core',
+        type: 'circle',
+        source: 'airlift-sites-src',
+        filter: ['==', ['get', 'kind'], 'site'],
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 3, 10, 4.5, 14, 6],
+          'circle-color': '#fbbf24',
+          'circle-stroke-color': '#111111',
+          'circle-stroke-width': 1.5,
         },
       });
 
@@ -4530,6 +4601,27 @@ function MapLibreFlatMapView({
         hideHoverPopup();
       });
 
+      map.on('click', 'airlift-site-halo', (event) => {
+        const site = airliftSitesByIdRef.current.get(String(event?.features?.[0]?.properties?.id || ''));
+        if (site && onAirliftSiteSelect) onAirliftSiteSelect(site);
+      });
+      map.on('mousemove', 'airlift-site-halo', (event) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const site = airliftSitesByIdRef.current.get(String(event?.features?.[0]?.properties?.id || ''));
+        if (!site) return;
+        const route = site.from && site.to ? `${site.from} → ${site.to}` : '';
+        showHoverPopup(
+          event.lngLat,
+          `<div style="font-size:11px;font-weight:700;">${t('map.rightPanel.ops.airlift.recovery')}</div>`
+          + `<div style="font-size:10px;opacity:0.9;">${t('map.rightPanel.ops.airlift.cratesLeft', { left: site.cratesLeft })} • ${t('map.rightPanel.ops.airlift.unitsShort', { units: site.units })}</div>`
+          + (route ? `<div style="font-size:10px;opacity:0.7;">${route}</div>` : ''),
+        );
+      });
+      map.on('mouseleave', 'airlift-site-halo', () => {
+        map.getCanvas().style.cursor = '';
+        hideHoverPopup();
+      });
+
       map.on('click', 'dcsar-points-hit-layer', (event) => {
         const feature = event?.features?.[0];
         const dcsarId = String(feature?.properties?.id || '').trim();
@@ -4737,6 +4829,22 @@ function MapLibreFlatMapView({
     const source = map.getSource('dcsar-points-src');
     if (source?.setData) source.setData(fcDcsarPoints);
   }, [fcDcsarPoints]);
+
+  // The sites often arrive while the style is still loading: apply now if the source exists, else once the map is idle.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return undefined;
+    const apply = () => {
+      const source = map.getSource?.('airlift-sites-src');
+      if (source?.setData) source.setData(fcAirliftSitesRef.current);
+    };
+    if (map.getSource?.('airlift-sites-src')) {
+      apply();
+      return undefined;
+    }
+    map.once('idle', apply);
+    return () => map.off('idle', apply);
+  }, [fcAirliftSites]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -5153,9 +5261,13 @@ function MapLibreFlatMapView({
       || focusKey.startsWith('retrieve:')
     );
     const currentZoom = map.getZoom();
+    // Points picked in the operations panel (crash sites, AI flights): close enough to see the crates.
+    const opsFocus = focusKey.startsWith('ops:');
     const focusZoom = airportLikeFocus
       ? Math.min(effectiveMaxZoom, 14)
-      : Math.min(effectiveMaxZoom, currentZoom + 0.35);
+      : opsFocus
+        ? Math.min(effectiveMaxZoom, Math.max(currentZoom, 12))
+        : Math.min(effectiveMaxZoom, currentZoom + 0.35);
     const duration = mapFocusAnimationMs(currentZoom, focusZoom);
 
     if (map.isMoving()) map.stop();
@@ -5249,6 +5361,10 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   // Region borders / active region vote exist only for the Syria DCORE campaign.
   const isSyriaCampaign = tacticalMap?.campaignId === 'hidc-modern-syria';
   const { campaign: hidcCampaign, setCampaign: setHidcCampaign } = useHidcCampaign();
+  const { airlift: hidcAirlift, setAirlift: setHidcAirlift } = useHidcAirlift(isSyriaCampaign);
+  // Point picked in the operations panel (crash site, AI flight): the map flies there.
+  const [opsMapFocus, setOpsMapFocus] = useState(null);
+
   // Front line debug tool (hidden; only with ?hidcDebug=1 in the URL): client-side override of active/base region and zone statuses.
   const [hidcDebugEnabled] = useState(readHidcDebugFlag);
   const [hidcDebug, setHidcDebug] = useState(null);
@@ -6284,6 +6400,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   const tacticalFocusCoordinates = spawnAirportCenter
     || retrievePpCenter
     || selectedAirportCenter
+    || (opsMapFocus ? { lat: opsMapFocus.lat, lon: opsMapFocus.lon } : null)
     || selectedDcsarFocus
     || normalizeMapCoordinates(focusedZone?.coordinates)
     || theaterFocus
@@ -6294,7 +6411,14 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       ? `retrieve:${retrieveMode.ppId}`
       : selectedAirportId
         ? `airport:${selectedAirportId}`
-        : (selectedDcsarId || selectedZoneId || null);
+        : opsMapFocus
+          ? `ops:${opsMapFocus.key}`
+          : (selectedDcsarId || selectedZoneId || null);
+
+  // A zone, CSAR point or airport picked afterwards takes the focus back.
+  useEffect(() => {
+    setOpsMapFocus(null);
+  }, [selectedZoneId, selectedDcsarId, selectedAirportId]);
 
   const handleScaleChange = (scale) => {
     if (!isDesktopDevice) return;
@@ -7548,6 +7672,8 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       orderAlerts={airportOrderAlerts}
                       onMapReady={notifyMapReady}
                       hidcCampaign={hidcMapCampaign}
+                      airliftSites={isSyriaCampaign ? (hidcAirlift?.sites || []) : []}
+                      onAirliftSiteSelect={(site) => setOpsMapFocus({ key: `site:${site.id}`, lat: site.lat, lon: site.lon, ts: Date.now() })}
                       showRegionBorders={isSyriaCampaign}
                       hidcZones={validZones}
                       hidcZoneOverrides={hidcDebug?.overrides || null}
@@ -7671,6 +7797,9 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                 onSelectDcsar={(point) => setSelectedDcsarId(point?.id || null)}
                 hidcCampaign={isSyriaCampaign ? hidcCampaign : null}
                 onHidcCampaignChange={setHidcCampaign}
+                hidcAirlift={isSyriaCampaign ? hidcAirlift : null}
+                onHidcAirliftChange={setHidcAirlift}
+                onFocusPoint={(point) => setOpsMapFocus(point ? { ...point, ts: Date.now() } : null)}
               />
 
               {filters.showAto && focusedZone && (

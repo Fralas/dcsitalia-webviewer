@@ -77,6 +77,9 @@ export default function LiveFeedPanel({
   onSelectDcsar,
   hidcCampaign = null,
   onHidcCampaignChange,
+  hidcAirlift = null,
+  onHidcAirliftChange,
+  onFocusPoint,
 }) {
   void language;
 
@@ -178,6 +181,9 @@ export default function LiveFeedPanel({
               onSelectDcsar={onSelectDcsar}
               hidcCampaign={hidcCampaign}
               onHidcCampaignChange={onHidcCampaignChange}
+              hidcAirlift={hidcAirlift}
+              onHidcAirliftChange={onHidcAirliftChange}
+              onFocusPoint={onFocusPoint}
             />
           </div>
         )}

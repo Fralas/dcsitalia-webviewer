@@ -15,6 +15,7 @@ import {
   HidcMissionRow,
   missionTypeLabel,
 } from './HidcMissionRows';
+import HidcAirliftPanel from './HidcAirliftPanel';
 import './MapOperationsPanel.css';
 
 const PLANE_MISSION_TASKS = ['CAS', 'DEAD', 'SEAD', 'STRIKE', 'CAP'];
@@ -358,6 +359,10 @@ export default function MapOperationsPanel({
   // HIDC (Syria): missions from /api/hidc/campaign replace the plain zone list in the "Missione" tab.
   hidcCampaign = null,
   onHidcCampaignChange,
+  // HIDC "Logistica": AI CH-47 / C-130 missions and crash sites (services/hidcAirLift.js).
+  hidcAirlift = null,
+  onHidcAirliftChange,
+  onFocusPoint,
 }) {
   void language;
   void logisticsMissions;
@@ -384,6 +389,8 @@ export default function MapOperationsPanel({
   const [openSelectId, setOpenSelectId] = useState(null);
 
   const hidcMissions = hidcCampaign?.missions || null;
+  const hidcLogistics = Boolean(hidcCampaign);
+  const [airliftFormOpen, setAirliftFormOpen] = useState(false);
   const [missionBusyId, setMissionBusyId] = useState('');
   const [missionError, setMissionError] = useState('');
   const missionTasks = hidcMissions
@@ -893,7 +900,7 @@ export default function MapOperationsPanel({
       </div>
 
       {/* HIDC: missions only, no departure / radius / aircraft filters (type filters stay in the side drawer). */}
-      {!(activeTab === 'mission' && hidcMissions) && (
+      {!(activeTab === 'mission' && hidcMissions) && !(activeTab === 'logistic' && hidcLogistics) && (
       <div className={`map-ops-section__toolbar${activeTab === 'mission' ? ' map-ops-section__toolbar--mission' : ''}`}>
         {activeTab === 'logistic' && (
             <OpsSelect
@@ -1112,8 +1119,29 @@ export default function MapOperationsPanel({
             {(myMissions?.active || []).length === 0 && <HidcMissionResult entry={myMissions?.recent?.[0]} />}
           </>
         )}
-        {activeRows.length === 0 ? (
-          (activeTab !== 'mission' || !hidcMissions || (myMissions?.active || []).length === 0) && (
+        {activeTab === 'logistic' && hidcLogistics && (
+          <HidcAirliftPanel
+            airlift={hidcAirlift}
+            onAirliftChange={onHidcAirliftChange}
+            onFocusPoint={onFocusPoint}
+            formOpen={airliftFormOpen}
+            onFormOpenChange={setAirliftFormOpen}
+            departureIcon={<TakeoffIcon />}
+            arrivalIcon={<LandingIcon />}
+            renderSelect={(selectProps) => (
+              <OpsSelect
+                key={selectProps.id}
+                openSelectId={openSelectId}
+                setOpenSelectId={setOpenSelectId}
+                wrapClassName="hidc-airlift-select"
+                {...selectProps}
+              />
+            )}
+          />
+        )}
+        {activeTab === 'logistic' && hidcLogistics && airliftFormOpen ? null : activeRows.length === 0 ? (
+          (activeTab !== 'mission' || !hidcMissions || (myMissions?.active || []).length === 0)
+          && !(activeTab === 'logistic' && hidcLogistics) && (
             <div className="map-ops-section__row map-ops-section__row--empty">
               <span>{activeTab === 'mission' && hidcMissions ? t('map.rightPanel.ops.missions.empty') : t('map.rightPanel.ops.noResults')}</span>
             </div>
