@@ -833,3 +833,212 @@
   color: var(--ops-mute);
 }
 
+
+/* ---- HIDC missions (HidcMissionRows.jsx) ---- */
+.hidc-mission {
+  position: relative;
+  overflow: hidden;
+  /* keep the Accept button clear of the task-filter drawer strip on the right */
+  padding-right: 32px;
+}
+
+/* The closed filter drawer overflows to the right: never let focus scroll the panel sideways. */
+.map-ops-section__results--mission {
+  overflow-x: clip;
+}
+
+.hidc-mission:focus-visible {
+  outline: 1px solid var(--ops-gold);
+  outline-offset: -1px;
+}
+
+.hidc-mission__line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.hidc-mission__type {
+  flex-shrink: 0;
+}
+
+.hidc-mission__type--sead { color: #c4b5fd; background: rgba(167, 139, 250, 0.14); }
+.hidc-mission__type--dead { color: #fca5a5; background: rgba(248, 113, 113, 0.14); }
+.hidc-mission__type--cas { color: #fcd34d; background: rgba(251, 191, 36, 0.14); }
+.hidc-mission__type--logistics { color: #86efac; background: rgba(74, 222, 128, 0.14); }
+
+.hidc-mission__pilots,
+.hidc-mission__timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ops-mute);
+  font-variant-numeric: tabular-nums;
+}
+
+.hidc-mission__pilots svg,
+.hidc-mission__timer svg {
+  width: 11px;
+  height: 11px;
+}
+
+.hidc-mission__timer {
+  color: var(--ops-gold);
+}
+
+.hidc-mission__state {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ops-mute);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hidc-mission__xp {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ops-gold);
+  white-space: nowrap;
+}
+
+.hidc-mission__state + .hidc-mission__xp {
+  margin-left: 0;
+}
+
+.hidc-mission__accept,
+.hidc-mission__abandon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+
+.hidc-mission__accept {
+  min-width: 58px;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--ops-pill);
+  background: var(--ops-gold);
+  color: #111111;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.hidc-mission__accept:hover:not(:disabled) {
+  background: #ffd24d;
+}
+
+.hidc-mission__accept:disabled {
+  background: var(--ops-fill-active);
+  color: var(--ops-mute);
+  cursor: not-allowed;
+}
+
+.hidc-mission__abandon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ops-fill);
+  color: var(--ops-mute);
+}
+
+.hidc-mission__abandon:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+}
+
+.hidc-mission__accept svg,
+.hidc-mission__abandon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.hidc-mission--active {
+  background: rgba(255, 187, 0, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(255, 187, 0, 0.28);
+}
+
+.hidc-mission--active:hover {
+  background: rgba(255, 187, 0, 0.1);
+}
+
+.hidc-mission--active.is-awaiting {
+  background: rgba(74, 222, 128, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(74, 222, 128, 0.3);
+}
+
+.hidc-mission__progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.hidc-mission__progress > span {
+  display: block;
+  height: 100%;
+  background: var(--ops-gold);
+  transition: width 1s linear;
+}
+
+.hidc-mission--active.is-awaiting .hidc-mission__progress > span {
+  background: #4ade80;
+}
+
+.hidc-mission-result,
+.hidc-mission-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 7px 10px;
+  border-radius: var(--ops-row-radius);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.hidc-mission-result svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.hidc-mission-result--completed {
+  background: rgba(74, 222, 128, 0.1);
+  color: #86efac;
+}
+
+.hidc-mission-result--expired,
+.hidc-mission-result--cancelled {
+  background: var(--ops-fill);
+  color: var(--ops-mute);
+}
+
+.hidc-mission-error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #fca5a5;
+}
+
+.hidc-mission .spin {
+  animation: hidc-mission-spin 0.9s linear infinite;
+}
+
+@keyframes hidc-mission-spin {
+  to { transform: rotate(360deg); }
+}

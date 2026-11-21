@@ -2327,6 +2327,8 @@ const hidcCampaign = createHidcCampaign({
   hasWebCommand: (id) => webCommands.some((cmd) => cmd?.id === id),
   getWebCommandResult: (id) => webCommandResultsById.get(id) || null,
   emit: (event, payload) => io.emit(event, payload),
+  getZones: () => loadFrontlineZonesFromFile(),
+  pushFeed: (event) => pushFeedEvent(event),
 });
 hidcCampaign.registerRoutes(app);
 setInterval(() => hidcCampaign.tick(), 15 * 1000);

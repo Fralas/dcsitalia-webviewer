@@ -1309,6 +1309,15 @@ export async function getHidcPilotLeaderboard() {
 }
 
 /** Active region, candidates, region status and current vote */
+// HIDC missions (SEAD / DEAD / CAS / LOGISTICS per zone): accept, abandon. Both return the campaign state.
+export async function acceptHidcMission(missionId) {
+  return fetchAPI(`/hidc/missions/${encodeURIComponent(missionId)}/accept`, { method: 'POST', body: JSON.stringify({}) });
+}
+
+export async function abandonHidcMission(assignmentId) {
+  return fetchAPI(`/hidc/missions/assignments/${encodeURIComponent(assignmentId)}`, { method: 'DELETE' });
+}
+
 export async function getHidcCampaign() {
   return fetchAPI('/hidc/campaign');
 }

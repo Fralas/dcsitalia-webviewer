@@ -7,6 +7,8 @@
  *   - Export_Pilot_Cargo.json         DBRIDGE_Cargo.lua: sling-load deliveries / kg / km per UCID (read-only)
  *   - Export_DCampaign_Focus.json     DMAP_Focus.lua: active region, BLUE attack region, candidates (read-only)
  *   - Export_DRegion_Status.json      DMAP_Region.lua: region -> "blue" | "red" (read-only)
+ * Missions (services/hidcMissions.js): SEAD / DEAD / CAS / LOGISTICS per zone, accepted on the site,
+ * completed in DCS within 2 hours; their XP is added to the pilot level.
  * Region votes open by themselves after each conquest, or are started by a pilot of level >= 5:
  * pilots pick the region to attack and the BLUE region to attack from; the winner is applied
  * through the DBRIDGE command queue (type "focus_vote").
@@ -21,6 +23,7 @@ import crypto from 'crypto';
 import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
 import { optionalPath } from '../config/envPaths.js';
 import * as discordAuth from './discordAuth.js';
+import { createHidcMissions } from './hidcMissions.js';
 
 const LINK_CODE_PATTERN = /^HIDC-[A-Z0-9]{6}$/;
 const LINK_CODE_TTL_MS = 15 * 60 * 1000;
@@ -84,6 +87,8 @@ function readJsonFile(targetPath, fallback = null) {
  * @param {(id: string) => object|null} deps.getWebCommandResult
  * @param {(event: string, payload: object) => void} deps.emit
  * @param {object} [deps.serverBot]  createDcsServerBot() instance (optional)
+ * @param {() => Array} [deps.getZones]  frontline zones (id, status, tasks) for the missions
+ * @param {(event: object) => void} [deps.pushFeed]  site activity feed
  */
 export function createHidcCampaign(deps) {
   const dbridgeDir = deps.dbridgeDir || null;
@@ -250,6 +255,7 @@ export function createHidcCampaign(deps) {
     const entry = serverBot.getPilot(discordId);
     if (!entry) return { link: null, stats: null, level: null, combat: null };
     const xp = botXp(entry);
+    const missionXp = missionXpFor(discordId);
     return {
       link: { ucid: entry.ucids[0], ucids: entry.ucids, name: entry.name, linkedAt: null, source: 'dcsserverbot' },
       stats: {
@@ -259,8 +265,10 @@ export function createHidcCampaign(deps) {
         lastSeen: entry.lastFlight ? Math.floor(entry.lastFlight / 1000) : (entry.lastSeen ? Math.floor(entry.lastSeen / 1000) : null),
         flightXp: xp.flightXp,
         sortieXp: xp.sortieXp,
+        missionXp: missionXp.total,
+        missionsCompleted: missionXp.completed,
       },
-      level: levelInfo(xp.xp, stats.thresholds),
+      level: levelInfo(xp.xp + missionXp.total, stats.thresholds),
       combat: {
         takeoffs: entry.totals.takeoffs,
         landings: entry.totals.landings,
@@ -303,7 +311,8 @@ export function createHidcCampaign(deps) {
     const link = readLinks()[discordId] || null;
     if (!link?.ucid) return { link: null, stats: null, level: null };
     const row = stats.pilots[link.ucid] || null;
-    const xp = Number(row?.xp) || 0;
+    const missionXp = missionXpFor(discordId);
+    const xp = (Number(row?.xp) || 0) + missionXp.total;
     return {
       link,
       stats: row
@@ -312,8 +321,10 @@ export function createHidcCampaign(deps) {
           flightSec: Number(row.flight_sec) || 0,
           sorties: Number(row.sorties) || 0,
           lastSeen: Number(row.last_seen) || null,
+          missionXp: missionXp.total,
+          missionsCompleted: missionXp.completed,
         }
-        : { name: link.name || null, flightSec: 0, sorties: 0, lastSeen: null },
+        : { name: link.name || null, flightSec: 0, sorties: 0, lastSeen: null, missionXp: missionXp.total, missionsCompleted: missionXp.completed },
       level: levelInfo(xp, stats.thresholds),
     };
   }
@@ -842,6 +853,37 @@ export function createHidcCampaign(deps) {
     }
   }
 
+  // ---------------------------------------------------------------- missions
+
+  function missionXpFor(discordId) {
+    return discordId ? missions.xpFor(discordId) : { total: 0, completed: 0, byType: {} };
+  }
+
+  /** Did the pilot fly in DCS after sinceMs? null when there is no flight data for them. */
+  function flewSince(discordId, sinceMs) {
+    if (serverBot) {
+      const entry = serverBot.getPilot(discordId);
+      if (!entry) return null;
+      if ((Number(entry.lastFlight) || 0) >= sinceMs) return true;
+      return (entry.sorties || []).some((sortie) => (
+        sortie.outcome === 'open' || (Number(sortie.at) || 0) + (Number(sortie.sec) || 0) * 1000 >= sinceMs
+      ));
+    }
+    const link = readLinks()[discordId];
+    const row = link?.ucid ? readStats().pilots[link.ucid] : null;
+    if (!row) return null;
+    return (Number(row.last_seen) || 0) * 1000 >= sinceMs;
+  }
+
+  const missions = createHidcMissions({
+    getZones: () => (typeof deps.getZones === 'function' ? deps.getZones() : []),
+    readFocus: () => readJsonFile(files.focus, null),
+    requirePilot: (user, minLevel, action) => requirePilot(user, minLevel, action),
+    flewSince,
+    emit: deps.emit,
+    pushFeed: deps.pushFeed,
+  });
+
   // ---------------------------------------------------------------- state for UI
 
   function getCampaignState(user) {
@@ -867,6 +909,7 @@ export function createHidcCampaign(deps) {
         cooldownMin: Math.round(VOTE_RULES.cooldownMs / 60000),
         minVotes: VOTE_RULES.minVotes,
       },
+      missions: missions.getPublicState(user),
       me: user?.id
         ? {
           linked,
@@ -902,10 +945,11 @@ export function createHidcCampaign(deps) {
 
   function getLeaderboard(limit = 10) {
     const stats = readStats();
+    const missionXpAll = missions.allXp();
     if (serverBot) {
       return serverBot.listPilots()
         .map((entry) => {
-          const { xp } = botXp(entry);
+          const xp = botXp(entry).xp + (missionXpAll[entry.discordId]?.total || 0);
           return {
             discordId: entry.discordId,
             name: entry.name || entry.discordId,
@@ -923,7 +967,7 @@ export function createHidcCampaign(deps) {
       .map(([discordId, link]) => {
         const row = stats.pilots[link.ucid];
         if (!row) return null;
-        const xp = Number(row.xp) || 0;
+        const xp = (Number(row.xp) || 0) + (missionXpAll[discordId]?.total || 0);
         return {
           discordId,
           name: row.name || link.name || discordId,
@@ -1009,6 +1053,28 @@ export function createHidcCampaign(deps) {
       }
     });
 
+    app.post('/api/hidc/missions/:missionId/accept', (req, res) => {
+      const user = requireUser(req, res);
+      if (!user) return;
+      try {
+        missions.accept(user, sanitizeText(req.params.missionId, 120));
+        res.json(getCampaignState(user));
+      } catch (error) {
+        sendError(res, error);
+      }
+    });
+
+    app.delete('/api/hidc/missions/assignments/:assignmentId', (req, res) => {
+      const user = requireUser(req, res);
+      if (!user) return;
+      try {
+        missions.abandon(user, sanitizeText(req.params.assignmentId, 80));
+        res.json(getCampaignState(user));
+      } catch (error) {
+        sendError(res, error);
+      }
+    });
+
     app.post('/api/hidc/campaign/votes/:voteId/ballot', (req, res) => {
       const user = requireUser(req, res);
       if (!user) return;
@@ -1031,6 +1097,7 @@ export function createHidcCampaign(deps) {
     if (serverBot) serverBot.tick();
     else syncLinkRequests();
     tickVotes();
+    missions.tick();
   }
 
   return {
@@ -1038,6 +1105,7 @@ export function createHidcCampaign(deps) {
     registerRoutes,
     tick,
     // test hooks
+    missions,
     _internals: { botThresholds, botXp, startVote, castBallot, tickVotes, voteWinner, syncLinkRequests, startLink, getCampaignState, getPilotProfile, levelInfo },
   };
 }

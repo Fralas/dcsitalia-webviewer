@@ -75,6 +75,8 @@ export default function LiveFeedPanel({
   onSelectAirportOrder,
   onSelectProductionPoint,
   onSelectDcsar,
+  hidcCampaign = null,
+  onHidcCampaignChange,
 }) {
   void language;
 
@@ -174,6 +176,8 @@ export default function LiveFeedPanel({
               onSelectAirportOrder={onSelectAirportOrder}
               onSelectProductionPoint={onSelectProductionPoint}
               onSelectDcsar={onSelectDcsar}
+              hidcCampaign={hidcCampaign}
+              onHidcCampaignChange={onHidcCampaignChange}
             />
           </div>
         )}

@@ -1220,6 +1220,24 @@ export default {
         nm: '{{value}} NM',
         neutral: 'Neutral',
         stock: 'Stock {{count}}',
+        missions: {
+          logisticsShort: 'LOG',
+          accept: 'Accept',
+          abandon: 'Abandon mission',
+          inProgress: 'In progress',
+          awaitingFlight: 'Task done, waiting for your flight',
+          empty: 'No missions available',
+          error: 'Action failed',
+          loginRequired: 'Sign in with Discord to accept missions',
+          linkRequired: 'Link your DCS account from the profile',
+          oneAtATime: 'You already have a mission in progress',
+          result: {
+            completed: '{{type}} Zone {{number}} completed: +{{xp}} XP',
+            expired: '{{type}} Zone {{number}} expired',
+            expiredNoFlight: '{{type}} Zone {{number}} expired: no flight recorded',
+            cancelled: '{{type}} Zone {{number}} cancelled'
+          }
+        },
         airdropUnit: 'Airdrop unit'
       },
       zoneCard: {

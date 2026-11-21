@@ -1220,6 +1220,24 @@ export default {
         nm: '{{value}} NM',
         neutral: 'Neutrale',
         stock: 'Scorte {{count}}',
+        missions: {
+          logisticsShort: 'LOG',
+          accept: 'Accetta',
+          abandon: 'Abbandona missione',
+          inProgress: 'In corso',
+          awaitingFlight: 'Task completata, in attesa del volo',
+          empty: 'Nessuna missione disponibile',
+          error: 'Operazione non riuscita',
+          loginRequired: 'Accedi con Discord per accettare le missioni',
+          linkRequired: 'Collega il tuo account DCS dal profilo',
+          oneAtATime: 'Hai già una missione in corso',
+          result: {
+            completed: '{{type}} Zona {{number}} completata: +{{xp}} XP',
+            expired: '{{type}} Zona {{number}} scaduta',
+            expiredNoFlight: '{{type}} Zona {{number}} scaduta: nessun volo registrato',
+            cancelled: '{{type}} Zona {{number}} annullata'
+          }
+        },
         airdropUnit: 'Airdrop unit'
       },
       zoneCard: {

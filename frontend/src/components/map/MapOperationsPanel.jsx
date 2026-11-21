@@ -7,6 +7,14 @@ import {
   haversineNm,
 } from '../../utils/mapGeo';
 import { getStatusLabel, t } from '../../utils/locale';
+import { acceptHidcMission, abandonHidcMission } from '../../services/api';
+import {
+  HIDC_MISSION_FILTERS,
+  HidcActiveMission,
+  HidcMissionResult,
+  HidcMissionRow,
+  missionTypeLabel,
+} from './HidcMissionRows';
 import './MapOperationsPanel.css';
 
 const PLANE_MISSION_TASKS = ['CAS', 'DEAD', 'SEAD', 'STRIKE', 'CAP'];
@@ -347,6 +355,9 @@ export default function MapOperationsPanel({
   onSelectAirportOrder,
   onSelectProductionPoint,
   onSelectDcsar,
+  // HIDC (Syria): missions from /api/hidc/campaign replace the plain zone list in the "Missione" tab.
+  hidcCampaign = null,
+  onHidcCampaignChange,
 }) {
   void language;
   void logisticsMissions;
@@ -372,7 +383,42 @@ export default function MapOperationsPanel({
   const [productionMinStock, setProductionMinStock] = useState('');
   const [openSelectId, setOpenSelectId] = useState(null);
 
-  const missionTasks = aircraftMode === 'heli' ? HELI_MISSION_TASKS : PLANE_MISSION_TASKS;
+  const hidcMissions = hidcCampaign?.missions || null;
+  const [missionBusyId, setMissionBusyId] = useState('');
+  const [missionError, setMissionError] = useState('');
+  const missionTasks = hidcMissions
+    ? HIDC_MISSION_FILTERS
+    : (aircraftMode === 'heli' ? HELI_MISSION_TASKS : PLANE_MISSION_TASKS);
+
+  useEffect(() => {
+    if (hidcMissions && taskFilter !== 'all' && !HIDC_MISSION_FILTERS.includes(taskFilter)) setTaskFilter('all');
+  }, [hidcMissions, taskFilter]);
+
+  const runMissionAction = async (busyId, action) => {
+    setMissionBusyId(busyId);
+    setMissionError('');
+    try {
+      const next = await action();
+      if (next) onHidcCampaignChange?.(next);
+    } catch (err) {
+      setMissionError(err?.message || t('map.rightPanel.ops.missions.error'));
+    } finally {
+      setMissionBusyId('');
+    }
+  };
+
+  const handleAcceptMission = (mission) => runMissionAction(mission.id, () => acceptHidcMission(mission.id));
+  const handleAbandonMission = (assignment) => runMissionAction(assignment.id, () => abandonHidcMission(assignment.id));
+
+  const myMissions = hidcMissions?.mine || null;
+  const missionBlockedReason = !hidcCampaign?.me
+    ? t('map.rightPanel.ops.missions.loginRequired')
+    : !hidcCampaign.me.linked
+      ? t('map.rightPanel.ops.missions.linkRequired')
+      : !myMissions?.canAccept
+        ? t('map.rightPanel.ops.missions.oneAtATime')
+        : '';
+  const canAcceptMission = Boolean(hidcCampaign?.me?.linked && myMissions?.canAccept);
 
   useEffect(() => {
     setOpenSelectId(null);
@@ -515,7 +561,24 @@ export default function MapOperationsPanel({
     const includeZoneRows = taskFilter !== 'CSAR';
     const includeCsarRows = aircraftMode === 'heli' && (taskFilter === 'all' || taskFilter === 'CSAR');
 
-    const zoneRows = includeZoneRows
+    const zoneById = new Map(zones.map((zone) => [zone.id, zone]));
+    const distanceTo = (coords) => (hasDeparture && coords
+      ? haversineNm(airportCoords.lat, airportCoords.lon, coords.lat, coords.lon)
+      : null);
+
+    const hidcRows = hidcMissions && includeZoneRows
+      ? (hidcMissions.available || [])
+        .filter((mission) => !mission.mine)
+        .filter((mission) => taskFilter === 'all' || mission.type === taskFilter)
+        .map((mission) => {
+          const distanceNm = distanceTo(getCoords(zoneById.get(mission.zoneId)));
+          if (distanceNm != null && distanceNm > radiusNm) return null;
+          return { kind: 'hidc', mission, distanceNm };
+        })
+        .filter(Boolean)
+      : [];
+
+    const zoneRows = includeZoneRows && !hidcMissions
       ? zones
         .map((zone) => {
           const zoneCoords = getCoords(zone);
@@ -562,10 +625,12 @@ export default function MapOperationsPanel({
         .filter(Boolean)
       : [];
 
-    return [...zoneRows, ...csarRows].sort((a, b) => {
+    return [...hidcRows, ...zoneRows, ...csarRows].sort((a, b) => {
       if (a.distanceNm != null && b.distanceNm != null) return a.distanceNm - b.distanceNm;
       if (a.distanceNm != null) return -1;
       if (b.distanceNm != null) return 1;
+      if (a.kind === 'hidc' && b.kind === 'hidc') return 0; // backend order: SEAD, DEAD, CAS, LOGISTICS
+      if (a.kind === 'hidc' || b.kind === 'hidc') return a.kind === 'hidc' ? -1 : 1;
       if (a.kind === 'zone' && b.kind === 'zone') {
         return getZoneNumber(a.zone).localeCompare(getZoneNumber(b.zone), undefined, { numeric: true });
       }
@@ -583,6 +648,7 @@ export default function MapOperationsPanel({
     missionAirportId,
     radiusNm,
     taskFilter,
+    hidcMissions,
   ]);
 
   const logisticRows = useMemo(() => {
@@ -1028,13 +1094,44 @@ export default function MapOperationsPanel({
 
       <div className={`map-ops-section__results${activeTab === 'mission' ? ' map-ops-section__results--mission' : ''}`}>
       <div className="map-ops-section__list">
+        {activeTab === 'mission' && hidcMissions && (
+          <>
+            {missionError && <div className="hidc-mission-error" role="alert">{missionError}</div>}
+            {(myMissions?.active || []).map((assignment) => (
+              <HidcActiveMission
+                key={assignment.id}
+                assignment={assignment}
+                busy={missionBusyId === assignment.id}
+                onAbandon={handleAbandonMission}
+                onSelectZone={onSelectZone}
+              />
+            ))}
+            {(myMissions?.active || []).length === 0 && <HidcMissionResult entry={myMissions?.recent?.[0]} />}
+          </>
+        )}
         {activeRows.length === 0 ? (
-          <div className="map-ops-section__row map-ops-section__row--empty">
-            <span>{t('map.rightPanel.ops.noResults')}</span>
-          </div>
+          (activeTab !== 'mission' || !hidcMissions || (myMissions?.active || []).length === 0) && (
+            <div className="map-ops-section__row map-ops-section__row--empty">
+              <span>{activeTab === 'mission' && hidcMissions ? t('map.rightPanel.ops.missions.empty') : t('map.rightPanel.ops.noResults')}</span>
+            </div>
+          )
         ) : (
           activeRows.map((row) => {
             if (activeTab === 'mission') {
+              if (row.kind === 'hidc') {
+                return (
+                  <HidcMissionRow
+                    key={row.mission.id}
+                    mission={row.mission}
+                    distance={formatRowDistance(row.distanceNm)}
+                    canAccept={canAcceptMission}
+                    blockedReason={missionBlockedReason}
+                    busy={missionBusyId === row.mission.id}
+                    onAccept={handleAcceptMission}
+                    onSelectZone={onSelectZone}
+                  />
+                );
+              }
               if (row.kind === 'csar') {
                 return (
                   <button
@@ -1162,7 +1259,7 @@ export default function MapOperationsPanel({
                 className={`map-ops-section__pill${taskFilter === task ? ' is-active' : ''}`}
                 onClick={() => toggleTaskFilter(task)}
               >
-                {task}
+                {hidcMissions ? missionTypeLabel(task) : task}
               </button>
             ))}
             </div>

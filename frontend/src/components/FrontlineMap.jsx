@@ -7669,6 +7669,8 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                 }}
                 onSelectProductionPoint={setSelectedProductionPointId}
                 onSelectDcsar={(point) => setSelectedDcsarId(point?.id || null)}
+                hidcCampaign={isSyriaCampaign ? hidcCampaign : null}
+                onHidcCampaignChange={setHidcCampaign}
               />
 
               {filters.showAto && focusedZone && (
