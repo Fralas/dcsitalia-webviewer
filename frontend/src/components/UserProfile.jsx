@@ -924,7 +924,7 @@ export default function UserProfile() {
           )}
 
           <Logbook combat={pilot.profile?.combat} linked={pilotLinked} />
-          <XpRules rules={pilot.profile?.rules} minProposerLevel={pilot.profile?.minProposerLevel} />
+          <XpRules rules={pilot.profile?.rules} minStartLevel={pilot.profile?.minStartLevel} />
         </aside>
       </div>
 

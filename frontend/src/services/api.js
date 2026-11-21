@@ -1313,18 +1313,15 @@ export async function getHidcCampaign() {
   return fetchAPI('/hidc/campaign');
 }
 
-/** Propose a vote to change the active region */
-export async function proposeHidcRegionVote(target, from) {
-  return fetchAPI('/hidc/campaign/votes', {
-    method: 'POST',
-    body: JSON.stringify({ target, from }),
-  });
+/** Start a region vote (pilots of level >= 5): everyone then picks target + base */
+export async function startHidcRegionVote() {
+  return fetchAPI('/hidc/campaign/votes', { method: 'POST', body: JSON.stringify({}) });
 }
 
-/** Vote yes/no on the open region vote */
-export async function castHidcRegionBallot(voteId, choice) {
+/** Ballot in the open region vote: region to attack + BLUE region to attack from (can be changed) */
+export async function castHidcRegionBallot(voteId, target, from) {
   return fetchAPI(`/hidc/campaign/votes/${encodeURIComponent(voteId)}/ballot`, {
     method: 'POST',
-    body: JSON.stringify({ choice }),
+    body: JSON.stringify({ target, from }),
   });
 }

@@ -15,7 +15,7 @@ function LinkBlock({ pilot }) {
         <p className="pf-link__copy">
           Collega il tuo account DCS con il comando <strong>/linkme</strong> del bot sul Discord DCS Italia:
           grado e statistiche compaiono qui entro un minuto.
-          Dal livello {profile?.minProposerLevel ?? 5} puoi proporre il cambio della regione attiva.
+          Dal livello {profile?.minStartLevel ?? 5} puoi avviare la votazione per cambiare la regione attiva.
         </p>
       </div>
     );
@@ -26,7 +26,7 @@ function LinkBlock({ pilot }) {
       <p className="profile__kicker">Account DCS</p>
       <p className="pf-link__copy">
         Collega il tuo account DCS per salire di grado volando sul server HIDC.
-        Dal livello {profile?.minProposerLevel ?? 5} puoi proporre il cambio della regione attiva.
+        Dal livello {profile?.minStartLevel ?? 5} puoi avviare la votazione per cambiare la regione attiva.
       </p>
       {pending && (
         <div className="pf-code">

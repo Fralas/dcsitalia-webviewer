@@ -1,7 +1,7 @@
 /**
  * How XP is earned, from the rules DCORE exports with the pilot stats.
  */
-export default function XpRules({ rules, minProposerLevel = 5 }) {
+export default function XpRules({ rules, minStartLevel = 5 }) {
   const perMinute = Number(rules?.xp_per_flight_minute) || 1;
   const perSortie = Number(rules?.xp_per_sortie) || 0;
   const sortieMin = Math.round((Number(rules?.sortie_min_sec) || 600) / 60);
@@ -9,8 +9,8 @@ export default function XpRules({ rules, minProposerLevel = 5 }) {
   const rows = [
     [rules?.source === 'dcsserverbot' ? 'Minuto in slot' : 'Minuto in volo', `+${perMinute} XP`],
     perSortie ? [rules?.source === 'dcsserverbot' ? 'Sortita (decollo e atterraggio)' : `Sortita (decollo e atterraggio, min ${sortieMin} min)`, `+${perSortie} XP`] : null,
-    ['Proposta cambio regione', `Livello ${minProposerLevel}`],
-    ['Voto sulle proposte', 'Account collegato'],
+    ['Avvio votazione cambio regione', `Livello ${minStartLevel}`],
+    ['Voto (anche dopo ogni conquista)', 'Account collegato'],
   ].filter(Boolean);
 
   return (

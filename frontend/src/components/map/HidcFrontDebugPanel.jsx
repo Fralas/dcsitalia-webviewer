@@ -5,7 +5,7 @@ import './HidcRegionVotePanel.css';
 import './HidcFrontDebugPanel.css';
 
 /**
- * Front line debug tool (enable with ?hidcDebug=1, disable with ?hidcDebug=0).
+ * Front line debug tool, hidden: open the map with ?hidcDebug=1 to show it for that page load.
  * Purely client-side: overrides the active/base region and zone statuses fed to the region
  * borders + front line on this page only. Nothing is sent to the backend or DCS.
  */
@@ -42,15 +42,19 @@ function pickRandom(list) {
   return list.length > 0 ? list[Math.floor(Math.random() * list.length)] : null;
 }
 
+/**
+ * Hidden by default: the panel shows only when the page is opened with ?hidcDebug=1, for that load.
+ * The flag is no longer remembered; the old stored one is cleared so the panel disappears for everyone.
+ */
 export function readHidcDebugFlag() {
   if (typeof window === 'undefined') return false;
   try {
-    const query = new URLSearchParams(window.location.search);
-    if (query.has('hidcDebug')) {
-      if (query.get('hidcDebug') === '0') window.localStorage.removeItem('hidcDebug');
-      else window.localStorage.setItem('hidcDebug', '1');
-    }
-    return window.localStorage.getItem('hidcDebug') === '1';
+    window.localStorage.removeItem('hidcDebug');
+  } catch {
+    // storage blocked: nothing to clear
+  }
+  try {
+    return new URLSearchParams(window.location.search).get('hidcDebug') === '1';
   } catch {
     return false;
   }

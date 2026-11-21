@@ -7,7 +7,9 @@
  *   - Export_Pilot_Cargo.json         DBRIDGE_Cargo.lua: sling-load deliveries / kg / km per UCID (read-only)
  *   - Export_DCampaign_Focus.json     DMAP_Focus.lua: active region, BLUE attack region, candidates (read-only)
  *   - Export_DRegion_Status.json      DMAP_Region.lua: region -> "blue" | "red" (read-only)
- * A passed vote is applied through the DBRIDGE command queue (type "focus_vote").
+ * Region votes open by themselves after each conquest, or are started by a pilot of level >= 5:
+ * pilots pick the region to attack and the BLUE region to attack from; the winner is applied
+ * through the DBRIDGE command queue (type "focus_vote").
  *
  * When DCSServerBot is configured (deps.serverBot, DCSSB_DATABASE_URL) it replaces the first two:
  * the Discord link comes from the bot's /linkme (players.discord_id) and XP is computed here from
@@ -34,13 +36,20 @@ function envIntOrZero(name, fallback) {
   return Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
+// Region votes: open by themselves after each conquest, or started by a pilot (see tickVotes / startVote).
 export const VOTE_RULES = Object.freeze({
-  minProposerLevel: envInt('HIDC_VOTE_MIN_LEVEL', 5),
+  minStartLevel: envIntOrZero('HIDC_VOTE_MIN_LEVEL', 5),
   minVoterLevel: envIntOrZero('HIDC_VOTE_MIN_VOTER_LEVEL', 0),
-  durationMs: envInt('HIDC_VOTE_DURATION_MIN', 720) * 60 * 1000,
+  // After a pilot-started round, wait this long before another one can be started.
+  cooldownMs: envIntOrZero('HIDC_VOTE_COOLDOWN_MIN', 60) * 60 * 1000,
+  // Ballots needed for a round to be valid. Below it an automatic round is extended,
+  // a pilot-started round closes and the active region stays.
   minVotes: envInt('HIDC_VOTE_MIN_VOTES', 3),
-  cooldownMs: envInt('HIDC_VOTE_COOLDOWN_MIN', 60) * 60 * 1000,
+  durationMs: envInt('HIDC_VOTE_DURATION_MIN', 120) * 60 * 1000,
+  retryMs: envInt('HIDC_VOTE_RETRY_MIN', 10) * 60 * 1000,
   applyTimeoutMs: envInt('HIDC_VOTE_APPLY_TIMEOUT_MIN', 7 * 24 * 60) * 60 * 1000,
+  // Discord ids allowed to start and vote below the min levels (comma separated), e.g. staff or testers.
+  levelBypassIds: String(process.env.HIDC_VOTE_LEVEL_BYPASS_IDS || '').split(',').map((id) => id.trim()).filter(Boolean),
 });
 
 const HISTORY_LIMIT = 20;
@@ -153,6 +162,7 @@ export function createHidcCampaign(deps) {
     return {
       current: raw?.current && typeof raw.current === 'object' ? raw.current : null,
       history: Array.isArray(raw?.history) ? raw.history : [],
+      lastFocusTarget: REGION_PATTERN.test(String(raw?.lastFocusTarget || '')) ? raw.lastFocusTarget : null,
     };
   }
 
@@ -160,6 +170,7 @@ export function createHidcCampaign(deps) {
     saveJson(DOC.HIDC_REGION_VOTES, {
       current: state.current || null,
       history: (state.history || []).slice(0, HISTORY_LIMIT),
+      lastFocusTarget: state.lastFocusTarget || null,
     });
   }
 
@@ -504,122 +515,178 @@ export function createHidcCampaign(deps) {
   }
 
   // ---------------------------------------------------------------- votes
+  //
+  // A round asks every pilot ONE ballot with two choices: the RED region to attack and the BLUE
+  // region to attack from (one of the regions bordering that target). Ballots can be changed until
+  // the round closes. A round starts:
+  //   - by itself when no region is active (a region was just conquered, or the campaign started);
+  //   - when a pilot of level >= minStartLevel starts it from the map (change of active region).
+  // Result: the target with most ballots wins; the base is the most voted base among the ballots
+  // for the winning target. Ties go to the option that reached that count first. With no ballots
+  // at all the round is extended. The winner goes to DCS through the DBRIDGE queue (focus_vote).
 
-  function tally(vote) {
-    let yes = 0;
-    let no = 0;
-    Object.values(vote?.ballots || {}).forEach((ballot) => {
-      if (ballot?.choice === 'yes') yes += 1;
-      else if (ballot?.choice === 'no') no += 1;
-    });
-    return { yes, no, total: yes + no };
+  function hasLevelBypass(discordId) {
+    return VOTE_RULES.levelBypassIds.includes(String(discordId || ''));
   }
 
-  function voteOutcome(vote) {
+  function candidateOptions(focus) {
+    return focus.candidates.map((entry) => ({ target: entry.target, froms: [...entry.froms] }));
+  }
+
+  /** Counts per target and per base, with the time each option reached its count (tie-break). */
+  function tally(vote) {
+    const targets = {};
+    const froms = {};
+    const ballots = Object.values(vote?.ballots || {})
+      .filter((ballot) => ballot?.target && ballot?.from)
+      .sort((a, b) => (a.at || 0) - (b.at || 0));
+    ballots.forEach((ballot) => {
+      const t = targets[ballot.target] || { votes: 0, reachedAt: 0 };
+      t.votes += 1;
+      t.reachedAt = ballot.at || 0;
+      targets[ballot.target] = t;
+      const key = `${ballot.target}|${ballot.from}`;
+      const f = froms[key] || { votes: 0, reachedAt: 0 };
+      f.votes += 1;
+      f.reachedAt = ballot.at || 0;
+      froms[key] = f;
+    });
+    return { targets, froms, total: ballots.length };
+  }
+
+  function best(entries) {
+    return entries
+      .filter(([, value]) => value.votes > 0)
+      .sort((a, b) => b[1].votes - a[1].votes || a[1].reachedAt - b[1].reachedAt)[0] || null;
+  }
+
+  function voteWinner(vote) {
     const counts = tally(vote);
-    const passed = counts.total >= VOTE_RULES.minVotes && counts.yes > counts.no;
-    return { ...counts, passed };
+    const target = best(Object.entries(counts.targets));
+    if (!target) return { ...counts, target: null, from: null };
+    const from = best(Object.entries(counts.froms).filter(([key]) => key.startsWith(`${target[0]}|`)));
+    return { ...counts, target: target[0], from: from ? from[0].split('|')[1] : null };
   }
 
   function publicVote(vote, discordId) {
     if (!vote) return null;
     const counts = tally(vote);
+    const mine = discordId ? vote.ballots?.[discordId] || null : null;
     return {
       id: vote.id,
-      target: vote.target,
-      from: vote.from,
+      kind: vote.kind || 'auto',
       status: vote.status,
-      proposedBy: vote.proposedBy,
+      conquered: vote.conquered || null,
+      startedBy: vote.startedBy ? { name: vote.startedBy.name } : null,
+      activeTarget: vote.activeTarget || null,
+      activeFrom: vote.activeFrom || null,
       createdAt: vote.createdAt,
       endsAt: vote.endsAt,
       closedAt: vote.closedAt || null,
+      extensions: vote.extensions || 0,
       resultMessage: vote.resultMessage || null,
-      yes: counts.yes,
-      no: counts.no,
+      target: vote.target || null,
+      from: vote.from || null,
       total: counts.total,
-      myChoice: discordId ? vote.ballots?.[discordId]?.choice || null : null,
+      options: (vote.options || []).map((option) => ({
+        target: option.target,
+        votes: counts.targets[option.target]?.votes || 0,
+        froms: option.froms.map((id) => ({ id, votes: counts.froms[`${option.target}|${id}`]?.votes || 0 })),
+      })),
+      myBallot: mine ? { target: mine.target, from: mine.from } : null,
     };
   }
 
-  function requirePilot(user, minLevel) {
+  function requirePilot(user, minLevel, action) {
     const pilot = pilotForUser(user.id);
     if (!pilot.link) {
       const error = new Error('Collega prima il tuo account DCS dal profilo.');
       error.status = 403;
       throw error;
     }
-    if ((pilot.level?.level ?? 0) < minLevel) {
-      const error = new Error(`Serve almeno il livello ${minLevel} (attuale ${pilot.level?.level ?? 0}).`);
+    if ((pilot.level?.level ?? 0) < minLevel && !hasLevelBypass(user.id)) {
+      const error = new Error(`Serve almeno il livello ${minLevel} per ${action} (attuale ${pilot.level?.level ?? 0}).`);
       error.status = 403;
       throw error;
     }
     return pilot;
   }
 
-  function proposeVote(user, target, from) {
-    requirePilot(user, VOTE_RULES.minProposerLevel);
+  /** Last round started by a pilot, for the start cooldown. */
+  function lastManualRound(state) {
+    return [state.current, ...state.history].find((vote) => vote?.kind === 'manual') || null;
+  }
+
+  function startCooldownUntil(state) {
+    const last = lastManualRound(state);
+    if (!last) return 0;
+    const from = last.closedAt || last.createdAt || 0;
+    return from + VOTE_RULES.cooldownMs;
+  }
+
+  function openRound(state, focus, { conquered = null, startedBy = null } = {}) {
+    if (state.current) state.history.unshift(state.current);
+    const now = Date.now();
+    const vote = {
+      id: `vote_${now}_${crypto.randomBytes(3).toString('hex')}`,
+      kind: startedBy ? 'manual' : 'auto',
+      status: 'open',
+      conquered: conquered || null,
+      startedBy: startedBy || null,
+      // Region active when the round opened: if it changes in DCS meanwhile, the round is moot.
+      activeTarget: focus.target || null,
+      activeFrom: focus.from || null,
+      options: candidateOptions(focus),
+      createdAt: now,
+      endsAt: now + VOTE_RULES.durationMs,
+      extensions: 0,
+      ballots: {},
+    };
+    state.current = vote;
+    writeVotes(state);
+    deps.emit('hidc:campaign-updated', { reason: 'vote-open' });
+    let headline = '**Votazione prossima regione aperta.**';
+    if (conquered) headline = `**${regionLabel(conquered)} conquistata!** Si vota la prossima regione.`;
+    else if (startedBy) headline = `**${startedBy.name}** ha avviato una votazione per cambiare la regione attiva${focus.target ? ` (ora ${regionLabel(focus.target)})` : ''}.`;
+    announce([
+      headline,
+      `Scegli la regione da attaccare e la regione BLUE da cui partire (${vote.options.length} regioni attaccabili).`,
+      `Chiude il <t:${Math.floor(vote.endsAt / 1000)}:f>.`,
+      siteUrl ? `Vota sulla mappa: ${siteUrl}` : '',
+    ].filter(Boolean).join('\n'));
+    return vote;
+  }
+
+  function startVote(user) {
+    requirePilot(user, VOTE_RULES.minStartLevel, 'avviare una votazione');
     const state = readVotes();
     if (state.current && (state.current.status === 'open' || state.current.status === 'passed')) {
       const error = new Error('C\'e\' gia\' una votazione in corso.');
       error.status = 409;
       throw error;
     }
-    const lastClosed = state.history[0];
-    if (lastClosed && lastClosed.status === 'rejected' && Date.now() - (lastClosed.closedAt || 0) < VOTE_RULES.cooldownMs) {
-      const error = new Error('Attendi prima di proporre una nuova votazione.');
+    const until = startCooldownUntil(state);
+    if (Date.now() < until) {
+      const error = new Error(`Una nuova votazione si puo' avviare tra ${Math.ceil((until - Date.now()) / 60000)} minuti.`);
       error.status = 429;
       throw error;
     }
-
     const focus = readFocus();
     if (!focus.available) {
       const error = new Error('Stato campagna non disponibile.');
       error.status = 503;
       throw error;
     }
-    if (focus.target === target && focus.from === from) {
-      const error = new Error('Questa e\' gia\' la regione attiva.');
-      error.status = 400;
+    if (focus.candidates.length === 0) {
+      const error = new Error('Nessuna regione attaccabile al momento.');
+      error.status = 409;
       throw error;
     }
-    const candidate = focus.candidates.find((entry) => entry.target === target);
-    if (!candidate || !candidate.froms.includes(from)) {
-      const error = new Error(`${regionLabel(target)} non e' attaccabile da ${regionLabel(from)}.`);
-      error.status = 400;
-      throw error;
-    }
-
-    if (state.current) state.history.unshift(state.current);
-    const now = Date.now();
-    const vote = {
-      id: `vote_${now}_${crypto.randomBytes(3).toString('hex')}`,
-      target,
-      from,
-      status: 'open',
-      proposedBy: { id: user.id, name: user.globalName || user.username || user.id },
-      createdAt: now,
-      endsAt: now + VOTE_RULES.durationMs,
-      ballots: { [user.id]: { choice: 'yes', at: now } },
-    };
-    state.current = vote;
-    writeVotes(state);
-    deps.emit('hidc:campaign-updated', { reason: 'vote-open' });
-    announce([
-      `**Votazione regione attiva** proposta da ${vote.proposedBy.name}`,
-      `Attaccare **${regionLabel(target)}** partendo da **${regionLabel(from)}**.`,
-      `Chiude il <t:${Math.floor(vote.endsAt / 1000)}:f>. Servono almeno ${VOTE_RULES.minVotes} voti.`,
-      siteUrl ? `Vota sul sito: ${siteUrl}` : '',
-    ].filter(Boolean).join('\n'));
-    return vote;
+    return openRound(state, focus, { startedBy: { id: user.id, name: user.globalName || user.username || user.id } });
   }
 
-  function castBallot(user, voteId, choice) {
-    if (choice !== 'yes' && choice !== 'no') {
-      const error = new Error('Voto non valido.');
-      error.status = 400;
-      throw error;
-    }
-    requirePilot(user, VOTE_RULES.minVoterLevel);
+  function castBallot(user, voteId, target, from) {
+    requirePilot(user, VOTE_RULES.minVoterLevel, 'votare');
     const state = readVotes();
     const vote = state.current;
     if (!vote || vote.id !== voteId || vote.status !== 'open') {
@@ -627,8 +694,19 @@ export function createHidcCampaign(deps) {
       error.status = 409;
       throw error;
     }
+    const option = (vote.options || []).find((entry) => entry.target === target);
+    if (!option) {
+      const error = new Error(`${regionLabel(target)} non e' tra le regioni attaccabili.`);
+      error.status = 400;
+      throw error;
+    }
+    if (!option.froms.includes(from)) {
+      const error = new Error(`${regionLabel(target)} non e' attaccabile da ${regionLabel(from)}.`);
+      error.status = 400;
+      throw error;
+    }
     vote.ballots = vote.ballots || {};
-    vote.ballots[user.id] = { choice, at: Date.now() };
+    vote.ballots[user.id] = { target, from, at: Date.now(), name: user.globalName || user.username || user.id };
     writeVotes(state);
     deps.emit('hidc:campaign-updated', { reason: 'ballot' });
     return vote;
@@ -652,8 +730,8 @@ export function createHidcCampaign(deps) {
         target: vote.target,
         from: vote.from,
         vote_id: vote.id,
-        requested_by: vote.proposedBy?.name || '',
-        requested_by_id: vote.proposedBy?.id || '',
+        requested_by: vote.startedBy?.name ? `Votazione avviata da ${vote.startedBy.name}` : 'Votazione sito',
+        requested_by_id: vote.startedBy?.id || '',
         ts: Date.now(),
       });
     }
@@ -662,39 +740,78 @@ export function createHidcCampaign(deps) {
   function tickVotes() {
     try {
       const state = readVotes();
-      const vote = state.current;
-      if (!vote) return;
+      const focus = readFocus();
       const now = Date.now();
 
-      if (vote.status === 'open' && now >= vote.endsAt) {
-        const outcome = voteOutcome(vote);
-        if (outcome.passed) {
-          vote.status = 'passed';
-          vote.passedAt = now;
-          vote.resultMessage = `Approvata ${outcome.yes}-${outcome.no}: in attesa di DCS.`;
-          enqueueFocusCommand(vote);
+      // Remember the active region, to name it when it gets conquered.
+      if (focus.available && focus.target && state.lastFocusTarget !== focus.target) {
+        state.lastFocusTarget = focus.target;
+        writeVotes(state);
+      }
+
+      const vote = state.current;
+
+      // ---- open round
+      if (vote?.status === 'open') {
+        if (focus.available && (focus.target || null) !== (vote.activeTarget || null)) {
+          // The active region changed in DCS meanwhile (conquered, or picked by an admin): the
+          // options are stale. A conquest opens a fresh automatic round on the next tick.
+          const reason = focus.target
+            ? `Annullata: in DCS e' ora attiva ${regionLabel(focus.target)}.`
+            : `Annullata: ${regionLabel(vote.activeTarget)} non e' piu' attiva.`;
+          closeVote(state, 'cancelled', reason);
           writeVotes(state);
-          announce(`**Votazione approvata** (${outcome.yes} si / ${outcome.no} no): ${regionLabel(vote.target)} da ${regionLabel(vote.from)}. Verra' applicata al server.`);
-        } else {
-          const reason = outcome.total < VOTE_RULES.minVotes
-            ? `Respinta: ${outcome.total}/${VOTE_RULES.minVotes} voti minimi.`
-            : `Respinta ${outcome.yes}-${outcome.no}.`;
-          closeVote(state, 'rejected', reason);
-          writeVotes(state);
-          announce(`**Votazione respinta**: ${regionLabel(vote.target)}. ${reason}`);
+          deps.emit('hidc:campaign-updated', { reason: 'vote-cancelled' });
+          return;
         }
+        if (now < vote.endsAt) return;
+        const result = voteWinner(vote);
+        // A round is valid only with at least minVotes ballots.
+        if (!result.target || !result.from || result.total < VOTE_RULES.minVotes) {
+          const short = `${result.total}/${VOTE_RULES.minVotes} voti minimi`;
+          if (vote.kind === 'manual') {
+            // Not enough pilots wanted the change: keep the current region.
+            closeVote(state, 'rejected', `Non valida (${short}): la regione attiva resta invariata.`);
+            writeVotes(state);
+            announce(`**Votazione non valida** (${short}): la regione attiva resta invariata.`);
+            deps.emit('hidc:campaign-updated', { reason: 'vote-closed' });
+            return;
+          }
+          // After a conquest the campaign needs a region: keep the round open until it is valid.
+          vote.endsAt = now + VOTE_RULES.durationMs;
+          vote.extensions = (vote.extensions || 0) + 1;
+          writeVotes(state);
+          if (vote.extensions === 1) announce(`**Votazione prossima regione prorogata**: ${short}.`);
+          deps.emit('hidc:campaign-updated', { reason: 'vote-extended' });
+          return;
+        }
+        const targetVotes = result.targets[result.target].votes;
+        vote.target = result.target;
+        vote.from = result.from;
+        if (result.target === vote.activeTarget && result.from === vote.activeFrom) {
+          closeVote(state, 'applied', `Confermata ${regionLabel(result.target)} da ${regionLabel(result.from)} (${targetVotes}/${result.total} voti).`);
+          writeVotes(state);
+          announce(`**Votazione chiusa**: resta attiva **${regionLabel(result.target)}** da **${regionLabel(result.from)}** (${targetVotes} voti su ${result.total}).`);
+          deps.emit('hidc:campaign-updated', { reason: 'vote-closed' });
+          return;
+        }
+        vote.status = 'passed';
+        vote.passedAt = now;
+        vote.resultMessage = `${regionLabel(result.target)} da ${regionLabel(result.from)} (${targetVotes}/${result.total} voti): in attesa di DCS.`;
+        enqueueFocusCommand(vote);
+        writeVotes(state);
+        announce(`**Votazione chiusa**: si attacca **${regionLabel(result.target)}** partendo da **${regionLabel(result.from)}** (${targetVotes} voti su ${result.total}).`);
         deps.emit('hidc:campaign-updated', { reason: 'vote-closed' });
         return;
       }
 
-      if (vote.status === 'passed') {
+      // ---- passed round, waiting for DCS
+      if (vote?.status === 'passed') {
         const result = vote.commandId ? deps.getWebCommandResult(vote.commandId) : null;
         if (result) {
-          if (result.ok) {
-            closeVote(state, 'applied', result.message || 'Applicata in DCS.');
-          } else {
-            closeVote(state, 'failed', `DCS ha rifiutato: ${result.message || 'errore'}`);
-          }
+          closeVote(state, result.ok ? 'applied' : 'failed', result.ok
+            ? (result.message || 'Applicata in DCS.')
+            : `DCS ha rifiutato: ${result.message || 'errore'}`);
           writeVotes(state);
           deps.emit('hidc:campaign-updated', { reason: 'vote-applied' });
           return;
@@ -705,10 +822,21 @@ export function createHidcCampaign(deps) {
           deps.emit('hidc:campaign-updated', { reason: 'vote-expired' });
           return;
         }
-        // La coda comandi ha un TTL: ri-accoda finche' DCS non risponde (DBRIDGE e' idempotente per id).
+        // The command queue has a TTL: re-enqueue until DCS answers (DBRIDGE is idempotent per id).
         enqueueFocusCommand(vote);
         writeVotes(state);
+        return;
       }
+
+      // ---- no round: open one by itself when DCS has no active region and offers candidates
+      if (!focus.available || focus.target || focus.candidates.length === 0) return;
+      const last = state.history[0];
+      if (last?.status === 'failed' && now - (last.closedAt || 0) < VOTE_RULES.retryMs) return;
+      const conquered = state.lastFocusTarget && readRegionStatus()[state.lastFocusTarget] === 'blue'
+        ? state.lastFocusTarget
+        : null;
+      state.lastFocusTarget = null;
+      openRound(state, focus, { conquered });
     } catch (error) {
       console.error('HIDC vote tick failed:', error.message);
     }
@@ -721,24 +849,34 @@ export function createHidcCampaign(deps) {
     const votes = readVotes();
     const pilot = user?.id ? pilotForUser(user.id) : null;
     const level = pilot?.level?.level || 0;
-    const voteOpen = votes.current?.status === 'open' || votes.current?.status === 'passed';
+    const linked = Boolean(pilot?.link);
+    const bypass = hasLevelBypass(user?.id);
+    const startLevelOk = level >= VOTE_RULES.minStartLevel || bypass;
+    const voteLevelOk = level >= VOTE_RULES.minVoterLevel || bypass;
+    const roundActive = votes.current?.status === 'open' || votes.current?.status === 'passed';
+    const cooldownUntil = startCooldownUntil(votes);
     return {
       focus,
       regionStatus: readRegionStatus(),
       vote: publicVote(votes.current, user?.id),
       lastVote: publicVote(votes.history[0], user?.id),
       rules: {
-        minProposerLevel: VOTE_RULES.minProposerLevel,
+        minStartLevel: VOTE_RULES.minStartLevel,
         minVoterLevel: VOTE_RULES.minVoterLevel,
-        minVotes: VOTE_RULES.minVotes,
         durationMin: Math.round(VOTE_RULES.durationMs / 60000),
+        cooldownMin: Math.round(VOTE_RULES.cooldownMs / 60000),
+        minVotes: VOTE_RULES.minVotes,
       },
       me: user?.id
         ? {
-          linked: Boolean(pilot?.link),
+          linked,
           level,
-          canPropose: Boolean(pilot?.link) && level >= VOTE_RULES.minProposerLevel && !voteOpen && focus.available,
-          canVote: Boolean(pilot?.link) && level >= VOTE_RULES.minVoterLevel && votes.current?.status === 'open',
+          startLevelOk,
+          voteLevelOk,
+          startCooldownUntil: cooldownUntil > Date.now() ? cooldownUntil : null,
+          canStart: linked && startLevelOk && !roundActive && focus.available
+            && focus.candidates.length > 0 && Date.now() >= cooldownUntil,
+          canVote: linked && voteLevelOk && votes.current?.status === 'open',
         }
         : null,
     };
@@ -758,7 +896,7 @@ export function createHidcCampaign(deps) {
       combat: pilot.combat || null,
       cargo: pilot.link ? cargoForUcids(ucids) : null,
       botAvailable: Boolean(botToken) && !serverBot,
-      minProposerLevel: VOTE_RULES.minProposerLevel,
+      minStartLevel: VOTE_RULES.minStartLevel,
     };
   }
 
@@ -859,17 +997,12 @@ export function createHidcCampaign(deps) {
       res.json(getCampaignState(req.session?.user || null));
     });
 
+    // A pilot of level >= minStartLevel starts a round (change of active region).
     app.post('/api/hidc/campaign/votes', (req, res) => {
       const user = requireUser(req, res);
       if (!user) return;
-      const target = sanitizeText(req.body?.target, 16);
-      const from = sanitizeText(req.body?.from, 16);
-      if (!REGION_PATTERN.test(target) || !REGION_PATTERN.test(from)) {
-        res.status(400).json({ error: 'Regione non valida.' });
-        return;
-      }
       try {
-        proposeVote(user, target, from);
+        startVote(user);
         res.json(getCampaignState(user));
       } catch (error) {
         sendError(res, error);
@@ -880,7 +1013,13 @@ export function createHidcCampaign(deps) {
       const user = requireUser(req, res);
       if (!user) return;
       try {
-        castBallot(user, sanitizeText(req.params.voteId, 80), sanitizeText(req.body?.choice, 8));
+        const target = sanitizeText(req.body?.target, 16);
+        const from = sanitizeText(req.body?.from, 16);
+        if (!REGION_PATTERN.test(target) || !REGION_PATTERN.test(from)) {
+          res.status(400).json({ error: 'Regione non valida.' });
+          return;
+        }
+        castBallot(user, sanitizeText(req.params.voteId, 80), target, from);
         res.json(getCampaignState(user));
       } catch (error) {
         sendError(res, error);
@@ -899,7 +1038,7 @@ export function createHidcCampaign(deps) {
     registerRoutes,
     tick,
     // test hooks
-    _internals: { botThresholds, botXp, proposeVote, castBallot, tickVotes, syncLinkRequests, startLink, getCampaignState, getPilotProfile, levelInfo },
+    _internals: { botThresholds, botXp, startVote, castBallot, tickVotes, voteWinner, syncLinkRequests, startLink, getCampaignState, getPilotProfile, levelInfo },
   };
 }
 

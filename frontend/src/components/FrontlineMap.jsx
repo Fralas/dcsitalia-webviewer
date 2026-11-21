@@ -5140,7 +5140,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   // Region borders / active region vote exist only for the Syria DCORE campaign.
   const isSyriaCampaign = tacticalMap?.campaignId === 'hidc-modern-syria';
   const { campaign: hidcCampaign, setCampaign: setHidcCampaign } = useHidcCampaign();
-  // Front line debug tool (?hidcDebug=1): client-side override of active/base region and zone statuses.
+  // Front line debug tool (hidden; only with ?hidcDebug=1 in the URL): client-side override of active/base region and zone statuses.
   const [hidcDebugEnabled] = useState(readHidcDebugFlag);
   const [hidcDebug, setHidcDebug] = useState(null);
   const [hidcFrontStats, setHidcFrontStats] = useState(null);

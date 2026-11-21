@@ -27,15 +27,20 @@ export default function CampaignBrief() {
   const blue = regions.filter((s) => s === 'blue').length;
   const bluePct = regions.length ? Math.round((blue / regions.length) * 100) : 0;
 
-  let voteLine = 'Nessuna votazione in corso.';
+  let voteLine = focus.target
+    ? `Alla conquista di Regione ${regionNumber(focus.target)} la votazione parte da sola.`
+    : 'Nessuna votazione in corso.';
   if (vote) {
-    voteLine = `Votazione aperta su Regione ${regionNumber(vote.target)}: ${vote.yes} sì, ${vote.no} no, chiude tra ${formatRemaining(vote.endsAt)}.`;
+    voteLine = `Si vota la prossima regione: ${vote.total}/${rules.minVotes ?? 3} voti minimi, chiude tra ${formatRemaining(vote.endsAt)}.`;
   }
   let actionLine = 'Collega l\'account DCS per partecipare.';
   if (me?.linked) {
-    if (vote) actionLine = me.canVote ? 'Puoi votare dalla mappa.' : 'Il tuo voto è registrato.';
-    else if (me.canPropose) actionLine = 'Puoi proporre il cambio regione dalla mappa.';
-    else actionLine = `Potrai proporre un cambio dal livello ${rules.minProposerLevel ?? 5}.`;
+    if (vote) {
+      if (!me.voteLevelOk) actionLine = `Potrai votare dal livello ${rules.minVoterLevel ?? 0}.`;
+      else actionLine = vote.myBallot ? 'Il tuo voto è registrato: puoi cambiarlo dalla mappa.' : 'Vota dalla mappa.';
+    } else if (me.canStart) actionLine = 'Puoi avviare una votazione per cambiare regione dalla mappa.';
+    else if (!me.startLevelOk) actionLine = `Dal livello ${rules.minStartLevel ?? 5} potrai avviare una votazione.`;
+    else actionLine = 'Voterai dalla mappa.';
   }
 
   return (

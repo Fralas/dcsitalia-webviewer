@@ -1,56 +1,76 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, Loader2, ThumbsDown, ThumbsUp, Vote } from 'lucide-react';
-import { castHidcRegionBallot, proposeHidcRegionVote } from '../../services/api';
+import { Check, ChevronDown, ChevronUp, Loader2, Play, Vote } from 'lucide-react';
+import { castHidcRegionBallot, startHidcRegionVote } from '../../services/api';
 import './HidcRegionVotePanel.css';
 
 const COPY = {
   it: {
     kicker: 'Campagna',
     title: 'Regione attiva',
-    none: 'Nessuna regione attiva',
+    voteKicker: 'Votazione in corso',
+    voteTitle: 'Prossima regione',
+    none: 'Nessuna regione attiva.',
     from: 'da',
-    vote: 'Votazione in corso',
-    passed: 'Approvata, in attesa di DCS',
-    yes: 'A favore',
-    no: 'Contro',
-    endsIn: 'Chiude tra',
-    minVotes: 'voti minimi',
-    propose: 'Proponi cambio regione',
+    conquered: (r) => `${r} conquistata! Scegli dove attaccare ora.`,
+    pick: 'Scegli la regione da attaccare e da dove partire.',
+    startedBy: (n) => `Avviata da ${n} per cambiare la regione attiva.`,
+    current: 'Attuale',
+    start: 'Avvia votazione',
+    startHint: 'Proponi di cambiare la regione attiva: tutti i piloti votano dove attaccare e da dove partire.',
+    startLevel: (min, lvl) => `Dal livello ${min} puoi avviare una votazione (tu: ${lvl}).`,
+    cooldown: (m) => `Nuova votazione avviabile tra ${m} min.`,
     target: 'Regione da attaccare',
-    base: 'Regione BLUE di partenza',
-    submit: 'Proponi votazione',
+    base: 'Attacca da',
+    votes: (n) => (n === 1 ? '1 voto' : `${n} voti`),
+    leading: 'In testa',
+    submit: 'Vota',
+    change: 'Cambia voto',
+    myBallot: 'Il tuo voto',
+    endsIn: 'Chiude tra',
+    quorum: (n, min) => `${n}/${min} voti minimi`,
+    extended: 'Prorogata: non c\'erano ancora abbastanza voti.',
+    passed: (t, f) => `Si attacca ${t} da ${f}: in attesa del server DCS.`,
+    next: (r) => `Alla conquista di ${r} la votazione parte da sola.`,
     login: 'Accedi con Discord per votare.',
     link: 'Collega il tuo account DCS dal profilo per votare.',
-    level: (min, lvl) => `Serve il livello ${min} per proporre (tu: ${lvl}).`,
-    noCandidates: 'Nessuna regione attaccabile al momento.',
+    level: (min, lvl) => `Serve il livello ${min} per votare (tu: ${lvl}).`,
     unavailable: 'Stato campagna non disponibile.',
     last: 'Ultima votazione',
-    proposedBy: 'proposta da',
-    status: { applied: 'applicata', rejected: 'respinta', failed: 'fallita', cancelled: 'annullata' },
+    status: { applied: 'applicata', failed: 'non applicata', cancelled: 'annullata', rejected: 'non valida', passed: 'in attesa' },
   },
   en: {
     kicker: 'Campaign',
     title: 'Active region',
-    none: 'No active region',
+    voteKicker: 'Vote in progress',
+    voteTitle: 'Next region',
+    none: 'No active region.',
     from: 'from',
-    vote: 'Vote in progress',
-    passed: 'Passed, waiting for DCS',
-    yes: 'For',
-    no: 'Against',
-    endsIn: 'Closes in',
-    minVotes: 'minimum votes',
-    propose: 'Propose region change',
+    conquered: (r) => `${r} captured! Choose where to attack next.`,
+    pick: 'Pick the region to attack and where to attack from.',
+    startedBy: (n) => `Started by ${n} to change the active region.`,
+    current: 'Current',
+    start: 'Start vote',
+    startHint: 'Propose a change of active region: every pilot votes where to attack and where from.',
+    startLevel: (min, lvl) => `From level ${min} you can start a vote (you: ${lvl}).`,
+    cooldown: (m) => `A new vote can be started in ${m} min.`,
     target: 'Region to attack',
-    base: 'BLUE staging region',
-    submit: 'Start vote',
+    base: 'Attack from',
+    votes: (n) => (n === 1 ? '1 vote' : `${n} votes`),
+    leading: 'Leading',
+    submit: 'Vote',
+    change: 'Change vote',
+    myBallot: 'Your vote',
+    endsIn: 'Closes in',
+    quorum: (n, min) => `${n}/${min} minimum votes`,
+    extended: 'Extended: not enough votes yet.',
+    passed: (t, f) => `Attacking ${t} from ${f}: waiting for the DCS server.`,
+    next: (r) => `When ${r} is captured the vote opens by itself.`,
     login: 'Sign in with Discord to vote.',
     link: 'Link your DCS account from your profile to vote.',
-    level: (min, lvl) => `Level ${min} required to propose (you: ${lvl}).`,
-    noCandidates: 'No attackable region right now.',
+    level: (min, lvl) => `Level ${min} required to vote (you: ${lvl}).`,
     unavailable: 'Campaign state unavailable.',
     last: 'Last vote',
-    proposedBy: 'proposed by',
-    status: { applied: 'applied', rejected: 'rejected', failed: 'failed', cancelled: 'cancelled' },
+    status: { applied: 'applied', failed: 'not applied', cancelled: 'cancelled', rejected: 'not valid', passed: 'pending' },
   },
 };
 
@@ -67,12 +87,17 @@ function formatRemaining(ms) {
   return hours > 0 ? `${hours}h ${String(minutes).padStart(2, '0')}m` : `${minutes}m`;
 }
 
+/**
+ * HIDC region vote. A round opens by itself after a conquest, or a pilot of level >= 5 starts one to
+ * change the active region. Every pilot picks the RED region to attack and the BLUE region to
+ * attack from, and can change the ballot until the round closes.
+ */
 export default function HidcRegionVotePanel({ campaign, onCampaignChange, language = 'it' }) {
   const t = COPY[language] || COPY.it;
   const [collapsed, setCollapsed] = useState(false);
   const [target, setTarget] = useState('');
   const [from, setFrom] = useState('');
-  const [busy, setBusy] = useState('');
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [now, setNow] = useState(() => Date.now());
 
@@ -85,154 +110,201 @@ export default function HidcRegionVotePanel({ campaign, onCampaignChange, langua
   const vote = campaign?.vote;
   const me = campaign?.me;
   const rules = campaign?.rules;
-  const candidates = useMemo(() => {
-    const list = Array.isArray(focus?.candidates) ? focus.candidates : [];
-    return list.filter((entry) => !(entry.target === focus?.target && entry.froms.length === 1 && entry.froms[0] === focus?.from));
-  }, [focus]);
-  const selectedCandidate = candidates.find((entry) => entry.target === target) || null;
+  const open = vote?.status === 'open';
+  const options = useMemo(() => (open ? vote.options || [] : []), [open, vote]);
+  const myBallot = vote?.myBallot || null;
+  const minVotes = rules?.minVotes ?? 3;
 
+  // Start from the pilot's own ballot; reset when a new round opens.
   useEffect(() => {
-    if (!selectedCandidate) {
-      setFrom('');
-    } else if (!selectedCandidate.froms.includes(from)) {
-      setFrom(selectedCandidate.froms[0] || '');
-    }
-  }, [selectedCandidate, from]);
+    setTarget(myBallot?.target || '');
+    setFrom(myBallot?.from || '');
+    setError('');
+  }, [vote?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const run = async (key, fn) => {
-    setBusy(key);
+  const selected = options.find((option) => option.target === target) || null;
+  useEffect(() => {
+    if (!selected) {
+      if (from) setFrom('');
+    } else if (!selected.froms.some((f) => f.id === from)) {
+      setFrom(selected.froms.length === 1 ? selected.froms[0].id : '');
+    }
+  }, [selected, from]);
+
+  const maxVotes = Math.max(1, ...options.map((option) => option.votes));
+  const leader = options.reduce((top, option) => (option.votes > (top?.votes || 0) ? option : top), null);
+  const unchanged = myBallot && myBallot.target === target && myBallot.from === from;
+
+  let blocked = '';
+  if (!me) blocked = t.login;
+  else if (!me.linked) blocked = t.link;
+  else if (!me.voteLevelOk) blocked = t.level(rules?.minVoterLevel ?? 0, me.level);
+
+  const startRound = async () => {
+    setBusy(true);
     setError('');
     try {
-      const next = await fn();
+      const next = await startHidcRegionVote();
       if (next) onCampaignChange?.(next);
-      return true;
     } catch (err) {
       setError(err?.message || 'Errore');
-      return false;
     } finally {
-      setBusy('');
+      setBusy(false);
     }
   };
 
-  const handlePropose = (event) => {
-    event.preventDefault();
-    if (!target || !from) return;
-    run('propose', () => proposeHidcRegionVote(target, from)).then((ok) => { if (ok) setTarget(''); });
+  let startBlocked = '';
+  if (!me) startBlocked = t.login;
+  else if (!me.linked) startBlocked = t.link;
+  else if (!me.startLevelOk) startBlocked = t.startLevel(rules?.minStartLevel ?? 5, me.level);
+  else if (me.startCooldownUntil) startBlocked = t.cooldown(Math.max(1, Math.ceil((me.startCooldownUntil - now) / 60000)));
+
+  const submit = async () => {
+    if (!target || !from || !vote) return;
+    setBusy(true);
+    setError('');
+    try {
+      const next = await castHidcRegionBallot(vote.id, target, from);
+      if (next) onCampaignChange?.(next);
+    } catch (err) {
+      setError(err?.message || 'Errore');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const voteOpen = vote?.status === 'open';
-  const yesPct = vote?.total ? Math.round((vote.yes / vote.total) * 100) : 0;
-
-  let proposeHint = '';
-  if (!me) proposeHint = t.login;
-  else if (!me.linked) proposeHint = t.link;
-  else if (me.level < (rules?.minProposerLevel || 5)) proposeHint = t.level(rules?.minProposerLevel || 5, me.level);
-  else if (candidates.length === 0) proposeHint = t.noCandidates;
+  const last = campaign?.lastVote;
 
   return (
-    <section className={`hidc-vote${collapsed ? ' is-collapsed' : ''}`} aria-label={t.title}>
+    <section className={`hidc-vote${collapsed ? ' is-collapsed' : ''}${open ? ' is-voting' : ''}`} aria-label={open ? t.voteTitle : t.title}>
       <button type="button" className="hidc-vote__head" onClick={() => setCollapsed((value) => !value)}>
         <span className="hidc-vote__head-copy">
-          <span className="hidc-vote__kicker">{t.kicker}</span>
+          <span className="hidc-vote__kicker">{open ? t.voteKicker : t.kicker}</span>
           <span className="hidc-vote__title">
-            {focus?.target ? regionLabel(focus.target) : t.title}
-            {focus?.target && focus?.from && (
+            {open && t.voteTitle}
+            {!open && (focus?.target ? regionLabel(focus.target) : t.title)}
+            {!open && focus?.target && focus?.from && (
               <span className="hidc-vote__title-from"> {t.from} {regionLabel(focus.from)}</span>
             )}
           </span>
         </span>
-        {(voteOpen || vote?.status === 'passed') && <span className="hidc-vote__badge"><Vote className="h-3 w-3" /></span>}
+        {open && <span className="hidc-vote__time">{formatRemaining(vote.endsAt - now)}</span>}
+        {(open || vote?.status === 'passed') && <span className="hidc-vote__badge"><Vote className="h-3 w-3" /></span>}
         {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
       </button>
 
       {!collapsed && (
         <div className="hidc-vote__body">
           {!campaign && <p className="hidc-vote__msg">{t.unavailable}</p>}
-          {campaign && !focus?.target && <p className="hidc-vote__msg">{t.none}</p>}
 
-          {vote && (vote.status === 'open' || vote.status === 'passed') && (
+          {open && (
             <div className="hidc-vote__ballot">
-              <div className="hidc-vote__row">
-                <span className="hidc-vote__label">{vote.status === 'open' ? t.vote : t.passed}</span>
-                {vote.status === 'open' && (
-                  <span className="hidc-vote__time">{t.endsIn} {formatRemaining(vote.endsAt - now)}</span>
-                )}
-              </div>
-              <p className="hidc-vote__proposal">
-                <strong>{regionLabel(vote.target)}</strong> {t.from} {regionLabel(vote.from)}
-                <span className="hidc-vote__by"> · {t.proposedBy} {vote.proposedBy?.name || '—'}</span>
+              <p className="hidc-vote__msg">
+                {vote.conquered && t.conquered(regionLabel(vote.conquered))}
+                {!vote.conquered && vote.startedBy && t.startedBy(vote.startedBy.name)}
+                {!vote.conquered && !vote.startedBy && t.pick}
+                {vote.extensions > 0 && <> {t.extended}</>}
               </p>
-              <div className="hidc-vote__bar" role="img" aria-label={`${vote.yes} / ${vote.no}`}>
-                <span className="hidc-vote__bar-yes" style={{ width: `${yesPct}%` }} />
-              </div>
-              <div className="hidc-vote__row hidc-vote__counts">
-                <span>{t.yes} {vote.yes}</span>
-                <span>{vote.total}/{rules?.minVotes ?? '—'} {t.minVotes}</span>
-                <span>{t.no} {vote.no}</span>
-              </div>
-              {voteOpen && me?.canVote && (
-                <div className="hidc-vote__actions">
-                  <button
-                    type="button"
-                    className={`hidc-vote__btn hidc-vote__btn--yes${vote.myChoice === 'yes' ? ' is-active' : ''}`}
-                    disabled={Boolean(busy)}
-                    onClick={() => run('yes', () => castHidcRegionBallot(vote.id, 'yes'))}
-                  >
-                    {busy === 'yes' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ThumbsUp className="h-3.5 w-3.5" />}
-                    {t.yes}
-                  </button>
-                  <button
-                    type="button"
-                    className={`hidc-vote__btn hidc-vote__btn--no${vote.myChoice === 'no' ? ' is-active' : ''}`}
-                    disabled={Boolean(busy)}
-                    onClick={() => run('no', () => castHidcRegionBallot(vote.id, 'no'))}
-                  >
-                    {busy === 'no' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ThumbsDown className="h-3.5 w-3.5" />}
-                    {t.no}
-                  </button>
-                </div>
+
+              <span className="hidc-vote__label">{t.target}</span>
+              <ul className="hidc-vote__options">
+                {options.map((option) => {
+                  const isSel = option.target === target;
+                  return (
+                    <li key={option.target}>
+                      <button
+                        type="button"
+                        className={`hidc-vote__option${isSel ? ' is-selected' : ''}`}
+                        disabled={Boolean(blocked) || busy}
+                        aria-pressed={isSel}
+                        onClick={() => setTarget(option.target)}
+                      >
+                        <span className="hidc-vote__option-name">
+                          {regionLabel(option.target)}
+                          {vote.activeTarget === option.target && <em className="is-current">{t.current}</em>}
+                          {leader === option && option.votes > 0 && <em>{t.leading}</em>}
+                          {myBallot?.target === option.target && <Check className="h-3 w-3" aria-label={t.myBallot} />}
+                        </span>
+                        <span className="hidc-vote__option-count">{t.votes(option.votes)}</span>
+                        <span className="hidc-vote__option-bar"><i style={{ width: `${(option.votes / maxVotes) * 100}%` }} /></span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              {selected && (
+                <>
+                  <span className="hidc-vote__label">{t.base}</span>
+                  <div className="hidc-vote__chips">
+                    {selected.froms.map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        className={`hidc-vote__chip${from === f.id ? ' is-selected' : ''}`}
+                        disabled={Boolean(blocked) || busy}
+                        aria-pressed={from === f.id}
+                        onClick={() => setFrom(f.id)}
+                      >
+                        {regionLabel(f.id)}
+                        <small>{f.votes}</small>
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
-              {voteOpen && !me?.canVote && <p className="hidc-vote__msg">{me ? t.link : t.login}</p>}
+
+              {blocked ? (
+                <p className="hidc-vote__msg">{blocked}</p>
+              ) : (
+                <button
+                  type="button"
+                  className="hidc-vote__btn hidc-vote__btn--primary"
+                  disabled={!target || !from || unchanged || busy}
+                  onClick={submit}
+                >
+                  {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  {myBallot ? t.change : t.submit}
+                </button>
+              )}
+
+              <div className="hidc-vote__row hidc-vote__counts">
+                <span className={vote.total >= minVotes ? 'is-valid' : ''}>{t.quorum(vote.total, minVotes)}</span>
+                <span>{t.endsIn} {formatRemaining(vote.endsAt - now)}</span>
+              </div>
+              {myBallot && (
+                <p className="hidc-vote__last">{t.myBallot}: {regionLabel(myBallot.target)} {t.from} {regionLabel(myBallot.from)}</p>
+              )}
             </div>
           )}
 
-          {campaign && !(vote && (vote.status === 'open' || vote.status === 'passed')) && (
-            me?.canPropose && candidates.length > 0 ? (
-              <form className="hidc-vote__form" onSubmit={handlePropose}>
-                <span className="hidc-vote__label">{t.propose}</span>
-                <label className="hidc-vote__field">
-                  <span>{t.target}</span>
-                  <select value={target} onChange={(event) => setTarget(event.target.value)}>
-                    <option value="">—</option>
-                    {candidates.map((entry) => (
-                      <option key={entry.target} value={entry.target}>{regionLabel(entry.target)}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="hidc-vote__field">
-                  <span>{t.base}</span>
-                  <select value={from} onChange={(event) => setFrom(event.target.value)} disabled={!selectedCandidate}>
-                    {(selectedCandidate?.froms || []).map((regionId) => (
-                      <option key={regionId} value={regionId}>{regionLabel(regionId)}</option>
-                    ))}
-                  </select>
-                </label>
-                <button type="submit" className="hidc-vote__btn hidc-vote__btn--primary" disabled={!target || !from || Boolean(busy)}>
-                  {busy === 'propose' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  {t.submit}
-                </button>
-              </form>
-            ) : (
-              proposeHint && <p className="hidc-vote__msg">{proposeHint}</p>
-            )
+          {vote?.status === 'passed' && (
+            <p className="hidc-vote__msg">{t.passed(regionLabel(vote.target), regionLabel(vote.from))}</p>
+          )}
+
+          {campaign && !open && vote?.status !== 'passed' && (
+            <div className="hidc-vote__ballot">
+              <p className="hidc-vote__msg">{focus?.target ? t.next(regionLabel(focus.target)) : t.none}</p>
+              {me?.canStart ? (
+                <>
+                  <p className="hidc-vote__msg">{t.startHint}</p>
+                  <button type="button" className="hidc-vote__btn hidc-vote__btn--primary" disabled={busy} onClick={startRound}>
+                    {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                    {t.start}
+                  </button>
+                </>
+              ) : (
+                startBlocked && focus?.target && <p className="hidc-vote__msg">{startBlocked}</p>
+              )}
+            </div>
           )}
 
           {error && <p className="hidc-vote__msg is-warn">{error}</p>}
 
-          {campaign?.lastVote && (
+          {last && !open && (
             <p className="hidc-vote__last">
-              {t.last}: {regionLabel(campaign.lastVote.target)} · {t.status[campaign.lastVote.status] || campaign.lastVote.status}
-              {' '}({campaign.lastVote.yes}-{campaign.lastVote.no})
+              {t.last}: {last.target ? `${regionLabel(last.target)} ${t.from} ${regionLabel(last.from)}` : '—'}
+              {' · '}{t.status[last.status] || last.status}
             </p>
           )}
         </div>

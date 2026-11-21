@@ -43,10 +43,17 @@ function roleFor(regionId, campaign) {
   return 'none';
 }
 
+/** Regions highlighted for the vote: every option while a round is open, the winner while DCS applies it. */
+function voteTargets(campaign) {
+  const vote = campaign?.vote;
+  if (vote?.status === 'open') return new Set((vote.options || []).map((option) => option.target));
+  if (vote?.status === 'passed' && vote.target) return new Set([vote.target]);
+  return new Set();
+}
+
 function buildData(campaign) {
   const status = campaign?.regionStatus || {};
-  const vote = campaign?.vote;
-  const voteOpen = vote && (vote.status === 'open' || vote.status === 'passed');
+  const targets = voteTargets(campaign);
   return {
     type: 'FeatureCollection',
     features: HIDC_REGION_BORDERS.features.map((feature) => {
@@ -57,7 +64,7 @@ function buildData(campaign) {
           ...feature.properties,
           status: status[id] === 'blue' ? 'blue' : 'red',
           role: roleFor(id, campaign),
-          vote: voteOpen && vote.target === id ? 1 : 0,
+          vote: targets.has(id) ? 1 : 0,
         },
       };
     }),
@@ -181,17 +188,17 @@ function buildLabels(map, campaign) {
   const height = canvas?.clientHeight || 0;
   if (!width || !height) return [];
   const showAll = map.getZoom() >= ALL_LABELS_MIN_ZOOM;
-  const vote = campaign?.vote;
-  const voteTarget = vote && (vote.status === 'open' || vote.status === 'passed') ? vote.target : null;
+  const targets = voteTargets(campaign);
+  const passed = campaign?.vote?.status === 'passed';
 
   return HIDC_REGION_BORDERS.features.flatMap((feature) => {
     const { id, label, center } = feature.properties;
     const role = roleFor(id, campaign);
-    const isVote = voteTarget === id;
+    const isVote = targets.has(id);
     if (!showAll && role === 'none' && !isVote) return [];
     const point = map.project(center);
     if (!Number.isFinite(point?.x) || point.x < -80 || point.y < -40 || point.x > width + 80 || point.y > height + 40) return [];
-    const tag = isVote && role === 'none' ? 'In votazione' : '';
+    const tag = isVote && role === 'none' ? (passed ? 'Scelta' : 'In votazione') : '';
     return [{ id, label, tag, tone: role !== 'none' ? role : (isVote ? 'vote' : 'none'), x: point.x, y: point.y }];
   });
 }
