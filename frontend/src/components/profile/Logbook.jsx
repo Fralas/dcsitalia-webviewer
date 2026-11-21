@@ -27,7 +27,7 @@ const AIRCRAFT_NAMES = {
   'C-130J-30': 'C-130J',
 };
 
-function aircraftName(type) {
+export function aircraftName(type) {
   return AIRCRAFT_NAMES[type] || String(type || '?').replace(/_/g, ' ');
 }
 
@@ -40,8 +40,18 @@ function formatHours(sec) {
 /**
  * Right-column logbook from DCSServerBot: aircraft flown (time bars), weapons (hit rate), carrier traps.
  */
-export default function Logbook({ combat }) {
-  if (!combat) return null;
+export default function Logbook({ combat, linked = false }) {
+  if (!linked) return null;
+  if (!combat) {
+    return (
+      <section className="pf-block">
+        <div className="profile__section-head">
+          <h2 className="profile__section-title">Velivoli e armi</h2>
+        </div>
+        <p className="profile__empty">Disponibili quando il sito è collegato a DCSServerBot.</p>
+      </section>
+    );
+  }
   const aircraft = (combat.aircraft || []).filter((a) => a.sec > 0).slice(0, 6);
   const weapons = (combat.weapons || []).slice(0, 6);
   const maxSec = aircraft.reduce((m, a) => Math.max(m, a.sec), 0) || 1;

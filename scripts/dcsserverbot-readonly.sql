@@ -12,7 +12,7 @@ GRANT USAGE ON SCHEMA public TO hidc_web_ro;
 -- Only the tables the site reads. missionstats / traps exist only with the
 -- missionstats / greenieboard plugins: drop those lines if the plugin is not installed.
 GRANT SELECT ON players, missions, statistics TO hidc_web_ro;
-GRANT SELECT ON missionstats TO hidc_web_ro;
+GRANT SELECT ON missionstats, refuelingstats TO hidc_web_ro;
 GRANT SELECT ON traps TO hidc_web_ro;
 
 -- Belt and braces: every session of this role is read-only.

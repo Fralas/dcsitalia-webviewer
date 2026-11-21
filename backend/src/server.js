@@ -56,6 +56,7 @@ import * as hidcAirportLogistics from './services/hidcAirportLogistics.js';
 import { createDscoreFactionPoints } from './services/dscoreFactionPoints.js';
 import { createHidcCampaign } from './services/hidcCampaign.js';
 import { createDcsServerBot } from './services/dcsServerBot.js';
+import { createDcsServerBotMock } from './services/dcsServerBotMock.js';
 import { proxyCartoBasemapTile } from './services/cartoBasemapProxy.js';
 import {
   LIDC_EXPORT_FILES,
@@ -2307,8 +2308,12 @@ app.put('/api/profile', (req, res) => {
 
 // HIDC: link account DCS, esperienza piloti, votazioni regione attiva (services/hidcCampaign.js).
 // Con DCSSB_DATABASE_URL link e statistiche arrivano da DCSServerBot (services/dcsServerBot.js).
-const dcsServerBot = createDcsServerBot();
-if (dcsServerBot.enabled) {
+// DCSSB_MOCK=true (solo sviluppo): dati DCSServerBot finti per lavorare sulla UI del profilo.
+const dcsServerBotMock = String(process.env.DCSSB_MOCK || '').toLowerCase() === 'true' && process.env.NODE_ENV !== 'production';
+const dcsServerBot = dcsServerBotMock ? createDcsServerBotMock() : createDcsServerBot();
+if (dcsServerBotMock) {
+  console.log('DCSServerBot: MODALITA DI PROVA (DCSSB_MOCK=true), dati finti');
+} else if (dcsServerBot.enabled) {
   dcsServerBot.refresh().then((snap) => {
     console.log(snap.ok
       ? `DCSServerBot: ${Object.keys(snap.byDiscord).length} piloti collegati`

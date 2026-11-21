@@ -1359,9 +1359,13 @@
       "lat": 35.003404,
       "lon": 34.048876
     },
-    "status": "NEUTRAL",
+    "status": "RED",
     "isActive": true,
-    "tasks": []
+    "tasks": [
+      "SEAD",
+      "DEAD",
+      "CAS"
+    ]
   },
   {
     "id": "zone_126",
@@ -2144,8 +2148,8 @@
       "lat": 35.456096,
       "lon": 36.056448
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -2177,8 +2181,8 @@
       "lat": 35.66969,
       "lon": 35.790862
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {
@@ -2243,8 +2247,8 @@
       "lat": 35.837145,
       "lon": 35.839042
     },
-    "status": "NEUTRAL",
-    "isActive": true,
+    "status": "BLUE",
+    "isActive": false,
     "tasks": []
   },
   {

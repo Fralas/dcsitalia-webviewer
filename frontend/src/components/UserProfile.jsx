@@ -5,16 +5,18 @@ import { useUser } from '../contexts/UserContext';
 import * as api from '../services/api';
 import InlineError from './InlineError';
 import PatchViewer from './PatchViewer';
-import PilotHero from './profile/PilotHero';
+import PilotHero, { PilotIdentity } from './profile/PilotHero';
 import CareerLadder from './profile/CareerLadder';
 import ServiceRecord from './profile/ServiceRecord';
 import CampaignBrief from './profile/CampaignBrief';
 import XpRules from './profile/XpRules';
 import CombatRecord from './profile/CombatRecord';
 import Logbook from './profile/Logbook';
+import SupportRecord from './profile/SupportRecord';
 import { getPilotRank } from '../config/pilotRanks';
 import useHidcPilot from '../utils/useHidcPilot';
 import { loadSeenAwards, rememberAwardKeys } from '../utils/achievementSeen';
+import { ActivityCalendar, PersonalRecords, RecentSorties } from './profile/PilotHistory';
 import './UserProfile.css';
 import './profile/ProfilePage.css';
 
@@ -520,6 +522,9 @@ export default function UserProfile() {
             <span className="pf-hint">Livello 0–100</span>
           </div>
           <CareerLadder level={pilotLevel} linked={pilotLinked} />
+          <ActivityCalendar activity={pilot.profile?.combat?.activity} linked={pilotLinked} available={Boolean(pilot.profile?.combat)} />
+          <PersonalRecords records={pilot.profile?.combat?.records} cargo={pilot.profile?.cargo} linked={pilotLinked} available={Boolean(pilot.profile?.combat)} />
+          <RecentSorties sorties={pilot.profile?.combat?.sorties} linked={pilotLinked} available={Boolean(pilot.profile?.combat)} />
         </section>
 
         <section className="profile__board">
@@ -527,8 +532,15 @@ export default function UserProfile() {
             profile={pilot.profile}
             patchCount={userAchievements.length}
             boardPosition={ownPilotIndex >= 0 ? ownPilotIndex + 1 : null}
+            identity={<PilotIdentity user={user} displayName={displayName} avatarUrl={avatarUrl} pilot={pilot} />}
           />
-          <CombatRecord combat={pilot.profile?.combat} />
+          <CombatRecord combat={pilot.profile?.combat} linked={pilotLinked} />
+          <SupportRecord
+            linked={pilotLinked}
+            cargo={pilot.profile?.cargo}
+            refueling={pilot.profile?.combat?.refueling}
+            botConnected={Boolean(pilot.profile?.combat)}
+          />
 
           <div className={`profile__section-head${pilotLinked ? ' pf-after-block' : ''}`}>
             <h2 className="profile__section-title">Riconoscimenti</h2>
@@ -911,7 +923,7 @@ export default function UserProfile() {
             )
           )}
 
-          <Logbook combat={pilot.profile?.combat} />
+          <Logbook combat={pilot.profile?.combat} linked={pilotLinked} />
           <XpRules rules={pilot.profile?.rules} minProposerLevel={pilot.profile?.minProposerLevel} />
         </aside>
       </div>

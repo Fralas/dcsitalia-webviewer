@@ -58,42 +58,40 @@ function LinkBlock({ pilot }) {
   );
 }
 
-/**
- * Profile header: identity only. Rank and flight figures live in the Stato di servizio block;
- * the DCS link flow shows here until the account is linked.
- */
-export default function PilotHero({ user, displayName, avatarUrl, pilot }) {
-  const { profile, loading, busy, message, unlink } = pilot;
-  const linked = Boolean(profile?.linked);
-  const stats = profile?.stats || null;
-
+function Avatar({ avatarUrl, small = false }) {
   return (
-    <header className={`pf-head${linked ? ' is-linked' : ''}`}>
-      <div className="pf-head__id">
-        <div className="profile__avatar">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt="" />
-          ) : (
-            <div className="profile__avatar-fallback">
-              <UserIcon className="h-7 w-7" />
-            </div>
-          )}
+    <div className={`profile__avatar${small ? ' profile__avatar--sm' : ''}`}>
+      {avatarUrl ? (
+        <img src={avatarUrl} alt="" />
+      ) : (
+        <div className="profile__avatar-fallback">
+          <UserIcon className={small ? 'h-5 w-5' : 'h-7 w-7'} />
         </div>
-        <div className="profile__id-copy">
-          <p className="profile__kicker">Profilo</p>
-          <h1 className="profile__name">{displayName}</h1>
-          <p className="profile__meta">
-            {user.username ? `@${user.username}` : user.id}
-            {linked && (stats?.name || profile?.link?.name) ? ` · DCS: ${stats?.name || profile?.link?.name}` : ''}
-          </p>
-        </div>
-      </div>
+      )}
+    </div>
+  );
+}
 
-      {loading && !profile ? (
-        <div className="profile__status">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Caricamento
-        </div>
-      ) : linked ? (profile?.linkSource === 'dcsserverbot' ? null : (
+function metaLine(user, profile) {
+  const handle = user.username ? `@${user.username}` : user.id;
+  const dcsName = profile?.stats?.name || profile?.link?.name;
+  return profile?.linked && dcsName ? `${handle} · DCS: ${dcsName}` : handle;
+}
+
+/**
+ * Compact identity for linked pilots: it sits in the Stato di servizio heading instead of a
+ * full-width header, so career, combat and history start at the top of the page.
+ */
+export function PilotIdentity({ user, displayName, avatarUrl, pilot }) {
+  const { profile, busy, unlink } = pilot;
+  return (
+    <div className="pf-ident">
+      <Avatar avatarUrl={avatarUrl} small />
+      <div className="pf-ident__copy">
+        <h1 className="pf-ident__name">{displayName}</h1>
+        <p className="pf-ident__meta">{metaLine(user, profile)}</p>
+      </div>
+      {profile?.linkSource !== 'dcsserverbot' && (
         <button
           type="button"
           className="pf-unlink"
@@ -104,17 +102,49 @@ export default function PilotHero({ user, displayName, avatarUrl, pilot }) {
         >
           <Unlink className="h-3 w-3" /> Scollega DCS
         </button>
-      )) : (
+      )}
+    </div>
+  );
+}
+
+/**
+ * Full-width header only until the DCS account is linked (identity + link flow).
+ * Linked pilots get PilotIdentity inside Stato di servizio; here only a status message, if any.
+ */
+export default function PilotHero({ user, displayName, avatarUrl, pilot }) {
+  const { profile, loading, message } = pilot;
+  const linked = Boolean(profile?.linked);
+  const note = message.text || (linked && profile && !profile.statsAvailable
+    ? 'Statistiche DCS non ancora disponibili: si aggiornano mentre voli sul server.'
+    : '');
+  const toneClass = message.tone ? ` is-${message.tone}` : '';
+
+  if (linked) {
+    return note ? <p className={`profile-msg pf-head__note${toneClass}`}>{note}</p> : null;
+  }
+
+  return (
+    <header className="pf-head">
+      <div className="pf-head__id">
+        <Avatar avatarUrl={avatarUrl} />
+        <div className="profile__id-copy">
+          <p className="profile__kicker">Profilo</p>
+          <h1 className="profile__name">{displayName}</h1>
+          <p className="profile__meta">{metaLine(user, profile)}</p>
+        </div>
+      </div>
+
+      {loading && !profile ? (
+        <div className="profile__status">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Caricamento
+        </div>
+      ) : (
         <div className="pf-head__link">
           <LinkBlock pilot={pilot} />
         </div>
       )}
 
-      {(message.text || (linked && profile && !profile.statsAvailable)) && (
-        <p className={`profile-msg pf-head__msg${message.tone ? ` is-${message.tone}` : ''}`}>
-          {message.text || 'Statistiche DCS non ancora disponibili: si aggiornano mentre voli sul server.'}
-        </p>
-      )}
+      {note && <p className={`profile-msg pf-head__msg${toneClass}`}>{note}</p>}
     </header>
   );
 }

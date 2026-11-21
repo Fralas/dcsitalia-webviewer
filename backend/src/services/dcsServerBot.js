@@ -5,7 +5,10 @@
  *   - Discord <-> DCS link:  players.discord_id (set by the bot's /linkme), -1 = not linked
  *   - flight figures:        statistics (userstats plugin): slot time, takeoffs, landings, kills, deaths...
  *   - weapons (optional):    missionstats (missionstats plugin): S_EVENT_SHOT / S_EVENT_HIT per weapon
+ *   - kills (optional):      missionstats S_EVENT_KILL -> favourite targets and nemesis
+ *   - air refueling:         refuelingstats (missionstats plugin): pounds taken, contact time, tanker type
  *   - carrier (optional):    traps (greenieboard plugin)
+ *   - history:               last sorties, daily flight time (12 weeks), personal records
  *
  * A snapshot of every linked pilot is refreshed in the background (DCSSB_REFRESH_SEC), so the
  * HTTP routes stay synchronous and the database sees one batch of queries per interval.
@@ -46,6 +49,12 @@ function emptyTotals() {
     killsShips: 0,
     killsSams: 0,
     killsGround: 0,
+    deathsPvp: 0,
+    deathsPlanes: 0,
+    deathsHelicopters: 0,
+    deathsShips: 0,
+    deathsSams: 0,
+    deathsGround: 0,
   };
 }
 
@@ -63,7 +72,22 @@ const STAT_COLUMNS = {
   killsShips: 'kills_ships',
   killsSams: 'kills_sams',
   killsGround: 'kills_ground',
+  deathsPvp: 'deaths_pvp',
+  deathsPlanes: 'deaths_planes',
+  deathsHelicopters: 'deaths_helicopters',
+  deathsShips: 'deaths_ships',
+  deathsSams: 'deaths_sams',
+  deathsGround: 'deaths_ground',
 };
+
+const TOP_N = 5;
+const RECENT_SORTIES = 4;
+const ACTIVITY_DAYS = 84; // 12 weeks of activity calendar
+const EMPTY_HISTORY = { sorties: [], days: [], longest: [], bestMission: [], streak: [], bestRefuel: [] };
+
+function topList(map, limit = TOP_N) {
+  return Object.values(map).sort((a, b) => b.count - a.count).slice(0, limit);
+}
 
 /** "F-16C_50 (Crew)" -> "F-16C_50", keeps the crew flag apart. */
 function cleanSlot(slot) {
@@ -91,7 +115,7 @@ export function createDcsServerBot(options = {}) {
   let snapshot = { ok: false, updatedAt: null, error: null, byDiscord: {} };
   let refreshing = null;
   let lastRefreshAt = 0;
-  const optional = { missionstats: true, traps: true };
+  const optional = { missionstats: true, refueling: true, traps: true };
 
   async function getQuery() {
     if (query) return query;
@@ -157,6 +181,67 @@ export function createDcsServerBot(options = {}) {
     }
   }
 
+  // S_EVENT_KILL rows: init_* = killer, target_* = victim; *_id is the player ucid or NULL for AI.
+  async function loadKills(q, ucids) {
+    if (!optional.missionstats) return { targets: [], killers: [] };
+    try {
+      const [targets, killers] = await Promise.all([
+        q(
+          `SELECT ms.init_id AS ucid, ms.target_type, ms.target_cat, COUNT(*)::int AS n
+             FROM missionstats ms
+             JOIN missions m ON m.id = ms.mission_id
+            WHERE ms.event = 'S_EVENT_KILL' AND ms.init_id = ANY($1::text[])
+              AND ms.target_type IS NOT NULL
+              AND (ms.target_id IS NULL OR ms.target_id <> ms.init_id) ${serverFilter}
+            GROUP BY ms.init_id, ms.target_type, ms.target_cat`,
+          baseParams(ucids),
+        ),
+        q(
+          `SELECT ms.target_id AS ucid, ms.init_type, ms.init_cat, ms.init_id AS killer_ucid,
+                  p.name AS killer_name, COUNT(*)::int AS n
+             FROM missionstats ms
+             JOIN missions m ON m.id = ms.mission_id
+             LEFT JOIN players p ON p.ucid = ms.init_id
+            WHERE ms.event = 'S_EVENT_KILL' AND ms.target_id = ANY($1::text[])
+              AND ms.init_type IS NOT NULL
+              AND (ms.init_id IS NULL OR ms.init_id <> ms.target_id) ${serverFilter}
+            GROUP BY ms.target_id, ms.init_type, ms.init_cat, ms.init_id, p.name`,
+          baseParams(ucids),
+        ),
+      ]);
+      return { targets: targets.rows, killers: killers.rows };
+    } catch (error) {
+      if (error?.code === '42P01') optional.missionstats = false;
+      else console.error('DCSServerBot kills query failed:', error.message);
+      return { targets: [], killers: [] };
+    }
+  }
+
+  // refuelingstats: fuel_taken in pounds, transfer_time in mission seconds, tanker = DCS type name.
+  async function loadRefueling(q, ucids) {
+    if (!optional.refueling) return [];
+    try {
+      const { rows } = await q(
+        `SELECT r.init_id AS ucid, r.tanker,
+                COUNT(*)::int AS contacts,
+                COUNT(*) FILTER (WHERE r.fuel_taken > 0)::int AS refuels,
+                COALESCE(SUM(r.fuel_taken), 0)::bigint AS lbs,
+                COALESCE(SUM(r.transfer_time) FILTER (WHERE r.fuel_taken > 0), 0)::float AS secs,
+                COUNT(*) FILTER (WHERE r.transfer_complete)::int AS full_tanks
+           FROM refuelingstats r
+           JOIN missions m ON m.id = r.mission_id
+          WHERE r.init_id = ANY($1::text[]) ${serverFilter}
+          GROUP BY r.init_id, r.tanker`,
+        baseParams(ucids),
+      );
+      return rows;
+    } catch (error) {
+      if (error?.code === '42P01') optional.refueling = false;
+      else console.error('DCSServerBot refueling query failed:', error.message);
+      return [];
+    }
+  }
+
   async function loadTraps(q, ucids) {
     if (!optional.traps) return [];
     try {
@@ -179,7 +264,108 @@ export function createDcsServerBot(options = {}) {
     }
   }
 
-  function buildSnapshot(players, statRows, weaponRows, trapRows) {
+  // Seconds of one slot session, capped (an unclosed row counts up to now, at most maxSessionSec).
+  const sessionSec = `LEAST(${maxSessionSec}, GREATEST(0, EXTRACT(EPOCH FROM (COALESCE(s.hop_off, NOW() AT TIME ZONE 'utc') - s.hop_on))))`;
+  // Open = no hop_off yet and recent enough to be real (old unclosed rows are leftovers of a crash).
+  const isOpen = `(s.hop_off IS NULL AND s.hop_on > (NOW() AT TIME ZONE 'utc') - INTERVAL '${maxSessionSec} seconds')`;
+  // A sortie = a slot session that took off (or is open right now); ramp sitting is not a sortie.
+  const isSortie = `(s.takeoffs > 0 OR ${isOpen})`;
+
+  /**
+   * Profile history: last sorties, daily flight time (activity calendar) and personal records.
+   * Days are UTC calendar days.
+   */
+  async function loadHistory(q, ucids) {
+    const params = baseParams(ucids);
+    const [sorties, days, longest, bestMission, streak, bestRefuel] = await Promise.all([
+      q(
+        `SELECT * FROM (
+           SELECT s.player_ucid AS ucid, s.slot, m.mission_theatre AS theatre, m.mission_name,
+                  EXTRACT(EPOCH FROM s.hop_on)::bigint AS start_epoch,
+                  ${sessionSec}::bigint AS sec,
+                  ${isOpen} AS open,
+                  s.kills, s.deaths, s.crashes, s.ejections, s.takeoffs, s.landings,
+                  ROW_NUMBER() OVER (PARTITION BY s.player_ucid ORDER BY s.hop_on DESC) AS rn
+             FROM statistics s
+             JOIN missions m ON m.id = s.mission_id
+            WHERE s.player_ucid = ANY($1::text[]) AND ${isSortie} ${serverFilter}
+         ) x WHERE x.rn <= ${RECENT_SORTIES}`,
+        params,
+      ),
+      q(
+        `SELECT s.player_ucid AS ucid, to_char(s.hop_on, 'YYYY-MM-DD') AS day, SUM(${sessionSec})::bigint AS sec,
+                COUNT(*) FILTER (WHERE ${isSortie})::int AS sorties
+           FROM statistics s
+           JOIN missions m ON m.id = s.mission_id
+          WHERE s.player_ucid = ANY($1::text[])
+            AND s.hop_on >= (NOW() AT TIME ZONE 'utc') - INTERVAL '${ACTIVITY_DAYS} days' ${serverFilter}
+          GROUP BY s.player_ucid, day`,
+        params,
+      ),
+      q(
+        `SELECT DISTINCT ON (s.player_ucid) s.player_ucid AS ucid, s.slot, m.mission_theatre AS theatre,
+                EXTRACT(EPOCH FROM s.hop_on)::bigint AS at_epoch, ${sessionSec}::bigint AS sec
+           FROM statistics s
+           JOIN missions m ON m.id = s.mission_id
+          WHERE s.player_ucid = ANY($1::text[]) AND s.takeoffs > 0 ${serverFilter}
+          ORDER BY s.player_ucid, ${sessionSec} DESC`,
+        params,
+      ),
+      q(
+        `SELECT DISTINCT ON (x.ucid) x.* FROM (
+           SELECT s.player_ucid AS ucid, s.mission_id, m.mission_theatre AS theatre,
+                  EXTRACT(EPOCH FROM MIN(s.hop_on))::bigint AS at_epoch, SUM(s.kills)::int AS kills
+             FROM statistics s
+             JOIN missions m ON m.id = s.mission_id
+            WHERE s.player_ucid = ANY($1::text[]) ${serverFilter}
+            GROUP BY s.player_ucid, s.mission_id, m.mission_theatre
+         ) x WHERE x.kills > 0
+         ORDER BY x.ucid, x.kills DESC, x.at_epoch DESC`,
+        params,
+      ),
+      // Longest run of sorties in a row without dying, crashing or ejecting (gaps and islands).
+      q(
+        `WITH runs AS (
+           SELECT s.player_ucid AS ucid, s.hop_on,
+                  (s.deaths > 0 OR s.crashes > 0 OR s.ejections > 0) AS lost,
+                  SUM(CASE WHEN s.deaths > 0 OR s.crashes > 0 OR s.ejections > 0 THEN 1 ELSE 0 END)
+                    OVER (PARTITION BY s.player_ucid ORDER BY s.hop_on ROWS UNBOUNDED PRECEDING) AS grp
+             FROM statistics s
+             JOIN missions m ON m.id = s.mission_id
+            WHERE s.player_ucid = ANY($1::text[]) AND s.takeoffs > 0 ${serverFilter}
+         )
+         SELECT ucid, MAX(n)::int AS best, (ARRAY_AGG(n ORDER BY last_at DESC))[1]::int AS current
+           FROM (SELECT ucid, grp, COUNT(*) FILTER (WHERE NOT lost) AS n, MAX(hop_on) AS last_at FROM runs GROUP BY ucid, grp) g
+          GROUP BY ucid`,
+        params,
+      ),
+      optional.refueling
+        ? q(
+          `SELECT DISTINCT ON (r.init_id) r.init_id AS ucid, r.tanker, r.fuel_taken::bigint AS lbs,
+                  EXTRACT(EPOCH FROM r.time)::bigint AS at_epoch
+             FROM refuelingstats r
+             JOIN missions m ON m.id = r.mission_id
+            WHERE r.init_id = ANY($1::text[]) AND r.fuel_taken > 0 ${serverFilter}
+            ORDER BY r.init_id, r.fuel_taken DESC`,
+          params,
+        ).catch((error) => {
+          if (error?.code === '42P01') optional.refueling = false;
+          else console.error('DCSServerBot refuel record query failed:', error.message);
+          return { rows: [] };
+        })
+        : { rows: [] },
+    ]);
+    return {
+      sorties: sorties.rows,
+      days: days.rows,
+      longest: longest.rows,
+      bestMission: bestMission.rows,
+      streak: streak.rows,
+      bestRefuel: bestRefuel.rows,
+    };
+  }
+
+  function buildSnapshot(players, statRows, weaponRows, trapRows, kills = { targets: [], killers: [] }, refuelRows = [], history = EMPTY_HISTORY) {
     const ucidToDiscord = {};
     const byDiscord = {};
 
@@ -197,7 +383,13 @@ export function createDcsServerBot(options = {}) {
         totals: emptyTotals(),
         aircraft: {},
         weapons: {},
+        targets: {},
+        nemeses: {},
+        refueling: null,
         traps: null,
+        sorties: [],
+        activity: {},
+        records: {},
       };
       entry.ucids.push(player.ucid);
       // Timestamps are UTC without zone: read them as epoch seconds to avoid local-time parsing.
@@ -239,6 +431,100 @@ export function createDcsServerBot(options = {}) {
       entry.weapons[row.weapon] = weapon;
     });
 
+    kills.targets.forEach((row) => {
+      const entry = byDiscord[ucidToDiscord[row.ucid]];
+      if (!entry) return;
+      const key = row.target_type;
+      const item = entry.targets[key] || { type: row.target_type, category: row.target_cat || null, count: 0 };
+      item.count += num(row.n);
+      entry.targets[key] = item;
+    });
+
+    kills.killers.forEach((row) => {
+      const entry = byDiscord[ucidToDiscord[row.ucid]];
+      if (!entry) return;
+      // A human killer is one nemesis whatever he flies; AI killers are grouped by unit type.
+      const key = row.killer_ucid ? `player:${row.killer_ucid}` : `type:${row.init_type}`;
+      const item = entry.nemeses[key] || {
+        type: row.init_type,
+        category: row.init_cat || null,
+        player: row.killer_ucid ? (row.killer_name || 'Pilota') : null,
+        count: 0,
+      };
+      item.count += num(row.n);
+      entry.nemeses[key] = item;
+    });
+
+    refuelRows.forEach((row) => {
+      const entry = byDiscord[ucidToDiscord[row.ucid]];
+      if (!entry) return;
+      const r = entry.refueling || { contacts: 0, refuels: 0, lbs: 0, secs: 0, fullTanks: 0, tankers: {} };
+      r.contacts += num(row.contacts);
+      r.refuels += num(row.refuels);
+      r.lbs += num(row.lbs);
+      r.secs += num(row.secs);
+      r.fullTanks += num(row.full_tanks);
+      const key = row.tanker || '?';
+      const t = r.tankers[key] || { tanker: row.tanker || null, contacts: 0, refuels: 0, lbs: 0, secs: 0, fullTanks: 0 };
+      t.contacts += num(row.contacts);
+      t.refuels += num(row.refuels);
+      t.lbs += num(row.lbs);
+      t.secs += num(row.secs);
+      t.fullTanks += num(row.full_tanks);
+      r.tankers[key] = t;
+      entry.refueling = r;
+    });
+
+    // --- history: last sorties, activity calendar, personal records ---
+    const entryOf = (row) => byDiscord[ucidToDiscord[row.ucid]];
+    history.sorties.forEach((row) => {
+      const entry = entryOf(row);
+      if (!entry) return;
+      const lost = num(row.deaths) > 0 || num(row.crashes) > 0;
+      let outcome = 'unknown'; // left the slot airborne / disconnected
+      if (row.open) outcome = 'open';
+      else if (lost) outcome = 'lost';
+      else if (num(row.ejections) > 0) outcome = 'ejected';
+      else if (num(row.landings) > 0) outcome = 'landed';
+      entry.sorties.push({
+        at: num(row.start_epoch) * 1000,
+        type: cleanSlot(row.slot),
+        theatre: row.theatre || null,
+        mission: row.mission_name || null,
+        sec: num(row.sec),
+        kills: num(row.kills),
+        deaths: num(row.deaths),
+        outcome,
+      });
+    });
+    history.days.forEach((row) => {
+      const entry = entryOf(row);
+      if (!entry || !row.day) return;
+      const day = entry.activity[row.day] || { sec: 0, sorties: 0 };
+      day.sec += num(row.sec);
+      day.sorties += num(row.sorties);
+      entry.activity[row.day] = day;
+    });
+    const better = (entry, key, record, value) => {
+      if (!entry.records[key] || value > entry.records[key].value) entry.records[key] = { ...record, value };
+    };
+    history.longest.forEach((row) => {
+      const entry = entryOf(row);
+      if (entry && num(row.sec) > 0) better(entry, 'longestSortie', { at: num(row.at_epoch) * 1000, type: cleanSlot(row.slot), theatre: row.theatre }, num(row.sec));
+    });
+    history.bestMission.forEach((row) => {
+      const entry = entryOf(row);
+      if (entry) better(entry, 'mostKills', { at: num(row.at_epoch) * 1000, theatre: row.theatre }, num(row.kills));
+    });
+    history.streak.forEach((row) => {
+      const entry = entryOf(row);
+      if (entry) better(entry, 'cleanStreak', { current: num(row.current) }, num(row.best));
+    });
+    history.bestRefuel.forEach((row) => {
+      const entry = entryOf(row);
+      if (entry) better(entry, 'biggestRefuel', { at: num(row.at_epoch) * 1000, tanker: row.tanker }, num(row.lbs));
+    });
+
     trapRows.forEach((row) => {
       const entry = byDiscord[ucidToDiscord[row.ucid]];
       if (!entry) return;
@@ -256,6 +542,33 @@ export function createDcsServerBot(options = {}) {
       entry.weapons = Object.values(entry.weapons)
         .filter((w) => w.shots > 0)
         .sort((a, b) => b.shots - a.shots);
+      entry.targets = topList(entry.targets);
+      entry.nemeses = topList(entry.nemeses, 3);
+      entry.sorties = entry.sorties.sort((a, b) => b.at - a.at).slice(0, RECENT_SORTIES);
+      if (entry.refueling) {
+        const r = entry.refueling;
+        // Per-tanker breakdown, most used first (the profile lets the pilot filter by tanker).
+        const byTanker = Object.values(r.tankers)
+          .map((t) => ({
+            tanker: t.tanker,
+            contacts: t.contacts,
+            refuels: t.refuels,
+            lbs: t.lbs,
+            avgSec: t.refuels ? t.secs / t.refuels : null,
+            fullTanks: t.fullTanks,
+          }))
+          .sort((a, b) => b.refuels - a.refuels || b.contacts - a.contacts);
+        const topTanker = byTanker.find((t) => t.tanker);
+        entry.refueling = {
+          contacts: r.contacts,
+          refuels: r.refuels,
+          lbs: r.lbs,
+          avgSec: r.refuels ? r.secs / r.refuels : null,
+          fullTanks: r.fullTanks,
+          topTanker: topTanker ? topTanker.tanker : null,
+          byTanker,
+        };
+      }
       if (entry.traps) {
         entry.traps = {
           traps: entry.traps.traps,
@@ -276,14 +589,21 @@ export function createDcsServerBot(options = {}) {
         const q = await getQuery();
         const players = await loadPlayers(q);
         const ucids = players.map((p) => p.ucid);
-        const [statRows, weaponRows, trapRows] = ucids.length > 0
-          ? await Promise.all([loadStatistics(q, ucids), loadWeapons(q, ucids), loadTraps(q, ucids)])
-          : [[], [], []];
+        const [statRows, weaponRows, trapRows, kills, refuelRows, history] = ucids.length > 0
+          ? await Promise.all([
+            loadStatistics(q, ucids),
+            loadWeapons(q, ucids),
+            loadTraps(q, ucids),
+            loadKills(q, ucids),
+            loadRefueling(q, ucids),
+            loadHistory(q, ucids),
+          ])
+          : [[], [], [], { targets: [], killers: [] }, [], EMPTY_HISTORY];
         snapshot = {
           ok: true,
           updatedAt: Date.now(),
           error: null,
-          byDiscord: buildSnapshot(players, statRows, weaponRows, trapRows),
+          byDiscord: buildSnapshot(players, statRows, weaponRows, trapRows, kills, refuelRows, history),
         };
       } catch (error) {
         console.error('DCSServerBot refresh failed:', error.message);

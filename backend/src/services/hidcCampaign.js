@@ -4,6 +4,7 @@
  * DCORE files (same machine, see DCORE src/DBRIDGE and src/DMAP):
  *   - Export_Pilot_LinkRequests.json  hook DPILOT_LinkHook.lua appends "code|ucid|name|ts" lines (we truncate after use)
  *   - Export_Pilot_Stats.json         DBRIDGE_Pilots.lua: flight time / sorties / XP / level per UCID (read-only)
+ *   - Export_Pilot_Cargo.json         DBRIDGE_Cargo.lua: sling-load deliveries / kg / km per UCID (read-only)
  *   - Export_DCampaign_Focus.json     DMAP_Focus.lua: active region, BLUE attack region, candidates (read-only)
  *   - Export_DRegion_Status.json      DMAP_Region.lua: region -> "blue" | "red" (read-only)
  * A passed vote is applied through the DBRIDGE command queue (type "focus_vote").
@@ -83,6 +84,8 @@ export function createHidcCampaign(deps) {
       || (dbridgeDir ? path.join(dbridgeDir, 'Export_Pilot_LinkRequests.json') : null),
     stats: optionalPath('HIDC_PILOT_STATS_FILE')
       || (dbridgeDir ? path.join(dbridgeDir, 'Export_Pilot_Stats.json') : null),
+    cargo: optionalPath('HIDC_PILOT_CARGO_FILE')
+      || (dbridgeDir ? path.join(dbridgeDir, 'Export_Pilot_Cargo.json') : null),
     focus: optionalPath('HIDC_FOCUS_FILE')
       || (dcoreSrcDir ? path.join(dcoreSrcDir, 'DMAP', 'Export_DCampaign_Focus.json') : null),
     regionStatus: optionalPath('HIDC_REGION_STATUS_FILE')
@@ -99,8 +102,8 @@ export function createHidcCampaign(deps) {
     xp_per_flight_minute: envIntOrZero('HIDC_XP_PER_MINUTE', 1),
     xp_per_sortie: envIntOrZero('HIDC_XP_PER_SORTIE', 10),
     level_max: envInt('HIDC_LEVEL_MAX', 100),
-    level_xp_base: envInt('HIDC_LEVEL_XP_BASE', 30),
-    level_xp_exp: Number.parseFloat(process.env.HIDC_LEVEL_XP_EXP) > 0 ? Number.parseFloat(process.env.HIDC_LEVEL_XP_EXP) : 1.5,
+    level_xp_base: envInt('HIDC_LEVEL_XP_BASE', 60),
+    level_xp_exp: Number.parseFloat(process.env.HIDC_LEVEL_XP_EXP) > 0 ? Number.parseFloat(process.env.HIDC_LEVEL_XP_EXP) : 1,
     source: 'dcsserverbot',
   };
   // Same curve as DBRIDGE_Pilots.lua: floor(base * L^exp), L = 0..max.
@@ -187,6 +190,34 @@ export function createHidcCampaign(deps) {
     };
   }
 
+  // Logistica per pilota (DCORE DBRIDGE_Cargo): somma sugli UCID collegati allo stesso account.
+  function cargoForUcids(ucids) {
+    if (serverBot?.getCargo) return serverBot.getCargo(ucids);
+    const parsed = readJsonFile(files.cargo, null);
+    const pilots = parsed?.pilots && typeof parsed.pilots === 'object' ? parsed.pilots : null;
+    if (!pilots) return null;
+    let found = false;
+    const out = { deliveries: 0, kg: 0, km: 0, tkm: 0, last: null, bestKm: 0, bestKg: 0, bestAt: null };
+    (ucids || []).forEach((ucid) => {
+      const row = pilots[ucid];
+      if (!row) return;
+      found = true;
+      out.deliveries += Number(row.deliveries) || 0;
+      out.kg += Number(row.kg) || 0;
+      out.km += Number(row.km) || 0;
+      out.tkm += Number(row.tkm) || 0;
+      // Longest single delivery (DBRIDGE_Cargo best_km / best_kg / best_at).
+      if ((Number(row.best_km) || 0) > out.bestKm) {
+        out.bestKm = Number(row.best_km) || 0;
+        out.bestKg = Number(row.best_kg) || 0;
+        out.bestAt = Number(row.best_at) || null;
+      }
+      const last = Number(row.last) || 0;
+      if (last && (!out.last || last > out.last)) out.last = last;
+    });
+    return found ? out : { deliveries: 0, kg: 0, km: 0, tkm: 0, last: null, bestKm: 0, bestKg: 0, bestAt: null };
+  }
+
   // Livelli 0-based: thresholds[i] = XP minima del livello i (0 = recluta), come DBRIDGE_Pilots.lua.
   function levelInfo(xp, thresholds) {
     let level = 0;
@@ -235,9 +266,23 @@ export function createHidcCampaign(deps) {
           ground: entry.totals.killsGround,
           ships: entry.totals.killsShips,
         },
+        deathsBy: {
+          planes: entry.totals.deathsPlanes,
+          helicopters: entry.totals.deathsHelicopters,
+          sams: entry.totals.deathsSams,
+          ground: entry.totals.deathsGround,
+          ships: entry.totals.deathsShips,
+          pvp: entry.totals.deathsPvp,
+        },
+        targets: entry.targets || [],
+        nemeses: entry.nemeses || [],
+        refueling: entry.refueling || null,
         aircraft: entry.aircraft.slice(0, 8),
         weapons: entry.weapons.slice(0, 8),
         traps: entry.traps,
+        sorties: entry.sorties || [],
+        activity: entry.activity || {},
+        records: entry.records || {},
       },
     };
   }
@@ -702,6 +747,7 @@ export function createHidcCampaign(deps) {
   function getPilotProfile(user) {
     const stats = readStats();
     const pilot = pilotForUser(user.id, stats);
+    const ucids = pilot.link?.ucids || (pilot.link?.ucid ? [pilot.link.ucid] : []);
     return {
       ...getLinkState(user.id),
       linkSource: serverBot ? 'dcsserverbot' : 'hidc',
@@ -710,6 +756,7 @@ export function createHidcCampaign(deps) {
       level: pilot.level || levelInfo(0, stats.thresholds),
       rules: stats.rules,
       combat: pilot.combat || null,
+      cargo: pilot.link ? cargoForUcids(ucids) : null,
       botAvailable: Boolean(botToken) && !serverBot,
       minProposerLevel: VOTE_RULES.minProposerLevel,
     };

@@ -393,6 +393,204 @@
   border-left: 0;
 }
 
+/* combat extras: death causes, favourite targets, nemesis */
+
+.pf-combat-extra {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid var(--profile-border);
+}
+
+.pf-mini {
+  min-width: 0;
+  padding: 0 24px;
+}
+
+.pf-mini:first-child {
+  padding-left: 0;
+}
+
+.pf-mini:last-child {
+  padding-right: 0;
+}
+
+.pf-mini + .pf-mini {
+  border-left: 1px solid var(--profile-border);
+}
+
+.pf-mini__title {
+  margin: 0 0 14px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--profile-dim);
+}
+
+.pf-mini__note {
+  margin: 10px 0 0;
+  font-size: 11px;
+  color: var(--profile-dim);
+}
+
+.pf-stack {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  margin-bottom: 14px;
+}
+
+.pf-stack span {
+  min-width: 3px;
+}
+
+.pf-rank-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pf-rank-list li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--profile-muted);
+}
+
+.pf-rank-list i {
+  width: 10px;
+  height: 10px;
+}
+
+.pf-rank-list__count,
+.pf-ranked__count {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--profile-dim);
+}
+
+.pf-ranked {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pf-ranked li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+}
+
+.pf-ranked__pos {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--profile-accent);
+}
+
+.pf-ranked.is-red .pf-ranked__pos {
+  color: #ef4444;
+}
+
+.pf-ranked__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pf-ranked__name {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--profile-text);
+}
+
+.pf-ranked__sub {
+  font-size: 11px;
+  color: var(--profile-dim);
+}
+
+.pf-ranked__bar {
+  height: 3px;
+  margin-top: 4px;
+  background: #262626;
+}
+
+.pf-ranked__bar i {
+  display: block;
+  height: 100%;
+  background: var(--profile-accent);
+}
+
+.pf-ranked.is-red .pf-ranked__bar i {
+  background: #ef4444;
+}
+
+/* support: logistics + air refueling */
+
+.pf-support {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px 0;
+}
+
+.pf-support__half {
+  min-width: 0;
+  padding: 0 24px;
+}
+
+.pf-support__half:first-child {
+  padding-left: 0;
+}
+
+.pf-support__half + .pf-support__half {
+  border-left: 1px solid var(--profile-border);
+}
+
+.pf-support__lead {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.pf-support__lead strong {
+  font-size: 30px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.pf-support__lead strong small {
+  margin-left: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--profile-dim);
+}
+
+.pf-support__lead span {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--profile-accent);
+}
+
 /* horizontal bars (aircraft time, weapon hit rate) */
 
 .pf-bars {
@@ -648,6 +846,23 @@
 /* ---------------------------------------------------------------- responsive */
 
 @media (max-width: 1500px) {
+  .pf-combat-extra {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 22px;
+  }
+
+  .pf-mini,
+  .pf-mini:first-child,
+  .pf-mini:last-child {
+    padding: 0;
+  }
+
+  .pf-mini + .pf-mini {
+    padding-top: 22px;
+    border-left: 0;
+    border-top: 1px solid var(--profile-border);
+  }
+
   .pf-service {
     grid-template-columns: minmax(0, 1fr);
     gap: 24px;
@@ -708,4 +923,416 @@
   .pf-figures {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* inline filter: value + bare chevron, site-styled list */
+.pf-figures dd:has(.pf-filter) {
+  overflow: visible;
+}
+
+.pf-filter {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+}
+
+.pf-filter__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pf-filter__button:focus-visible {
+  outline: 1px dashed var(--profile-accent);
+  outline-offset: 3px;
+}
+
+.pf-filter__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pf-filter__chevron {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--profile-dim);
+  transition: color 0.15s, transform 0.15s;
+}
+
+.pf-filter__button:hover .pf-filter__chevron,
+.pf-filter.is-open .pf-filter__chevron {
+  color: var(--profile-accent);
+}
+
+.pf-filter.is-open .pf-filter__chevron {
+  transform: rotate(180deg);
+}
+
+.pf-filter__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  min-width: 210px;
+  margin: 0;
+  padding: 6px 0;
+  list-style: none;
+  background: var(--profile-surface);
+  border: 1px solid var(--profile-border);
+  border-top: 2px solid var(--profile-accent);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.55);
+  font-family: var(--profile-font);
+}
+
+.pf-filter__menu li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 14px;
+  border-left: 2px solid transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--profile-muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.pf-filter__menu li small {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--profile-dim);
+}
+
+.pf-filter__menu li.is-active {
+  background: var(--profile-accent-soft);
+  color: var(--profile-text);
+}
+
+.pf-filter__menu li.is-selected {
+  border-left-color: var(--profile-accent);
+  color: var(--profile-accent);
+}
+
+/* ---------------------------------------------------------------- left column: history */
+.pf-col > .pf-side {
+  margin-top: 30px;
+  padding-top: 24px;
+  border-top: 1px solid var(--profile-border);
+}
+
+/* activity calendar */
+.pf-cal__summary {
+  display: flex;
+  gap: 28px;
+  margin-bottom: 16px;
+}
+
+.pf-cal__summary div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pf-cal__summary strong {
+  font-size: 24px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.pf-cal__summary strong small,
+.pf-records__value small {
+  margin-left: 3px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--profile-dim);
+}
+
+.pf-cal__summary span {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--profile-dim);
+}
+
+.pf-cal {
+  --cal-gap: 3px;
+  --cal-lead: 14px;
+}
+
+.pf-cal__months {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--cal-gap);
+  margin: 0 0 5px calc(var(--cal-lead) + var(--cal-gap));
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--profile-dim);
+  white-space: nowrap;
+}
+
+.pf-cal__body {
+  display: flex;
+  gap: var(--cal-gap);
+}
+
+.pf-cal__days {
+  display: grid;
+  grid-template-rows: repeat(7, minmax(0, 1fr));
+  gap: var(--cal-gap);
+  width: var(--cal-lead);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--profile-dim);
+}
+
+.pf-cal__days span {
+  display: flex;
+  align-items: center;
+}
+
+.pf-cal__grid {
+  display: grid;
+  flex: 1;
+  grid-auto-flow: column;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: repeat(7, auto);
+  gap: var(--cal-gap);
+}
+
+.pf-cal__grid i,
+.pf-cal__legend i {
+  display: block;
+  aspect-ratio: 1;
+  border-radius: 2px;
+  background: #262626;
+}
+
+.pf-cal i.l1 { background: rgba(255, 140, 0, 0.28); }
+.pf-cal i.l2 { background: rgba(255, 140, 0, 0.5); }
+.pf-cal i.l3 { background: rgba(255, 140, 0, 0.75); }
+.pf-cal i.l4 { background: #ff8c00; }
+.pf-cal__grid i.is-future { background: transparent; }
+
+.pf-cal__legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  margin-top: 10px;
+  font-size: 10px;
+  color: var(--profile-dim);
+}
+
+.pf-cal__legend i {
+  width: 10px;
+}
+
+.pf-cal__legend i:first-child {
+  margin-left: 4px;
+}
+
+.pf-cal__legend i:last-child {
+  margin-right: 4px;
+}
+
+/* personal records */
+.pf-records {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pf-records li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 12px;
+  padding: 11px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.pf-records li:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.pf-records__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--profile-muted);
+}
+
+.pf-records__value {
+  grid-row: span 2;
+  align-self: center;
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--profile-accent);
+  white-space: nowrap;
+}
+
+.pf-records__sub {
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--profile-dim);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* recent sorties */
+.pf-sorties {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pf-sorties li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.pf-sorties li:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.pf-sorties__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--profile-dim);
+}
+
+.pf-sorties .is-ok .pf-sorties__dot { background: #4ade80; }
+.pf-sorties .is-lost .pf-sorties__dot { background: #ef4444; }
+.pf-sorties .is-eject .pf-sorties__dot { background: #f5b041; }
+.pf-sorties .is-unknown .pf-sorties__dot { background: #5a5a5a; }
+
+.pf-sorties .is-open .pf-sorties__dot {
+  background: var(--profile-accent);
+  box-shadow: 0 0 0 0 rgba(255, 140, 0, 0.6);
+  animation: pf-pulse 1.8s ease-out infinite;
+}
+
+@keyframes pf-pulse {
+  to { box-shadow: 0 0 0 7px rgba(255, 140, 0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-sorties .is-open .pf-sorties__dot { animation: none; }
+}
+
+.pf-sorties__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pf-sorties__type {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pf-sorties__sub {
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--profile-dim);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pf-sorties__sub b {
+  font-weight: 700;
+  color: var(--profile-accent);
+}
+
+.pf-sorties__figures {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.pf-sorties__kills {
+  font-size: 11px;
+  color: var(--profile-accent);
+}
+
+/* ---------------------------------------------------------------- compact identity (linked pilots) */
+.pf-service-head {
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.pf-ident {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.profile__avatar.profile__avatar--sm {
+  width: 44px;
+  height: 44px;
+}
+
+.pf-ident__copy {
+  min-width: 0;
+}
+
+.pf-ident__name {
+  overflow: hidden;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pf-ident__meta {
+  overflow: hidden;
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--profile-dim);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pf-ident .pf-unlink {
+  margin-left: 10px;
+}
+
+.pf-head__note {
+  margin: 0 0 18px;
 }

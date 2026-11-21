@@ -84,7 +84,7 @@ function RankTrack({ levelInfo }) {
  * Service record: current rank and road to the next one, XP composition, flight figures.
  * Only for pilots with a linked DCS account (the header shows the link flow otherwise).
  */
-export default function ServiceRecord({ profile, patchCount = 0, boardPosition = null }) {
+export default function ServiceRecord({ profile, patchCount = 0, boardPosition = null, identity = null }) {
   if (!profile?.linked) return null;
   const stats = profile.stats || {};
   const rules = profile.rules || {};
@@ -110,8 +110,8 @@ export default function ServiceRecord({ profile, patchCount = 0, boardPosition =
 
   return (
     <section className="pf-block">
-      <div className="profile__section-head">
-        <h2 className="profile__section-title">Stato di servizio</h2>
+      <div className={`profile__section-head${identity ? ' pf-service-head' : ''}`}>
+        {identity || <h2 className="profile__section-title">Stato di servizio</h2>}
         <span className="pf-hint">Livello {levelInfo.level} / {levelInfo.maxLevel ?? PILOT_MAX_LEVEL}</span>
       </div>
 
