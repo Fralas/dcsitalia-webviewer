@@ -5,7 +5,8 @@ import './HidcMapZoneNumberLabels.css';
 const ZONE_NUMBER_MIN_ZOOM = 9;
 // Font size grows from this zoom, so close-up labels keep their old size.
 const ZONE_NUMBER_FONT_BASE_ZOOM = 11;
-const DOME_HEIGHT_METERS = 1000 * 0.28;
+// Zones are 2D circles of this radius: the number sits just above the north edge.
+const ZONE_RADIUS_METERS = 1000;
 const LABEL_GAP_PX = 8;
 
 function getZoneNumber(zone) {
@@ -103,9 +104,11 @@ function buildFrames(map, engine, zones, selectedZoneId, hoveredZoneId) {
       if (pitch > 52 && point.y < height * 0.12) return [];
     }
 
-    const lift = Math.max(10, screenSpanPx(map, engine, lat, lon, DOME_HEIGHT_METERS)) + LABEL_GAP_PX;
+    // Top of the circle on screen (works with pitch too); fall back to a small lift.
+    const north = projectPoint(map, engine, lat + ZONE_RADIUS_METERS / 111320, lon);
+    const edgeY = Number.isFinite(north?.y) ? Math.min(north.y, point.y - 10) : point.y - 10;
     const x = point.x;
-    const y = point.y - lift;
+    const y = edgeY - LABEL_GAP_PX / 2;
     if (x < -48 || y < -48 || x > width + 48 || y > height + 48) return [];
 
     return [{

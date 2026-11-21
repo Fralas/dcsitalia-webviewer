@@ -285,6 +285,47 @@ function getEncryptedCountdownValue(seed = 0) {
   return `${first}${second}`;
 }
 
+// ---- 2D zone areas (replace the old 3D domes) ----
+const ZONE_AREA_RADIUS_METERS = 1000;
+const ZONE_AREA_INNER_RATIO = 0.55;
+const ZONE_AREA_COLORS = {
+  red: '#ef4444',
+  blue: '#3b82f6',
+  attack: '#f97316',
+  accepted: '#22c55e',
+  neutral: '#e2e8f0',
+};
+// MapLibre expression: tone property -> colour.
+const ZONE_AREA_COLOR_EXPR = [
+  'match', ['get', 'tone'],
+  'red', ZONE_AREA_COLORS.red,
+  'blue', ZONE_AREA_COLORS.blue,
+  'attack', ZONE_AREA_COLORS.attack,
+  'accepted', ZONE_AREA_COLORS.accepted,
+  ZONE_AREA_COLORS.neutral,
+];
+
+function zoneAreaTone(zone) {
+  const isAccepted = zone.operation_assigned === true && Number(zone.operation_remaining_ms || 0) > 0;
+  if (isAccepted) return 'accepted';
+  if (zone.status === 'RED') return 'red';
+  if (zone.status === 'BLUE') return 'blue';
+  if (zone.status === 'UNDER_ATTACK') return 'attack';
+  return 'neutral';
+}
+
+/** Ground circle of radiusMeters around lon/lat as a GeoJSON ring (good enough at zone scale). */
+function circleRing(lon, lat, radiusMeters, steps = 72) {
+  const dLat = radiusMeters / 111320;
+  const dLon = radiusMeters / (111320 * Math.max(0.2, Math.cos((lat * Math.PI) / 180)));
+  const ring = [];
+  for (let i = 0; i <= steps; i += 1) {
+    const a = (i / steps) * Math.PI * 2;
+    ring.push([lon + dLon * Math.cos(a), lat + dLat * Math.sin(a)]);
+  }
+  return ring;
+}
+
 function getZoneNumber(zone) {
   const source = String(zone?.id || zone?.name || '');
   const match = source.match(/\d+/);
@@ -2930,6 +2971,25 @@ function MapLibreFlatMapView({
     }),
   }), [zones, showAto, selectedZoneId]);
 
+  const fcZoneAreas = useMemo(() => ({
+    type: 'FeatureCollection',
+    features: !showAto ? [] : (zones || []).flatMap((zone) => {
+      const lat = Number(zone?.coordinates?.lat);
+      const lon = Number(zone?.coordinates?.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return [];
+      const properties = {
+        id: zone.id || '',
+        tone: zoneAreaTone(zone),
+        selected: zone.id === selectedZoneId ? 1 : 0,
+        hovered: hoveredZoneId && zone.id === hoveredZoneId ? 1 : 0,
+      };
+      return [
+        { type: 'Feature', geometry: { type: 'Polygon', coordinates: [circleRing(lon, lat, ZONE_AREA_RADIUS_METERS)] }, properties: { ...properties, ring: 'outer' } },
+        { type: 'Feature', geometry: { type: 'LineString', coordinates: circleRing(lon, lat, ZONE_AREA_RADIUS_METERS * ZONE_AREA_INNER_RATIO, 48) }, properties: { ...properties, ring: 'inner' } },
+      ];
+    }),
+  }), [zones, showAto, selectedZoneId, hoveredZoneId]);
+
   const fcAirports = useMemo(() => ({
     type: 'FeatureCollection',
     features: !showAirports ? [] : (airportsData || []).flatMap((airport) => {
@@ -3184,64 +3244,7 @@ function MapLibreFlatMapView({
       return;
     }
 
-    if (showAto && !domes3dRef.current.geometry) {
-      const domeGeometry = new THREE.SphereGeometry(1, 64, 48, 0, Math.PI * 2, 0, Math.PI / 2);
-      domeGeometry.rotateX(Math.PI / 2);
-      domes3dRef.current.geometry = domeGeometry;
-    }
-
-    if (showAto) (zones || []).forEach((zone) => {
-      const lat = Number(zone?.coordinates?.lat);
-      const lon = Number(zone?.coordinates?.lon);
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-
-      const isAccepted = zone.operation_assigned === true && Number(zone.operation_remaining_ms || 0) > 0;
-      const isSelected = zone.id === selectedZoneId;
-
-      let color = '#e2e8f0';
-      if (isAccepted) color = '#22c55e';
-      else if (zone.status === 'RED') color = '#ef4444';
-      else if (zone.status === 'BLUE') color = '#3b82f6';
-      else if (zone.status === 'UNDER_ATTACK') color = '#f97316';
-
-      const material = new THREE.MeshPhongMaterial({
-        color,
-        transparent: true,
-        opacity: isSelected ? 0.55 : 0.42,
-        depthTest: false,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-        emissive: new THREE.Color(color),
-        emissiveIntensity: 0.08,
-      });
-      const mesh = new THREE.Mesh(domes3dRef.current.geometry, material);
-      mesh.renderOrder = 10;
-      nextGroup.add(mesh);
-
-      const glowMaterial = new THREE.MeshBasicMaterial({
-        color,
-        transparent: true,
-        opacity: isSelected ? 0.28 : 0.2,
-        blending: THREE.AdditiveBlending,
-        depthTest: false,
-        depthWrite: false,
-        side: THREE.BackSide,
-      });
-      const glowMesh = new THREE.Mesh(domes3dRef.current.geometry, glowMaterial);
-      glowMesh.renderOrder = 11;
-      nextGroup.add(glowMesh);
-      applyZoneDomePose(map, mesh, glowMesh, lon, lat);
-
-      nextDomes.push({
-        lon,
-        lat,
-        isSelected,
-        main: mesh,
-        glow: glowMesh,
-        mainBaseOpacity: isSelected ? 0.55 : 0.42,
-        glowBaseOpacity: isSelected ? 0.28 : 0.2,
-      });
-    });
+    // Zones are 2D MapLibre layers (zone-areas-*): the three.js overlay keeps aircraft, convoys and routes.
 
     if (showLogistics) {
       const routesByKey = new Map();
@@ -3770,6 +3773,7 @@ function MapLibreFlatMapView({
       addGeoSource('dcsar-links-src', fcDcsarLinks);
       addGeoSource('dcsar-points-src', fcDcsarPoints);
       addGeoSource('zones-src', fcZones);
+      addGeoSource('zone-areas-src', fcZoneAreas);
       addGeoSource('airports-src', fcAirports);
       addGeoSource('production-points-src', fcProductionPoints);
       addGeoSource('ships-src', fcShips);
@@ -3904,6 +3908,90 @@ function MapLibreFlatMapView({
           'line-width': 1,
           'line-opacity': 0.22,
           'line-dasharray': [3, 7],
+        },
+      });
+
+      // ---- 2D zones: soft disc, outer glow, crisp rim, dashed inner ring, centre pip ----
+      const zoneZoomWidth = (base) => ['interpolate', ['linear'], ['zoom'], 6, base * 0.6, 10, base, 14, base * 1.6];
+      map.addLayer({
+        id: 'zone-areas-fill',
+        type: 'fill',
+        source: 'zone-areas-src',
+        filter: ['==', ['get', 'ring'], 'outer'],
+        paint: {
+          'fill-color': ZONE_AREA_COLOR_EXPR,
+          'fill-opacity': ['case', ['==', ['get', 'selected'], 1], 0.3, ['==', ['get', 'hovered'], 1], 0.24, 0.14],
+          'fill-antialias': true,
+        },
+      });
+      map.addLayer({
+        id: 'zone-areas-glow',
+        type: 'line',
+        source: 'zone-areas-src',
+        filter: ['==', ['get', 'ring'], 'outer'],
+        paint: {
+          'line-color': ZONE_AREA_COLOR_EXPR,
+          'line-width': zoneZoomWidth(7),
+          'line-blur': zoneZoomWidth(6),
+          'line-opacity': ['case', ['==', ['get', 'selected'], 1], 0.55, ['==', ['get', 'hovered'], 1], 0.42, 0.22],
+        },
+      });
+      map.addLayer({
+        id: 'zone-areas-rim',
+        type: 'line',
+        source: 'zone-areas-src',
+        filter: ['==', ['get', 'ring'], 'outer'],
+        paint: {
+          'line-color': ['case', ['==', ['get', 'selected'], 1], '#ffbb00', ZONE_AREA_COLOR_EXPR],
+          // Zoom must be the outermost expression: the selected/normal choice goes inside each stop.
+          'line-width': ['interpolate', ['linear'], ['zoom'],
+            6, ['case', ['==', ['get', 'selected'], 1], 1.6, 0.9],
+            10, ['case', ['==', ['get', 'selected'], 1], 2.4, 1.4],
+            14, ['case', ['==', ['get', 'selected'], 1], 3.6, 2.2]],
+          'line-opacity': 0.95,
+        },
+      });
+      map.addLayer({
+        id: 'zone-areas-inner',
+        type: 'line',
+        source: 'zone-areas-src',
+        filter: ['==', ['get', 'ring'], 'inner'],
+        minzoom: 8.5,
+        paint: {
+          'line-color': ZONE_AREA_COLOR_EXPR,
+          'line-width': 1,
+          'line-opacity': 0.5,
+          'line-dasharray': [2, 3],
+        },
+      });
+      // Zones under attack breathe (see the pulse effect below).
+      map.addLayer({
+        id: 'zone-areas-pulse',
+        type: 'line',
+        source: 'zone-areas-src',
+        filter: ['all', ['==', ['get', 'ring'], 'outer'], ['==', ['get', 'tone'], 'attack']],
+        paint: {
+          'line-color': ZONE_AREA_COLORS.attack,
+          'line-width': zoneZoomWidth(10),
+          'line-blur': zoneZoomWidth(8),
+          'line-opacity': 0.3,
+        },
+      });
+      map.addLayer({
+        id: 'zone-areas-center',
+        type: 'circle',
+        source: 'zones-src',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 1.5, 10, 2.5, 14, 3.5],
+          'circle-color': ['case',
+            ['==', ['get', 'accepted'], 1], ZONE_AREA_COLORS.accepted,
+            ['==', ['get', 'status'], 'RED'], ZONE_AREA_COLORS.red,
+            ['==', ['get', 'status'], 'BLUE'], ZONE_AREA_COLORS.blue,
+            ['==', ['get', 'status'], 'UNDER_ATTACK'], ZONE_AREA_COLORS.attack,
+            ZONE_AREA_COLORS.neutral],
+          'circle-stroke-color': 'rgba(10, 10, 10, 0.85)',
+          'circle-stroke-width': 1,
+          'circle-pitch-alignment': 'map',
         },
       });
 
@@ -4656,6 +4744,27 @@ function MapLibreFlatMapView({
     const source = map.getSource('zones-src');
     if (source?.setData) source.setData(fcZones);
   }, [fcZones]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const source = map.getSource('zone-areas-src');
+    if (source?.setData) source.setData(fcZoneAreas);
+  }, [fcZoneAreas]);
+
+  // Slow "breathing" halo on zones under attack (skipped with reduced motion).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !showAto) return undefined;
+    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return undefined;
+    const started = performance.now();
+    const timer = window.setInterval(() => {
+      if (!map.getLayer?.('zone-areas-pulse')) return;
+      const phase = ((performance.now() - started) / 1800) * Math.PI * 2;
+      map.setPaintProperty('zone-areas-pulse', 'line-opacity', 0.12 + 0.3 * (0.5 + 0.5 * Math.sin(phase)));
+    }, 90);
+    return () => window.clearInterval(timer);
+  }, [showAto]);
 
   useEffect(() => {
     rebuildThreeDomes();
