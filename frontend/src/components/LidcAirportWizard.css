@@ -1054,3 +1054,172 @@
     grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
   }
 }
+
+/* N tabs (overview / logistics / armament): glider and panes follow --wizard-tab-count / --wizard-tab-index. */
+.lidc-airport-wizard-tabs {
+  grid-template-columns: repeat(var(--wizard-tab-count, 2), 1fr);
+}
+
+.lidc-airport-wizard-tab-glider,
+.lidc-airport-wizard-tab-glider.is-logistics {
+  width: calc((100% - 8px * (var(--wizard-tab-count, 2) - 1)) / var(--wizard-tab-count, 2));
+  transform: translateX(calc((100% + 8px) * var(--wizard-tab-index, 0)));
+}
+
+.lidc-airport-wizard-panes {
+  grid-template-columns: repeat(var(--wizard-tab-count, 2), calc(100% / var(--wizard-tab-count, 2)));
+  width: calc(100% * var(--wizard-tab-count, 2));
+}
+
+.lidc-airport-wizard-stage .lidc-airport-wizard-panes,
+.lidc-airport-wizard-stage.is-logistics .lidc-airport-wizard-panes {
+  transform: translateX(calc(-100% / var(--wizard-tab-count, 2) * var(--wizard-tab-index, 0)));
+}
+
+/* ---- armament (warehouse CSV) ---- */
+.airport-armament {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 100%;
+}
+
+.airport-armament__summary {
+  display: flex;
+  align-items: flex-end;
+  gap: 28px;
+}
+
+.airport-armament__summary div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.airport-armament__summary strong {
+  font-size: 24px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: #ffffff;
+}
+
+.airport-armament__summary span {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lidc-mute);
+}
+
+.airport-armament__summary .is-time {
+  margin-left: auto;
+  align-items: flex-end;
+}
+
+.airport-armament__summary em {
+  font-size: 12px;
+  font-style: normal;
+  color: #dadbdf;
+}
+
+.airport-armament__groups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.airport-armament__group {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+
+.airport-armament__group.is-open {
+  border-color: rgba(255, 187, 0, 0.35);
+}
+
+.airport-armament__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  background: transparent;
+  color: #ffffff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.airport-armament__head:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.airport-armament__title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.airport-armament__meta {
+  margin-left: auto;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--lidc-mute);
+  white-space: nowrap;
+}
+
+.airport-armament__chevron {
+  flex: none;
+  color: var(--lidc-mute);
+  transition: transform 180ms ease;
+}
+
+.airport-armament__group.is-open .airport-armament__chevron {
+  transform: rotate(180deg);
+  color: var(--lidc-accent-gold);
+}
+
+.airport-armament__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0 18px;
+  margin: 0;
+  padding: 2px 14px 10px;
+  list-style: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.airport-armament__list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 12px;
+  color: #dadbdf;
+}
+
+.airport-armament__list li span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.airport-armament__list li strong {
+  flex: none;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #ffffff;
+}
+
+.airport-armament__list li.is-empty {
+  grid-column: 1 / -1;
+  border-bottom: 0;
+  color: var(--lidc-mute);
+  font-style: italic;
+}

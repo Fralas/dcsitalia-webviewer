@@ -14,7 +14,6 @@ const COPY = {
     conquered: (r) => `${r} conquistata! Scegli dove attaccare ora.`,
     pick: 'Scegli la regione da attaccare e da dove partire.',
     startedBy: (n) => `Avviata da: ${n}`,
-    current: 'Attuale',
     start: 'Avvia votazione',
     startHint: 'Proponi di cambiare la regione attiva: tutti i piloti votano dove attaccare e da dove partire.',
     startLevel: (min, lvl) => `Dal livello ${min} puoi avviare una votazione (tu: ${lvl}).`,
@@ -22,7 +21,6 @@ const COPY = {
     target: 'Regione da attaccare',
     base: 'Attacca da',
     votes: (n) => (n === 1 ? '1 voto' : `${n} voti`),
-    leading: 'In testa',
     submit: 'Vota',
     change: 'Cambia voto',
     myBallot: 'Il tuo voto',
@@ -48,7 +46,6 @@ const COPY = {
     conquered: (r) => `${r} captured! Choose where to attack next.`,
     pick: 'Pick the region to attack and where to attack from.',
     startedBy: (n) => `Started by: ${n}`,
-    current: 'Current',
     start: 'Start vote',
     startHint: 'Propose a change of active region: every pilot votes where to attack and where from.',
     startLevel: (min, lvl) => `From level ${min} you can start a vote (you: ${lvl}).`,
@@ -56,7 +53,6 @@ const COPY = {
     target: 'Region to attack',
     base: 'Attack from',
     votes: (n) => (n === 1 ? '1 vote' : `${n} votes`),
-    leading: 'Leading',
     submit: 'Vote',
     change: 'Change vote',
     myBallot: 'Your vote',
@@ -132,7 +128,6 @@ export default function HidcRegionVotePanel({ campaign, onCampaignChange, langua
   }, [selected, from]);
 
   const maxVotes = Math.max(1, ...options.map((option) => option.votes));
-  const leader = options.reduce((top, option) => (option.votes > (top?.votes || 0) ? option : top), null);
   const unchanged = myBallot && myBallot.target === target && myBallot.from === from;
 
   let blocked = '';
@@ -220,8 +215,6 @@ export default function HidcRegionVotePanel({ campaign, onCampaignChange, langua
                       >
                         <span className="hidc-vote__option-name">
                           {regionLabel(option.target)}
-                          {vote.activeTarget === option.target && <em className="is-current">{t.current}</em>}
-                          {leader === option && option.votes > 0 && <em>{t.leading}</em>}
                           {myBallot?.target === option.target && <Check className="h-3 w-3" aria-label={t.myBallot} />}
                         </span>
                         <span className="hidc-vote__option-count">{t.votes(option.votes)}</span>
@@ -271,9 +264,6 @@ export default function HidcRegionVotePanel({ campaign, onCampaignChange, langua
                 <span className={vote.total >= minVotes ? 'is-valid' : ''}>{t.quorum(vote.total, minVotes)}</span>
                 <span>{t.endsIn} {formatRemaining(vote.endsAt - now)}</span>
               </div>
-              {myBallot && (
-                <p className="hidc-vote__last">{t.myBallot}: {regionLabel(myBallot.target)} {t.from} {regionLabel(myBallot.from)}</p>
-              )}
             </div>
           )}
 

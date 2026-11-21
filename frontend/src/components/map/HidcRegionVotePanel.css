@@ -408,3 +408,42 @@
 .hidc-vote__counts span.is-valid {
   color: #86efac;
 }
+
+/* Option row: name and badges on one line, never wrapped. */
+.hidc-vote__option {
+  align-items: center;
+}
+
+.hidc-vote__option-name {
+  flex-wrap: nowrap;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.hidc-vote__option-name em,
+.hidc-vote__option-name svg {
+  flex: none;
+}
+
+.hidc-vote__option-name em {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 6px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.hidc-vote__option-count {
+  white-space: nowrap;
+}
+
+.hidc-vote__option-name {
+  gap: 5px;
+}
+
+.hidc-vote__option-name em {
+  padding: 0 5px;
+  font-size: 8.5px;
+  letter-spacing: 0.06em;
+}

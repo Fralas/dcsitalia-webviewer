@@ -7968,7 +7968,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       setRetrieveMode(null);
                       setTankerMode(null);
                     }}
-                    onOpenWizard={(tab) => setAirportWizardTab(tab === 'logistics' ? 'logistics' : 'overview')}
+                    onOpenWizard={(tab) => setAirportWizardTab(['logistics', 'armament'].includes(tab) ? tab : 'overview')}
                   />
                 </div>
               )}

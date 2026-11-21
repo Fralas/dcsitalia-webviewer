@@ -341,3 +341,27 @@
     transition: none;
   }
 }
+
+/* Collapsed feed / missions: only the arrow floats on the map, no card behind it. */
+.live-feed-card.is-collapsed {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.live-feed-card.is-collapsed .live-feed-card__toggle {
+  color: #ffffff;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9));
+}
+
+.live-feed-card.is-collapsed .live-feed-card__toggle:hover {
+  background: transparent;
+  color: #ff8c00;
+}
+
+.live-feed-card.is-collapsed .live-feed-card__toggle-icon {
+  width: 18px;
+  height: 18px;
+}

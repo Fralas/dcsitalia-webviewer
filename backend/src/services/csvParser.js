@@ -43,9 +43,34 @@ export async function parseCSV(filePath) {
  * @param {string} dataDir - Directory containing CSV files
  * @returns {Object} Object with weapons and liquids data
  */
+// DCS writes warehouse files with the airbase's own name ("Deir ez-Zor_weapons.csv"), while the
+// site config uses ids like "Deir_ez_Zor": compare names ignoring case, spaces, dashes and underscores.
+const normalizeCsvName = (name) => String(name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+async function resolveCsvPath(dataDir, csvPrefix, suffix) {
+  const exact = path.join(dataDir, `${csvPrefix}${suffix}`);
+  try {
+    await fs.promises.access(exact, fs.constants.F_OK);
+    return exact;
+  } catch {
+    // fall through to a loose match
+  }
+  try {
+    const wanted = normalizeCsvName(csvPrefix);
+    const files = await fs.promises.readdir(dataDir);
+    const match = files.find((file) => file.endsWith(suffix) && normalizeCsvName(file.slice(0, -suffix.length)) === wanted);
+    if (match) return path.join(dataDir, match);
+  } catch {
+    // directory missing: parseCSV reports the file as not found
+  }
+  return exact;
+}
+
 export async function getAirportData(csvPrefix, dataDir = './') {
-  const weaponsPath = path.join(dataDir, `${csvPrefix}_weapons.csv`);
-  const liquidsPath = path.join(dataDir, `${csvPrefix}_liquids.csv`);
+  const [weaponsPath, liquidsPath] = await Promise.all([
+    resolveCsvPath(dataDir, csvPrefix, '_weapons.csv'),
+    resolveCsvPath(dataDir, csvPrefix, '_liquids.csv'),
+  ]);
 
   const [weapons, liquids] = await Promise.all([
     parseCSV(weaponsPath),

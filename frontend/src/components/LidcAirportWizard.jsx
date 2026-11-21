@@ -27,9 +27,12 @@ import * as api from '../services/api';
 import { t } from '../utils/locale';
 import { getLidcUnitImageUrl } from '../utils/lidcUnitImages';
 import InlineError from './InlineError';
+import AirportArmament from './AirportArmament';
 import './LidcAirportWizard.css';
 
 const TABS = ['overview', 'logistics'];
+// HIDC airports also show the warehouse armament (DCS CSV).
+const HIDC_TABS = ['overview', 'logistics', 'armament'];
 
 const SHOP_IMAGES = {
   container_blue_mid: ammoContainerImage,
@@ -257,6 +260,9 @@ export default function LidcAirportWizard({
   const showSquadrons = !factionEconomy;
   const shopper = occupancy?.shopper || null;
   const knownCredits = Number.isFinite(Number(shopper?.credits)) ? Number(shopper.credits) : null;
+  const tabs = factionEconomy ? HIDC_TABS : TABS;
+  const tabIndex = Math.max(0, tabs.indexOf(activeTab));
+  const tabVars = { '--wizard-tab-count': tabs.length, '--wizard-tab-index': tabIndex };
 
   const shopById = useMemo(() => {
     return new Map(shop.map((item) => [item.id, item]));
@@ -494,12 +500,12 @@ export default function LidcAirportWizard({
           </button>
         </header>
 
-        <div className="lidc-airport-wizard-tabs" role="tablist">
+        <div className="lidc-airport-wizard-tabs" role="tablist" style={tabVars}>
           <span
             className={`lidc-airport-wizard-tab-glider is-${activeTab}`}
             aria-hidden="true"
           />
-          {TABS.map((tab) => (
+          {tabs.map((tab) => (
             <button
               key={tab}
               type="button"
@@ -513,7 +519,7 @@ export default function LidcAirportWizard({
           ))}
         </div>
 
-        <div className={`lidc-airport-wizard-stage is-${activeTab}`}>
+        <div className={`lidc-airport-wizard-stage is-${activeTab}`} style={tabVars}>
           <div className="lidc-airport-wizard-panes">
             <div
               className="lidc-airport-wizard-pane"
@@ -775,6 +781,17 @@ export default function LidcAirportWizard({
               </section>
               </div>
             </div>
+
+            {tabs.includes('armament') && (
+              <div
+                className="lidc-airport-wizard-pane"
+                role="tabpanel"
+                aria-hidden={activeTab !== 'armament'}
+                inert={activeTab !== 'armament'}
+              >
+                <AirportArmament airportId={airport?.id} active={activeTab === 'armament'} />
+              </div>
+            )}
           </div>
         </div>
       </section>
