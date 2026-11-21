@@ -32,6 +32,8 @@ export const AIRLIFT_AIRCRAFT = Object.freeze({
     minLevel: envInt('HIDC_AIRLIFT_CH47_MIN_LEVEL', 6),
     baseCost: envInt('HIDC_AIRLIFT_CH47_BASE_COST', 50),
     runwayOnly: false,
+    // Cruise speed of the AI (DCORE DBRIDGE_Config.lua airlift.aircraft.CH47.speed_kmh): route time estimate on the site.
+    speedKmh: 250,
   }),
   C130: Object.freeze({
     key: 'C130',
@@ -39,6 +41,7 @@ export const AIRLIFT_AIRCRAFT = Object.freeze({
     minLevel: envInt('HIDC_AIRLIFT_C130_MIN_LEVEL', 25),
     baseCost: envInt('HIDC_AIRLIFT_C130_BASE_COST', 120),
     runwayOnly: true,
+    speedKmh: 500,
   }),
 });
 
@@ -48,7 +51,8 @@ export const AIRLIFT_RULES = Object.freeze({
 });
 
 const ORDER_HISTORY = 60;
-const ITEM_PATTERN = /^weapons\.[A-Za-z0-9_]+\.[^,\s]{1,80}$/;
+// CSV ids such as "weapons.droptanks.1100L Tank Empty" or "weapons.containers.{INV-SMOKE-WHITE}": spaces allowed, no commas / newlines.
+const ITEM_PATTERN = /^weapons\.[A-Za-z0-9_]+\.[^,\r\n]{1,100}$/;
 
 export function airliftCost(aircraftKey, units) {
   const aircraft = AIRLIFT_AIRCRAFT[aircraftKey];

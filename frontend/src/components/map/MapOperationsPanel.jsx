@@ -390,7 +390,6 @@ export default function MapOperationsPanel({
 
   const hidcMissions = hidcCampaign?.missions || null;
   const hidcLogistics = Boolean(hidcCampaign);
-  const [airliftFormOpen, setAirliftFormOpen] = useState(false);
   const [missionBusyId, setMissionBusyId] = useState('');
   const [missionError, setMissionError] = useState('');
   const missionTasks = hidcMissions
@@ -1124,22 +1123,9 @@ export default function MapOperationsPanel({
             airlift={hidcAirlift}
             onAirliftChange={onHidcAirliftChange}
             onFocusPoint={onFocusPoint}
-            formOpen={airliftFormOpen}
-            onFormOpenChange={setAirliftFormOpen}
-            departureIcon={<TakeoffIcon />}
-            arrivalIcon={<LandingIcon />}
-            renderSelect={(selectProps) => (
-              <OpsSelect
-                key={selectProps.id}
-                openSelectId={openSelectId}
-                setOpenSelectId={setOpenSelectId}
-                wrapClassName="hidc-airlift-select"
-                {...selectProps}
-              />
-            )}
           />
         )}
-        {activeTab === 'logistic' && hidcLogistics && airliftFormOpen ? null : activeRows.length === 0 ? (
+        {activeRows.length === 0 ? (
           (activeTab !== 'mission' || !hidcMissions || (myMissions?.active || []).length === 0)
           && !(activeTab === 'logistic' && hidcLogistics) && (
             <div className="map-ops-section__row map-ops-section__row--empty">

@@ -2042,7 +2042,11 @@ async function loadFromBuffer() {
     const bufferedEntries = Object.keys(bufferedData || {}).length;
     if (bufferedEntries > 0) {
     console.log(`📂 Loaded airport data from SQLite CSV buffer (${bufferedEntries} airports).`);
-      return processData(bufferedData);
+      const fromBuffer = processData(bufferedData);
+      // The buffer only makes the start fast: re-read the CSVs right away, so files changed while the
+      // server was down (or a new CSV_DIR) are not hidden behind stale buffered warehouses.
+      refreshDataFromCsv('startup-resync');
+      return fromBuffer;
     }
 
     console.warn('⚠️  CSV buffer is empty. Loading directly from CSV.');
