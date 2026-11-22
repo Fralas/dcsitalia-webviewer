@@ -27,6 +27,11 @@ function formatCountdown(ms) {
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+function formatHours(minutes) {
+  const m = Number(minutes) || 120;
+  return m % 60 === 0 ? `${m / 60} h` : `${Math.floor(m / 60)} h ${m % 60} min`;
+}
+
 function useNow(enabled) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -58,7 +63,8 @@ export function HidcActiveMission({ assignment, busy, onAbandon, onSelectZone })
       onClick={() => onSelectZone?.(assignment.zoneId)}
       onKeyDown={(event) => { if (event.key === 'Enter') onSelectZone?.(assignment.zoneId); }}
     >
-      <div className="map-ops-section__row-top">
+      <div className="hidc-mission__head">
+        <TypeTag type={assignment.type} />
         <span className="map-ops-section__row-title">
           {t('map.rightPanel.ops.zone', { number: zoneNumber(assignment.zoneId) })}
         </span>
@@ -67,23 +73,24 @@ export function HidcActiveMission({ assignment, busy, onAbandon, onSelectZone })
           {formatCountdown(remaining)}
         </span>
       </div>
-      <div className="hidc-mission__line">
-        <TypeTag type={assignment.type} />
-        <span className="hidc-mission__state">
-          {assignment.awaitingFlight
-            ? t('map.rightPanel.ops.missions.awaitingFlight')
-            : t('map.rightPanel.ops.missions.inProgress')}
+      <p className="hidc-mission__desc">
+        {assignment.awaitingFlight
+          ? t('map.rightPanel.ops.missions.awaitingFlight')
+          : t(`map.rightPanel.ops.missions.desc.${assignment.type}`)}
+      </p>
+      <div className="hidc-mission__foot">
+        <span className="hidc-mission__reward">
+          {t('map.rightPanel.ops.missions.inProgress')}
+          <span className="hidc-mission__sep">·</span>
+          <strong>+{assignment.xp} XP</strong>
         </span>
-        <span className="hidc-mission__xp">+{assignment.xp} XP</span>
         <button
           type="button"
-          className="hidc-mission__abandon"
+          className="hidc-mission__link"
           disabled={busy}
           onClick={(event) => { event.stopPropagation(); onAbandon?.(assignment); }}
-          title={t('map.rightPanel.ops.missions.abandon')}
-          aria-label={t('map.rightPanel.ops.missions.abandon')}
         >
-          {busy ? <Loader2 className="spin" strokeWidth={2.4} /> : <X strokeWidth={2.4} />}
+          {busy ? <Loader2 className="spin" strokeWidth={2.4} /> : t('map.rightPanel.ops.missions.abandonShort')}
         </button>
       </div>
       <span className="hidc-mission__progress" aria-hidden="true">
@@ -113,7 +120,7 @@ export function HidcMissionResult({ entry }) {
 }
 
 /** A mission the pilot can accept. */
-export function HidcMissionRow({ mission, distance, canAccept, blockedReason, busy, onAccept, onSelectZone }) {
+export function HidcMissionRow({ mission, distance, durationMin, canAccept, blockedReason, busy, onAccept, onSelectZone }) {
   const pilots = mission.pilots.length;
   return (
     <div
@@ -123,21 +130,27 @@ export function HidcMissionRow({ mission, distance, canAccept, blockedReason, bu
       onClick={() => onSelectZone?.(mission.zoneId)}
       onKeyDown={(event) => { if (event.key === 'Enter') onSelectZone?.(mission.zoneId); }}
     >
-      <div className="map-ops-section__row-top">
+      <div className="hidc-mission__head">
+        <TypeTag type={mission.type} />
         <span className="map-ops-section__row-title">
           {t('map.rightPanel.ops.zone', { number: zoneNumber(mission.zoneId) })}
         </span>
-        <span className="map-ops-section__row-meta">{distance}</span>
-      </div>
-      <div className="hidc-mission__line">
-        <TypeTag type={mission.type} />
+        {distance && <span className="map-ops-section__row-meta">{distance}</span>}
         {pilots > 0 && (
           <span className="hidc-mission__pilots" title={mission.pilots.join(', ')}>
             <Users strokeWidth={2.4} aria-hidden="true" />
             {pilots}
           </span>
         )}
-        <span className="hidc-mission__xp">+{mission.xp} XP</span>
+      </div>
+      <p className="hidc-mission__desc">{t(`map.rightPanel.ops.missions.desc.${mission.type}`)}</p>
+      <div className="hidc-mission__foot">
+        <span className="hidc-mission__reward">
+          <strong>+{mission.xp} XP</strong>
+          <span className="hidc-mission__sep">·</span>
+          <Clock strokeWidth={2.4} aria-hidden="true" />
+          {formatHours(durationMin)}
+        </span>
         {!mission.mine && (
           <button
             type="button"

@@ -1,0 +1,162 @@
+/* Test level menu (HidcTestLevelMenu.jsx): dev servers only. */
+.hidc-test-level {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  transform: translateX(-50%);
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  color: #ffffff;
+}
+
+.hidc-test-level__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 107, 1, 0.55);
+  border-radius: 999px;
+  background: rgba(14, 14, 14, 0.92);
+  color: #dadbdf;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.hidc-test-level__pill svg:first-child {
+  color: #ff6b01;
+}
+
+.hidc-test-level__pill strong {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.hidc-test-level__pill > svg:last-child {
+  color: #7d8187;
+  transition: transform 0.15s ease;
+}
+
+.hidc-test-level.is-open .hidc-test-level__pill > svg:last-child {
+  transform: rotate(180deg);
+}
+
+.hidc-test-level__menu {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 264px;
+  padding: 12px;
+  border: 1px solid #4e4e4e;
+  border-radius: 14px;
+  background: #0e0e0e;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+}
+
+.hidc-test-level__head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hidc-test-level__head span {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.hidc-test-level__head small {
+  color: #7d8187;
+  font-size: 11px;
+}
+
+.hidc-test-level__presets {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.hidc-test-level__presets button,
+.hidc-test-level__custom button,
+.hidc-test-level__real {
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: transparent;
+  color: #dadbdf;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hidc-test-level__presets button:hover:not(:disabled),
+.hidc-test-level__custom button:hover:not(:disabled),
+.hidc-test-level__real:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+}
+
+.hidc-test-level__presets button.is-active,
+.hidc-test-level__real.is-active {
+  border-color: #ff6b01;
+  background: rgba(255, 107, 1, 0.14);
+  color: #ffffff;
+}
+
+.hidc-test-level__custom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.hidc-test-level__custom input {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  outline: none;
+  background: transparent;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 12px;
+  -moz-appearance: textfield;
+}
+
+.hidc-test-level__custom input:focus {
+  border-color: rgba(255, 107, 1, 0.6);
+}
+
+.hidc-test-level__custom input::-webkit-outer-spin-button,
+.hidc-test-level__custom input::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+.hidc-test-level__custom button {
+  padding: 0 12px;
+}
+
+.hidc-test-level button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.hidc-test-level__error {
+  margin: 0;
+  color: #f87171;
+  font-size: 11px;
+}
+
+.hidc-test-level__spin {
+  animation: hidc-test-level-spin 0.9s linear infinite;
+}
+
+@keyframes hidc-test-level-spin {
+  to { transform: rotate(360deg); }
+}

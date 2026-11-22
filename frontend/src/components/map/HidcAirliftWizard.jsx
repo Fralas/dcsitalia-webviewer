@@ -12,7 +12,14 @@ import './HidcAirliftWizard.css';
  * departure is picked): the departure warehouse. Backend services/hidcAirLift.js, DCORE DBRIDGE_AirLift.lua.
  */
 
-const CATEGORY_ORDER = ['missiles', 'bombs', 'nurs', 'torpedoes', 'shells', 'containers', 'droptanks', 'adapters', 'other'];
+const CATEGORY_ORDER = ['missiles', 'bombs', 'nurs', 'shells', 'other'];
+// Not offered for AI transport (backend refuses them too): pods / containers, drop tanks, torpedoes, adapters / pylons.
+const EXCLUDED_CATEGORIES = new Set(['containers', 'droptanks', 'torpedoes', 'adapters']);
+
+function rawCategory(id) {
+  const parts = String(id || '').split('.');
+  return parts[0] === 'weapons' && parts.length > 2 ? parts[1] : 'other';
+}
 const fmt = (n) => (Number(n) || 0).toLocaleString('it-IT');
 
 export function itemName(id) {
@@ -146,7 +153,7 @@ export default function HidcAirliftWizard({ airlift, onClose, onOrdered }) {
         if (cancelled) return;
         setStock((Array.isArray(airport?.data?.weapons) ? airport.data.weapons : [])
           .map((row) => ({ id: String(row.item), qty: Math.max(0, Math.floor(Number(row.quantity) || 0)) }))
-          .filter((row) => row.qty > 0 && row.id.startsWith('weapons.'))
+          .filter((row) => row.qty > 0 && row.id.startsWith('weapons.') && !EXCLUDED_CATEGORIES.has(rawCategory(row.id)))
           .sort((a, b) => itemName(a.id).localeCompare(itemName(b.id), 'it')));
       })
       .catch((err) => {
@@ -244,13 +251,6 @@ export default function HidcAirliftWizard({ airlift, onClose, onOrdered }) {
                 </button>
               ))}
             </div>
-            {rules && (
-              <p className="hidc-alw-note">
-                {rules.runwayOnly ? t('map.rightPanel.ops.airlift.runwayShort') : t('map.rightPanel.ops.airlift.anyBaseShort')}
-                {' · '}
-                {t('map.rightPanel.ops.airlift.base', { cost: rules.baseCost })}
-              </p>
-            )}
 
             <div className="hidc-alw-route">
               <AirportSelect

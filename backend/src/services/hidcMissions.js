@@ -30,7 +30,7 @@ function envIntOrZero(name, fallback) {
 
 export const MISSION_RULES = Object.freeze({
   durationMs: envInt('HIDC_MISSION_DURATION_MIN', 120) * 60 * 1000,
-  maxActive: envInt('HIDC_MISSION_MAX_ACTIVE', 1),
+  maxActive: envInt('HIDC_MISSION_MAX_ACTIVE', 2),
   // The task must stay cleared this long before the mission counts as done (export glitches, mission restarts).
   confirmMs: envIntOrZero('HIDC_MISSION_CONFIRM_SEC', 90) * 1000,
   // XP is given only if the pilot flew in DCS after accepting.

@@ -422,7 +422,7 @@ export default function MapOperationsPanel({
     : !hidcCampaign.me.linked
       ? t('map.rightPanel.ops.missions.linkRequired')
       : !myMissions?.canAccept
-        ? t('map.rightPanel.ops.missions.oneAtATime')
+        ? t('map.rightPanel.ops.missions.oneAtATime', { max: hidcMissions?.rules?.maxActive ?? 2 })
         : '';
   const canAcceptMission = Boolean(hidcCampaign?.me?.linked && myMissions?.canAccept);
 
@@ -1141,6 +1141,7 @@ export default function MapOperationsPanel({
                     key={row.mission.id}
                     mission={row.mission}
                     distance={formatRowDistance(row.distanceNm)}
+                    durationMin={hidcMissions?.rules?.durationMin}
                     canAccept={canAcceptMission}
                     blockedReason={missionBlockedReason}
                     busy={missionBusyId === row.mission.id}

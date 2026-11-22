@@ -23,6 +23,7 @@ export const DOC = Object.freeze({
   HIDC_REGION_VOTES: 'hidc.region-votes',
   HIDC_MISSIONS: 'hidc.missions',
   HIDC_AIRLIFT: 'hidc.airlift',
+  HIDC_DEV_LEVELS: 'hidc.dev-levels',
   LIDC_WAREHOUSE_OPS: 'lidc.warehouse-ops',
   ATC_BOARD: 'atc.board',
   ATC_HISTORY: 'atc.history',

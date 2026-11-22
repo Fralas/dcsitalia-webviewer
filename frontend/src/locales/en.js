@@ -1245,7 +1245,7 @@ export default {
           needRoute: 'Pick departure and arrival',
           needCargo: 'Pick at least one munition',
           needPoints: 'Not enough BLUE points',
-          newMission: 'New AI mission',
+          newMission: 'Logistics request',
           newTitle: 'Logistics transport',
           aircraft: 'Aircraft',
           cancel: 'Cancel',
@@ -1278,6 +1278,13 @@ export default {
           }
         },
         missions: {
+          desc: {
+            SEAD: 'Suppress the short-range air defences (SHORAD) protecting the zone.',
+            DEAD: 'Destroy the anti-aircraft artillery (AAA) deployed in the zone.',
+            CAS: 'Close air support: take out the enemy ground forces in the zone.',
+            LOGISTICS: 'Empty zone: bring troops and supplies in to capture it.',
+          },
+          abandonShort: 'Abandon',
           logisticsShort: 'LOG',
           accept: 'Accept',
           abandon: 'Abandon mission',
@@ -1287,7 +1294,7 @@ export default {
           error: 'Action failed',
           loginRequired: 'Sign in with Discord to accept missions',
           linkRequired: 'Link your DCS account from the profile',
-          oneAtATime: 'You already have a mission in progress',
+          oneAtATime: 'You already have {{max}} missions in progress',
           result: {
             completed: '{{type}} Zone {{number}} completed: +{{xp}} XP',
             expired: '{{type}} Zone {{number}} expired',

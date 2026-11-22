@@ -28,8 +28,69 @@
   overflow: hidden;
 }
 
-.hidc-vote.is-collapsed {
-  width: auto;
+/* Closed: only the arrow floats on the map, like the collapsed feed / missions panels (LiveFeedPanel.css). */
+.hidc-vote-reopen {
+  position: absolute;
+  top: 20px;
+  left: 14px;
+  z-index: 1000;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9));
+}
+
+.hidc-vote-reopen svg {
+  width: 18px;
+  height: 18px;
+}
+
+.hidc-vote-reopen:hover {
+  color: #ff8c00;
+}
+
+/* A vote is open: small gold dot so the closed panel is not missed. */
+.hidc-vote-reopen__dot {
+  position: absolute;
+  top: 6px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ffbb00;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.6);
+}
+
+/* Close arrow pinned on the kicker line (top right), clear of the battle graphic below it. */
+.hidc-vote .hidc-vote__head {
+  position: relative;
+  padding-right: 34px;
+}
+
+.hidc-vote__close {
+  position: absolute;
+  top: 11px;
+  right: 12px;
+  width: 15px;
+  height: 15px;
+  color: #7d8187;
+}
+
+.hidc-vote__head:hover .hidc-vote__close {
+  color: #ffffff;
+}
+
+@media (max-width: 1180px) {
+  .hidc-vote-reopen {
+    top: 72px;
+  }
 }
 
 /* Narrow viewports: the centered MapFilterBar would overlap the card's right edge. */
@@ -81,9 +142,71 @@
   text-overflow: ellipsis;
 }
 
-.hidc-vote__title-from {
-  font-weight: 400;
+/* BLUE attack base vs RED active region, same graphic as the profile (.pf-war), sized for the panel. */
+.hidc-vote__war {
+  display: grid;
+  grid-template-columns: auto minmax(28px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.hidc-vote__war-side {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 9px;
+  border-left: 3px solid #60a5fa;
+}
+
+.hidc-vote__war-side.is-red {
+  align-items: flex-end;
+  padding: 0 9px 0 0;
+  border-left: 0;
+  border-right: 3px solid var(--hv-red);
+}
+
+.hidc-vote__war-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: var(--hv-mute);
+  white-space: nowrap;
+}
+
+.hidc-vote__war-region {
+  font-size: 15px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.hidc-vote__war-side.is-blue .hidc-vote__war-region {
+  color: #60a5fa;
+}
+
+.hidc-vote__war-side.is-red .hidc-vote__war-region {
+  color: var(--hv-red);
+}
+
+.hidc-vote__war-front {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.hidc-vote__war-line {
+  flex: 1;
+  height: 0;
+  border-top: 1px dashed var(--hv-hairline);
+}
+
+.hidc-vote__war-icon {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  color: var(--hv-accent);
 }
 
 .hidc-vote__badge {

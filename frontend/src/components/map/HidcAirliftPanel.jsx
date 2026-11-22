@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Helicopter, Package, Plane, Plus } from 'lucide-react';
+import { ChevronRight, Helicopter, Package, Plane, Plus } from 'lucide-react';
 import { t } from '../../utils/locale';
 import HidcAirliftWizard, { aircraftShort } from './HidcAirliftWizard';
 
@@ -84,19 +84,21 @@ export default function HidcAirliftPanel({ airlift, onAirliftChange, onFocusPoin
   const orders = (airlift?.orders || []).slice(0, ORDER_LIMIT);
   return (
     <>
-      <div className="hidc-airlift-bar">
-        <button
-          type="button"
-          className="hidc-airlift-primary"
-          disabled={!airlift || Boolean(blockedReason)}
-          title={blockedReason || undefined}
-          onClick={() => setWizardOpen(true)}
-        >
-          <Plus strokeWidth={2.6} aria-hidden="true" />
-          {t('map.rightPanel.ops.airlift.newMission')}
-        </button>
-        {blockedReason && <span className="hidc-airlift-bar__hint">{blockedReason}</span>}
-      </div>
+      {/* Full-width row, same size and radius as the list rows below it. */}
+      <button
+        type="button"
+        className="hidc-airlift-request"
+        disabled={!airlift || Boolean(blockedReason)}
+        onClick={() => setWizardOpen(true)}
+      >
+        <span className="hidc-airlift-request__icon" aria-hidden="true">
+          <Plus strokeWidth={2.6} />
+        </span>
+        <span className="hidc-airlift-request__label">{t('map.rightPanel.ops.airlift.newMission')}</span>
+        {blockedReason
+          ? <span className="hidc-airlift-request__hint">{blockedReason}</span>
+          : <ChevronRight className="hidc-airlift-request__chevron" strokeWidth={2.4} aria-hidden="true" />}
+      </button>
       {sites.map((site) => <SiteRow key={site.id} site={site} onFocusPoint={onFocusPoint} />)}
       {orders.map((order) => <OrderRow key={order.id} order={order} onFocusPoint={onFocusPoint} />)}
       {wizardOpen && airlift && typeof document !== 'undefined' && createPortal(

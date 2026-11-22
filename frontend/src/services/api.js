@@ -1327,6 +1327,11 @@ export async function abandonHidcMission(assignmentId) {
   return fetchAPI(`/hidc/missions/assignments/${encodeURIComponent(assignmentId)}`, { method: 'DELETE' });
 }
 
+/** Test only (dev servers, allowed accounts): force my level, null = real level. Returns the campaign state. */
+export async function setHidcTestLevel(level) {
+  return fetchAPI('/hidc/dev/level', { method: 'POST', body: JSON.stringify({ level }) });
+}
+
 export async function getHidcCampaign() {
   return fetchAPI('/hidc/campaign');
 }

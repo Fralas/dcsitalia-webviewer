@@ -1,5 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, Loader2, Play } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Loader2, Play, Swords } from 'lucide-react';
+
+// Closed / open is a per-viewer preference: remembered in this browser only.
+const CLOSED_STORAGE_KEY = 'dcsitalia.hidcVotePanelClosed';
+
+function readClosed() {
+  try {
+    return window.localStorage.getItem(CLOSED_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeClosed(closed) {
+  try {
+    window.localStorage.setItem(CLOSED_STORAGE_KEY, closed ? '1' : '0');
+  } catch {
+    // storage blocked (private window): the panel still works, it just is not remembered
+  }
+}
 import { castHidcRegionBallot, startHidcRegionVote } from '../../services/api';
 import './HidcRegionVotePanel.css';
 
@@ -7,6 +26,9 @@ const COPY = {
   it: {
     kicker: 'Campagna',
     title: 'Regione attiva',
+    close: 'Chiudi pannello campagna',
+    warFrom: 'Base d\'attacco',
+    warTarget: 'Regione attiva',
     voteKicker: 'Votazione in corso',
     voteTitle: 'Prossima regione',
     none: 'Nessuna regione attiva.',
@@ -39,6 +61,9 @@ const COPY = {
   en: {
     kicker: 'Campaign',
     title: 'Active region',
+    close: 'Close campaign panel',
+    warFrom: 'Attack base',
+    warTarget: 'Active region',
     voteKicker: 'Vote in progress',
     voteTitle: 'Next region',
     none: 'No active region.',
@@ -90,7 +115,14 @@ function formatRemaining(ms) {
  */
 export default function HidcRegionVotePanel({ campaign, onCampaignChange, language = 'it' }) {
   const t = COPY[language] || COPY.it;
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsedState] = useState(readClosed);
+  const setCollapsed = (next) => {
+    setCollapsedState((value) => {
+      const resolved = typeof next === 'function' ? next(value) : next;
+      writeClosed(resolved);
+      return resolved;
+    });
+  };
   const [target, setTarget] = useState('');
   const [from, setFrom] = useState('');
   const [busy, setBusy] = useState(false);
@@ -168,26 +200,56 @@ export default function HidcRegionVotePanel({ campaign, onCampaignChange, langua
     }
   };
 
-  const last = campaign?.lastVote;
+
+  // Closed: only a floating arrow on the map (same as the feed / missions panels); a gold dot while a vote is open.
+  if (collapsed) {
+    return (
+      <button
+        type="button"
+        className={`hidc-vote-reopen${open ? ' has-vote' : ''}`}
+        onClick={() => setCollapsed(false)}
+        aria-label={open ? t.voteTitle : t.title}
+        title={open ? t.voteTitle : t.title}
+      >
+        <ChevronRight strokeWidth={3} aria-hidden="true" />
+        {open && <span className="hidc-vote-reopen__dot" aria-hidden="true" />}
+      </button>
+    );
+  }
 
   return (
-    <section className={`hidc-vote${collapsed ? ' is-collapsed' : ''}${open ? ' is-voting' : ''}`} aria-label={open ? t.voteTitle : t.title}>
-      <button type="button" className="hidc-vote__head" onClick={() => setCollapsed((value) => !value)}>
+    <section className={`hidc-vote${open ? ' is-voting' : ''}`} aria-label={open ? t.voteTitle : t.title}>
+      <button type="button" className="hidc-vote__head" onClick={() => setCollapsed(true)} aria-label={t.close} title={t.close}>
         <span className="hidc-vote__head-copy">
           <span className="hidc-vote__kicker">{open ? t.voteKicker : t.kicker}</span>
-          <span className="hidc-vote__title">
-            {open && t.voteTitle}
-            {!open && (focus?.target ? regionLabel(focus.target) : t.title)}
-            {!open && focus?.target && focus?.from && (
-              <span className="hidc-vote__title-from"> {t.from} {regionLabel(focus.from)}</span>
-            )}
-          </span>
+          {!open && focus?.target && focus?.from ? (
+            // Same BLUE base vs RED region graphic as the profile campaign block (ProfilePage.css .pf-war).
+            <span className="hidc-vote__war">
+              <span className="hidc-vote__war-side is-blue">
+                <span className="hidc-vote__war-label">{t.warFrom}</span>
+                <span className="hidc-vote__war-region">{regionLabel(focus.from)}</span>
+              </span>
+              <span className="hidc-vote__war-front" aria-hidden="true">
+                <span className="hidc-vote__war-line" />
+                <Swords className="hidc-vote__war-icon" />
+                <span className="hidc-vote__war-line" />
+              </span>
+              <span className="hidc-vote__war-side is-red">
+                <span className="hidc-vote__war-label">{t.warTarget}</span>
+                <span className="hidc-vote__war-region">{regionLabel(focus.target)}</span>
+              </span>
+            </span>
+          ) : (
+            <span className="hidc-vote__title">
+              {open ? t.voteTitle : (focus?.target ? regionLabel(focus.target) : t.title)}
+            </span>
+          )}
         </span>
         {open && <span className="hidc-vote__time">{formatRemaining(vote.endsAt - now)}</span>}
-        {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+        <ChevronLeft className="hidc-vote__close" strokeWidth={2.6} aria-hidden="true" />
       </button>
 
-      {!collapsed && (
+      {(
         <div className="hidc-vote__body">
           {!campaign && <p className="hidc-vote__msg">{t.unavailable}</p>}
 
@@ -289,13 +351,6 @@ export default function HidcRegionVotePanel({ campaign, onCampaignChange, langua
           )}
 
           {error && <p className="hidc-vote__msg is-warn">{error}</p>}
-
-          {last && !open && (
-            <p className="hidc-vote__last">
-              {t.last}: {last.target ? `${regionLabel(last.target)} ${t.from} ${regionLabel(last.from)}` : '—'}
-              {' · '}{t.status[last.status] || last.status}
-            </p>
-          )}
         </div>
       )}
     </section>

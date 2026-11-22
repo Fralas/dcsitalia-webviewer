@@ -8,9 +8,9 @@
 }
 
 .lidc-wizard-card.hidc-alw-card {
-  width: min(460px, 96vw);
-  height: min(720px, calc(100dvh - 48px));
-  max-height: min(720px, calc(100dvh - 48px));
+  width: min(580px, 96vw);
+  height: min(840px, calc(100dvh - 40px));
+  max-height: min(840px, calc(100dvh - 40px));
   padding: 20px 22px;
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 18px;
@@ -219,7 +219,6 @@
   padding: 0;
   overflow-y: auto;
   list-style: none;
-  scrollbar-width: thin;
 }
 
 .hidc-alw-menu li.is-empty {
@@ -263,7 +262,7 @@
 .hidc-alw-preview {
   position: relative;
   flex-shrink: 0;
-  height: 170px;
+  height: clamp(220px, 38dvh, 340px);
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
@@ -312,7 +311,6 @@
   padding: 0;
   overflow-y: auto;
   list-style: none;
-  scrollbar-width: thin;
 }
 
 .hidc-alw-chosen li {
@@ -411,13 +409,13 @@
 /* warehouse drawer (slide of the logistics cart) */
 .lidc-airport-wizard-cart.hidc-alw-drawer {
   grid-template-columns: minmax(0, 1fr);
-  height: min(720px, calc(100dvh - 48px));
-  max-height: min(720px, calc(100dvh - 48px));
+  height: min(840px, calc(100dvh - 40px));
+  max-height: min(840px, calc(100dvh - 40px));
   grid-template-rows: auto minmax(0, 1fr);
 }
 
 .lidc-airport-wizard-cart.hidc-alw-drawer.is-open {
-  width: min(440px, calc(96vw - 472px));
+  width: min(380px, calc(96vw - 592px));
   padding: 20px 18px;
 }
 
@@ -492,7 +490,6 @@
   padding: 0;
   overflow-y: auto;
   list-style: none;
-  scrollbar-width: thin;
 }
 
 .hidc-alw-stock li {
@@ -605,7 +602,7 @@
   -webkit-appearance: none;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1080px) {
   .lidc-airport-wizard-shell.hidc-alw-shell.is-cart-open {
     flex-direction: column;
     overflow-y: auto;
@@ -613,6 +610,39 @@
   }
 
   .lidc-airport-wizard-cart.hidc-alw-drawer.is-open {
-    width: min(460px, 96vw);
+    width: min(580px, 96vw);
   }
+}
+
+/* Thin orange scrollbar, same as the LIDC panels (LidcPage.css .lidc-wizard-body). */
+.hidc-alw-stock,
+.hidc-alw-menu ul,
+.hidc-alw-chosen ul {
+  scrollbar-width: thin;
+  scrollbar-color: var(--lidc-accent-orange) transparent;
+}
+
+.hidc-alw-stock::-webkit-scrollbar,
+.hidc-alw-menu ul::-webkit-scrollbar,
+.hidc-alw-chosen ul::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.hidc-alw-stock::-webkit-scrollbar-track,
+.hidc-alw-menu ul::-webkit-scrollbar-track,
+.hidc-alw-chosen ul::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.hidc-alw-stock::-webkit-scrollbar-thumb,
+.hidc-alw-menu ul::-webkit-scrollbar-thumb,
+.hidc-alw-chosen ul::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--lidc-accent-orange);
+}
+
+.hidc-alw-stock,
+.hidc-alw-chosen ul {
+  padding-right: 6px;
 }

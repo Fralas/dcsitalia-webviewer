@@ -249,12 +249,60 @@ export function createHidcCampaign(deps) {
     return found ? out : { deliveries: 0, kg: 0, km: 0, tkm: 0, last: null, bestKm: 0, bestKg: 0, bestAt: null };
   }
 
-  /** XP lifted to the threshold of a forced test level (HIDC_LEVEL_OVERRIDES). */
+  // ---------------------------------------------------------------- test levels (never in production)
+  // Accounts allowed to force their own level from the map test menu: HIDC_LEVEL_OVERRIDES ids and
+  // HIDC_VOTE_LEVEL_BYPASS_IDS (staff / testers). The level picked in the menu wins over the .env one.
+
+  function canUseTestLevel(discordId) {
+    if (process.env.NODE_ENV === 'production' || !discordId) return false;
+    const id = String(discordId);
+    return LEVEL_OVERRIDES.has(id) || VOTE_RULES.levelBypassIds.includes(id);
+  }
+
+  function readTestLevels() {
+    const raw = loadJson(DOC.HIDC_DEV_LEVELS, {});
+    return raw && typeof raw === 'object' ? raw : {};
+  }
+
+  /** Forced level of an account, or null (menu choice first, then HIDC_LEVEL_OVERRIDES). */
+  function forcedLevel(discordId) {
+    if (!canUseTestLevel(discordId)) return null;
+    const id = String(discordId);
+    const picked = readTestLevels()[id];
+    if (picked === 'real') return null;
+    if (Number.isFinite(Number(picked))) return Number(picked);
+    return LEVEL_OVERRIDES.has(id) ? LEVEL_OVERRIDES.get(id) : null;
+  }
+
+  function setTestLevel(user, level) {
+    if (!canUseTestLevel(user?.id)) {
+      const error = new Error('Livello di test non disponibile per questo account.');
+      error.status = 403;
+      throw error;
+    }
+    const levels = readTestLevels();
+    if (level == null) {
+      levels[String(user.id)] = 'real';
+    } else {
+      const value = Math.floor(Number(level));
+      if (!Number.isFinite(value) || value < 0 || value > botRules.level_max) {
+        const error = new Error(`Livello non valido (0-${botRules.level_max}).`);
+        error.status = 400;
+        throw error;
+      }
+      levels[String(user.id)] = value;
+    }
+    saveJson(DOC.HIDC_DEV_LEVELS, levels);
+    deps.emit('hidc:campaign-updated', { reason: 'test-level' });
+    deps.emit('hidc:airlift-updated', { reason: 'test-level' });
+  }
+
+  /** XP set exactly to the threshold of a forced test level, so higher and lower levels can both be tried. */
   function withLevelOverride(discordId, xp, thresholds) {
-    const forced = LEVEL_OVERRIDES.get(String(discordId || ''));
+    const forced = forcedLevel(discordId);
     if (forced == null) return xp;
     const level = Math.max(0, Math.min(forced, thresholds.length - 1));
-    return Math.max(xp, thresholds[level] || 0);
+    return thresholds[level] || 0;
   }
 
   // Livelli 0-based: thresholds[i] = XP minima del livello i (0 = recluta), come DBRIDGE_Pilots.lua.
@@ -560,6 +608,8 @@ export function createHidcCampaign(deps) {
   // at all the round is extended. The winner goes to DCS through the DBRIDGE queue (focus_vote).
 
   function hasLevelBypass(discordId) {
+    // A level picked in the test menu is tested as is: no bypass on top of it.
+    if (Number.isFinite(Number(readTestLevels()[String(discordId || '')]))) return false;
     return VOTE_RULES.levelBypassIds.includes(String(discordId || ''));
   }
 
@@ -919,6 +969,7 @@ export function createHidcCampaign(deps) {
       return pilot?.link ? (pilot.level?.level ?? 0) : null;
     },
     enqueueWebCommand: deps.enqueueWebCommand,
+    hasWebCommand: deps.hasWebCommand,
     getWebCommandResult: deps.getWebCommandResult,
     emit: deps.emit,
     pushFeed: deps.pushFeed,
@@ -960,6 +1011,10 @@ export function createHidcCampaign(deps) {
           canStart: linked && startLevelOk && !roundActive && focus.available
             && focus.candidates.length > 0 && Date.now() >= cooldownUntil,
           canVote: linked && voteLevelOk && votes.current?.status === 'open',
+          // Test level menu on the map (dev only): null when this account cannot use it.
+          testLevel: canUseTestLevel(user.id)
+            ? { forced: forcedLevel(user.id), max: botRules.level_max }
+            : null,
         }
         : null,
     };
@@ -1079,6 +1134,18 @@ export function createHidcCampaign(deps) {
 
     app.get('/api/hidc/campaign', (req, res) => {
       res.json(getCampaignState(req.session?.user || null));
+    });
+
+    // Test only: force the caller's level (body { level: number } or { level: null } for the real one).
+    app.post('/api/hidc/dev/level', (req, res) => {
+      const user = requireUser(req, res);
+      if (!user) return;
+      try {
+        setTestLevel(user, req.body?.level ?? null);
+        res.json(getCampaignState(user));
+      } catch (error) {
+        sendError(res, error);
+      }
     });
 
     // A pilot of level >= minStartLevel starts a round (change of active region).

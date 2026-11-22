@@ -24,7 +24,7 @@ import airports from '../config/airports';
 import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
 import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
-import { acceptDcsarTask, acceptFrontlineZone, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, declineFrontlineZone, getAirliftPlayers, getAirportOccupancy, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getHidcLogisticsAlerts, getLogisticsRouteVisibility, getMissions, getServerTime, getTankerOptions, getTankerRoutes, purchaseAirportLogistics, setAirportLogisticsRoutePriority, getProductionPoints, getShipPositions, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate, spawnAirportCrateBundle, spawnMapAction, spawnTanker, updateAirportOrder } from '../services/api';
+import { acceptDcsarTask, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, getAirliftPlayers, getAirportOccupancy, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getHidcLogisticsAlerts, getLogisticsRouteVisibility, getMissions, getServerTime, getTankerOptions, getTankerRoutes, purchaseAirportLogistics, setAirportLogisticsRoutePriority, getProductionPoints, getShipPositions, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate, spawnAirportCrateBundle, spawnMapAction, spawnTanker, updateAirportOrder } from '../services/api';
 import ZoneMissionCard from './map/ZoneMissionCard';
 import LiveFeedPanel from './map/LiveFeedPanel';
 import MapFilterBar from './map/MapFilterBar';
@@ -37,6 +37,7 @@ import HidcRegionBorders from './map/HidcRegionBorders';
 import HidcRegionVotePanel from './map/HidcRegionVotePanel';
 import HidcFrontDebugPanel, { readHidcDebugFlag } from './map/HidcFrontDebugPanel';
 import useHidcAirlift from '../utils/useHidcAirlift';
+import HidcTestLevelMenu from './map/HidcTestLevelMenu';
 import useHidcCampaign from '../utils/useHidcCampaign';
 import LidcAirportPresencePanel from './LidcAirportPresencePanel';
 import LidcAirportWizard from './LidcAirportWizard';
@@ -5421,8 +5422,6 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   const [requestingOrder, setRequestingOrder] = useState(false);
   const [hiddenLogisticsRouteAirportIds, setHiddenLogisticsRouteAirportIds] = useState(new Set());
   const [updatingRoutePriorityAirportId, setUpdatingRoutePriorityAirportId] = useState(null);
-  const [acceptingZoneOperationId, setAcceptingZoneOperationId] = useState(null);
-  const [decliningZoneOperationId, setDecliningZoneOperationId] = useState(null);
   const [acceptingMissionId, setAcceptingMissionId] = useState(null);
   const [acceptingDcsarId, setAcceptingDcsarId] = useState(null);
   const [updatingDcsarId, setUpdatingDcsarId] = useState(null);
@@ -6444,22 +6443,6 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     }
   };
 
-  const currentUserName = user?.globalName || user?.username || user?.id || '';
-  const activeAcceptedZonesByCurrentUser = useMemo(() => {
-    if (!currentUserName) return [];
-    return validZones.filter((zone) =>
-      zone.operation_assigned === true &&
-      zone.operation_assigned_to === currentUserName &&
-      Number(zone.operation_remaining_ms || 0) > 0
-    );
-  }, [validZones, currentUserName]);
-  const canCurrentUserAcceptMoreZones = activeAcceptedZonesByCurrentUser.length < 2;
-  const zoneOptionsForCard = useMemo(
-    () => [...validZones]
-      .map((entry) => ({ ...entry, zoneNumber: getZoneNumber(entry) }))
-      .sort((a, b) => Number(a.zoneNumber) - Number(b.zoneNumber)),
-    [validZones],
-  );
   const selectedZoneNeighbors = useMemo(() => {
     if (!focusedZone?.id) return [];
     return getNeighborZoneIds(focusedZone.id)
@@ -6467,18 +6450,6 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       .filter(Boolean)
       .map((entry) => ({ ...entry, zoneNumber: getZoneNumber(entry) }));
   }, [focusedZone, zoneById]);
-  const selectedZoneHasTasks = Array.isArray(focusedZone?.tasks) && focusedZone.tasks.length > 0;
-  const selectedZoneAcceptedByOther = Boolean(
-    focusedZone?.operation_assigned &&
-    focusedZone?.operation_assigned_to &&
-    focusedZone.operation_assigned_to !== currentUserName &&
-    Number(focusedZone?.operation_remaining_ms || 0) > 0
-  );
-  const selectedZoneAcceptedByCurrentUser = Boolean(
-    focusedZone?.operation_assigned &&
-    focusedZone?.operation_assigned_to === currentUserName &&
-    Number(focusedZone?.operation_remaining_ms || 0) > 0
-  );
   const selectedChangedAt = focusedZone ? zoneStatusMeta[focusedZone.id]?.changedAt : null;
 
   const airportLogistics = useMemo(() => {
@@ -7056,63 +7027,6 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       alert(`Failed to accept DCSAR task: ${error.message}`);
     } finally {
       setAcceptingDcsarId(null);
-    }
-  };
-
-  const handleDeclineZoneOperation = async (zone) => {
-    if (!zone?.id) return;
-    if (!user) {
-      window.location.href = '/api/auth/discord';
-      return;
-    }
-    if (!currentUserName) return;
-
-    setDecliningZoneOperationId(zone.id);
-    try {
-      const payload = await declineFrontlineZone(zone.id, currentUserName);
-      if (Array.isArray(payload?.zones)) {
-        setZones((previous) => applyIncomingFrontlineZones(payload.zones, previous));
-      } else {
-        const refreshed = await getFrontlineZones();
-        const fetchedZones = refreshed?.zones || refreshed;
-        if (Array.isArray(fetchedZones)) {
-          setZones((previous) => applyIncomingFrontlineZones(fetchedZones, previous));
-        }
-      }
-    } catch (error) {
-      console.error('Failed to decline zone operation:', error);
-      alert(`Failed to decline zone: ${error.message}`);
-    } finally {
-      setDecliningZoneOperationId(null);
-    }
-  };
-
-  const handleAcceptZoneOperation = async (zone) => {
-    if (!zone?.id) return;
-    if (!user) {
-      window.location.href = '/api/auth/discord';
-      return;
-    }
-
-    if (!currentUserName) return;
-
-    setAcceptingZoneOperationId(zone.id);
-    try {
-      const payload = await acceptFrontlineZone(zone.id, currentUserName);
-      if (Array.isArray(payload?.zones)) {
-        setZones((previous) => applyIncomingFrontlineZones(payload.zones, previous));
-      } else {
-        const refreshed = await getFrontlineZones();
-        const fetchedZones = refreshed?.zones || refreshed;
-        if (Array.isArray(fetchedZones)) {
-          setZones((previous) => applyIncomingFrontlineZones(fetchedZones, previous));
-        }
-      }
-    } catch (error) {
-      console.error('Failed to accept zone operation:', error);
-      alert(`Failed to accept zone: ${error.message}`);
-    } finally {
-      setAcceptingZoneOperationId(null);
     }
   };
 
@@ -7756,6 +7670,11 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                 />
               )}
 
+              {/* Test only: force my level (shown by the backend on dev servers to staff/tester accounts). */}
+              {isSyriaCampaign && (
+                <HidcTestLevelMenu campaign={hidcCampaign} onCampaignChange={setHidcCampaign} />
+              )}
+
               {isSyriaCampaign && hidcDebugEnabled && (
                 <HidcFrontDebugPanel
                   liveCampaign={hidcCampaign}
@@ -7806,22 +7725,11 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                 <div className="absolute bottom-4 left-4 z-[1000]">
                   <ZoneMissionCard
                     zone={focusedZone}
-                    zones={zoneOptionsForCard}
                     neighborZones={selectedZoneNeighbors}
                     changedAt={selectedChangedAt}
                     zoneNumber={getZoneNumber(focusedZone)}
                     coordinatesDms={formatZoneCoordinates(focusedZone.coordinates, 'dms')}
                     coordinatesMgrs={formatZoneCoordinates(focusedZone.coordinates, 'mgrs')}
-                    acceptedByCurrentUser={selectedZoneAcceptedByCurrentUser}
-                    acceptedByOther={selectedZoneAcceptedByOther}
-                    hasTasks={selectedZoneHasTasks}
-                    canAcceptMore={canCurrentUserAcceptMoreZones}
-                    accepting={acceptingZoneOperationId === focusedZone.id}
-                    declining={decliningZoneOperationId === focusedZone.id}
-                    activeZoneId={selectedZoneId}
-                    onSelectZone={setSelectedZoneId}
-                    onAccept={handleAcceptZoneOperation}
-                    onDecline={handleDeclineZoneOperation}
                     onClose={() => setSelectedZoneId(null)}
                   />
                 </div>

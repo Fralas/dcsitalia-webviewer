@@ -833,7 +833,6 @@
   color: var(--ops-mute);
 }
 
-
 /* ---- HIDC missions (HidcMissionRows.jsx) ---- */
 .hidc-mission {
   position: relative;
@@ -852,11 +851,87 @@
   outline-offset: -1px;
 }
 
-.hidc-mission__line {
+.hidc-mission {
+  gap: 0;
+}
+
+.hidc-mission__head {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
+}
+
+.hidc-mission__head .map-ops-section__row-title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.hidc-mission__desc {
+  margin: 6px 0 0;
+  color: #b4b7bc;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.hidc-mission__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.hidc-mission__reward {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: var(--ops-mute);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.hidc-mission__reward strong {
+  color: var(--ops-gold);
+  font-weight: 800;
+}
+
+.hidc-mission__reward svg {
+  width: 11px;
+  height: 11px;
+}
+
+.hidc-mission__sep {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.hidc-mission__link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ops-mute);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hidc-mission__link:hover:not(:disabled) {
+  color: #fca5a5;
+}
+
+.hidc-mission__link svg {
+  width: 12px;
+  height: 12px;
 }
 
 .hidc-mission__type {
@@ -898,31 +973,7 @@
   color: var(--ops-gold);
 }
 
-.hidc-mission__state {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--ops-mute);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.hidc-mission__xp {
-  margin-left: auto;
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--ops-gold);
-  white-space: nowrap;
-}
-
-.hidc-mission__state + .hidc-mission__xp {
-  margin-left: 0;
-}
-
-.hidc-mission__accept,
-.hidc-mission__abandon {
+.hidc-mission__accept {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -934,12 +985,13 @@
 }
 
 .hidc-mission__accept {
-  min-width: 58px;
-  height: 22px;
-  padding: 0 10px;
+  min-width: 72px;
+  height: 24px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 187, 0, 0.6);
   border-radius: var(--ops-pill);
-  background: var(--ops-gold);
-  color: #111111;
+  background: transparent;
+  color: var(--ops-gold);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -947,30 +999,18 @@
 }
 
 .hidc-mission__accept:hover:not(:disabled) {
-  background: #ffd24d;
+  background: var(--ops-gold);
+  color: #111111;
 }
 
 .hidc-mission__accept:disabled {
-  background: var(--ops-fill-active);
+  border-color: rgba(255, 255, 255, 0.1);
+  background: transparent;
   color: var(--ops-mute);
   cursor: not-allowed;
 }
 
-.hidc-mission__abandon {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--ops-fill);
-  color: var(--ops-mute);
-}
-
-.hidc-mission__abandon:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.18);
-  color: #fca5a5;
-}
-
-.hidc-mission__accept svg,
-.hidc-mission__abandon svg {
+.hidc-mission__accept svg {
   width: 12px;
   height: 12px;
 }
@@ -1053,53 +1093,80 @@
 }
 
 /* ---- HIDC AI logistics (HidcAirliftPanel.jsx) ---- */
-.hidc-airlift-bar {
+.hidc-airlift-request {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 12px 8px 10px;
+  border: 1px solid rgba(255, 187, 0, 0.35);
+  border-radius: var(--ops-row-radius);
+  background: rgba(255, 187, 0, 0.07);
+  color: #ffffff;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.hidc-airlift-bar__hint {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--ops-mute);
+.hidc-airlift-request:hover:not(:disabled) {
+  border-color: rgba(255, 187, 0, 0.6);
+  background: rgba(255, 187, 0, 0.12);
 }
 
-.hidc-airlift-primary {
+.hidc-airlift-request__icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  flex-shrink: 0;
+  width: 28px;
   height: 28px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: var(--ops-pill);
+  border-radius: 50%;
   background: var(--ops-gold);
   color: #111111;
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  cursor: pointer;
+}
+
+.hidc-airlift-request__icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.hidc-airlift-request__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.hidc-airlift-request__chevron {
   flex-shrink: 0;
-  transition: background 0.15s ease;
-}
-
-.hidc-airlift-primary:hover:not(:disabled) {
-  background: #ffd24d;
-}
-
-.hidc-airlift-primary:disabled {
-  background: var(--ops-fill-active);
+  width: 16px;
+  height: 16px;
   color: var(--ops-mute);
+}
+
+.hidc-airlift-request__hint {
+  flex-shrink: 0;
+  color: var(--ops-mute);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.hidc-airlift-request:disabled {
+  border-color: transparent;
+  background: var(--ops-row);
   cursor: not-allowed;
 }
 
-.hidc-airlift-primary svg {
-  width: 13px;
-  height: 13px;
+.hidc-airlift-request:disabled .hidc-airlift-request__icon {
+  background: var(--ops-fill-active);
+  color: var(--ops-mute);
+}
+
+.hidc-airlift-request:disabled .hidc-airlift-request__label {
+  color: var(--ops-mute);
 }
 
 .hidc-airlift-row .map-ops-section__row-title {
@@ -1147,6 +1214,3 @@
 .hidc-airlift-chip--refused,
 .hidc-airlift-chip--failed { background: rgba(239, 68, 68, 0.14); color: #fca5a5; }
 
-.hidc-airlift-primary .spin {
-  animation: hidc-mission-spin 0.9s linear infinite;
-}

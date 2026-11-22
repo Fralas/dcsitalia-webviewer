@@ -1245,7 +1245,7 @@ export default {
           needRoute: 'Scegli partenza e arrivo',
           needCargo: 'Scegli almeno una munizione',
           needPoints: 'Punti BLUE insufficienti',
-          newMission: 'Nuova missione IA',
+          newMission: 'Richiesta logistica',
           newTitle: 'Trasporto logistico',
           aircraft: 'Mezzo',
           cancel: 'Annulla',
@@ -1278,6 +1278,13 @@ export default {
           }
         },
         missions: {
+          desc: {
+            SEAD: 'Sopprimi le difese antiaeree a corto raggio (SHORAD) che proteggono la zona.',
+            DEAD: 'Distruggi l\'artiglieria contraerea (AAA) schierata nella zona.',
+            CAS: 'Supporto aereo ravvicinato: elimina le forze di terra nemiche nella zona.',
+            LOGISTICS: 'Zona libera: porta truppe e rifornimenti per conquistarla.',
+          },
+          abandonShort: 'Abbandona',
           logisticsShort: 'LOG',
           accept: 'Accetta',
           abandon: 'Abbandona missione',
@@ -1287,7 +1294,7 @@ export default {
           error: 'Operazione non riuscita',
           loginRequired: 'Accedi con Discord per accettare le missioni',
           linkRequired: 'Collega il tuo account DCS dal profilo',
-          oneAtATime: 'Hai già una missione in corso',
+          oneAtATime: 'Hai già {{max}} missioni in corso',
           result: {
             completed: '{{type}} Zona {{number}} completata: +{{xp}} XP',
             expired: '{{type}} Zona {{number}} scaduta',

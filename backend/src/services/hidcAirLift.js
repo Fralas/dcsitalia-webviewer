@@ -53,6 +53,8 @@ export const AIRLIFT_RULES = Object.freeze({
 const ORDER_HISTORY = 60;
 // CSV ids such as "weapons.droptanks.1100L Tank Empty" or "weapons.containers.{INV-SMOKE-WHITE}": spaces allowed, no commas / newlines.
 const ITEM_PATTERN = /^weapons\.[A-Za-z0-9_]+\.[^,\r\n]{1,100}$/;
+// Categories not offered for AI transport: pods / containers, drop tanks, torpedoes, adapters / pylons.
+export const AIRLIFT_EXCLUDED_CATEGORIES = Object.freeze(['containers', 'droptanks', 'torpedoes', 'adapters']);
 
 export function airliftCost(aircraftKey, units) {
   const aircraft = AIRLIFT_AIRCRAFT[aircraftKey];
@@ -75,6 +77,7 @@ function httpError(message, status = 400) {
  * @param {(user, minLevel, action) => object} deps.requirePilot
  * @param {(user) => number} deps.levelOf
  * @param {(cmd: object) => object} deps.enqueueWebCommand
+ * @param {(id: string) => boolean} [deps.hasWebCommand]  is the command still in the DBRIDGE queue?
  * @param {(id: string) => object|null} deps.getWebCommandResult
  * @param {(event: string, payload: object) => void} deps.emit
  * @param {(event: object) => void} [deps.pushFeed]
@@ -141,6 +144,9 @@ export function createHidcAirLift(deps) {
       const id = String(row?.id || '').trim();
       const qty = Math.floor(Number(row?.qty) || 0);
       if (!ITEM_PATTERN.test(id) || qty <= 0) return;
+      if (AIRLIFT_EXCLUDED_CATEGORIES.includes(id.split('.')[1])) {
+        throw httpError(`${id.split('.').slice(2).join('.')} non è trasportabile con le missioni IA.`);
+      }
       merged.set(id, (merged.get(id) || 0) + qty);
     });
     if (merged.size === 0) throw httpError('Scegli almeno una munizione da trasportare.');
@@ -157,7 +163,7 @@ export function createHidcAirLift(deps) {
     const id = `AL${now.toString(36).toUpperCase()}${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
     const pilotName = pilot.stats?.name || pilot.link?.name || user.username || null;
     const commandId = `airlift_${id}`;
-    deps.enqueueWebCommand({
+    const command = {
       id: commandId,
       type: 'ai_airlift',
       mission_id: id,
@@ -169,9 +175,13 @@ export function createHidcAirLift(deps) {
       pilot: pilotName || '',
       requested_by: pilotName || '',
       requested_by_id: user.id,
+      // Stays in the queue until DCS answers, even if the mission is not running right now.
+      keep_until_result: true,
       ts: now,
-    });
+    };
+    deps.enqueueWebCommand(command);
     const entry = {
+      command,
       id,
       commandId,
       discordId: user.id,
@@ -201,7 +211,8 @@ export function createHidcAirLift(deps) {
   /** Order status: DCS result first (refused?), then the flight in the DCORE state file. */
   function publicOrder(entry, flightsById) {
     const flight = flightsById.get(entry.id) || null;
-    const result = deps.getWebCommandResult(entry.commandId);
+    // The live result leaves the DBRIDGE files once the command is pruned: fall back to the saved one.
+    const result = deps.getWebCommandResult(entry.commandId) || entry.dcsResult || null;
     let status = 'queued';
     let message = null;
     if (result && result.ok === false) {
@@ -227,7 +238,7 @@ export function createHidcAirLift(deps) {
       cost: entry.cost,
       createdAt: entry.createdAt,
       status,
-      message,
+      message: message || (status === 'queued' ? 'In attesa del server DCS' : null),
       position: flight && Number.isFinite(Number(flight.lat)) && flight.status === 'enroute'
         ? { lat: Number(flight.lat), lon: Number(flight.lon) }
         : null,
@@ -286,9 +297,61 @@ export function createHidcAirLift(deps) {
     };
   }
 
+  /** DBRIDGE command of an order (older orders did not store it: rebuilt from the airport config). */
+  function commandFor(entry) {
+    if (entry.command) return { ...entry.command, keep_until_result: true, ts: Date.now() };
+    const airports = new Map(airportOptions().map((airport) => [airport.id, airport]));
+    const from = airports.get(entry.fromId);
+    const to = airports.get(entry.toId);
+    if (!from || !to) return null;
+    return {
+      id: entry.commandId,
+      type: 'ai_airlift',
+      mission_id: entry.id,
+      aircraft: entry.aircraft,
+      from: from.dcsName,
+      to: to.dcsName,
+      items: entry.items,
+      cost: entry.cost,
+      pilot: entry.pilotName || '',
+      requested_by: entry.pilotName || '',
+      requested_by_id: entry.discordId,
+      keep_until_result: true,
+      ts: Date.now(),
+    };
+  }
+
+  /**
+   * Orders still waiting for DCS: save its answer on the order as soon as it comes (the result files are pruned
+   * later), and put the command back in the queue if it got lost (old TTL, queue file reset, site restart).
+   */
+  function syncPendingOrders() {
+    const orders = readOrders();
+    const flights = new Set(readDcoreState().flights.map((flight) => String(flight.id)));
+    let dirty = false;
+    let changed = false;
+    orders.forEach((entry) => {
+      if (entry.dcsResult) return;
+      const result = deps.getWebCommandResult(entry.commandId);
+      if (result) {
+        entry.dcsResult = { ok: result.ok === true, message: result.message || '', at: Date.now() };
+        dirty = true;
+        changed = true;
+        return;
+      }
+      if (flights.has(String(entry.id))) return; // DCS took it (state file), result already pruned
+      if (typeof deps.hasWebCommand === 'function' && !deps.hasWebCommand(entry.commandId)) {
+        const command = commandFor(entry);
+        if (command) deps.enqueueWebCommand(command);
+      }
+    });
+    if (dirty) writeOrders(orders);
+    return changed;
+  }
+
   /** Tells the clients when DCS rewrites the state file or answers a command. */
   function tick() {
-    let changed = false;
+    let changed = syncPendingOrders();
     try {
       if (deps.stateFile && fs.existsSync(deps.stateFile)) {
         const mtime = fs.statSync(deps.stateFile).mtimeMs;

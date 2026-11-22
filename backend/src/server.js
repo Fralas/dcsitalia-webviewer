@@ -1372,7 +1372,8 @@ function pruneWebCommands(now = Date.now()) {
   const before = webCommands.length;
   webCommands = webCommands.filter((cmd) => {
     const ts = Number(cmd?.ts) || 0;
-    if (now - ts > WEB_COMMAND_TTL_MS) return false;
+    // keep_until_result (AI logistics orders): wait for DCS however long the mission is down.
+    if (now - ts > WEB_COMMAND_TTL_MS && cmd?.keep_until_result !== true) return false;
     const result = webCommandResultsById.get(cmd.id);
     if (result && now - (Number(result._localTs) || now) > WEB_COMMAND_RESULT_GRACE_MS) return false;
     return true;
