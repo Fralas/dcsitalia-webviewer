@@ -2481,11 +2481,7 @@ function FlatMapView({
               key={`ship-${ship.id || ship.group}`}
               position={[ship.lat, ship.lon]}
               icon={createShipMapIcon(ship)}
-            >
-              <Tooltip direction="top" offset={[0, -10]} opacity={0.95}>
-                {formatShipHoverLabel(ship, language)}
-              </Tooltip>
-            </Marker>
+            />
           );
         })}
 
@@ -4359,19 +4355,7 @@ function MapLibreFlatMapView({
         },
       });
 
-      map.on('mousemove', 'ships-hit-layer', (event) => {
-        map.getCanvas().style.cursor = 'pointer';
-        const feature = event?.features?.[0];
-        const name = feature?.properties?.name || 'Ship';
-        showHoverPopup(
-          event.lngLat,
-          `<div style="font-size:11px;font-weight:600;">${name}</div>`
-        );
-      });
-      map.on('mouseleave', 'ships-hit-layer', () => {
-        if (!placementActive) map.getCanvas().style.cursor = '';
-        hideHoverPopup();
-      });
+      // Ships show no hover label.
 
       addGeoSource('crate-clusters-src', fcCrateClusters);
       addGeoSource('spawn-radius-src', fcSpawnRadius);
