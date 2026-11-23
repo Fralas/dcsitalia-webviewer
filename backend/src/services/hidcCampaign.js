@@ -221,14 +221,17 @@ export function createHidcCampaign(deps) {
     };
   }
 
-  // Logistica per pilota (DCORE DBRIDGE_Cargo): somma sugli UCID collegati allo stesso account.
+  // Logistica per pilota (DCORE DBRIDGE_Cargo: casse al gancio o nel vano, truppe): somma sugli UCID collegati allo stesso account.
   function cargoForUcids(ucids) {
     if (serverBot?.getCargo) return serverBot.getCargo(ucids);
     const parsed = readJsonFile(files.cargo, null);
     const pilots = parsed?.pilots && typeof parsed.pilots === 'object' ? parsed.pilots : null;
     if (!pilots) return null;
     let found = false;
-    const out = { deliveries: 0, kg: 0, km: 0, tkm: 0, last: null, bestKm: 0, bestKg: 0, bestAt: null };
+    const out = {
+      deliveries: 0, kg: 0, km: 0, tkm: 0, last: null, bestKm: 0, bestKg: 0, bestAt: null,
+      troops: 0, troopsKg: 0, troopsKm: 0, troopsTkm: 0,
+    };
     (ucids || []).forEach((ucid) => {
       const row = pilots[ucid];
       if (!row) return;
@@ -237,6 +240,11 @@ export function createHidcCampaign(deps) {
       out.kg += Number(row.kg) || 0;
       out.km += Number(row.km) || 0;
       out.tkm += Number(row.tkm) || 0;
+      // Truppe imbarcate e sbarcate (DBRIDGE_Cargo troops_*).
+      out.troops += Number(row.troops) || 0;
+      out.troopsKg += Number(row.troops_kg) || 0;
+      out.troopsKm += Number(row.troops_km) || 0;
+      out.troopsTkm += Number(row.troops_tkm) || 0;
       // Longest single delivery (DBRIDGE_Cargo best_km / best_kg / best_at).
       if ((Number(row.best_km) || 0) > out.bestKm) {
         out.bestKm = Number(row.best_km) || 0;
@@ -246,7 +254,10 @@ export function createHidcCampaign(deps) {
       const last = Number(row.last) || 0;
       if (last && (!out.last || last > out.last)) out.last = last;
     });
-    return found ? out : { deliveries: 0, kg: 0, km: 0, tkm: 0, last: null, bestKm: 0, bestKg: 0, bestAt: null };
+    return found ? out : {
+      deliveries: 0, kg: 0, km: 0, tkm: 0, last: null, bestKm: 0, bestKg: 0, bestAt: null,
+      troops: 0, troopsKg: 0, troopsKm: 0, troopsTkm: 0,
+    };
   }
 
   // ---------------------------------------------------------------- test levels (never in production)
@@ -373,6 +384,12 @@ export function createHidcCampaign(deps) {
         sorties: entry.sorties || [],
         activity: entry.activity || {},
         records: entry.records || {},
+        // Only the DCSSB_MOCK data has these for now; the profile hides each chart when missing.
+        monthly: entry.monthly || null,
+        hours: entry.hours || null,
+        theatres: entry.theatres || null,
+        sides: entry.sides || null,
+        credits: entry.credits || null,
       },
     };
   }
@@ -1034,6 +1051,8 @@ export function createHidcCampaign(deps) {
       combat: pilot.combat || null,
       cargo: pilot.link ? cargoForUcids(ucids) : null,
       botAvailable: Boolean(botToken) && !serverBot,
+      // DCSSB_MOCK: the profile also fills the patch grid with catalog patches to preview the layout.
+      mock: Boolean(serverBot?.mock),
       minStartLevel: VOTE_RULES.minStartLevel,
     };
   }

@@ -1,37 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Award, ChevronDown, Loader2, Pencil, Trash2, Upload } from 'lucide-react';
+import { ChevronDown, Loader2, Pencil, Trash2, Upload } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useUser } from '../contexts/UserContext';
 import * as api from '../services/api';
 import InlineError from './InlineError';
 import PatchViewer from './PatchViewer';
-import PilotHero, { PilotIdentity } from './profile/PilotHero';
-import CareerLadder from './profile/CareerLadder';
-import ServiceRecord from './profile/ServiceRecord';
-import CampaignBrief from './profile/CampaignBrief';
-import XpRules from './profile/XpRules';
+import PilotHero, { AccountFooter } from './profile/PilotHero';
 import CombatRecord from './profile/CombatRecord';
-import Logbook from './profile/Logbook';
 import SupportRecord from './profile/SupportRecord';
+import AwardsGrid from './profile/AwardsGrid';
+import {
+  AircraftTable, FlightPattern, KpiStrip, MonthlyTrend, Section, TheatreSplit, TrapsRecord, WeaponsTable,
+} from './profile/StatsCharts';
 import { getPilotRank } from '../config/pilotRanks';
 import useHidcPilot from '../utils/useHidcPilot';
 import { loadSeenAwards, rememberAwardKeys } from '../utils/achievementSeen';
 import { ActivityCalendar, PersonalRecords, RecentSorties } from './profile/PilotHistory';
 import './UserProfile.css';
 import './profile/ProfilePage.css';
-
-function formatDate(timestamp) {
-  if (!Number.isFinite(timestamp)) return '-';
-  try {
-    return new Date(timestamp).toLocaleDateString('it-IT', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-  } catch {
-    return '-';
-  }
-}
 
 function normalizeUserName(value, fallback = '') {
   const trimmed = String(value || '').trim();
@@ -40,6 +26,17 @@ function normalizeUserName(value, fallback = '') {
 }
 
 const ACHIEVEMENTS_REFRESH_INTERVAL_MS = 15000;
+const STANDINGS_LIMIT = 10;
+
+/** Top rows of a standings list, plus the viewer's own row (after a gap) when it falls outside. */
+function standingsRows(entries, selfIndex) {
+  const rows = entries.slice(0, STANDINGS_LIMIT).map((entry, index) => ({ entry, index }));
+  if (selfIndex >= STANDINGS_LIMIT) {
+    rows.push({ gap: true });
+    rows.push({ entry: entries[selfIndex], index: selfIndex });
+  }
+  return rows;
+}
 
 function getAchievementAwardKey(achievement) {
   const awardId = String(achievement?.awardId || '').trim();
@@ -310,8 +307,10 @@ export default function UserProfile() {
 
   const pilotLeaderboard = pilot.leaderboard || [];
   const ownPilotIndex = pilotLeaderboard.findIndex((entry) => String(entry?.discordId || '') === String(user?.id || ''));
-  const pilotLevel = pilot.profile?.level?.level ?? 0;
   const pilotLinked = Boolean(pilot.profile?.linked);
+  const combat = pilot.profile?.combat;
+  const botConnected = Boolean(combat);
+  const ownPatchIndex = leaderboard.findIndex((entry) => String(entry?.userId || '') === String(user?.id || ''));
 
   const handleCreateAchievement = async (event) => {
     event.preventDefault();
@@ -506,46 +505,93 @@ export default function UserProfile() {
   const allVisibleSelected = visibleMemberIds.length > 0
     && visibleMemberIds.every((id) => selectedAssignIds.includes(id));
 
+  const cargo = pilot.profile?.cargo;
+  const hasDiary = pilotLinked && (botConnected || Number(cargo?.bestKm) > 0);
+
+  // DCSSB_MOCK only: pad the patch grid with catalog / sample patches to preview the 3x3 and its expansion.
+  let shownAchievements = userAchievements;
+  if (pilot.profile?.mock && userAchievements.length < 14) {
+    const owned = new Set(userAchievements.map((a) => String(a.achievementId)));
+    const pad = catalog.filter((c) => !owned.has(String(c.id))).map((c) => ({
+      achievementId: c.id, name: c.name, description: c.description, imageUrl: c.imageUrl,
+    }));
+    while (userAchievements.length + pad.length < 14) pad.push({ achievementId: `sample-${pad.length}`, name: `Patch di prova ${pad.length + 1}`, imageUrl: '' });
+    shownAchievements = [
+      ...userAchievements,
+      ...pad.slice(0, 14 - userAchievements.length).map((a, i) => ({ ...a, awardId: `mock-${a.achievementId}`, awardedAt: Date.now() - (i + 1) * 6 * 86400000 })),
+    ];
+  }
+
   return (
     <div className="profile pf">
-      <PilotHero
-        user={user}
-        displayName={displayName}
-        avatarUrl={avatarUrl}
-        pilot={pilot}
+      <div className={pilotLinked ? 'pf-top pf-top--split' : 'pf-top'}>
+        <PilotHero
+          user={user}
+          displayName={displayName}
+          avatarUrl={avatarUrl}
+          pilot={pilot}
+        />
+        {pilotLinked && <KpiStrip profile={pilot.profile} boardPosition={ownPilotIndex >= 0 ? ownPilotIndex + 1 : null} />}
+      </div>
+
+      {pilotLinked && pilot.profile && !botConnected && (
+        <p className="profile-msg pf-bot-notice">
+          Combattimento, attività, ultime sortite, velivoli e rifornimenti in volo arrivano da DCSServerBot:
+          compariranno quando il sito sarà collegato al bot.
+        </p>
+      )}
+
+      {pilotLinked && combat?.monthly && (
+        <Section title="Andamento">
+          <MonthlyTrend monthly={combat.monthly} />
+        </Section>
+      )}
+
+      {pilotLinked && botConnected && (
+        <Section title="Attività">
+          <div className="pf-grid-3 pf-grid-3--flush pf-activity">
+            <ActivityCalendar activity={combat.activity} linked={pilotLinked} available={botConnected} />
+            <FlightPattern hours={combat.hours} />
+            <TheatreSplit theatres={combat.theatres} sides={combat.sides} />
+          </div>
+        </Section>
+      )}
+
+      <CombatRecord combat={combat} linked={pilotLinked} />
+
+      {pilotLinked && botConnected && (combat.aircraft?.length > 0 || combat.weapons?.length > 0) && (
+        <Section title="Velivoli e armi">
+          <div className="pf-grid-2">
+            <AircraftTable aircraft={combat.aircraft} />
+            <WeaponsTable weapons={combat.weapons} />
+          </div>
+        </Section>
+      )}
+
+      {pilotLinked && <TrapsRecord traps={combat?.traps} />}
+
+      <SupportRecord
+        linked={pilotLinked}
+        cargo={cargo}
+        refueling={combat?.refueling}
+        botConnected={botConnected}
       />
 
-      <div className="pf-layout">
-        <section className="pf-col">
+      {hasDiary && (
+        <Section title="Diario di volo">
+          <div className="pf-grid-2">
+            <RecentSorties sorties={combat?.sorties} linked={pilotLinked} available={botConnected} />
+            <PersonalRecords records={combat?.records} cargo={cargo} linked={pilotLinked} available={botConnected} />
+          </div>
+        </Section>
+      )}
+
+      <div className="pf-section pf-grid-2 pf-grid-2--wide">
+        <div className="pf-panel">
           <div className="profile__section-head">
-            <h2 className="profile__section-title">Carriera</h2>
-            <span className="pf-hint">Livello 0–100</span>
-          </div>
-          <CareerLadder level={pilotLevel} linked={pilotLinked} />
-          <ActivityCalendar activity={pilot.profile?.combat?.activity} linked={pilotLinked} available={Boolean(pilot.profile?.combat)} />
-          <PersonalRecords records={pilot.profile?.combat?.records} cargo={pilot.profile?.cargo} linked={pilotLinked} available={Boolean(pilot.profile?.combat)} />
-          <RecentSorties sorties={pilot.profile?.combat?.sorties} linked={pilotLinked} available={Boolean(pilot.profile?.combat)} />
-        </section>
-
-        <section className="profile__board">
-          <ServiceRecord
-            profile={pilot.profile}
-            patchCount={userAchievements.length}
-            boardPosition={ownPilotIndex >= 0 ? ownPilotIndex + 1 : null}
-            identity={<PilotIdentity user={user} displayName={displayName} avatarUrl={avatarUrl} pilot={pilot} />}
-          />
-          <CombatRecord combat={pilot.profile?.combat} linked={pilotLinked} />
-          <SupportRecord
-            linked={pilotLinked}
-            cargo={pilot.profile?.cargo}
-            refueling={pilot.profile?.combat?.refueling}
-            botConnected={Boolean(pilot.profile?.combat)}
-          />
-
-          <div className={`profile__section-head${pilotLinked ? ' pf-after-block' : ''}`}>
             <h2 className="profile__section-title">Riconoscimenti</h2>
+            <span className="pf-hint">{shownAchievements.length} patch</span>
           </div>
-
           {loading && (
             <div className="profile__status">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -553,41 +599,92 @@ export default function UserProfile() {
             </div>
           )}
           <InlineError message={error} className="mb-3" />
-
-          {userAchievements.length === 0 && !loading ? (
+          {shownAchievements.length === 0 && !loading ? (
             <p className="profile__empty">Nessuna patch assegnata.</p>
           ) : (
-            <div className="profile__patches">
-              {userAchievements.map((achievement) => (
-                <button
-                  key={achievement.awardId || achievement.achievementId}
-                  type="button"
-                  className="profile__patch"
-                  onClick={() => openPatchViewer(achievement)}
-                  disabled={!achievement.imageUrl}
-                  title={achievement.imageUrl ? 'Apri patch' : 'Patch non disponibile'}
-                  aria-label={achievement.imageUrl ? `Apri patch ${achievement.name || ''}` : 'Patch non disponibile'}
-                >
-                  {achievement.imageUrl ? (
-                    <img
-                      src={achievement.imageUrl}
-                      alt=""
-                      className="profile__patch-art"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <span className="profile__patch-fallback">
-                      <Award className="h-8 w-8" />
-                    </span>
-                  )}
-                  <p className="profile__patch-name">{achievement.name}</p>
-                  <p className="profile__patch-date">{formatDate(achievement.awardedAt)}</p>
-                </button>
-              ))}
-            </div>
+            <AwardsGrid achievements={shownAchievements} onOpen={openPatchViewer} />
+          )}
+        </div>
+
+        <div className="pf-panel">
+          <div className="profile__section-head">
+            <h2 className="profile__section-title">Classifica</h2>
+            <span className="pf-hint">{boardTab === 'pilots' ? 'Livello' : 'Patch'}</span>
+          </div>
+          <div className="profile-ops__tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={boardTab === 'pilots'}
+              className={`profile-ops__tab${boardTab === 'pilots' ? ' is-active' : ''}`}
+              onClick={() => setBoardTab('pilots')}
+            >
+              Piloti
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={boardTab === 'patches'}
+              className={`profile-ops__tab${boardTab === 'patches' ? ' is-active' : ''}`}
+              onClick={() => setBoardTab('patches')}
+            >
+              Patch
+            </button>
+          </div>
+
+          {boardTab === 'pilots' && (
+            pilotLeaderboard.length === 0 ? (
+              <p className="profile__empty">Nessun pilota collegato.</p>
+            ) : (
+              <div className="profile__standings-list">
+                {standingsRows(pilotLeaderboard, ownPilotIndex).map(({ entry, index, gap }) => {
+                  if (gap) return <div key="gap" className="pf-standings-gap" aria-hidden="true">···</div>;
+                  const isSelf = String(entry?.discordId || '') === String(user?.id || '');
+                  const rank = getPilotRank(entry?.level);
+                  return (
+                    <div key={entry.discordId || index} className={`profile__standings-row pf-standings-row${isSelf ? ' is-self' : ''}`}>
+                      <span className={`profile__standings-pos${index < 3 ? ' is-top' : ''}`}>{index + 1}</span>
+                      <span className="pf-standings-who">
+                        <span className="profile__standings-name">{isSelf ? `${entry.name} · tu` : entry.name}</span>
+                        <span className="pf-standings-rank">{rank.fullName}</span>
+                      </span>
+                      <span className="profile__standings-count">{rank.level}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )
           )}
 
-          <CampaignBrief />
+          {boardTab === 'patches' && (
+            leaderboard.length === 0 ? (
+              <p className="profile__empty">Nessun dato.</p>
+            ) : (
+              <div className="profile__standings-list">
+                {standingsRows(leaderboard, ownPatchIndex).map(({ entry, gap }) => {
+                  if (gap) return <div key="gap" className="pf-standings-gap" aria-hidden="true">···</div>;
+                  const isSelf = String(entry?.userId || '') === String(user?.id || '');
+                  const rowName = normalizeUserName(entry?.displayName, entry?.userId);
+                  const position = Number(entry?.position || 0);
+                  return (
+                    <div
+                      key={`${entry?.userId || 'user'}-${entry?.position || 0}`}
+                      className={`profile__standings-row${isSelf ? ' is-self' : ''}`}
+                    >
+                      <span className={`profile__standings-pos${position > 0 && position <= 3 ? ' is-top' : ''}`}>
+                        {entry?.position || '—'}
+                      </span>
+                      <span className="profile__standings-name">{isSelf ? `${rowName} · tu` : rowName}</span>
+                      <span className="profile__standings-count">{entry?.achievementCount || 0}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          )}
+        </div>
+      </div>
+
 
           {canManageAchievements && (
             <section className="profile__ops">
@@ -847,86 +944,8 @@ export default function UserProfile() {
               )}
             </section>
           )}
-        </section>
 
-        <aside className="profile__standings">
-          <div className="profile__section-head">
-            <h2 className="profile__section-title">Classifica</h2>
-          </div>
-          <div className="profile-ops__tabs" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={boardTab === 'pilots'}
-              className={`profile-ops__tab${boardTab === 'pilots' ? ' is-active' : ''}`}
-              onClick={() => setBoardTab('pilots')}
-            >
-              Piloti
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={boardTab === 'patches'}
-              className={`profile-ops__tab${boardTab === 'patches' ? ' is-active' : ''}`}
-              onClick={() => setBoardTab('patches')}
-            >
-              Patch
-            </button>
-          </div>
-
-          {boardTab === 'pilots' && (
-            pilotLeaderboard.length === 0 ? (
-              <p className="profile__empty">Nessun pilota collegato.</p>
-            ) : (
-              <div className="profile__standings-list">
-                {pilotLeaderboard.map((entry, index) => {
-                  const isSelf = String(entry?.discordId || '') === String(user?.id || '');
-                  const rank = getPilotRank(entry?.level);
-                  return (
-                    <div key={entry.discordId || index} className={`profile__standings-row pf-standings-row${isSelf ? ' is-self' : ''}`}>
-                      <span className={`profile__standings-pos${index < 3 ? ' is-top' : ''}`}>{index + 1}</span>
-                      <span className="pf-standings-who">
-                        <span className="profile__standings-name">{isSelf ? `${entry.name} · tu` : entry.name}</span>
-                        <span className="pf-standings-rank">{rank.fullName}</span>
-                      </span>
-                      <span className="profile__standings-count">{rank.level}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )
-          )}
-
-          {boardTab === 'patches' && (
-            leaderboard.length === 0 ? (
-              <p className="profile__empty">Nessun dato.</p>
-            ) : (
-              <div className="profile__standings-list">
-                {leaderboard.slice(0, 12).map((entry) => {
-                  const isSelf = String(entry?.userId || '') === String(user?.id || '');
-                  const rowName = normalizeUserName(entry?.displayName, entry?.userId);
-                  const position = Number(entry?.position || 0);
-                  return (
-                    <div
-                      key={`${entry?.userId || 'user'}-${entry?.position || 0}`}
-                      className={`profile__standings-row${isSelf ? ' is-self' : ''}`}
-                    >
-                      <span className={`profile__standings-pos${position > 0 && position <= 3 ? ' is-top' : ''}`}>
-                        {entry?.position || '—'}
-                      </span>
-                      <span className="profile__standings-name">{isSelf ? `${rowName} · tu` : rowName}</span>
-                      <span className="profile__standings-count">{entry?.achievementCount || 0}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )
-          )}
-
-          <Logbook combat={pilot.profile?.combat} linked={pilotLinked} />
-          <XpRules rules={pilot.profile?.rules} minStartLevel={pilot.profile?.minStartLevel} />
-        </aside>
-      </div>
+      <AccountFooter user={user} pilot={pilot} />
 
       {pendingClaim && (
         <div className="profile-claim">

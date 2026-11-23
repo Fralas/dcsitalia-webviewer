@@ -4,8 +4,7 @@ import { tankerName } from './SupportRecord';
 const fmt = (n, digits = 0) => (Number(n) || 0).toLocaleString('it-IT', { maximumFractionDigits: digits, minimumFractionDigits: digits });
 const LB_TO_KG = 0.45359237;
 const WEEKS = 12;
-const RECENT_LIMIT = 4;
-const MISSING = 'Disponibile quando il sito è collegato a DCSServerBot.';
+const RECENT_LIMIT = 8;
 
 const THEATRES = {
   Caucasus: 'Caucaso',
@@ -36,13 +35,15 @@ const joinSub = (...parts) => parts.filter(Boolean).join(' · ');
 
 function Block({ title, hint, children }) {
   return (
-    <section className="pf-block pf-side">
-      <div className="profile__section-head">
-        <h2 className="profile__section-title">{title}</h2>
-        {hint && <span className="pf-hint">{hint}</span>}
-      </div>
+    <div className="pf-panel">
+      {(title || hint) && (
+        <div className="pf-panel__head">
+          {title && <h3 className="pf-mini__title">{title}</h3>}
+          {hint && <span className="pf-hint">{hint}</span>}
+        </div>
+      )}
       {children}
-    </section>
+    </div>
   );
 }
 
@@ -60,10 +61,7 @@ function level(sec) {
 
 /** 12 weeks x 7 days (Monday first), one square per UTC day, shaded by flight time. */
 export function ActivityCalendar({ activity, linked, available }) {
-  if (!linked) return null;
-  if (!available) {
-    return <Block title="Attività"><p className="profile__empty">{MISSING}</p></Block>;
-  }
+  if (!linked || !available) return null;
   const now = new Date();
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const mondayOffset = (today.getUTCDay() + 6) % 7;
@@ -96,7 +94,7 @@ export function ActivityCalendar({ activity, linked, available }) {
   }
 
   return (
-    <Block title="Attività" hint="12 settimane">
+    <Block>
       <div className="pf-cal__summary">
         <div><strong>{Math.round(totalSec / 3600)}<small>h</small></strong><span>In volo</span></div>
         <div><strong>{activeDays}</strong><span>Giorni attivi</span></div>
@@ -146,13 +144,16 @@ export function PersonalRecords({ records, cargo, linked, available }) {
     items.push({ key: 'refuel', label: 'Rifornimento più grande', value: <>{fmt((r.biggestRefuel.value * LB_TO_KG) / 1000, 1)}<small>t</small></>, sub: joinSub(tankerName(r.biggestRefuel.tanker), shortDate(r.biggestRefuel.at)) });
   }
   if (Number(cargo?.bestKm) > 0) {
-    items.push({ key: 'cargo', label: 'Consegna sling load più lunga', value: <>{fmt(cargo.bestKm, cargo.bestKm < 10 ? 1 : 0)}<small>km</small></>, sub: joinSub(cargo.bestKg ? `${fmt(cargo.bestKg / 1000, 1)} t` : null, cargo.bestAt ? shortDate(cargo.bestAt * 1000) : null) });
+    items.push({ key: 'cargo', label: 'Consegna più lunga', value: <>{fmt(cargo.bestKm, cargo.bestKm < 10 ? 1 : 0)}<small>km</small></>, sub: joinSub(cargo.bestKg ? `${fmt(cargo.bestKg / 1000, 1)} t` : null, cargo.bestAt ? shortDate(cargo.bestAt * 1000) : null) });
   }
+
+  // Without DCSServerBot only the sling-load record can exist; the page shows one notice for the rest.
+  if (!available && items.length === 0) return null;
 
   return (
     <Block title="Record personali">
       {items.length === 0 ? (
-        <p className="profile__empty">{available ? 'Ancora nessun record: vola una sortita per stabilirne uno.' : MISSING}</p>
+        <p className="profile__empty">Ancora nessun record: vola una sortita per stabilirne uno.</p>
       ) : (
         <ul className="pf-records">
           {items.map((item) => (
@@ -179,12 +180,12 @@ const OUTCOMES = {
 };
 
 export function RecentSorties({ sorties, linked, available }) {
-  if (!linked) return null;
+  if (!linked || !available) return null;
   const list = (sorties || []).slice(0, RECENT_LIMIT);
   return (
     <Block title="Ultime sortite">
       {list.length === 0 ? (
-        <p className="profile__empty">{available ? 'Nessuna sortita registrata.' : MISSING}</p>
+        <p className="profile__empty">Nessuna sortita registrata.</p>
       ) : (
         <ol className="pf-sorties">
           {list.map((s) => {

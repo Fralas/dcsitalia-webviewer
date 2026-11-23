@@ -110,7 +110,8 @@ function TankerFilter({ options, value, onChange }) {
 }
 
 /**
- * Support work: sling-load logistics (DCORE DBRIDGE_Cargo) and air-to-air refueling (DCSServerBot).
+ * Support work: cargo logistics, crates (sling or internal) and troops (DCORE DBRIDGE_Cargo), and
+ * air-to-air refueling (DCSServerBot).
  * Shown to every linked pilot: zeros until the first delivery, a note when DCSServerBot is not connected.
  */
 export default function SupportRecord({ cargo: cargoIn, refueling, linked = false, botConnected = false }) {
@@ -118,7 +119,10 @@ export default function SupportRecord({ cargo: cargoIn, refueling, linked = fals
   if (!linked) return null;
   // Nessun file del tracker DCORE ancora: il pilota non ha ancora trasportato nulla.
   const cargo = cargoIn || { deliveries: 0, kg: 0, km: 0, tkm: 0 };
-  const tonnes = (Number(cargo?.kg) || 0) / 1000;
+  // Totale = casse (gancio o vano) + truppe; km e t·km sommano i due tipi di viaggio.
+  const tonnes = ((Number(cargo.kg) || 0) + (Number(cargo.troopsKg) || 0)) / 1000;
+  const km = (Number(cargo.km) || 0) + (Number(cargo.troopsKm) || 0);
+  const tkm = (Number(cargo.tkm) || 0) + (Number(cargo.troopsTkm) || 0);
 
   const tankers = refueling?.byTanker || [];
   const picked = tanker === ALL ? null : tankers.find((t) => (t.tanker || '?') === tanker);
@@ -126,7 +130,7 @@ export default function SupportRecord({ cargo: cargoIn, refueling, linked = fals
   const fuelKg = (Number(fuel?.lbs) || 0) * LB_TO_KG;
 
   return (
-    <section className="pf-block">
+    <section className="pf-section">
       <div className="profile__section-head">
         <h2 className="profile__section-title">Supporto</h2>
       </div>
@@ -134,23 +138,22 @@ export default function SupportRecord({ cargo: cargoIn, refueling, linked = fals
         <div className="pf-support__half">
           <div className="pf-support__lead">
             <strong>{nf(tonnes, tonnes < 10 ? 1 : 0)}<small>t</small></strong>
-            <span>Carico trasportato in elicottero (sling load)</span>
+            <span>Carico trasportato (casse e truppe)</span>
           </div>
-          <dl className="pf-figures pf-figures--flat">
-            <Stat label="Consegne" value={nf(cargo.deliveries)} />
-            <Stat label="Distanza" value={`${nf(cargo.km, 0)} km`} />
-            <Stat label="Tonnellate·km" value={nf(cargo.tkm, 0)} />
+          <dl className="pf-figures pf-figures--flat pf-figures--4">
+            <Stat label="Casse" value={nf(cargo.deliveries)} />
+            <Stat label="Truppe" value={nf(cargo.troops)} />
+            <Stat label="Distanza" value={`${nf(km, 0)} km`} />
+            <Stat label="Tonnellate·km" value={nf(tkm, 0)} />
           </dl>
         </div>
-        {!refueling && (
+        {!refueling && botConnected && (
           <div className="pf-support__half">
             <div className="pf-support__lead">
               <strong>—</strong>
               <span>Carburante preso in volo</span>
             </div>
-            <p className="profile__empty">
-              {botConnected ? 'Nessun rifornimento in volo registrato.' : 'Disponibile quando il sito è collegato a DCSServerBot.'}
-            </p>
+            <p className="profile__empty">Nessun rifornimento in volo registrato.</p>
           </div>
         )}
         {refueling && (

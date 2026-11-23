@@ -1,15 +1,14 @@
 import Donut from './Donut';
+import { CATEGORY_COLORS, OTHER } from './chartPalette';
 
 const fmt = (n) => (Number(n) || 0).toLocaleString('it-IT');
 
-export const BOT_MISSING = 'Abbattimenti, morti per causa, bersagli preferiti e nemesi arrivano da DCSServerBot: compaiono quando il sito è collegato al suo database (DCSSB_DATABASE_URL).';
-
 export const KILL_CATEGORIES = [
-  { key: 'planes', label: 'Aerei', color: '#ff8c00' },
-  { key: 'helicopters', label: 'Elicotteri', color: '#f5b041' },
-  { key: 'sams', label: 'SAM', color: '#ef4444' },
-  { key: 'ground', label: 'Terra', color: '#8a5a20' },
-  { key: 'ships', label: 'Navi', color: '#60a5fa' },
+  { key: 'planes', label: 'Aerei', color: CATEGORY_COLORS.planes },
+  { key: 'helicopters', label: 'Elicotteri', color: CATEGORY_COLORS.helicopters },
+  { key: 'sams', label: 'SAM', color: CATEGORY_COLORS.sams },
+  { key: 'ground', label: 'Terra', color: CATEGORY_COLORS.ground },
+  { key: 'ships', label: 'Navi', color: CATEGORY_COLORS.ships },
 ];
 
 function ratio(a, b) {
@@ -17,43 +16,30 @@ function ratio(a, b) {
   return (a / b).toLocaleString('it-IT', { maximumFractionDigits: 2 });
 }
 
-function percent(a, b) {
-  if (!b) return '—';
-  return `${Math.round((a / b) * 100)}%`;
-}
 
 /**
  * Combat record from DCSServerBot (userstats): kills by category as a ring, survival figures.
- * Hidden when the stats come from the DCORE tracker (no combat data there).
+ * Hidden without DCSServerBot data: the page shows a single notice for that.
  */
 export default function CombatRecord({ combat, linked = false }) {
-  if (!linked) return null;
-  if (!combat) {
-    return (
-      <section className="pf-block">
-        <div className="profile__section-head">
-          <h2 className="profile__section-title">Combattimento</h2>
-        </div>
-        <p className="profile__empty">{BOT_MISSING}</p>
-      </section>
-    );
-  }
+  if (!linked || !combat) return null;
   const killsBy = combat.killsBy || {};
   const kills = Number(combat.kills) || 0;
 
+  // K/D and landing rate are in the KPI strip at the top of the page.
   const figures = [
-    ['Kill / morti', ratio(kills, combat.deaths)],
     ['PvP', fmt(combat.pvp)],
     ['Morti', fmt(combat.deaths)],
-    ['Rientri', percent(combat.landings, combat.takeoffs)],
     ['Decolli', fmt(combat.takeoffs)],
+    ['Atterraggi', fmt(combat.landings)],
     ['Eiezioni', fmt(combat.ejections)],
     ['Crash', fmt(combat.crashes)],
     ['Fuoco amico', fmt(combat.teamkills)],
+    ['Uccisioni per sortita', combat.takeoffs ? ratio(kills, combat.takeoffs) : '—'],
   ];
 
   return (
-    <section className="pf-block">
+    <section className="pf-section">
       <div className="profile__section-head">
         <h2 className="profile__section-title">Combattimento</h2>
         <span className="pf-hint">Dati DCSServerBot</span>
@@ -125,20 +111,14 @@ function unitName(type) {
   return String(type || '?').replace(/_/g, ' ');
 }
 
-const DEATH_CAUSES = [
-  { key: 'planes', label: 'Aerei', color: '#ff8c00' },
-  { key: 'helicopters', label: 'Elicotteri', color: '#f5b041' },
-  { key: 'sams', label: 'SAM', color: '#ef4444' },
-  { key: 'ground', label: 'Terra', color: '#8a5a20' },
-  { key: 'ships', label: 'Navi', color: '#60a5fa' },
-];
+const DEATH_CAUSES = KILL_CATEGORIES;
 
 /** Deaths split by what killed you; the rest (crashes, collisions, unknown) is "Altro". */
 function DeathCauses({ combat }) {
   const by = combat.deathsBy || {};
   const deaths = Number(combat.deaths) || 0;
   const known = DEATH_CAUSES.reduce((sum, c) => sum + (Number(by[c.key]) || 0), 0);
-  const causes = [...DEATH_CAUSES, { key: 'other', label: 'Altro', color: '#4a4a4a' }]
+  const causes = [...DEATH_CAUSES, { key: 'other', label: 'Altro', color: OTHER }]
     .map((c) => ({ ...c, value: c.key === 'other' ? Math.max(0, deaths - known) : Number(by[c.key]) || 0 }));
   const total = Math.max(deaths, known);
 

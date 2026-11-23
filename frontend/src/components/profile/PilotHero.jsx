@@ -1,4 +1,8 @@
 import { Copy, Link2, Loader2, MessageCircle, Unlink, User as UserIcon } from 'lucide-react';
+import RankInsignia from './RankInsignia';
+import { getNextTier, getPilotRank, getRankTier, PILOT_MAX_LEVEL } from '../../config/pilotRanks';
+
+const fmt = (n) => (Number(n) || 0).toLocaleString('it-IT');
 
 function formatRemaining(expiresAt) {
   const ms = (Number(expiresAt) || 0) - Date.now();
@@ -58,40 +62,71 @@ function LinkBlock({ pilot }) {
   );
 }
 
-function Avatar({ avatarUrl, small = false }) {
-  return (
-    <div className={`profile__avatar${small ? ' profile__avatar--sm' : ''}`}>
-      {avatarUrl ? (
-        <img src={avatarUrl} alt="" />
-      ) : (
-        <div className="profile__avatar-fallback">
-          <UserIcon className={small ? 'h-5 w-5' : 'h-7 w-7'} />
-        </div>
-      )}
-    </div>
-  );
-}
-
 function metaLine(user, profile) {
   const handle = user.username ? `@${user.username}` : user.id;
   const dcsName = profile?.stats?.name || profile?.link?.name;
   return profile?.linked && dcsName ? `${handle} · DCS: ${dcsName}` : handle;
 }
 
-/**
- * Compact identity for linked pilots: it sits in the Stato di servizio heading instead of a
- * full-width header, so career, combat and history start at the top of the page.
- */
-export function PilotIdentity({ user, displayName, avatarUrl, pilot }) {
-  const { profile, busy, unlink } = pilot;
+/** Road to the next rank: one notch per level of the current rank, current level partly filled. */
+function RankProgress({ levelInfo }) {
+  const level = levelInfo.level;
+  const tier = getRankTier(level);
+  const next = getNextTier(level);
+  const inLevel = levelInfo.nextLevelXp
+    ? Math.min(1, (levelInfo.xp - levelInfo.levelXp) / Math.max(1, levelInfo.nextLevelXp - levelInfo.levelXp))
+    : 1;
+  const toNextLevel = levelInfo.nextLevelXp ? levelInfo.nextLevelXp - levelInfo.xp : 0;
+
+  const levels = [];
+  for (let l = tier.from; l < (next ? next.from : tier.to + 1); l += 1) levels.push(l);
+
+  let caption = 'Grado massimo raggiunto';
+  if (next) {
+    const left = next.from - level;
+    caption = `Livello ${level + 1} tra ${fmt(toNextLevel)} XP · ${left === 1 ? 'ultimo livello' : `${left} livelli`} a ${next.name}`;
+  }
+
   return (
-    <div className="pf-ident">
-      <Avatar avatarUrl={avatarUrl} small />
-      <div className="pf-ident__copy">
-        <h1 className="pf-ident__name">{displayName}</h1>
-        <p className="pf-ident__meta">{metaLine(user, profile)}</p>
+    <div className="pf-hero__progress">
+      <div className="pf-track__line">
+        {levels.map((l) => {
+          const fill = l < level ? 1 : l === level ? inLevel : 0;
+          return (
+            <span key={l} className={`pf-track__seg${l === level ? ' is-current' : ''}`} title={`Livello ${l}`}>
+              <i style={{ width: `${Math.round(fill * 100)}%` }} />
+            </span>
+          );
+        })}
       </div>
-      {profile?.linkSource !== 'dcsserverbot' && (
+      <div className="pf-hero__caption">
+        <span>{caption}</span>
+        {next && (
+          <span className="pf-hero__next" title={`Prossimo grado: ${next.name}`}>
+            <RankInsignia level={next.from} size={22} />
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Account footer for linked pilots: unlinking is destructive, so it sits at the bottom of the
+ * page instead of next to the pilot name.
+ */
+export function AccountFooter({ user, pilot }) {
+  const { profile, busy, unlink } = pilot;
+  if (!profile?.linked) return null;
+  return (
+    <section className="pf-section pf-account">
+      <div className="profile__section-head">
+        <h2 className="profile__section-title">Account DCS</h2>
+      </div>
+      <p className="pf-account__meta">{metaLine(user, profile)}</p>
+      {profile.linkSource === 'dcsserverbot' ? (
+        <p className="pf-account__meta">Collegato con /linkme di DCSServerBot.</p>
+      ) : (
         <button
           type="button"
           className="pf-unlink"
@@ -103,48 +138,57 @@ export function PilotIdentity({ user, displayName, avatarUrl, pilot }) {
           <Unlink className="h-3 w-3" /> Scollega DCS
         </button>
       )}
-    </div>
+    </section>
   );
 }
 
 /**
- * Full-width header only until the DCS account is linked (identity + link flow).
- * Linked pilots get PilotIdentity inside Stato di servizio; here only a status message, if any.
+ * One header block: avatar with the rank insignia on it, rank as the kicker, name, and the road to
+ * the next rank right under the name. Before the DCS link, the link flow takes the progress' place.
  */
 export default function PilotHero({ user, displayName, avatarUrl, pilot }) {
   const { profile, loading, message } = pilot;
   const linked = Boolean(profile?.linked);
+  const levelInfo = profile?.level || { level: 0, xp: 0 };
+  const rank = linked ? getPilotRank(levelInfo.level) : null;
   const note = message.text || (linked && profile && !profile.statsAvailable
     ? 'Statistiche DCS non ancora disponibili: si aggiornano mentre voli sul server.'
     : '');
   const toneClass = message.tone ? ` is-${message.tone}` : '';
 
-  if (linked) {
-    return note ? <p className={`profile-msg pf-head__note${toneClass}`}>{note}</p> : null;
-  }
-
   return (
-    <header className="pf-head">
-      <div className="pf-head__id">
-        <Avatar avatarUrl={avatarUrl} />
-        <div className="profile__id-copy">
-          <p className="profile__kicker">Profilo</p>
-          <h1 className="profile__name">{displayName}</h1>
-          <p className="profile__meta">{metaLine(user, profile)}</p>
+    <header className="pf-hero">
+      <div className="pf-hero__avatar">
+        <div className="profile__avatar">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="" />
+          ) : (
+            <div className="profile__avatar-fallback"><UserIcon className="h-8 w-8" /></div>
+          )}
         </div>
+        {rank && (
+          <span className="pf-hero__insignia" title={rank.fullName}>
+            <RankInsignia level={levelInfo.level} size={40} />
+          </span>
+        )}
       </div>
 
-      {loading && !profile ? (
-        <div className="profile__status">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Caricamento
-        </div>
-      ) : (
-        <div className="pf-head__link">
-          <LinkBlock pilot={pilot} />
-        </div>
-      )}
+      <div className="pf-hero__body">
+        <p className="profile__kicker">
+          {rank ? `${rank.fullName} · Livello ${levelInfo.level} / ${levelInfo.maxLevel ?? PILOT_MAX_LEVEL}` : 'Profilo'}
+        </p>
+        <h1 className="pf-hero__name">{displayName}</h1>
+        <p className="profile__meta">{metaLine(user, profile)}</p>
 
-      {note && <p className={`profile-msg pf-head__msg${toneClass}`}>{note}</p>}
+        {loading && !profile && (
+          <div className="profile__status">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Caricamento
+          </div>
+        )}
+        {linked && <RankProgress levelInfo={levelInfo} />}
+        {!linked && profile && <div className="pf-hero__link"><LinkBlock pilot={pilot} /></div>}
+        {note && <p className={`profile-msg pf-hero__msg${toneClass}`}>{note}</p>}
+      </div>
     </header>
   );
 }

@@ -1,0 +1,77 @@
+/* Marker debug card: same dashed glass surface as the front debug panel. */
+
+.hidc-vote.hidc-front-debug.hidc-marker-debug {
+  width: 320px;
+}
+
+/* Front debug panel already docked bottom-left: sit next to it. */
+.hidc-vote.hidc-front-debug.hidc-marker-debug.is-shifted {
+  left: 372px;
+}
+
+.hidc-marker-debug__body {
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+}
+
+.hidc-marker-debug__group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hidc-marker-debug__group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.hidc-marker-debug__group-head:hover {
+  color: var(--hv-accent);
+}
+
+.hidc-marker-debug__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hidc-marker-debug__chip {
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--hv-hairline);
+  border-radius: 999px;
+  background: var(--hv-fill);
+  color: var(--hv-mute);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.hidc-marker-debug__chip:hover {
+  background: var(--hv-fill-hover);
+  color: #ffffff;
+}
+
+.hidc-marker-debug__chip.is-on {
+  border-color: rgba(255, 140, 0, 0.7);
+  background: rgba(255, 140, 0, 0.14);
+  color: #ffffff;
+}
+
+@media (max-width: 760px) {
+  .hidc-vote.hidc-front-debug.hidc-marker-debug,
+  .hidc-vote.hidc-front-debug.hidc-marker-debug.is-shifted {
+    left: 12px;
+    right: 12px;
+    width: auto;
+  }
+}

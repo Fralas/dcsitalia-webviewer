@@ -1,49 +1,20 @@
 /*
- * Full-width profile. Same language as UserProfile.css: flat surfaces, square corners,
+ * Profile page. Same language as UserProfile.css: flat surfaces, square corners,
  * 1px --profile-border lines, uppercase micro labels, single orange accent. Only layout and
  * the new elements (rank, XP bar, career list, link code) are defined here.
  */
 
+/* One column at full page width: sections stacked, side-by-side panels inside a section. */
 .profile.pf {
   display: flex;
   flex-direction: column;
   max-width: none;
   min-height: 100%;
   margin: 0;
-  padding: 28px clamp(16px, 3vw, 48px) 28px;
+  padding: 32px clamp(16px, 3vw, 48px) 40px;
 }
 
 /* ---------------------------------------------------------------- header */
-
-.pf-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px 40px;
-  padding-bottom: 22px;
-  margin-bottom: 26px;
-  border-bottom: 1px solid var(--profile-border);
-}
-
-.pf-head__id {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  min-width: 0;
-}
-
-.pf-head__link {
-  flex: 1;
-  max-width: 720px;
-  padding-left: 32px;
-  border-left: 1px solid var(--profile-border);
-}
-
-.pf-head__msg {
-  flex-basis: 100%;
-  margin: 0;
-}
 
 .pf-unlink {
   display: inline-flex;
@@ -112,31 +83,6 @@
 /* ---------------------------------------------------------------- body */
 
 /* Columns fill the remaining viewport height, separated by full-height hairlines. */
-.pf-layout {
-  display: grid;
-  flex: 1;
-  grid-template-columns: 300px minmax(0, 1fr) 320px;
-  gap: 0;
-  align-items: stretch;
-}
-
-.pf-layout > * {
-  min-width: 0;
-  padding: 0 28px;
-}
-
-.pf-layout > *:first-child {
-  padding-left: 0;
-}
-
-.pf-layout > *:last-child {
-  padding-right: 0;
-}
-
-.pf-layout > * + * {
-  border-left: 1px solid var(--profile-border);
-}
-
 /* Staff tools live inside the Riconoscimenti column (hidden for regular users). */
 .profile.pf .profile__ops {
   margin-top: 28px;
@@ -160,64 +106,8 @@
   margin-top: 0;
 }
 
-.profile__section-head.pf-after-block {
-  margin-top: 34px;
-}
 
 /* road to the next rank */
-
-.pf-track {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 22px;
-}
-
-.pf-track__end {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-.pf-track__end.is-next {
-  flex-direction: row-reverse;
-  text-align: right;
-}
-
-.pf-track__end.is-next svg {
-  opacity: 0.45;
-}
-
-.pf-track__rank {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.pf-track__rank strong {
-  font-size: 18px;
-  font-weight: 800;
-  line-height: 1.15;
-  color: var(--profile-text);
-}
-
-.pf-track__end.is-next .pf-track__rank strong {
-  font-size: 13px;
-  color: var(--profile-dim);
-}
-
-.pf-track__rank small {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--profile-accent);
-}
-
-.pf-track__end.is-next .pf-track__rank small {
-  color: var(--profile-dim);
-}
 
 .pf-track__line {
   position: relative;
@@ -241,19 +131,6 @@
 
 .pf-track__seg.is-current {
   border-color: rgba(255, 140, 0, 0.6);
-}
-
-.pf-track__caption {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-align: center;
-  text-transform: uppercase;
-  color: var(--profile-dim);
 }
 
 /* XP ring + figures */
@@ -391,6 +268,10 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   padding-left: 0;
   border-left: 0;
+}
+
+.pf-figures--flat.pf-figures--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 /* combat extras: death causes, favourite targets, nemesis */
@@ -637,69 +518,6 @@
   background: #8a5a20;
 }
 
-/* campaign */
-
-.pf-war {
-  display: grid;
-  grid-template-columns: auto minmax(60px, 1fr) auto;
-  align-items: center;
-  gap: 16px;
-}
-
-.pf-war__side {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding-left: 12px;
-  border-left: 3px solid #60a5fa;
-}
-
-.pf-war__side.is-red {
-  align-items: flex-end;
-  padding: 0 12px 0 0;
-  border-left: 0;
-  border-right: 3px solid #ef4444;
-}
-
-.pf-war__label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--profile-dim);
-}
-
-.pf-war__region {
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.pf-war__side.is-blue .pf-war__region {
-  color: #60a5fa;
-}
-
-.pf-war__side.is-red .pf-war__region {
-  color: #ef4444;
-}
-
-.pf-war__front {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.pf-war__line {
-  flex: 1;
-  height: 0;
-  border-top: 1px dashed var(--profile-border);
-}
-
-.pf-war__icon {
-  width: 16px;
-  height: 16px;
-  color: var(--profile-accent);
-}
-
 .pf-control {
   margin-top: 22px;
 }
@@ -749,72 +567,6 @@
   color: var(--profile-accent);
 }
 
-.pf-rules {
-  border-top: 1px solid var(--profile-border);
-}
-
-.pf-rules__row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 9px 0;
-  border-bottom: 1px solid #2a2a2a;
-  font-size: 13px;
-  color: var(--profile-muted);
-}
-
-.pf-rules__value {
-  flex-shrink: 0;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--profile-accent);
-}
-
-/* career list: same rows as the standings */
-
-.pf-ladder {
-  border-top: 1px solid var(--profile-border);
-}
-
-.pf-ladder__row {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 0;
-  border-bottom: 1px solid #2a2a2a;
-  font-size: 13px;
-}
-
-.pf-ladder__row.is-locked {
-  color: var(--profile-dim);
-}
-
-.pf-ladder__row.is-locked svg {
-  opacity: 0.35;
-}
-
-.pf-ladder__row.is-current {
-  color: var(--profile-accent);
-}
-
-.pf-ladder__name {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.pf-ladder__range {
-  font-size: 11px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--profile-dim);
-}
-
-.pf-ladder__row.is-current .pf-ladder__range {
-  color: var(--profile-accent);
-}
-
 /* pilots standings: name + rank under it */
 
 .pf-standings-row {
@@ -835,17 +587,9 @@
   color: var(--profile-dim);
 }
 
-.profile.pf .profile__standings-list {
-  margin-top: 0;
-}
-
-.profile.pf .profile-ops__tabs {
-  margin-bottom: 0;
-}
-
 /* ---------------------------------------------------------------- responsive */
 
-@media (max-width: 1500px) {
+@media (max-width: 980px) {
   .pf-combat-extra {
     grid-template-columns: minmax(0, 1fr);
     gap: 22px;
@@ -875,52 +619,9 @@
   }
 }
 
-@media (max-width: 1280px) {
-  .pf-layout {
-    grid-template-columns: 280px minmax(0, 1fr);
-  }
-
-  .profile.pf .pf-layout > .profile__standings {
-    grid-column: 1 / -1;
-    margin-top: 26px;
-    padding: 22px 0 0;
-    border-left: 0;
-    border-top: 1px solid var(--profile-border);
-  }
-}
-
 @media (max-width: 860px) {
-  .pf-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .pf-head__link {
-    flex-basis: 100%;
-    padding-left: 0;
-    border-left: 0;
-  }
-
-  .pf-layout > *,
-  .profile.pf .pf-layout > .profile__standings {
-    padding: 0;
-    border-left: 0;
-  }
-
-  .pf-layout > * + * {
-    margin-top: 26px;
-    padding-top: 22px;
-    border-top: 1px solid var(--profile-border);
-  }
-
-  .pf-track {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .pf-track__end.is-next {
-    display: none;
-  }
-
-  .pf-figures {
+  .pf-figures,
+  .pf-figures--flat.pf-figures--4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -1024,12 +725,6 @@
 }
 
 /* ---------------------------------------------------------------- left column: history */
-.pf-col > .pf-side {
-  margin-top: 30px;
-  padding-top: 24px;
-  border-top: 1px solid var(--profile-border);
-}
-
 /* activity calendar */
 .pf-cal__summary {
   display: flex;
@@ -1069,6 +764,8 @@
 .pf-cal {
   --cal-gap: 3px;
   --cal-lead: 14px;
+  /* square cells: cap the width so a wide column does not make them huge */
+  max-width: 340px;
 }
 
 .pf-cal__months {
@@ -1287,52 +984,603 @@
   color: var(--profile-accent);
 }
 
-/* ---------------------------------------------------------------- compact identity (linked pilots) */
-.pf-service-head {
+/* one notice when DCSServerBot data is missing (replaces the per-block empty states) */
+.pf-bot-notice {
+  margin: 24px 0 0;
+}
+
+/* text toggle (used by the awards grid) */
+.pf-ladder__toggle {
+  display: inline-flex;
   align-items: center;
-  margin-bottom: 18px;
+  gap: 5px;
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--profile-dim);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
 }
 
-.pf-ident {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
+.pf-ladder__toggle:hover {
+  color: var(--profile-text);
 }
 
-.profile__avatar.profile__avatar--sm {
-  width: 44px;
-  height: 44px;
+/* standings: gap before the viewer's own row when it is outside the top rows */
+.pf-standings-gap {
+  padding: 4px 0;
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  text-align: center;
+  color: var(--profile-dim);
 }
 
-.pf-ident__copy {
-  min-width: 0;
+/* account footer (unlink lives here, away from the pilot name) */
+.pf-account {
+  padding-top: 24px;
+  border-top: 1px solid var(--profile-border);
 }
 
-.pf-ident__name {
-  overflow: hidden;
-  margin: 0;
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  line-height: 1.15;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.pf-ident__meta {
-  overflow: hidden;
-  margin: 3px 0 0;
+.pf-account__meta {
+  margin: 0 0 10px;
   font-size: 12px;
   color: var(--profile-dim);
+}
+
+
+/* ================================================================ single-column profile */
+
+/* header: avatar + insignia, rank kicker, name, road to the next rank in one block */
+.pf-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.pf-hero__avatar {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.pf-hero__avatar .profile__avatar {
+  width: 96px;
+  height: 96px;
+}
+
+.pf-hero__insignia {
+  position: absolute;
+  right: -14px;
+  bottom: -10px;
+  display: flex;
+  padding: 3px;
+  border: 1px solid var(--profile-border);
+  background: var(--profile-bg);
+}
+
+.pf-hero__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.pf-hero__name {
+  overflow: hidden;
+  margin: 0;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.pf-ident .pf-unlink {
-  margin-left: 10px;
+.pf-hero__progress {
+  max-width: 640px;
+  margin-top: 16px;
 }
 
-.pf-head__note {
-  margin: 0 0 18px;
+.pf-hero__progress .pf-track__line {
+  padding-bottom: 0;
+}
+
+.pf-hero__caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--profile-dim);
+}
+
+.pf-hero__next {
+  display: flex;
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.pf-hero__link {
+  margin-top: 18px;
+}
+
+.pf-hero__msg {
+  margin: 12px 0 0;
+}
+
+/* sections */
+.pf-section {
+  margin-top: 40px;
+  padding-top: 28px;
+  border-top: 1px solid var(--profile-border);
+}
+
+.pf-panel {
+  min-width: 0;
+}
+
+.pf-panel__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.pf-panel__head .pf-mini__title {
+  margin: 0;
+}
+
+.pf-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px 40px;
+}
+
+.pf-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 32px 40px;
+  margin-top: 28px;
+}
+
+.pf-grid-3--flush {
+  margin-top: 0;
+}
+
+/* Attività row: the calendar sets the height, the punch card and theatre bars stretch to it */
+.pf-activity > .pf-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+/* the calendar column hugs its fixed-width grid, so the three panels are evenly spaced */
+@media (min-width: 1281px) {
+  .pf-activity {
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .pf-activity .pf-cal {
+    width: 340px;
+  }
+}
+
+.pf-activity .pf-punch {
+  flex: 1;
+}
+
+.pf-activity .pf-punch__row:not(.pf-punch__axis) {
+  flex: 1;
+  align-items: stretch;
+}
+
+.pf-activity .pf-punch__day {
+  align-self: center;
+}
+
+.pf-activity .pf-punch__cells i {
+  height: auto;
+  min-height: 14px;
+}
+
+.pf-activity .pf-sides {
+  margin-top: auto;
+  padding-top: 24px;
+}
+
+@media (max-width: 1280px) and (min-width: 861px) {
+  .pf-grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* KPI strip */
+.pf-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0;
+  margin: 32px 0 0;
+  border-top: 1px solid var(--profile-border);
+  border-left: 1px solid var(--profile-border);
+}
+
+.pf-kpi {
+  min-width: 0;
+  padding: 14px 16px;
+  border-right: 1px solid var(--profile-border);
+  border-bottom: 1px solid var(--profile-border);
+}
+
+.pf-kpi dt {
+  margin-bottom: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--profile-dim);
+}
+
+.pf-kpi dd {
+  overflow: hidden;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pf-kpis--compact {
+  margin-top: 0;
+}
+
+/* header row: identity on the left, headline stats on the right */
+.pf-top--split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+  align-items: center;
+  gap: clamp(24px, 3vw, 48px);
+}
+
+.pf-top--split .pf-kpis {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+}
+
+@media (max-width: 1280px) {
+  .pf-top--split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pf-top--split .pf-kpis {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  }
+}
+
+/* recharts */
+.pf-chart {
+  min-width: 0;
+}
+
+.pf-chart-legend {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--profile-muted);
+}
+
+.pf-tip {
+  min-width: 150px;
+  padding: 8px 10px;
+  border: 1px solid var(--profile-border);
+  background: var(--profile-surface);
+  font-size: 12px;
+}
+
+.pf-tip__title {
+  margin: 0 0 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--profile-dim);
+}
+
+.pf-tip__row {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 0;
+  color: var(--profile-muted);
+}
+
+.pf-tip__row i {
+  width: 8px;
+  height: 8px;
+}
+
+.pf-tip__row strong {
+  font-variant-numeric: tabular-nums;
+  color: var(--profile-text);
+}
+
+/* weekday x hour punch card (same orange steps as the activity calendar) */
+.pf-punch {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pf-punch__row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+
+.pf-punch__day {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--profile-dim);
+}
+
+.pf-punch__cells {
+  display: grid;
+  grid-template-columns: repeat(24, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.pf-punch__cells i {
+  display: block;
+  height: 14px;
+  border-radius: 2px;
+  background: #262626;
+}
+
+.pf-punch__cells i.l1 { background: rgba(255, 140, 0, 0.28); }
+.pf-punch__cells i.l2 { background: rgba(255, 140, 0, 0.5); }
+.pf-punch__cells i.l3 { background: rgba(255, 140, 0, 0.75); }
+.pf-punch__cells i.l4 { background: #ff8c00; }
+
+.pf-punch__axis span {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--profile-dim);
+  white-space: nowrap;
+}
+
+.pf-sides {
+  margin-top: 22px;
+}
+
+/* aircraft / weapons tables */
+.pf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.pf-table th {
+  padding: 0 0 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-align: left;
+  text-transform: uppercase;
+  color: var(--profile-dim);
+  border-bottom: 1px solid var(--profile-border);
+}
+
+.pf-table td {
+  padding: 9px 0;
+  border-bottom: 1px solid #2a2a2a;
+  font-variant-numeric: tabular-nums;
+  color: var(--profile-muted);
+  vertical-align: middle;
+}
+
+.pf-table .is-num {
+  width: 64px;
+  text-align: right;
+}
+
+.pf-table td:first-child {
+  padding-right: 16px;
+}
+
+.pf-table__name {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: var(--profile-text);
+}
+
+.pf-table__name small {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--profile-dim);
+}
+
+.pf-table .pf-bars__track {
+  display: block;
+}
+
+/* vertical count bars (LSO grades, wires, cases) */
+.pf-cols {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  height: 150px;
+}
+
+.pf-cols__col {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pf-cols__value {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--profile-muted);
+}
+
+.pf-cols__bar {
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  width: 100%;
+  max-width: 28px;
+}
+
+.pf-cols__bar i {
+  display: block;
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  background: var(--profile-accent);
+}
+
+.pf-cols__label {
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--profile-dim);
+}
+
+/* patches: 3x3 square, expandable */
+.pf-awards--square {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  max-width: 420px;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.pf-awards__slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid var(--profile-border);
+  background: var(--profile-surface);
+}
+
+.pf-awards__slot.is-empty {
+  border-style: dashed;
+  background: transparent;
+}
+
+.pf-awards--square:hover .pf-awards__slot:not(.is-empty),
+.pf-awards--square:focus-visible .pf-awards__slot:not(.is-empty) {
+  border-color: rgba(255, 140, 0, 0.6);
+}
+
+.pf-awards__art {
+  width: 86%;
+  height: 86%;
+  object-fit: contain;
+}
+
+.pf-awards__fallback {
+  color: var(--profile-dim);
+}
+
+.pf-awards__more {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 15, 15, 0.72);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--profile-text);
+}
+
+.pf-awards--list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 16px 12px;
+}
+
+.pf-awards__item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pf-awards__item:disabled {
+  cursor: default;
+}
+
+.pf-awards__item:hover:not(:disabled) .pf-awards__slot {
+  border-color: rgba(255, 140, 0, 0.6);
+}
+
+.pf-awards__name {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pf-awards__date {
+  font-size: 11px;
+  color: var(--profile-dim);
+}
+
+@media (max-width: 860px) {
+  .pf-hero {
+    gap: 18px;
+  }
+
+  .pf-hero__avatar .profile__avatar {
+    width: 72px;
+    height: 72px;
+  }
+
+  .pf-hero__name {
+    font-size: 24px;
+  }
+
+  .pf-grid-2,
+  .pf-grid-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pf-kpi dd {
+    font-size: 18px;
+  }
 }

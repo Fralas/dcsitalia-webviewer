@@ -4,7 +4,7 @@
  *
  * Every Discord account that opens its profile is "linked" and gets a stable, plausible set of stats
  * (seeded by the Discord id), plus a few fake pilots for the leaderboard. Also fakes the DCORE
- * sling-load logistics (getCargo), so every profile block has data.
+ * cargo logistics (getCargo: crates and troops), so every profile block has data.
  */
 
 function seededRandom(seedText) {
@@ -44,6 +44,10 @@ function mockEntry(discordId, name) {
     sec: Math.round((40 - i * 6) * 3600 * (0.4 + rand())),
     takeoffs: int(rand, 5, 60),
     kills: int(rand, 0, 40),
+  })).map((a) => ({
+    ...a,
+    landings: Math.round(a.takeoffs * (0.7 + rand() * 0.25)),
+    deaths: int(rand, 0, Math.max(1, Math.round(a.takeoffs / 6))),
   })).sort((a, b) => b.sec - a.sec);
   const playtimeSec = aircraft.reduce((s, a) => s + a.sec, 0);
   const takeoffs = aircraft.reduce((s, a) => s + a.takeoffs, 0);
@@ -70,7 +74,8 @@ function mockEntry(discordId, name) {
     .sort((a, b) => b.count - a.count).slice(0, 3);
   const weapons = WEAPONS.map((weapon) => {
     const shots = int(rand, 4, 90);
-    return { weapon, shots, hits: Math.round(shots * (0.25 + rand() * 0.6)) };
+    const hits = Math.round(shots * (0.25 + rand() * 0.6));
+    return { weapon, shots, hits, kills: Math.round(hits * (0.3 + rand() * 0.5)) };
   }).sort((a, b) => b.shots - a.shots);
   const byTanker = TANKER_TYPES.slice(0, int(rand, 2, TANKER_TYPES.length)).map((tanker) => {
     const n = int(rand, 2, 18);
@@ -88,7 +93,7 @@ function mockEntry(discordId, name) {
   // Last sorties, newest first.
   const OUTCOMES = ['landed', 'landed', 'landed', 'landed', 'lost', 'ejected', 'unknown'];
   let cursor = Date.now() - int(rand, 1, 20) * 3600 * 1000;
-  const sorties = Array.from({ length: 4 }, (_, i) => {
+  const sorties = Array.from({ length: 8 }, (_, i) => {
     const a = aircraft[int(rand, 0, aircraft.length - 1)];
     const sec = int(rand, 18, 150) * 60;
     const outcome = i === 0 && rand() > 0.6 ? 'open' : OUTCOMES[int(rand, 0, OUTCOMES.length - 1)];
@@ -124,6 +129,45 @@ function mockEntry(discordId, name) {
     biggestRefuel: { value: int(rand, 9000, 16000), tanker: byTanker[0].tanker, at: Date.now() - int(rand, 3, 60) * 86400000 },
   };
   const bestKm = int(rand, 18, 75);
+  const troops = int(rand, 10, 240);
+
+  // Last 12 months, oldest first ('YYYY-MM' UTC).
+  const monthly = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - (11 - i), 1));
+    const sortiesN = int(rand, 2, 30);
+    return {
+      month: d.toISOString().slice(0, 7),
+      sec: sortiesN * int(rand, 35, 80) * 60,
+      sorties: sortiesN,
+      kills: int(rand, 0, sortiesN * 2),
+      deaths: int(rand, 0, Math.ceil(sortiesN / 4)),
+    };
+  });
+
+  // Flight time by weekday (0 = Monday) x UTC hour: evenings and weekend afternoons.
+  const hours = Array.from({ length: 7 }, (_, day) => Array.from({ length: 24 }, (_, hour) => {
+    const evening = hour >= 18 && hour <= 23;
+    const weekendDay = day >= 5 && hour >= 13 && hour <= 23;
+    const p = evening ? 0.75 : weekendDay ? 0.6 : hour >= 9 && hour <= 17 ? 0.1 : 0.02;
+    return rand() < p ? int(rand, 10, 180) * 60 : 0;
+  }));
+
+  const theatres = THEATRES.map((theatre) => ({ theatre, sec: int(rand, 2, 60) * 3600 }))
+    .sort((a, b) => b.sec - a.sec);
+  const sides = { blue: Math.round(playtimeSec * (0.7 + rand() * 0.25)) };
+  sides.red = playtimeSec - sides.blue;
+
+  const trapsN = int(rand, 8, 60);
+  const trapGrades = { '_OK_': int(rand, 0, 4), OK: int(rand, 3, 18), '(OK)': int(rand, 3, 14), '--': int(rand, 1, 8), B: int(rand, 0, 5), WO: int(rand, 0, 6), C: int(rand, 0, 2) };
+  const traps = rand() > 0.15 ? {
+    traps: trapsN,
+    avgPoints: 2.5 + rand() * 1.5,
+    wire3: int(rand, 2, Math.round(trapsN / 2)),
+    grades: trapGrades,
+    wires: { 1: int(rand, 0, 8), 2: int(rand, 2, 14), 3: int(rand, 4, 22), 4: int(rand, 0, 6) },
+    cases: { 1: int(rand, 6, 30), 2: int(rand, 0, 6), 3: int(rand, 0, 10) },
+    night: int(rand, 0, 9),
+  } : null;
 
   return {
     sorties,
@@ -161,7 +205,12 @@ function mockEntry(discordId, name) {
       topTanker: byTanker[0].tanker,
       byTanker,
     },
-    traps: rand() > 0.3 ? { traps: int(rand, 5, 60), avgPoints: 2.5 + rand() * 1.5, wire3: int(rand, 2, 30) } : null,
+    traps,
+    monthly,
+    hours,
+    theatres,
+    sides,
+    credits: { points: int(rand, 200, 4800), campaign: 'HIDC' },
     cargo: {
       deliveries: int(rand, 4, 80),
       kg: int(rand, 8, 140) * 1000,
@@ -171,6 +220,10 @@ function mockEntry(discordId, name) {
       bestKm,
       bestKg: int(rand, 1, 5) * 1000,
       bestAt: Math.floor(Date.now() / 1000) - int(rand, 3, 40) * 86400,
+      troops,
+      troopsKg: troops * 100,
+      troopsKm: int(rand, 20, 400),
+      troopsTkm: Math.round(troops * 0.1 * int(rand, 3, 20)),
     },
   };
 }

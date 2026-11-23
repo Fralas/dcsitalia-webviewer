@@ -36,6 +36,9 @@ import HidcMapZoneNumberLabels from './map/HidcMapZoneNumberLabels';
 import HidcRegionBorders from './map/HidcRegionBorders';
 import HidcRegionVotePanel from './map/HidcRegionVotePanel';
 import HidcFrontDebugPanel, { readHidcDebugFlag } from './map/HidcFrontDebugPanel';
+import HidcMarkerDebugPanel from './map/HidcMarkerDebugPanel';
+import { buildDebugMarkers } from '../utils/hidcDebugMarkers';
+import { HIDC_REGION_BORDERS } from '../config/hidcRegionBorders';
 import useHidcAirlift from '../utils/useHidcAirlift';
 import HidcTestLevelMenu from './map/HidcTestLevelMenu';
 import useHidcCampaign from '../utils/useHidcCampaign';
@@ -4768,49 +4771,49 @@ function MapLibreFlatMapView({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map) return;
     const source = map.getSource('grid-src');
     if (source?.setData) source.setData(fcGrid);
   }, [fcGrid]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map) return;
     const source = map.getSource('logistics-src');
     if (source?.setData) source.setData(fcLogistics);
   }, [fcLogistics]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map) return;
     const source = map.getSource('convoy-lines-src');
     if (source?.setData) source.setData(fcConvoyLines);
   }, [fcConvoyLines]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map) return;
     const source = map.getSource('convoy-points-src');
     if (source?.setData) source.setData(fcConvoyPoints);
   }, [fcConvoyPoints]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map) return;
     const source = map.getSource('airlift-players-src');
     if (source?.setData) source.setData(fcAirliftPlayers);
   }, [fcAirliftPlayers]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map) return;
     const source = map.getSource('dcsar-links-src');
     if (source?.setData) source.setData(fcDcsarLinks);
   }, [fcDcsarLinks]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map) return;
     const source = map.getSource('dcsar-points-src');
     if (source?.setData) source.setData(fcDcsarPoints);
   }, [fcDcsarPoints]);
@@ -4833,14 +4836,14 @@ function MapLibreFlatMapView({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map) return;
     const source = map.getSource('zones-src');
     if (source?.setData) source.setData(fcZones);
   }, [fcZones]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map) return;
     const source = map.getSource('zone-areas-src');
     if (source?.setData) source.setData(fcZoneAreas);
   }, [fcZoneAreas]);
@@ -4865,7 +4868,7 @@ function MapLibreFlatMapView({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map) return;
     const source = map.getSource('airports-src');
     if (source?.setData) source.setData(fcAirports);
   }, [fcAirports]);
@@ -4999,7 +5002,8 @@ function MapLibreFlatMapView({
       applyProductionPointSourceData(map);
     };
 
-    if (map.isStyleLoaded()) {
+    // isStyleLoaded() is false while tiles/terrain stream in and `load` has already fired: apply as soon as the source exists.
+    if (map.isStyleLoaded() || map.getSource('production-points-src')) {
       syncProductionPoints();
       return undefined;
     }
@@ -5028,7 +5032,7 @@ function MapLibreFlatMapView({
       retryId = window.setTimeout(syncShips, 100);
     };
 
-    if (map.isStyleLoaded()) {
+    if (map.isStyleLoaded() || map.getSource('ships-src')) {
       syncShips();
     } else {
       map.once('load', syncShips);
@@ -5043,21 +5047,21 @@ function MapLibreFlatMapView({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map) return;
     const source = map.getSource('crate-clusters-src');
     if (source?.setData) source.setData(fcCrateClusters);
   }, [fcCrateClusters]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map) return;
     const source = map.getSource('spawn-radius-src');
     if (source?.setData) source.setData(fcSpawnRadius);
   }, [fcSpawnRadius]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map) return;
     const source = map.getSource('dbuild-markers-src');
     if (source?.setData) source.setData(fcDbuildMarkers);
   }, [fcDbuildMarkers]);
@@ -5071,7 +5075,7 @@ function MapLibreFlatMapView({
       if (routesSource?.setData) routesSource.setData(fcTankerRoutes);
     };
 
-    if (map.isStyleLoaded()) {
+    if (map.isStyleLoaded() || map.getSource('tanker-routes-src')) {
       applyTankerRouteData();
       return undefined;
     }
@@ -5084,7 +5088,7 @@ function MapLibreFlatMapView({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map) return;
     const tankerRingSource = map.getSource('tanker-exclusion-ring-src');
     if (tankerRingSource?.setData) tankerRingSource.setData(fcTankerExclusionRing);
     const tankerPointSource = map.getSource('tanker-wp1-point-src');
@@ -5354,6 +5358,8 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   const [hidcDebugEnabled] = useState(readHidcDebugFlag);
   const [hidcDebug, setHidcDebug] = useState(null);
   const [hidcFrontStats, setHidcFrontStats] = useState(null);
+  // Marker debug tool (same ?hidcDebug=1 flag): fake markers of every type, client-side only.
+  const [debugMarkerTypes, setDebugMarkerTypes] = useState(() => new Set());
   const hidcMapCampaign = useMemo(() => {
     if (!hidcDebug) return hidcCampaign;
     return {
@@ -7328,6 +7334,48 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
     [webSpawnMarkers]
   );
 
+  // Marker debug tool: fake markers placed around the active region (fallback: theater focus).
+  const debugMarkerAnchor = useMemo(() => {
+    if (!hidcDebugEnabled) return null;
+    const target = hidcMapCampaign?.focus?.target || null;
+    const feature = target
+      ? HIDC_REGION_BORDERS.features.find((entry) => entry?.properties?.id === target)
+      : null;
+    const regionZoneIds = new Set((feature?.properties?.zones || []).map((zoneId) => normalizeZoneId(zoneId)));
+    if (regionZoneIds.size > 0) {
+      const points = validZones
+        .filter((zone) => regionZoneIds.has(normalizeZoneId(zone.id)))
+        .map((zone) => zone.coordinates);
+      if (points.length > 0) {
+        return {
+          lat: points.reduce((sum, point) => sum + point.lat, 0) / points.length,
+          lon: points.reduce((sum, point) => sum + point.lon, 0) / points.length,
+          label: `regione attiva ${target}`,
+        };
+      }
+    }
+    return theaterFocus ? { ...theaterFocus, label: 'centro teatro' } : null;
+  }, [hidcDebugEnabled, hidcMapCampaign, validZones, theaterFocus]);
+
+  const debugMarkers = useMemo(
+    () => buildDebugMarkers(debugMarkerTypes, debugMarkerAnchor),
+    [debugMarkerTypes, debugMarkerAnchor]
+  );
+  const withDebug = (live, fake) => (fake.length > 0 ? [...(live || []), ...fake] : live);
+  const mapAirportsWithDebug = useMemo(() => withDebug(airportsForMap, debugMarkers.airports), [airportsForMap, debugMarkers]);
+  const mapConvoysWithDebug = useMemo(() => withDebug(convoyRenderData, debugMarkers.convoys), [convoyRenderData, debugMarkers]);
+  const mapAirliftPlayersWithDebug = useMemo(() => withDebug(airliftPlayerRenderData, debugMarkers.airliftPlayers), [airliftPlayerRenderData, debugMarkers]);
+  const mapDcsarWithDebug = useMemo(() => withDebug(dcsarPointsWithNearest, debugMarkers.dcsarPoints), [dcsarPointsWithNearest, debugMarkers]);
+  const mapProductionPointsWithDebug = useMemo(() => withDebug(productionPointsForMap, debugMarkers.productionPoints), [productionPointsForMap, debugMarkers]);
+  const mapShipsWithDebug = useMemo(() => withDebug(shipPositions, debugMarkers.ships), [shipPositions, debugMarkers]);
+  const mapCrateClustersWithDebug = useMemo(() => withDebug(crateClusters, debugMarkers.crateClusters), [crateClusters, debugMarkers]);
+  const mapDbuildMarkersWithDebug = useMemo(() => withDebug(dbuildMapMarkers, debugMarkers.dbuildMarkers), [dbuildMapMarkers, debugMarkers]);
+  const mapTankerRoutesWithDebug = useMemo(() => withDebug(tankerRoutes, debugMarkers.tankerRoutes), [tankerRoutes, debugMarkers]);
+  const mapAirliftSitesWithDebug = useMemo(
+    () => withDebug(isSyriaCampaign ? (hidcAirlift?.sites || []) : [], debugMarkers.airliftSites),
+    [isSyriaCampaign, hidcAirlift, debugMarkers]
+  );
+
   const selectedDbuildPlacement = useMemo(
     () => (selectedDbuildPlacementId ? dbuildPlacements.find((entry) => entry.id === selectedDbuildPlacementId) || null : null),
     [selectedDbuildPlacementId, dbuildPlacements]
@@ -7517,13 +7565,13 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                   {isMapLibreEngine ? (
                     <MapLibreFlatMapView
                       zones={atoZonesForMap}
-                      airportsData={airportsForMap}
+                      airportsData={mapAirportsWithDebug}
                       logisticsMissions={routeVisibleLogisticsMissions}
                       logisticsFrontlineAirportIds={logisticsFrontlineAirportIds}
                       gridConnections={gridConnections}
-                      convoys={convoyRenderData}
-                      airliftPlayers={airliftPlayerRenderData}
-                      dcsarPoints={dcsarPointsWithNearest}
+                      convoys={mapConvoysWithDebug}
+                      airliftPlayers={mapAirliftPlayersWithDebug}
+                      dcsarPoints={mapDcsarWithDebug}
                       selectedZoneId={selectedZoneId}
                       hoveredZoneId={hoveredZoneId}
                       onZoneSelect={setSelectedZoneId}
@@ -7541,11 +7589,11 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       showDcsar={filters.showDcsar}
                       basemapMode={basemapMode}
                       focusTargetKey={tacticalFocusTargetKey}
-                      productionPoints={productionPointsForMap}
+                      productionPoints={mapProductionPointsWithDebug}
                       showProductionPoints={filters.showProductionPoints}
                       selectedProductionPointId={selectedProductionPointId}
                       onProductionPointSelect={handleProductionPointSelect}
-                      ships={shipPositions}
+                      ships={mapShipsWithDebug}
                       showShips={filters.showShips}
                       language={language}
                       spawnPlacementActive={Boolean(spawnMode)}
@@ -7554,9 +7602,9 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       retrievePlacementActive={Boolean(retrieveMode)}
                       onRetrievePlace={handleRetrievePlace}
                       retrievePpCenter={retrievePpCenter}
-                      crateClusters={crateClusters}
+                      crateClusters={mapCrateClustersWithDebug}
                       mapMaxZoom={mapMaxZoom}
-                      dbuildMapMarkers={dbuildMapMarkers}
+                      dbuildMapMarkers={mapDbuildMarkersWithDebug}
                       selectedDbuildPlacementId={selectedDbuildPlacementId}
                       onDbuildPlacementSelect={handleDbuildPlacementSelect}
                       mapContextMenuEnabled={mapContextMenuEnabled}
@@ -7566,11 +7614,11 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       tankerPlacementActive={Boolean(tankerMode)}
                       onTankerPlace={handleTankerPlace}
                       tankerWp1={tankerWp1}
-                      tankerRoutes={tankerRoutes}
+                      tankerRoutes={mapTankerRoutesWithDebug}
                       orderAlerts={airportOrderAlerts}
                       onMapReady={notifyMapReady}
                       hidcCampaign={hidcMapCampaign}
-                      airliftSites={isSyriaCampaign ? (hidcAirlift?.sites || []) : []}
+                      airliftSites={mapAirliftSitesWithDebug}
                       onAirliftSiteSelect={(site) => setOpsMapFocus({ key: `site:${site.id}`, lat: site.lat, lon: site.lon, ts: Date.now() })}
                       showRegionBorders={isSyriaCampaign}
                       hidcZones={validZones}
@@ -7580,12 +7628,12 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                   ) : (
                     <FlatMapView
                       zones={zonesForMap}
-                      airportsData={airportsForMap}
+                      airportsData={mapAirportsWithDebug}
                       logisticsMissions={routeVisibleLogisticsMissions}
                       gridConnections={gridConnections}
-                      convoys={convoyRenderData}
-                      airliftPlayers={airliftPlayerRenderData}
-                      dcsarPoints={dcsarPointsWithNearest}
+                      convoys={mapConvoysWithDebug}
+                      airliftPlayers={mapAirliftPlayersWithDebug}
+                      dcsarPoints={mapDcsarWithDebug}
                       selectedZoneId={selectedZoneId}
                       hoveredZoneId={hoveredZoneId}
                       onZoneSelect={setSelectedZoneId}
@@ -7604,11 +7652,11 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       animationTick={animationTick}
                       basemapMode={basemapMode}
                       focusTargetKey={tacticalFocusTargetKey}
-                      productionPoints={productionPointsForMap}
+                      productionPoints={mapProductionPointsWithDebug}
                       showProductionPoints={filters.showProductionPoints}
                       selectedProductionPointId={selectedProductionPointId}
                       onProductionPointSelect={handleProductionPointSelect}
-                      ships={shipPositions}
+                      ships={mapShipsWithDebug}
                       showShips={filters.showShips}
                       language={language}
                       spawnPlacementActive={Boolean(spawnMode)}
@@ -7617,9 +7665,9 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       retrievePlacementActive={Boolean(retrieveMode)}
                       onRetrievePlace={handleRetrievePlace}
                       retrievePpCenter={retrievePpCenter}
-                      crateClusters={crateClusters}
+                      crateClusters={mapCrateClustersWithDebug}
                       mapMaxZoom={mapMaxZoom}
-                      dbuildMapMarkers={dbuildMapMarkers}
+                      dbuildMapMarkers={mapDbuildMarkersWithDebug}
                       selectedDbuildPlacementId={selectedDbuildPlacementId}
                       onDbuildPlacementSelect={handleDbuildPlacementSelect}
                       mapContextMenuEnabled={mapContextMenuEnabled}
@@ -7629,7 +7677,7 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                       tankerPlacementActive={Boolean(tankerMode)}
                       onTankerPlace={handleTankerPlace}
                       tankerWp1={tankerWp1}
-                      tankerRoutes={tankerRoutes}
+                      tankerRoutes={mapTankerRoutesWithDebug}
                       orderAlerts={airportOrderAlerts}
                       onMapReady={notifyMapReady}
                     />
@@ -7666,6 +7714,20 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                   debug={hidcDebug}
                   onChange={setHidcDebug}
                   stats={hidcFrontStats}
+                />
+              )}
+
+              {hidcDebugEnabled && (
+                <HidcMarkerDebugPanel
+                  enabled={debugMarkerTypes}
+                  onChange={setDebugMarkerTypes}
+                  anchorLabel={debugMarkerAnchor?.label || 'nessuna posizione'}
+                  shifted={isSyriaCampaign}
+                  onCenter={() => {
+                    if (debugMarkerAnchor) {
+                      setOpsMapFocus({ key: `debug-markers:${Date.now()}`, lat: debugMarkerAnchor.lat, lon: debugMarkerAnchor.lon, ts: Date.now() });
+                    }
+                  }}
                 />
               )}
 
