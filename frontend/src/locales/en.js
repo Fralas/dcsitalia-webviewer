@@ -1302,6 +1302,32 @@ export default {
             cancelled: '{{type}} Zone {{number}} cancelled'
           }
         },
+        cargo: {
+          title: 'Cargo transport',
+          desc: 'The production point is full: retrieve the crates (RETRIEVE) and fly them to the airport shown.',
+          queueHeading: 'Your transports',
+          availableHeading: 'Available transports',
+          pointsHeading: 'Production points',
+          route: 'Route',
+          routeHint: 'Shortest order: each load is delivered before picking up the next one.',
+          routeHintMulti: 'Shortest order with {{capacity}} loads on board at once.',
+          stops: '{{count}} stops',
+          departure: 'Take off',
+          pickup: 'Pick up',
+          dropoff: 'Deliver',
+          queue: 'Queue',
+          queueFull: 'You already have {{max}} transports queued',
+          delivered: 'Delivered {{done}}/{{total}}',
+          crates: '{{count}} crate',
+          cratesMany: '{{count}} crates',
+          empty: 'No full production point',
+          result: {
+            completed: 'Transport {{pp}} → {{airport}} completed: +{{xp}} XP',
+            expired: 'Transport {{pp}} → {{airport}} expired',
+            expiredNoFlight: 'Transport {{pp}} → {{airport}} expired: no flight recorded',
+            cancelled: 'Transport {{pp}} → {{airport}} cancelled'
+          }
+        },
         airdropUnit: 'Airdrop unit'
       },
       zoneCard: {

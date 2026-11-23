@@ -1327,6 +1327,15 @@ export async function abandonHidcMission(assignmentId) {
   return fetchAPI(`/hidc/missions/assignments/${encodeURIComponent(assignmentId)}`, { method: 'DELETE' });
 }
 
+// HIDC "Trasporto cargo" (full production point -> nearest BLUE airport): queue, drop. Both return the campaign state.
+export async function acceptHidcCargoMission(missionId) {
+  return fetchAPI(`/hidc/cargo/${encodeURIComponent(missionId)}/accept`, { method: 'POST', body: JSON.stringify({}) });
+}
+
+export async function abandonHidcCargoMission(assignmentId) {
+  return fetchAPI(`/hidc/cargo/assignments/${encodeURIComponent(assignmentId)}`, { method: 'DELETE' });
+}
+
 /** Test only (dev servers, allowed accounts): force my level, null = real level. Returns the campaign state. */
 export async function setHidcTestLevel(level) {
   return fetchAPI('/hidc/dev/level', { method: 'POST', body: JSON.stringify({ level }) });

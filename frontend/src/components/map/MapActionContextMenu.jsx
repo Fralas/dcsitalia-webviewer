@@ -46,6 +46,13 @@ function resolveIcon(entry) {
   return ICON_BY_KEY[entry.icon] || Target;
 }
 
+function formatLatLon(lat, lon) {
+  const la = Number(lat);
+  const lo = Number(lon);
+  if (!Number.isFinite(la) || !Number.isFinite(lo)) return '';
+  return `${Math.abs(la).toFixed(3)}°${la >= 0 ? 'N' : 'S'}  ${Math.abs(lo).toFixed(3)}°${lo >= 0 ? 'E' : 'W'}`;
+}
+
 export default function MapActionContextMenu({
   menu,
   onClose,
@@ -93,38 +100,66 @@ export default function MapActionContextMenu({
     }
   }, [menu, onSelectDbuild, onSelectMapAction, onSelectTanker]);
 
-  const flowerItems = useMemo(() => currentItems.map((entry) => ({
-    id: entry.id,
-    icon: resolveIcon(entry),
-    label: entry.label,
-    onClick: () => handleItemClick(entry),
-  })), [currentItems, handleItemClick]);
+  const flowerItems = useMemo(() => currentItems.map((entry) => {
+    const hasChildren = Boolean(entry.children?.length) && !entry.action;
+    let meta = null;
+    let metaTone = 'mute';
+    if (Number.isFinite(Number(entry.cost)) && entry.cost !== null && entry.cost !== undefined) {
+      meta = `${entry.cost} fp`;
+      metaTone = 'cost';
+    } else if (entry.subtitle) {
+      meta = entry.subtitle;
+    } else if (hasChildren) {
+      meta = `${entry.children.length} voci`;
+    }
+    return {
+      id: entry.id,
+      icon: resolveIcon(entry),
+      label: entry.label,
+      title: [entry.label, entry.subtitle, entry.cost != null ? `${entry.cost} fp` : null].filter(Boolean).join(' · '),
+      meta,
+      metaTone,
+      hasChildren,
+      onClick: () => handleItemClick(entry),
+    };
+  }), [currentItems, handleItemClick]);
+
+  // Esc: back one level, or close at the root.
+  useEffect(() => {
+    if (!menu) return undefined;
+    const onKey = (event) => {
+      if (event.key !== 'Escape') return;
+      if (path.length > 0) handleBack();
+      else onClose?.();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menu, path.length, handleBack, onClose]);
 
   if (!menu) return null;
 
   const atRoot = path.length === 0;
-  const centerIcon = atRoot ? Crosshair : ChevronLeft;
+  const centerIcon = atRoot ? null : ChevronLeft;
+  const trail = path.map((id) => resolveContextMenuNode(path.slice(0, path.indexOf(id) + 1))?.label || id);
+  const title = atRoot ? 'Azioni' : trail.join(' › ');
+  const caption = formatLatLon(menu.lat, menu.lon);
 
   return (
     <div
       className="absolute z-[1200] -translate-x-1/2 -translate-y-1/2"
-      style={{ left: menu.x, top: menu.y }}
+      style={{ left: Math.round(menu.x), top: Math.round(menu.y) }}
       onClick={(event) => event.stopPropagation()}
       onContextMenu={(event) => event.preventDefault()}
     >
       <FlowerMenu
         key={path.join('/') || 'root'}
         menuItems={flowerItems}
-        defaultOpen
         centerIcon={centerIcon}
+        centerLabel={atRoot ? 'Chiudi' : 'Indietro'}
         centerOnClick={atRoot ? null : handleBack}
         onClose={atRoot ? onClose : null}
-        closeDelay={180}
-        togglerSize={34}
-        petalOffset={28}
-        labelMaxLength={13}
-        animationDuration={280}
-        centerIconColor={atRoot ? '#FF8C00' : '#EDEDED'}
+        title={title}
+        caption={caption}
       />
     </div>
   );

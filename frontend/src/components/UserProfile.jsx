@@ -10,7 +10,7 @@ import CombatRecord from './profile/CombatRecord';
 import SupportRecord from './profile/SupportRecord';
 import AwardsGrid from './profile/AwardsGrid';
 import {
-  AircraftTable, FlightPattern, KpiStrip, MonthlyTrend, Section, TheatreSplit, TrapsRecord, WeaponsTable,
+  AircraftTable, FlightHours, KpiStrip, MonthlyTrend, Section, TheatreSplit, TrapsRecord, WeaponsTable,
 } from './profile/StatsCharts';
 import { getPilotRank } from '../config/pilotRanks';
 import useHidcPilot from '../utils/useHidcPilot';
@@ -71,8 +71,7 @@ export default function UserProfile() {
   const [assignAchievementId, setAssignAchievementId] = useState('');
   const [assigningAchievement, setAssigningAchievement] = useState(false);
   const [assignStatus, setAssignStatus] = useState('');
-  const [managementOpen, setManagementOpen] = useState(false);
-  const [opsMode, setOpsMode] = useState('assign');
+  const [managementOpen, setManagementOpen] = useState(false);  const [opsMode, setOpsMode] = useState('assign');
 
   const [editAchievementId, setEditAchievementId] = useState('');
   const [editAchievementName, setEditAchievementName] = useState('');
@@ -551,7 +550,7 @@ export default function UserProfile() {
         <Section title="Attività">
           <div className="pf-grid-3 pf-grid-3--flush pf-activity">
             <ActivityCalendar activity={combat.activity} linked={pilotLinked} available={botConnected} />
-            <FlightPattern hours={combat.hours} />
+            <FlightHours hours={combat.hours} />
             <TheatreSplit theatres={combat.theatres} sides={combat.sides} />
           </div>
         </Section>
@@ -586,7 +585,7 @@ export default function UserProfile() {
         </Section>
       )}
 
-      <div className="pf-section pf-grid-2 pf-grid-2--wide">
+      <div className="pf-section pf-grid-2 pf-awards-row">
         <div className="pf-panel">
           <div className="profile__section-head">
             <h2 className="profile__section-title">Riconoscimenti</h2>
@@ -602,7 +601,10 @@ export default function UserProfile() {
           {shownAchievements.length === 0 && !loading ? (
             <p className="profile__empty">Nessuna patch assegnata.</p>
           ) : (
-            <AwardsGrid achievements={shownAchievements} onOpen={openPatchViewer} />
+            <AwardsGrid
+              achievements={shownAchievements}
+              onSeen={rememberSeenAward}
+            />
           )}
         </div>
 

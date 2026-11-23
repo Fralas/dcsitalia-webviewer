@@ -1092,6 +1092,208 @@
   to { transform: rotate(360deg); }
 }
 
+/* ---- HIDC cargo transports (HidcCargoPanel.jsx, tab Produzione) ---- */
+.hidc-mission__type--cargo { color: #fdba74; background: rgba(255, 140, 0, 0.16); }
+
+/* no filter drawer on this tab: no room to keep clear on the right */
+.hidc-mission.hidc-cargo {
+  padding-right: 10px;
+}
+
+.hidc-cargo__heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-top: 4px;
+  padding: 0 2px;
+  color: var(--ops-mute);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.hidc-cargo__count {
+  color: var(--ops-gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.hidc-cargo__leg {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  margin-top: 6px;
+  color: #d4d6da;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.hidc-cargo__leg span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hidc-cargo__leg svg {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  color: var(--ops-mute);
+}
+
+.hidc-cargo__arrow {
+  flex-shrink: 0;
+  color: var(--ops-gold);
+}
+
+.map-ops-section__row-meta.is-full {
+  color: var(--ops-gold);
+}
+
+.hidc-cargo-route {
+  flex-shrink: 0;
+  padding: 10px 10px 8px;
+  border-radius: var(--ops-row-radius);
+  background: var(--ops-row);
+  box-shadow: inset 0 0 0 1px rgba(255, 140, 0, 0.22);
+}
+
+.hidc-cargo-route__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.hidc-cargo-route__head svg {
+  width: 13px;
+  height: 13px;
+  color: #ff8c00;
+}
+
+.hidc-cargo-route__title {
+  flex: 1 1 auto;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.hidc-cargo-route__total {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ops-gold);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hidc-cargo-route__stops {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* the line joining the stops, behind their dots */
+.hidc-cargo-route__stops::before {
+  content: '';
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 10px;
+  border-left: 1px dashed rgba(255, 140, 0, 0.45);
+}
+
+.hidc-cargo-route__stop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 24px;
+  padding: 2px 4px 2px 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #ffffff;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hidc-cargo-route__stop:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.hidc-cargo-route__dot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 21px;
+  height: 21px;
+  border: 1px solid rgba(255, 140, 0, 0.5);
+  border-radius: 999px;
+  background: #121212;
+  color: #ff8c00;
+}
+
+.hidc-cargo-route__dot svg {
+  width: 11px;
+  height: 11px;
+}
+
+.hidc-cargo-route__stop--departure .hidc-cargo-route__dot {
+  border-color: rgba(255, 255, 255, 0.25);
+  color: var(--ops-mute);
+}
+
+.hidc-cargo-route__stop--dropoff .hidc-cargo-route__dot {
+  border-color: rgba(74, 222, 128, 0.5);
+  color: #86efac;
+}
+
+.hidc-cargo-route__kind {
+  flex-shrink: 0;
+  width: 58px;
+  color: var(--ops-mute);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.hidc-cargo-route__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hidc-cargo-route__leg {
+  flex-shrink: 0;
+  color: var(--ops-mute);
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hidc-cargo-route__hint {
+  margin: 6px 0 0;
+  color: var(--ops-mute);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
 /* ---- HIDC AI logistics (HidcAirliftPanel.jsx) ---- */
 .hidc-airlift-request {
   display: flex;

@@ -3212,6 +3212,28 @@ function MapLibreFlatMapView({
     return { type: 'FeatureCollection', features: lineFeatures };
   }, [tankerRoutes]);
 
+  // HIDC "Trasporto cargo": the pilot's queued transports in the shortest order (backend hidcCargoMissions.js).
+  const cargoRouteStops = hidcCampaign?.cargo?.mine?.route?.stops;
+  const fcCargoRoute = useMemo(() => {
+    const stops = (cargoRouteStops || []).filter((stop) => Number.isFinite(stop?.lat) && Number.isFinite(stop?.lon));
+    if (stops.length < 2) return { type: 'FeatureCollection', features: [] };
+    return {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: stops.map((stop) => [stop.lon, stop.lat]) },
+          properties: { id: 'cargo-route' },
+        },
+        ...stops.map((stop, index) => ({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [stop.lon, stop.lat] },
+          properties: { id: `cargo-stop-${index}`, kind: stop.kind, step: index, name: stop.name },
+        })),
+      ],
+    };
+  }, [cargoRouteStops]);
+
   const disposeThreeNode = useCallback((node) => {
     if (!node) return;
     node.traverse?.((entry) => {
@@ -4487,6 +4509,51 @@ function MapLibreFlatMapView({
         hideHoverPopup();
       });
 
+      addGeoSource('cargo-route-src', fcCargoRoute);
+      map.addLayer({
+        id: 'cargo-route-line-layer',
+        type: 'line',
+        source: 'cargo-route-src',
+        filter: ['==', ['geometry-type'], 'LineString'],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#ff8c00',
+          'line-width': 2.5,
+          'line-opacity': 0.9,
+          'line-dasharray': [2, 1.5],
+        },
+      });
+      map.addLayer({
+        id: 'cargo-route-stops-layer',
+        type: 'circle',
+        source: 'cargo-route-src',
+        filter: ['==', ['geometry-type'], 'Point'],
+        paint: {
+          'circle-radius': 6,
+          'circle-color': [
+            'match',
+            ['get', 'kind'],
+            'departure', '#9a9a9a',
+            'dropoff', '#4ade80',
+            '#ff8c00',
+          ],
+          'circle-stroke-color': '#0f0f0f',
+          'circle-stroke-width': 2,
+        },
+      });
+      map.on('mousemove', 'cargo-route-stops-layer', (event) => {
+        const props = event?.features?.[0]?.properties || {};
+        const kindLabel = props.kind === 'departure' ? 'Decollo' : props.kind === 'dropoff' ? 'Consegna' : 'Carica';
+        const name = String(props.name || '').replace(/[<>&"]/g, '');
+        showHoverPopup(
+          event.lngLat,
+          `<div style="font-size:11px;font-weight:600;">${Number(props.step) + 1}. ${kindLabel} · ${name}</div>`
+        );
+      });
+      map.on('mouseleave', 'cargo-route-stops-layer', () => {
+        hideHoverPopup();
+      });
+
       map.addLayer({
         id: 'dbuild-markers-layer',
         type: 'symbol',
@@ -5085,6 +5152,23 @@ function MapLibreFlatMapView({
       map.off('load', applyTankerRouteData);
     };
   }, [fcTankerRoutes]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return undefined;
+    const applyCargoRoute = () => {
+      const source = map.getSource('cargo-route-src');
+      if (source?.setData) source.setData(fcCargoRoute);
+    };
+    if (map.isStyleLoaded() || map.getSource('cargo-route-src')) {
+      applyCargoRoute();
+      return undefined;
+    }
+    map.once('load', applyCargoRoute);
+    return () => {
+      map.off('load', applyCargoRoute);
+    };
+  }, [fcCargoRoute]);
 
   useEffect(() => {
     const map = mapRef.current;

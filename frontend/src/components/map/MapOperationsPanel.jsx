@@ -16,6 +16,7 @@ import {
   missionTypeLabel,
 } from './HidcMissionRows';
 import HidcAirliftPanel from './HidcAirliftPanel';
+import HidcCargoPanel from './HidcCargoPanel';
 import './MapOperationsPanel.css';
 
 const PLANE_MISSION_TASKS = ['CAS', 'DEAD', 'SEAD', 'STRIKE', 'CAP'];
@@ -289,12 +290,6 @@ function parseRadiusDigits(rawValue) {
   return Math.min(9999, Math.max(1, Number(digits)));
 }
 
-function parseStockDigits(rawValue) {
-  const digits = String(rawValue).replace(/\D/g, '').slice(0, 2);
-  if (digits === '') return '';
-  return String(Math.min(99, Math.max(0, Number(digits))));
-}
-
 function formatProductionPointCode(pp) {
   const raw = String(pp?.zone_name || pp?.id || '').trim();
   const match = raw.match(/^PP[_\s-]*0*(\d+)$/i);
@@ -318,17 +313,6 @@ function findZoneForProductionPoint(pp, zoneList) {
       .filter(Boolean);
     return ppKeys.some((key) => zoneKeys.includes(key));
   }) || null;
-}
-
-function productionPointMatchesZone(pp, zone) {
-  if (!zone) return false;
-  const ppKeys = [pp?.id, pp?.zone_name]
-    .map((value) => String(value || '').trim())
-    .filter(Boolean);
-  const zoneKeys = [zone?.id, zone?.name, zone?.zone_name]
-    .map((value) => String(value || '').trim())
-    .filter(Boolean);
-  return ppKeys.some((key) => zoneKeys.includes(key));
 }
 
 function resolveProductionPointCoords(pp, zoneList) {
@@ -380,12 +364,6 @@ export default function MapOperationsPanel({
   const [logisticDistanceMode, setLogisticDistanceMode] = useState('range');
   const [logisticAircraft, setLogisticAircraft] = useState(LOGISTIC_AIRCRAFT[0]);
 
-  const [productionDepartureAirportId, setProductionDepartureAirportId] = useState('');
-  const [productionArrivalZoneId, setProductionArrivalZoneId] = useState('');
-  const [productionRangeNm, setProductionRangeNm] = useState(100);
-  const [productionDistanceMode, setProductionDistanceMode] = useState('range');
-  const [productionPointId, setProductionPointId] = useState('');
-  const [productionMinStock, setProductionMinStock] = useState('');
   const [openSelectId, setOpenSelectId] = useState(null);
 
   const hidcMissions = hidcCampaign?.missions || null;
@@ -489,16 +467,6 @@ export default function MapOperationsPanel({
     [airportOptions, logisticDepartureAirportId],
   );
 
-  const productionDepartureAirport = useMemo(
-    () => airportOptions.find((entry) => entry.id === productionDepartureAirportId) || null,
-    [airportOptions, productionDepartureAirportId],
-  );
-
-  const productionArrivalZone = useMemo(
-    () => zones.find((entry) => entry.id === productionArrivalZoneId) || null,
-    [zones, productionArrivalZoneId],
-  );
-
   const resolvedProductionPoints = useMemo(() => (
     productionPoints.map((pp) => resolveProductionPointCoords(pp, zones))
   ), [productionPoints, zones]);
@@ -508,18 +476,6 @@ export default function MapOperationsPanel({
       .filter((pp) => getCoords(pp))
       .sort((a, b) => getProductionPointSortKey(a) - getProductionPointSortKey(b))
   ), [resolvedProductionPoints]);
-
-  const productionDeliveryZones = useMemo(() => {
-    const linkedZoneIds = new Set(
-      productionPointOptions
-        .map((pp) => findZoneForProductionPoint(pp, zones)?.id)
-        .filter(Boolean),
-    );
-
-    return [...zones]
-      .filter((zone) => getCoords(zone) && (linkedZoneIds.size === 0 || linkedZoneIds.has(zone.id)))
-      .sort((a, b) => getZoneNumber(a).localeCompare(getZoneNumber(b), undefined, { numeric: true }));
-  }, [zones, productionPointOptions]);
 
   useEffect(() => {
     if (missionAirportId && !airportOptions.some((entry) => entry.id === missionAirportId)) {
@@ -537,15 +493,6 @@ export default function MapOperationsPanel({
         setLogisticArrivalAirportId('');
       }
     }
-    if (productionDepartureAirportId && !airportOptions.some((entry) => entry.id === productionDepartureAirportId)) {
-      setProductionDepartureAirportId('');
-    }
-    if (productionArrivalZoneId && !productionDeliveryZones.some((entry) => entry.id === productionArrivalZoneId)) {
-      setProductionArrivalZoneId('');
-    }
-    if (productionPointId && !productionPointOptions.some((entry) => entry.id === productionPointId)) {
-      setProductionPointId('');
-    }
   }, [
     airportOptions,
     logisticHubOptions,
@@ -554,11 +501,6 @@ export default function MapOperationsPanel({
     missionAirportId,
     logisticDepartureAirportId,
     logisticArrivalAirportId,
-    productionDepartureAirportId,
-    productionArrivalZoneId,
-    productionDeliveryZones,
-    productionPointId,
-    productionPointOptions,
   ]);
 
   const missionRows = useMemo(() => {
@@ -744,49 +686,10 @@ export default function MapOperationsPanel({
     logisticDistanceMode,
   ]);
 
-  const productionRows = useMemo(() => {
-    const depCoords = getCoords(productionDepartureAirport);
-    const hasDeparture = Boolean(depCoords && productionDepartureAirportId);
-
-    const rows = productionPointOptions
-      .map((pp) => {
-        if (productionPointId && pp.id !== productionPointId) return null;
-        if (productionMinStock !== '' && Number(pp?.stock || 0) < Number(productionMinStock)) return null;
-
-        const ppCoords = getCoords(pp);
-        if (!ppCoords) return null;
-
-        if (productionDistanceMode === 'arrival' && productionArrivalZoneId) {
-          if (!productionPointMatchesZone(pp, productionArrivalZone)) return null;
-        }
-
-        let distanceNm = null;
-        if (hasDeparture) {
-          distanceNm = haversineNm(depCoords.lat, depCoords.lon, ppCoords.lat, ppCoords.lon);
-          if (productionDistanceMode === 'range' && distanceNm > productionRangeNm) return null;
-        }
-
-        return { pp, distanceNm };
-      })
-      .filter(Boolean);
-
-    return [...rows].sort((a, b) => {
-      if (a.distanceNm != null && b.distanceNm != null) return a.distanceNm - b.distanceNm;
-      if (a.distanceNm != null) return -1;
-      if (b.distanceNm != null) return 1;
-      return getProductionPointSortKey(a.pp) - getProductionPointSortKey(b.pp);
-    });
-  }, [
-    productionPointOptions,
-    productionDepartureAirport,
-    productionDepartureAirportId,
-    productionArrivalZone,
-    productionArrivalZoneId,
-    productionDistanceMode,
-    productionRangeNm,
-    productionPointId,
-    productionMinStock,
-  ]);
+  // No filters: every production point, by number (the full ones also appear above as cargo missions).
+  const productionRows = useMemo(() => (
+    productionPointOptions.map((pp) => ({ pp }))
+  ), [productionPointOptions]);
 
   const activeRows = activeTab === 'mission'
     ? missionRows
@@ -796,8 +699,6 @@ export default function MapOperationsPanel({
 
   const logisticArrivalMuted = logisticDistanceMode === 'range';
   const logisticRangeMuted = logisticDistanceMode === 'arrival';
-  const productionArrivalMuted = productionDistanceMode === 'range';
-  const productionRangeMuted = productionDistanceMode === 'arrival';
 
   const handleReset = () => {
     if (activeTab === 'mission') {
@@ -814,15 +715,7 @@ export default function MapOperationsPanel({
       setLogisticRangeNm(100);
       setLogisticDistanceMode('range');
       setLogisticAircraft(LOGISTIC_AIRCRAFT[0]);
-      return;
     }
-
-    setProductionDepartureAirportId('');
-    setProductionArrivalZoneId('');
-    setProductionRangeNm(100);
-    setProductionDistanceMode('range');
-    setProductionPointId('');
-    setProductionMinStock('');
   };
 
   const toggleTaskFilter = (task) => {
@@ -899,7 +792,8 @@ export default function MapOperationsPanel({
       </div>
 
       {/* HIDC: missions only, no departure / radius / aircraft filters (type filters stay in the side drawer). */}
-      {!(activeTab === 'mission' && hidcMissions) && !(activeTab === 'logistic' && hidcLogistics) && (
+      {/* Produzione: no filters (cargo missions + production point list). */}
+      {activeTab !== 'production' && !(activeTab === 'mission' && hidcMissions) && !(activeTab === 'logistic' && hidcLogistics) && (
       <div className={`map-ops-section__toolbar${activeTab === 'mission' ? ' map-ops-section__toolbar--mission' : ''}`}>
         {activeTab === 'logistic' && (
             <OpsSelect
@@ -913,28 +807,6 @@ export default function MapOperationsPanel({
               ariaLabel={t('map.rightPanel.ops.aircraft')}
               options={LOGISTIC_AIRCRAFT.map((aircraft) => ({ value: aircraft, label: aircraft }))}
             />
-        )}
-
-        {activeTab === 'production' && (
-          <div
-            className="map-ops-section__stock-wrap"
-            onClick={(event) => {
-              const input = event.currentTarget.querySelector('input');
-              if (input && event.target !== input) input.focus();
-            }}
-          >
-            <input
-              type="number"
-              min={0}
-              max={99}
-              step={1}
-              className="map-ops-section__stock"
-              value={productionMinStock}
-              onChange={(event) => setProductionMinStock(parseStockDigits(event.target.value))}
-              aria-label={t('map.rightPanel.ops.minStock')}
-            />
-            <span className="map-ops-section__stock-suffix">{t('map.rightPanel.ops.stockLabel')}</span>
-          </div>
         )}
 
         {activeTab === 'logistic' ? (
@@ -984,51 +856,6 @@ export default function MapOperationsPanel({
                 ...logisticArrivalOptions.map((airport) => ({
                   value: airport.id,
                   label: getAirportLabel(airport),
-                })),
-              ]}
-            />
-          </div>
-        ) : activeTab === 'production' ? (
-          <div className="map-ops-section__logistic-route map-ops-section__logistic-route--production">
-            <OpsSelect
-              id="production-departure"
-              openSelectId={openSelectId}
-              setOpenSelectId={setOpenSelectId}
-              wrapClassName="map-ops-section__select-wrap--departure"
-              icon={<TakeoffIcon />}
-              value={productionDepartureAirportId}
-              onChange={setProductionDepartureAirportId}
-              ariaLabel={t('map.rightPanel.ops.departure')}
-              options={[
-                { value: '', label: t('map.rightPanel.ops.departure') },
-                ...airportOptions.map((airport) => ({
-                  value: airport.id,
-                  label: getAirportLabel(airport),
-                })),
-              ]}
-            />
-
-            {renderRadiusField({
-              value: productionRangeNm,
-              onChange: setProductionRangeNm,
-              muted: productionRangeMuted,
-              onActivate: () => setProductionDistanceMode('range'),
-              ariaLabel: t('map.rightPanel.ops.radius'),
-            })}
-
-            <OpsSelect
-              id="production-point"
-              openSelectId={openSelectId}
-              setOpenSelectId={setOpenSelectId}
-              wrapClassName="map-ops-section__select-wrap--brandina map-ops-section__select-wrap--production-point"
-              value={productionPointId}
-              onChange={setProductionPointId}
-              ariaLabel={t('map.rightPanel.ops.productionPoint')}
-              options={[
-                { value: '', label: t('map.rightPanel.ops.productionPoint') },
-                ...productionPointOptions.map((pp) => ({
-                  value: pp.id,
-                  label: formatProductionPointCode(pp),
                 })),
               ]}
             />
@@ -1124,6 +951,16 @@ export default function MapOperationsPanel({
             onAirliftChange={onHidcAirliftChange}
             onFocusPoint={onFocusPoint}
           />
+        )}
+        {activeTab === 'production' && hidcCampaign?.cargo && (
+          <HidcCargoPanel
+            campaign={hidcCampaign}
+            onCampaignChange={onHidcCampaignChange}
+            onFocusPoint={onFocusPoint}
+          />
+        )}
+        {activeTab === 'production' && hidcCampaign?.cargo && activeRows.length > 0 && (
+          <div className="hidc-cargo__heading">{t('map.rightPanel.ops.cargo.pointsHeading')}</div>
         )}
         {activeRows.length === 0 ? (
           (activeTab !== 'mission' || !hidcMissions || (myMissions?.active || []).length === 0)
@@ -1250,7 +1087,11 @@ export default function MapOperationsPanel({
               >
                 <div className="map-ops-section__row-top">
                   <span className="map-ops-section__row-title">{formatProductionPointCode(row.pp)}</span>
-                  <span className="map-ops-section__row-meta">{formatNm(row.distanceNm)}</span>
+                  {Number(row.pp.max_stock) > 0 && (
+                    <span className={`map-ops-section__row-meta${Number(row.pp.stock) >= Number(row.pp.max_stock) ? ' is-full' : ''}`}>
+                      {`${Number(row.pp.stock || 0)}/${Number(row.pp.max_stock)}`}
+                    </span>
+                  )}
                 </div>
                 <div className="map-ops-section__row-sub">
                   {row.pp.owner || t('map.rightPanel.ops.neutral')} • {t('map.rightPanel.ops.stock', { count: Number(row.pp.stock || 0) })}

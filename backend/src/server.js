@@ -2335,6 +2335,7 @@ const hidcCampaign = createHidcCampaign({
   getZones: () => loadFrontlineZonesFromFile(),
   pushFeed: (event) => pushFeedEvent(event),
   getActiveAirports: () => airbaseStatusManager.getActiveAirports(),
+  getProductionPoints: () => productionPoints,
   getAirportStock: (airportId) => currentData[airportId]?.data?.weapons || [],
   readBluePoints: () => dscoreFactionPoints.readBluePoints(),
 });

@@ -1302,6 +1302,32 @@ export default {
             cancelled: '{{type}} Zona {{number}} annullata'
           }
         },
+        cargo: {
+          title: 'Trasporto cargo',
+          desc: 'Il punto di produzione è pieno: recupera le casse (RETRIEVE) e portale all\'aeroporto indicato.',
+          queueHeading: 'I tuoi trasporti',
+          availableHeading: 'Trasporti disponibili',
+          pointsHeading: 'Punti di produzione',
+          route: 'Rotta',
+          routeHint: 'Ordine più breve: ogni carico va consegnato prima di prenderne un altro.',
+          routeHintMulti: 'Ordine più breve con {{capacity}} carichi a bordo insieme.',
+          stops: '{{count}} tappe',
+          departure: 'Decollo',
+          pickup: 'Carica',
+          dropoff: 'Consegna',
+          queue: 'Accoda',
+          queueFull: 'Hai già {{max}} trasporti in coda',
+          delivered: 'Consegnate {{done}}/{{total}}',
+          crates: '{{count}} cassa',
+          cratesMany: '{{count}} casse',
+          empty: 'Nessun punto di produzione pieno',
+          result: {
+            completed: 'Trasporto {{pp}} → {{airport}} completato: +{{xp}} XP',
+            expired: 'Trasporto {{pp}} → {{airport}} scaduto',
+            expiredNoFlight: 'Trasporto {{pp}} → {{airport}} scaduto: nessun volo registrato',
+            cancelled: 'Trasporto {{pp}} → {{airport}} annullato'
+          }
+        },
         airdropUnit: 'Airdrop unit'
       },
       zoneCard: {

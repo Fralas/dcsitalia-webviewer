@@ -25,6 +25,7 @@ import { optionalPath } from '../config/envPaths.js';
 import * as discordAuth from './discordAuth.js';
 import { createHidcMissions } from './hidcMissions.js';
 import { createHidcAirLift } from './hidcAirLift.js';
+import { createHidcCargoMissions, readDeliveriesFile } from './hidcCargoMissions.js';
 
 const LINK_CODE_PATTERN = /^HIDC-[A-Z0-9]{6}$/;
 const LINK_CODE_TTL_MS = 15 * 60 * 1000;
@@ -119,6 +120,9 @@ export function createHidcCampaign(deps) {
       || (dcoreSrcDir ? path.join(dcoreSrcDir, 'DMAP', 'Export_DRegion_Status.json') : null),
     airlift: optionalPath('HIDC_AIRLIFT_STATE_FILE')
       || (dbridgeDir ? path.join(dbridgeDir, 'Export_AirLift.json') : null),
+    // Production crates delivered at BLUE airports (DCORE DWAREHOUSE), for the "Trasporto cargo" missions.
+    productionDeliveries: optionalPath('HIDC_PRODUCTION_DELIVERIES_FILE')
+      || (dcoreSrcDir ? path.join(dcoreSrcDir, 'DWAREHOUSE', 'Export_Production_Deliveries.json') : null),
   };
   const botToken = String(process.env.DISCORD_BOT_TOKEN || '').trim();
   const voteChannelId = String(process.env.HIDC_VOTE_CHANNEL_ID || '').trim();
@@ -945,8 +949,25 @@ export function createHidcCampaign(deps) {
 
   // ---------------------------------------------------------------- missions
 
+  function sumXp(a, b) {
+    const byType = { ...(a?.byType || {}) };
+    Object.entries(b?.byType || {}).forEach(([type, count]) => { byType[type] = (byType[type] || 0) + count; });
+    return {
+      total: (Number(a?.total) || 0) + (Number(b?.total) || 0),
+      completed: (Number(a?.completed) || 0) + (Number(b?.completed) || 0),
+      byType,
+    };
+  }
+
+  // Zone missions + cargo transports: both add to the pilot level.
   function missionXpFor(discordId) {
-    return discordId ? missions.xpFor(discordId) : { total: 0, completed: 0, byType: {} };
+    return discordId ? sumXp(missions.xpFor(discordId), cargo.xpFor(discordId)) : { total: 0, completed: 0, byType: {} };
+  }
+
+  function allMissionXp() {
+    const out = { ...missions.allXp() };
+    Object.entries(cargo.allXp()).forEach(([discordId, row]) => { out[discordId] = sumXp(out[discordId], row); });
+    return out;
   }
 
   /** Did the pilot fly in DCS after sinceMs? null when there is no flight data for them. */
@@ -968,6 +989,24 @@ export function createHidcCampaign(deps) {
   const missions = createHidcMissions({
     getZones: () => (typeof deps.getZones === 'function' ? deps.getZones() : []),
     readFocus: () => readJsonFile(files.focus, null),
+    requirePilot: (user, minLevel, action) => requirePilot(user, minLevel, action),
+    flewSince,
+    emit: deps.emit,
+    pushFeed: deps.pushFeed,
+  });
+
+  // "Trasporto cargo" (tab Produzione): full production points -> nearest BLUE airport.
+  const cargo = createHidcCargoMissions({
+    getProductionPoints: () => (typeof deps.getProductionPoints === 'function' ? deps.getProductionPoints() : []),
+    getAirports: () => (typeof deps.getActiveAirports === 'function' ? deps.getActiveAirports() : [])
+      .filter((airport) => airport && airport.id && !airport.isCarrier)
+      .map((airport) => ({
+        id: airport.id,
+        name: airport.displayName || airport.name || airport.id,
+        aliases: [airport.name, airport.displayName, airport.csvPrefix, airport.id].filter(Boolean),
+        coordinates: airport.coordinates || null,
+      })),
+    readDeliveries: () => readDeliveriesFile(files.productionDeliveries),
     requirePilot: (user, minLevel, action) => requirePilot(user, minLevel, action),
     flewSince,
     emit: deps.emit,
@@ -1018,6 +1057,7 @@ export function createHidcCampaign(deps) {
         minVotes: VOTE_RULES.minVotes,
       },
       missions: missions.getPublicState(user),
+      cargo: cargo.getPublicState(user),
       me: user?.id
         ? {
           linked,
@@ -1059,7 +1099,7 @@ export function createHidcCampaign(deps) {
 
   function getLeaderboard(limit = 10) {
     const stats = readStats();
-    const missionXpAll = missions.allXp();
+    const missionXpAll = allMissionXp();
     if (serverBot) {
       return serverBot.listPilots()
         .map((entry) => {
@@ -1205,6 +1245,28 @@ export function createHidcCampaign(deps) {
       }
     });
 
+    app.post('/api/hidc/cargo/:missionId/accept', (req, res) => {
+      const user = requireUser(req, res);
+      if (!user) return;
+      try {
+        cargo.accept(user, sanitizeText(req.params.missionId, 160));
+        res.json(getCampaignState(user));
+      } catch (error) {
+        sendError(res, error);
+      }
+    });
+
+    app.delete('/api/hidc/cargo/assignments/:assignmentId', (req, res) => {
+      const user = requireUser(req, res);
+      if (!user) return;
+      try {
+        cargo.abandon(user, sanitizeText(req.params.assignmentId, 80));
+        res.json(getCampaignState(user));
+      } catch (error) {
+        sendError(res, error);
+      }
+    });
+
     app.delete('/api/hidc/missions/assignments/:assignmentId', (req, res) => {
       const user = requireUser(req, res);
       if (!user) return;
@@ -1239,6 +1301,11 @@ export function createHidcCampaign(deps) {
     else syncLinkRequests();
     tickVotes();
     missions.tick();
+    try {
+      cargo.tick();
+    } catch (error) {
+      console.error('HIDC cargo tick failed:', error.message);
+    }
     airlift.tick();
   }
 
@@ -1248,6 +1315,7 @@ export function createHidcCampaign(deps) {
     tick,
     // test hooks
     missions,
+    cargo,
     airlift,
     _internals: { botThresholds, botXp, startVote, castBallot, tickVotes, voteWinner, syncLinkRequests, startLink, getCampaignState, getPilotProfile, levelInfo },
   };

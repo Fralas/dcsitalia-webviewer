@@ -19,7 +19,7 @@ function zoneNumber(zoneId) {
   return match ? match[0] : String(zoneId || '?');
 }
 
-function formatCountdown(ms) {
+export function formatCountdown(ms) {
   const total = Math.max(0, Math.floor(ms / 1000));
   const h = Math.floor(total / 3600);
   const m = Math.floor((total % 3600) / 60);
@@ -27,12 +27,12 @@ function formatCountdown(ms) {
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-function formatHours(minutes) {
+export function formatHours(minutes) {
   const m = Number(minutes) || 120;
   return m % 60 === 0 ? `${m / 60} h` : `${Math.floor(m / 60)} h ${m % 60} min`;
 }
 
-function useNow(enabled) {
+export function useNow(enabled) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!enabled) return undefined;

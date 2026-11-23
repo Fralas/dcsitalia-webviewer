@@ -158,39 +158,64 @@ export function MonthlyTrend({ monthly }) {
 
 /* ------------------------------------------------------------ when you fly */
 
-const DAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
-const DAYS_LONG = ['lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica'];
+// Time-of-day bands, local time, in chart order: the day starts at 06:00 and the night closes it.
+// The 12 day hours get half-width columns, so the three bands are equally wide.
+const BANDS = [
+  { key: 'day', label: 'Giorno', from: 6, to: 18, width: 0.5 },
+  { key: 'evening', label: 'Sera', from: 18, to: 24, width: 1 },
+  { key: 'night', label: 'Notte', from: 0, to: 6, width: 1 },
+];
+const HOUR_ORDER = BANDS.flatMap((b) => Array.from({ length: b.to - b.from }, (_, i) => ({ hour: b.from + i, band: b })));
+const hh = (h) => `${String(h).padStart(2, '0')}:00`;
 
-/** Weekday x hour punch card (UTC), shaded relative to the busiest cell. */
-export function FlightPattern({ hours }) {
+/**
+ * Flight time by hour of day (24 bars, local time, 06:00 to 05:00) grouped in day / evening / night;
+ * the favourite band is highlighted.
+ * hours is the DCSServerBot 7x24 matrix in UTC: summed over the weekdays and shifted by the browser offset.
+ */
+export function FlightHours({ hours }) {
   if (!Array.isArray(hours) || hours.length !== 7) return null;
-  const max = Math.max(1, ...hours.flat());
-  const step = (sec) => (sec ? Math.min(4, Math.ceil((sec / max) * 4)) : 0);
-  const byHour = Array.from({ length: 24 }, (_, h) => hours.reduce((s, row) => s + (row[h] || 0), 0));
-  const peak = byHour.indexOf(Math.max(...byHour));
+  const offset = Math.round(-new Date().getTimezoneOffset() / 60);
+  const utc = Array.from({ length: 24 }, (_, h) => hours.reduce((s, row) => s + (Number(row?.[h]) || 0), 0));
+  const local = Array.from({ length: 24 }, (_, h) => utc[(((h - offset) % 24) + 24) % 24]);
+  const total = local.reduce((s, v) => s + v, 0);
+  if (!total) return null;
+  const max = Math.max(...local);
+  const bands = BANDS.map((b) => ({ ...b, sec: local.slice(b.from, b.to).reduce((s, v) => s + v, 0) }));
+  const top = bands.reduce((a, b) => (b.sec > a.sec ? b : a));
+  const peak = local.indexOf(max);
+  const zone = offset === 0 ? 'UTC' : `UTC${offset > 0 ? '+' : ''}${offset}`;
 
   return (
-    <Panel title="Quando voli" hint={`Ora UTC · picco ${String(peak).padStart(2, '0')}:00`}>
-      <div className="pf-punch">
-        {hours.map((row, d) => (
-          <div key={d} className="pf-punch__row">
-            <span className="pf-punch__day">{DAYS[d]}</span>
-            <div className="pf-punch__cells">
-              {row.map((sec, h) => (
-                <i
-                  key={h}
-                  className={`l${step(sec)}`}
-                  title={`${DAYS_LONG[d]} ${String(h).padStart(2, '0')}:00 · ${sec ? duration(sec) : 'nessun volo'}`}
-                />
-              ))}
+    <Panel title="Fascia oraria" hint={`Ora locale (${zone}) · picco ${hh(peak)}`}>
+      <div className="pf-hours">
+        <div className="pf-hours__lead">
+          <strong>{top.label}</strong>
+          <span>{hh(top.from)}–{hh(top.to % 24)} · {Math.round((top.sec / total) * 100)}% del tempo in volo</span>
+        </div>
+        <div
+          className="pf-hours__plot"
+          style={{ gridTemplateColumns: HOUR_ORDER.map(({ band }) => `minmax(0, ${band.width}fr)`).join(' ') }}
+          role="img"
+          aria-label={bands.map((b) => `${b.label} ${Math.round((b.sec / total) * 100)}%`).join(', ')}
+        >
+          {HOUR_ORDER.map(({ hour, band }) => {
+            const sec = local[hour];
+            return (
+              <div key={hour} className={`pf-hours__col${band.key === top.key ? ' is-top' : ''}`}>
+                <span className="pf-hours__bar" style={{ height: `${sec ? Math.max(3, (sec / max) * 100) : 0}%` }} />
+                <span className="pf-hours__tip">{hh(hour)} · {sec ? duration(sec) : 'nessun volo'}</span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="pf-hours__bands">
+          {bands.map((b) => (
+            <div key={b.key} className={`pf-hours__band${b.key === top.key ? ' is-top' : ''}`}>
+              <span className="pf-hours__band-name">{b.label}</span>
+              <span className="pf-hours__band-value">{Math.round((b.sec / total) * 100)}%</span>
             </div>
-          </div>
-        ))}
-        <div className="pf-punch__row pf-punch__axis" aria-hidden="true">
-          <span className="pf-punch__day" />
-          <div className="pf-punch__cells">
-            {Array.from({ length: 24 }, (_, h) => <span key={h}>{h % 6 === 0 ? String(h).padStart(2, '0') : ''}</span>)}
-          </div>
+          ))}
         </div>
       </div>
     </Panel>

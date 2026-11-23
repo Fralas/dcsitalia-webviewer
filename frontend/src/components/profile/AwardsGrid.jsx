@@ -1,12 +1,8 @@
 import { useState } from 'react';
-import { Award, ChevronDown } from 'lucide-react';
+import { Award } from 'lucide-react';
+import PatchCarousel from './PatchCarousel';
 
 const COLLAPSED = 9;
-
-function formatDate(ms) {
-  if (!Number.isFinite(Number(ms)) || !ms) return null;
-  return new Date(Number(ms)).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
 
 function PatchArt({ achievement }) {
   return achievement.imageUrl ? (
@@ -17,56 +13,55 @@ function PatchArt({ achievement }) {
 }
 
 /**
- * Patches as a 3x3 square. Collapsed, the whole square is one button that opens the full list
- * (empty slots are placeholders); expanded, every patch shows name and date and opens the viewer.
+ * Patches as a 3x3 square (newest first, "+N" on the last slot). Clicking the square opens every patch
+ * in a full-screen carousel, starting from the clicked slot ("+N" and empty slots start from the ninth / first).
  */
-export default function AwardsGrid({ achievements = [], onOpen }) {
-  const [expanded, setExpanded] = useState(false);
+export default function AwardsGrid({ achievements = [], onSeen }) {
+  const [carousel, setCarousel] = useState(null); // { start, origin } while open
   const sorted = [...achievements].sort((a, b) => (Number(b?.awardedAt) || 0) - (Number(a?.awardedAt) || 0));
   const extra = Math.max(0, sorted.length - COLLAPSED);
+  const shown = sorted.slice(0, COLLAPSED);
+  const slots = Array.from({ length: COLLAPSED }, (_, i) => shown[i] || null);
 
-  if (!expanded) {
-    const shown = sorted.slice(0, COLLAPSED);
-    const slots = Array.from({ length: COLLAPSED }, (_, i) => shown[i] || null);
-    return (
+  const open = (event) => {
+    const slot = event.target.closest?.('[data-index]');
+    const clicked = slot ? Number(slot.dataset.index) : 0;
+    const rect = event.currentTarget.getBoundingClientRect();
+    setCarousel({
+      start: Math.min(clicked, sorted.length - 1),
+      origin: { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 },
+    });
+  };
+
+  return (
+    <>
       <button
         type="button"
         className="pf-awards pf-awards--square"
-        onClick={() => setExpanded(true)}
-        aria-expanded="false"
-        aria-label={`Riconoscimenti: ${sorted.length}. Apri l'elenco completo`}
+        onClick={open}
+        aria-haspopup="dialog"
+        aria-label={`Riconoscimenti: ${sorted.length}. Apri a schermo intero`}
       >
         {slots.map((achievement, i) => (
-          <span key={achievement ? (achievement.awardId || achievement.achievementId || i) : `empty-${i}`} className={`pf-awards__slot${achievement ? '' : ' is-empty'}`}>
+          <span
+            key={achievement ? (achievement.awardId || achievement.achievementId || i) : `empty-${i}`}
+            className={`pf-awards__slot${achievement ? '' : ' is-empty'}`}
+            data-index={achievement ? i : undefined}
+          >
             {achievement && <PatchArt achievement={achievement} />}
             {i === COLLAPSED - 1 && extra > 0 && <span className="pf-awards__more">+{extra}</span>}
           </span>
         ))}
       </button>
-    );
-  }
-
-  return (
-    <div className="pf-awards-open">
-      <div className="pf-awards pf-awards--list">
-        {sorted.map((achievement) => (
-          <button
-            key={achievement.awardId || achievement.achievementId}
-            type="button"
-            className="pf-awards__item"
-            onClick={() => onOpen?.(achievement)}
-            disabled={!achievement.imageUrl}
-            title={achievement.imageUrl ? 'Apri patch' : 'Patch non disponibile'}
-          >
-            <span className="pf-awards__slot"><PatchArt achievement={achievement} /></span>
-            <span className="pf-awards__name">{achievement.name}</span>
-            {formatDate(achievement.awardedAt) && <span className="pf-awards__date">{formatDate(achievement.awardedAt)}</span>}
-          </button>
-        ))}
-      </div>
-      <button type="button" className="pf-ladder__toggle" onClick={() => setExpanded(false)} aria-expanded="true">
-        Riduci <ChevronDown className="h-3.5 w-3.5 rotate-180" />
-      </button>
-    </div>
+      {carousel && sorted.length > 0 && (
+        <PatchCarousel
+          achievements={sorted}
+          startIndex={carousel.start}
+          origin={carousel.origin}
+          onClose={() => setCarousel(null)}
+          onSeen={onSeen}
+        />
+      )}
+    </>
   );
 }
