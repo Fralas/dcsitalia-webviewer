@@ -23,18 +23,13 @@ function cratesLabel(count) {
   return t(count === 1 ? 'map.rightPanel.ops.cargo.crates' : 'map.rightPanel.ops.cargo.cratesMany', { count });
 }
 
-function CargoTag() {
-  return <span className="map-ops-section__tag hidc-mission__type hidc-mission__type--cargo">CARGO</span>;
-}
-
 function legTitle(mission) {
-  return `${mission.ppName} → ${mission.destination?.name || '?'}`;
+  return mission.destination?.name ? `${mission.ppName} → ${mission.destination.name}` : mission.ppName;
 }
 
 /** Shortest order through the queued transports: departure, pickups and deliveries. */
 function CargoRoute({ route, onFocusPoint }) {
   if (!route?.stops?.length) return null;
-  const legs = route.stops.filter((stop) => stop.kind !== 'departure').length;
   return (
     <div className="hidc-cargo-route">
       <div className="hidc-cargo-route__head">
@@ -43,7 +38,7 @@ function CargoRoute({ route, onFocusPoint }) {
         <span className="hidc-cargo-route__total">
           {formatNm(route.totalNm)}
           <span className="hidc-mission__sep">·</span>
-          {t('map.rightPanel.ops.cargo.stops', { count: legs })}
+          {t(route.trips === 1 ? 'map.rightPanel.ops.cargo.trip' : 'map.rightPanel.ops.cargo.trips', { count: route.trips })}
         </span>
       </div>
       <ol className="hidc-cargo-route__stops">
@@ -61,6 +56,10 @@ function CargoRoute({ route, onFocusPoint }) {
                 </span>
                 <span className="hidc-cargo-route__kind">{t(`map.rightPanel.ops.cargo.${stop.kind}`)}</span>
                 <span className="hidc-cargo-route__name">{stop.name}</span>
+                {stop.kind === 'pickup' && stop.crates > 0 && (
+                  <span className="hidc-cargo-route__crates">{cratesLabel(stop.crates)}</span>
+                )}
+                {stop.trips > 1 && <span className="hidc-cargo-route__trips">{`×${stop.trips}`}</span>}
                 {stop.legNm > 0 && <span className="hidc-cargo-route__leg">{formatNm(stop.legNm)}</span>}
               </button>
             </li>
@@ -69,8 +68,8 @@ function CargoRoute({ route, onFocusPoint }) {
       </ol>
       <p className="hidc-cargo-route__hint">
         {route.capacity > 1
-          ? t('map.rightPanel.ops.cargo.routeHintMulti', { capacity: route.capacity })
-          : t('map.rightPanel.ops.cargo.routeHint')}
+          ? t('map.rightPanel.ops.cargo.routeHintMulti', { capacity: route.capacity, airport: route.dropoff?.name })
+          : t('map.rightPanel.ops.cargo.routeHint', { airport: route.dropoff?.name })}
       </p>
     </div>
   );
@@ -90,7 +89,6 @@ function CargoActive({ assignment, busy, onAbandon, onFocusPoint }) {
       onKeyDown={(event) => { if (event.key === 'Enter') focus(); }}
     >
       <div className="hidc-mission__head">
-        <CargoTag />
         <span className="map-ops-section__row-title">{legTitle(assignment)}</span>
         <span className="hidc-mission__timer">
           <Clock strokeWidth={2.4} aria-hidden="true" />
@@ -106,7 +104,7 @@ function CargoActive({ assignment, busy, onAbandon, onFocusPoint }) {
         <span className="hidc-mission__reward">
           {t('map.rightPanel.ops.missions.inProgress')}
           <span className="hidc-mission__sep">·</span>
-          <strong>+{assignment.xp} XP</strong>
+          <strong>~+{assignment.xp} XP</strong>
         </span>
         <button
           type="button"
@@ -124,7 +122,7 @@ function CargoActive({ assignment, busy, onAbandon, onFocusPoint }) {
   );
 }
 
-function CargoRow({ mission, durationMin, canAccept, blockedReason, busy, onAccept, onFocusPoint }) {
+function CargoRow({ mission, canAccept, blockedReason, busy, onAccept, onFocusPoint }) {
   const focus = () => mission.origin && onFocusPoint?.({ key: `cargo:${mission.id}`, ...mission.origin });
   return (
     <div
@@ -135,25 +133,23 @@ function CargoRow({ mission, durationMin, canAccept, blockedReason, busy, onAcce
       onKeyDown={(event) => { if (event.key === 'Enter') focus(); }}
     >
       <div className="hidc-mission__head">
-        <CargoTag />
-        <span className="map-ops-section__row-title">{t('map.rightPanel.ops.cargo.title')}</span>
-        <span className="map-ops-section__row-meta">{formatNm(mission.distanceNm)}</span>
+        <span className="map-ops-section__row-title">{mission.ppName}</span>
+        {mission.nearestNm != null && (
+          <span className="map-ops-section__row-meta" title={t('map.rightPanel.ops.cargo.nearestHint')}>
+            {`≈ ${formatNm(mission.nearestNm)}`}
+          </span>
+        )}
       </div>
       <div className="hidc-cargo__leg">
         <Package strokeWidth={2.2} aria-hidden="true" />
-        <span>{mission.ppName}</span>
-        <span className="hidc-cargo__arrow" aria-hidden="true">→</span>
-        <PlaneLanding strokeWidth={2.2} aria-hidden="true" />
-        <span>{mission.destination?.name}</span>
+        <span>{t('map.rightPanel.ops.cargo.emptyPoint', { crates: cratesLabel(mission.crates) })}</span>
       </div>
       <div className="hidc-mission__foot">
         <span className="hidc-mission__reward">
-          <strong>+{mission.xp} XP</strong>
-          <span className="hidc-mission__sep">·</span>
-          {cratesLabel(mission.crates)}
+          <strong>~+{mission.xp} XP</strong>
           <span className="hidc-mission__sep">·</span>
           <Clock strokeWidth={2.4} aria-hidden="true" />
-          {formatHours(durationMin)}
+          {formatHours(mission.durationMin)}
         </span>
         <button
           type="button"
@@ -177,7 +173,7 @@ function CargoResult({ entry }) {
     <div className={`hidc-mission-result hidc-mission-result--${entry.status}`}>
       {entry.status === 'completed' ? <Check strokeWidth={2.6} aria-hidden="true" /> : <X strokeWidth={2.6} aria-hidden="true" />}
       <span>
-        {t(`map.rightPanel.ops.cargo.result.${key}`, { pp: entry.ppName, airport: entry.destination?.name || '?', xp: entry.xp })}
+        {t(`map.rightPanel.ops.cargo.result.${key}`, { pp: entry.ppName, crates: cratesLabel(entry.crates), xp: entry.xp })}
       </span>
     </div>
   );
@@ -246,7 +242,6 @@ export default function HidcCargoPanel({ campaign, onCampaignChange, onFocusPoin
         <CargoRow
           key={mission.id}
           mission={mission}
-          durationMin={cargo.rules?.durationMin}
           canAccept={canAccept}
           blockedReason={blockedReason}
           busy={busyId === mission.id}

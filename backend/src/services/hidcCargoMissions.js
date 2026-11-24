@@ -1,17 +1,22 @@
 /**
  * HIDC "Trasporto cargo" missions (operations panel, Produzione tab).
  *
- * A BLUE production point that reaches its maximum stock (DCORE DSCORE_Rigs export: stock >= max_stock)
- * puts a cargo mission on the board: bring its production crates to the nearest BLUE airport.
- * One mission per production point at a time; a pilot takes it for themself and can queue up to
- * HIDC_CARGO_MAX_ACTIVE (default 3) of them. For the queued missions the site plans the shortest route:
- * departure airport, then every pickup before its delivery, with HIDC_CARGO_ROUTE_CAPACITY crates on board
- * at once (default 1: production crates are sling loads).
+ * A BLUE production point with at least HIDC_CARGO_MIN_CRATES crates in stock (default 3, DCORE DSCORE_Rigs
+ * export) puts a cargo mission on the board: empty it, i.e. fly all its crates to a BLUE airport. The number of
+ * crates is the stock when the pilot takes the mission. One mission per production point at a time; a pilot takes
+ * it for themself and can queue up to HIDC_CARGO_MAX_ACTIVE (default 3) of them.
+ *
+ * Destination: any BLUE airport counts. For the queue the site picks one single drop-off airport, the one that
+ * gives the shortest route for all the queued production points (HIDC_CARGO_ROUTE_CAPACITY crates per trip,
+ * default 1: production crates are sling loads, so every trip is airport -> production point -> airport).
+ *
+ * XP: per delivered crate, HIDC_CARGO_XP_PER_CRATE + HIDC_CARGO_XP_PER_CRATE_NM x distance from the production
+ * point to the airport where it was delivered (capped at HIDC_CARGO_XP_MAX_NM).
  *
  * Completion: DCORE DWAREHOUSE logs every production crate consumed at a BLUE airport
- * (Export_Production_Deliveries.json: crate, origin zone, airbase). A mission is done when
- * HIDC_CARGO_CRATES crates (default 1) from its production point reach its destination after it was
- * accepted, and the pilot flew in DCS after accepting (same rule as the other HIDC missions).
+ * (Export_Production_Deliveries.json: crate, origin zone, airbase). The mission is done when all its crates
+ * reached an airport after it was accepted, and the pilot flew in DCS after accepting (same rule as the other
+ * HIDC missions).
  */
 import crypto from 'crypto';
 import fs from 'fs';
@@ -27,14 +32,23 @@ function envIntOrZero(name, fallback) {
   return Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
+function envNumber(name, fallback) {
+  const value = Number.parseFloat(process.env[name]);
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
 export const CARGO_TYPE = 'CARGO';
 
 export const CARGO_RULES = Object.freeze({
-  durationMs: envInt('HIDC_CARGO_DURATION_MIN', 120) * 60 * 1000,
+  minCrates: envInt('HIDC_CARGO_MIN_CRATES', 3),
   maxActive: envInt('HIDC_CARGO_MAX_ACTIVE', 3),
-  crates: envInt('HIDC_CARGO_CRATES', 1),
   capacity: envInt('HIDC_CARGO_ROUTE_CAPACITY', 1),
-  xp: envIntOrZero('HIDC_MISSION_XP_CARGO', 40),
+  // Time to complete: the longer of the base and minPerCrate x crates.
+  durationMin: envInt('HIDC_CARGO_DURATION_MIN', 120),
+  minPerCrate: envIntOrZero('HIDC_CARGO_MIN_PER_CRATE', 15),
+  xpPerCrate: envNumber('HIDC_CARGO_XP_PER_CRATE', 4),
+  xpPerCrateNm: envNumber('HIDC_CARGO_XP_PER_CRATE_NM', 0.4),
+  xpMaxNm: envInt('HIDC_CARGO_XP_MAX_NM', 100),
   requireFlight: String(process.env.HIDC_MISSION_REQUIRE_FLIGHT || 'true').toLowerCase() !== 'false',
 });
 
@@ -58,11 +72,13 @@ function point(value) {
   return Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null;
 }
 
+const round1 = (value) => Math.round(value * 10) / 10;
+
 export function normalizeName(value) {
   return String(value || '').toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-/** "PP_001" / "PP 1" -> "1": DCORE and the map do not always pad production point numbers the same way. */
+/** "PP_001" / "PP 1" -> "PP1": DCORE and the map do not always pad production point numbers the same way. */
 function ppKey(value) {
   const raw = String(value || '').trim();
   const match = raw.match(/^PP[_\s-]*0*(\d+)$/i);
@@ -74,13 +90,21 @@ export function ppLabel(value) {
   return match ? `PP_${match[1].padStart(2, '0')}` : String(value || '');
 }
 
-export function isFullProductionPoint(pp) {
-  const max = Number(pp?.max_stock) || 0;
+export function isCargoReady(pp, minCrates = CARGO_RULES.minCrates) {
   return String(pp?.owner || '').toUpperCase() === 'BLUE'
     && pp?.built === true
-    && max > 0
-    && (Number(pp?.stock) || 0) >= max
+    && (Number(pp?.stock) || 0) >= minCrates
     && Boolean(point(pp?.coordinates));
+}
+
+/** XP for `crates` crates flown `nm` nautical miles. */
+export function cargoXp(crates, nm) {
+  const distance = Math.min(Math.max(0, Number(nm) || 0), CARGO_RULES.xpMaxNm);
+  return Math.round((Number(crates) || 0) * (CARGO_RULES.xpPerCrate + CARGO_RULES.xpPerCrateNm * distance));
+}
+
+export function cargoDurationMs(crates) {
+  return Math.max(CARGO_RULES.durationMin, (Number(crates) || 0) * CARGO_RULES.minPerCrate) * 60 * 1000;
 }
 
 /** Nearest airport to a point (airports: { id, name, coordinates }). */
@@ -94,85 +118,64 @@ export function nearestAirport(target, airports) {
 }
 
 /**
- * Shortest route through the queued missions.
- * tasks: [{ id, pickup: {lat, lon, name}, dropoff: {lat, lon, name} }]
- * Every pickup comes before its delivery, at most `capacity` loads on board. The route starts from the
- * airport nearest to the first pickup (where the pilot takes off) and ends at the last delivery.
- * At most 3 missions (720 orders at worst): plain search is enough.
+ * Route through the queued production points with ONE drop-off airport for all of them.
+ * tasks: [{ id, name, lat, lon, crates }]
+ * With `capacity` crates per trip, a production point of n crates takes ceil(n / capacity) round trips
+ * airport -> production point -> airport. The airport is the one with the shortest total; it is also where the
+ * pilot takes off. Production points are visited nearest first.
  */
 export function planCargoRoute(tasks, airports, capacity = 1) {
-  if (!Array.isArray(tasks) || tasks.length === 0) return null;
-  const n = tasks.length;
+  const list = (tasks || []).filter((task) => point(task));
+  if (list.length === 0) return null;
+  const perTrip = Math.max(1, capacity);
   let best = null;
-
-  const visit = (sequence, picked, dropped, load, cost) => {
-    if (best && cost >= best.cost) return;
-    if (sequence.length === n * 2) {
-      best = { sequence: [...sequence], cost };
-      return;
-    }
-    const last = sequence.length ? sequence[sequence.length - 1] : null;
-    const lastPoint = last ? (last.kind === 'pickup' ? tasks[last.index].pickup : tasks[last.index].dropoff) : null;
-    for (let i = 0; i < n; i += 1) {
-      if (!picked[i] && load < capacity) {
-        const target = tasks[i].pickup;
-        // First leg: from the airport nearest to the first pickup.
-        const leg = lastPoint ? distanceNm(lastPoint, target) : (nearestAirport(target, airports)?.nm || 0);
-        picked[i] = true;
-        sequence.push({ kind: 'pickup', index: i });
-        visit(sequence, picked, dropped, load + 1, cost + leg);
-        sequence.pop();
-        picked[i] = false;
-      }
-      if (picked[i] && !dropped[i]) {
-        const leg = distanceNm(lastPoint, tasks[i].dropoff);
-        dropped[i] = true;
-        sequence.push({ kind: 'dropoff', index: i });
-        visit(sequence, picked, dropped, load - 1, cost + leg);
-        sequence.pop();
-        dropped[i] = false;
-      }
-    }
-  };
-  visit([], new Array(n).fill(false), new Array(n).fill(false), 0, 0);
+  (airports || []).forEach((airport) => {
+    const at = point(airport.coordinates);
+    if (!at) return;
+    let cost = 0;
+    list.forEach((task) => {
+      cost += Math.ceil(Math.max(1, task.crates) / perTrip) * 2 * distanceNm(at, task);
+    });
+    if (!best || cost < best.cost) best = { airport, at, cost };
+  });
   if (!best) return null;
 
-  const firstPickup = tasks[best.sequence[0].index].pickup;
-  const departure = nearestAirport(firstPickup, airports);
-  const stops = [];
-  if (departure) {
-    const coords = point(departure.airport.coordinates);
+  const legs = list
+    .map((task) => ({ task, nm: distanceNm(best.at, task), trips: Math.ceil(Math.max(1, task.crates) / perTrip) }))
+    .sort((a, b) => a.nm - b.nm);
+  const dropoff = { id: best.airport.id, name: best.airport.name, lat: best.at.lat, lon: best.at.lon };
+  const stops = [{ kind: 'departure', name: dropoff.name, airportId: dropoff.id, lat: dropoff.lat, lon: dropoff.lon, legNm: 0, missionIds: [] }];
+  legs.forEach(({ task, nm, trips }) => {
     stops.push({
-      kind: 'departure',
-      name: departure.airport.name,
-      airportId: departure.airport.id,
-      lat: coords.lat,
-      lon: coords.lon,
-      legNm: 0,
-      missionIds: [],
+      kind: 'pickup',
+      name: task.name,
+      lat: task.lat,
+      lon: task.lon,
+      legNm: round1(nm),
+      crates: task.crates,
+      trips,
+      missionIds: [task.id],
     });
-  }
-  best.sequence.forEach((step) => {
-    const task = tasks[step.index];
-    const at = step.kind === 'pickup' ? task.pickup : task.dropoff;
-    const prev = stops[stops.length - 1];
-    // Same place twice in a row (two crates from one PP, two deliveries to one airport): one stop.
-    if (prev && prev.kind === step.kind && prev.name === at.name) {
-      prev.missionIds.push(task.id);
-      return;
-    }
     stops.push({
-      kind: step.kind,
-      name: at.name,
-      airportId: at.airportId || null,
-      lat: at.lat,
-      lon: at.lon,
-      legNm: prev ? Math.round(distanceNm(prev, at) * 10) / 10 : 0,
+      kind: 'dropoff',
+      name: dropoff.name,
+      airportId: dropoff.id,
+      lat: dropoff.lat,
+      lon: dropoff.lon,
+      legNm: round1(nm),
+      crates: task.crates,
+      trips,
       missionIds: [task.id],
     });
   });
-  const totalNm = stops.reduce((sum, stop) => sum + stop.legNm, 0);
-  return { stops, totalNm: Math.round(totalNm * 10) / 10, capacity };
+  return {
+    dropoff,
+    stops,
+    totalNm: round1(best.cost),
+    trips: legs.reduce((sum, leg) => sum + leg.trips, 0),
+    capacity: perTrip,
+    distanceById: Object.fromEntries(legs.map(({ task, nm }) => [task.id, round1(nm)])),
+  };
 }
 
 /**
@@ -215,62 +218,51 @@ export function createHidcCargoMissions(deps) {
     return (deps.getAirports() || []).filter((airport) => airport?.id && point(airport.coordinates));
   }
 
-  function destinationFor(pp, airports) {
-    const found = nearestAirport(point(pp.coordinates), airports);
-    if (!found) return null;
-    const coords = point(found.airport.coordinates);
-    return {
-      id: found.airport.id,
-      name: found.airport.name,
-      aliases: [...new Set([found.airport.name, ...(found.airport.aliases || [])].map(normalizeName).filter(Boolean))],
-      lat: coords.lat,
-      lon: coords.lon,
-      nm: Math.round(found.nm * 10) / 10,
-    };
-  }
-
-  /** Full production points get a mission, the others lose theirs (unless a pilot already took it). */
+  /** Production points with enough crates get a mission; the others lose theirs (unless a pilot took it). */
   function syncBoard(state, now) {
     const pps = deps.getProductionPoints() || [];
     if (pps.length === 0) return false; // no export yet: leave the board alone
     const airports = airportList();
-    if (airports.length === 0) return false;
     const taken = new Set(state.active.map((entry) => entry.missionId));
-    const full = new Map(pps.filter(isFullProductionPoint).map((pp) => [ppKey(pp.id), pp]));
+    const takenPp = new Set(state.active.map((entry) => ppKey(entry.ppId)));
+    const ready = new Map(pps.filter((pp) => isCargoReady(pp)).map((pp) => [ppKey(pp.id), pp]));
     let changed = false;
 
     Object.values(state.board).forEach((mission) => {
       if (taken.has(mission.id)) return;
-      const pp = full.get(ppKey(mission.ppId));
+      const pp = ready.get(ppKey(mission.ppId));
       if (!pp) {
         delete state.board[mission.id];
         changed = true;
         return;
       }
-      // Destination lost (airport captured or closed): pick the nearest one again.
-      if (!airports.some((airport) => airport.id === mission.destination?.id)) {
-        const destination = destinationFor(pp, airports);
-        if (destination) mission.destination = destination;
-        else delete state.board[mission.id];
+      // The mission empties the production point: follow its stock until someone takes it.
+      const stock = Number(pp.stock) || 0;
+      if (mission.crates !== stock) {
+        mission.crates = stock;
+        changed = true;
+      }
+      if (mission.nearestNm === undefined) {
+        const nearest = nearestAirport(mission.origin, airports);
+        mission.nearestNm = nearest ? round1(nearest.nm) : null;
+        delete mission.destination; // missions saved before the single drop-off airport
         changed = true;
       }
     });
 
     const onBoard = new Set(Object.values(state.board).map((mission) => ppKey(mission.ppId)));
-    full.forEach((pp, key) => {
-      if (onBoard.has(key)) return;
-      const destination = destinationFor(pp, airports);
-      if (!destination) return;
-      const id = `${CARGO_TYPE}:${pp.id}:${now}`;
+    ready.forEach((pp, key) => {
+      if (onBoard.has(key) || takenPp.has(key)) return;
       const origin = point(pp.coordinates);
+      const nearest = nearestAirport(origin, airports);
+      const id = `${CARGO_TYPE}:${pp.id}:${now}`;
       state.board[id] = {
         id,
         ppId: pp.id,
         ppName: ppLabel(pp.zone_name || pp.id),
         origin,
-        destination,
-        stock: Number(pp.stock) || 0,
-        maxStock: Number(pp.max_stock) || 0,
+        crates: Number(pp.stock) || 0,
+        nearestNm: nearest ? round1(nearest.nm) : null,
         createdAt: now,
       };
       changed = true;
@@ -280,7 +272,7 @@ export function createHidcCargoMissions(deps) {
 
   function closeAssignment(state, assignment, status, now, extra = {}) {
     state.active = state.active.filter((entry) => entry.id !== assignment.id);
-    // The production point gets a fresh mission at the next sync if it is still full.
+    // The production point gets a fresh mission at the next sync if it has enough crates again.
     delete state.board[assignment.missionId];
     const closed = { ...assignment, ...extra, status, closedAt: now };
     state.history.unshift(closed);
@@ -288,7 +280,7 @@ export function createHidcCargoMissions(deps) {
   }
 
   function award(state, assignment) {
-    const xp = CARGO_RULES.xp;
+    const xp = Math.round(Number(assignment.xpEarned) || 0);
     const row = state.xp[assignment.discordId] || { total: 0, completed: 0, byType: {} };
     row.total += xp;
     row.completed += 1;
@@ -297,7 +289,15 @@ export function createHidcCargoMissions(deps) {
     return xp;
   }
 
-  /** Records the deliveries in the DCORE file and gives each one to at most one assignment. */
+  function airportByDcsName(name) {
+    const wanted = normalizeName(name);
+    if (!wanted) return null;
+    return airportList().find((airport) => (
+      [airport.name, ...(airport.aliases || [])].some((alias) => normalizeName(alias) === wanted)
+    )) || null;
+  }
+
+  /** Records the deliveries in the DCORE file and gives each crate to at most one assignment. */
   function creditDeliveries(state, now) {
     const deliveries = deps.readDeliveries();
     if (!Array.isArray(deliveries)) return false;
@@ -313,16 +313,20 @@ export function createHidcCargoMissions(deps) {
       if (seen.usedBy) return;
       const at = Number(delivery.at) > 0 ? Number(delivery.at) * 1000 : seen.firstSeen;
       const zone = ppKey(delivery.zone);
-      const airbase = normalizeName(delivery.airbase);
       const assignment = state.active
-        .filter((entry) => !entry.deliveredAt
-          && ppKey(entry.ppId) === zone
-          && (entry.destination?.aliases || []).includes(airbase)
-          && at >= entry.acceptedAt)
+        .filter((entry) => !entry.deliveredAt && ppKey(entry.ppId) === zone && at >= entry.acceptedAt)
         .sort((a, b) => a.acceptedAt - b.acceptedAt)[0];
       if (!assignment) return;
+      // XP on the real distance: production point -> airport where the crate was delivered.
+      const airport = airportByDcsName(delivery.airbase);
+      const nm = airport
+        ? distanceNm(assignment.origin, point(airport.coordinates))
+        : (nearestAirport(assignment.origin, airportList())?.nm || 0);
       seen.usedBy = assignment.id;
       assignment.delivered = (Number(assignment.delivered) || 0) + 1;
+      assignment.xpEarned = (Number(assignment.xpEarned) || 0) + cargoXp(1, nm);
+      assignment.deliveredNm = round1((Number(assignment.deliveredNm) || 0) + nm);
+      assignment.lastAirport = airport?.name || String(delivery.airbase || '') || null;
       if (assignment.delivered >= assignment.crates) assignment.deliveredAt = now;
       changed = true;
     });
@@ -356,9 +360,9 @@ export function createHidcCargoMissions(deps) {
       deps.pushFeed?.({
         type: 'ato.mission.completed',
         title: 'Trasporto cargo completato',
-        message: `${entry.pilotName || 'Un pilota'} ha portato il cargo di ${entry.ppName} a ${entry.destination?.name || '?'} (+${entry.xp} XP)`,
+        message: `${entry.pilotName || 'Un pilota'} ha svuotato ${entry.ppName}: ${entry.crates} casse consegnate (+${entry.xp} XP)`,
         actor: entry.pilotName || null,
-        metadata: { production_point_id: entry.ppId, airport_id: entry.destination?.id || null, type: CARGO_TYPE, xp: entry.xp },
+        metadata: { production_point_id: entry.ppId, crates: entry.crates, type: CARGO_TYPE, xp: entry.xp },
       });
     });
   }
@@ -369,7 +373,6 @@ export function createHidcCargoMissions(deps) {
     const boardChanged = syncBoard(state, now);
     const delivered = creditDeliveries(state, now);
     const events = evaluate(state, now);
-    // Deliveries just consumed by a closed mission free its production point for a new one.
     if (events.length > 0) syncBoard(state, now);
     if (boardChanged || delivered || events.length > 0) {
       writeState(state);
@@ -400,6 +403,7 @@ export function createHidcCargoMissions(deps) {
     if (mine.length >= CARGO_RULES.maxActive) {
       throw httpError(`Puoi accodare al massimo ${CARGO_RULES.maxActive} trasporti cargo.`, 409);
     }
+    const crates = Math.max(CARGO_RULES.minCrates, Number(mission.crates) || 0);
     const assignment = {
       id: crypto.randomUUID(),
       missionId,
@@ -407,14 +411,15 @@ export function createHidcCargoMissions(deps) {
       ppId: mission.ppId,
       ppName: mission.ppName,
       origin: mission.origin,
-      destination: mission.destination,
-      crates: CARGO_RULES.crates,
+      crates,
       delivered: 0,
+      xpEarned: 0,
+      deliveredNm: 0,
       deliveredAt: null,
       discordId: user.id,
       pilotName: pilot.stats?.name || pilot.link?.name || user.username || null,
       acceptedAt: now,
-      expiresAt: now + CARGO_RULES.durationMs,
+      expiresAt: now + cargoDurationMs(crates),
     };
     state.active.push(assignment);
     writeState(state);
@@ -422,9 +427,9 @@ export function createHidcCargoMissions(deps) {
     deps.pushFeed?.({
       type: 'ato.mission.accepted',
       title: 'Trasporto cargo accettato',
-      message: `${assignment.pilotName || 'Un pilota'} porta il cargo di ${assignment.ppName} a ${assignment.destination.name}`,
+      message: `${assignment.pilotName || 'Un pilota'} svuota ${assignment.ppName} (${crates} casse)`,
       actor: assignment.pilotName,
-      metadata: { production_point_id: assignment.ppId, airport_id: assignment.destination.id, type: CARGO_TYPE, expires_at: assignment.expiresAt },
+      metadata: { production_point_id: assignment.ppId, crates, type: CARGO_TYPE, expires_at: assignment.expiresAt },
     });
     return assignment;
   }
@@ -450,37 +455,37 @@ export function createHidcCargoMissions(deps) {
     return readState().xp;
   }
 
-  function publicStop(value) {
-    return value ? { lat: value.lat, lon: value.lon } : null;
-  }
-
   function publicMission(mission) {
     return {
       id: mission.id,
       type: CARGO_TYPE,
       ppId: mission.ppId,
       ppName: mission.ppName,
-      origin: publicStop(mission.origin),
-      destination: mission.destination
-        ? { id: mission.destination.id, name: mission.destination.name, lat: mission.destination.lat, lon: mission.destination.lon }
-        : null,
-      distanceNm: mission.destination?.nm ?? null,
-      stock: mission.stock,
-      maxStock: mission.maxStock,
-      crates: CARGO_RULES.crates,
-      xp: CARGO_RULES.xp,
+      origin: mission.origin ? { lat: mission.origin.lat, lon: mission.origin.lon } : null,
+      crates: mission.crates,
+      // Estimate on the nearest BLUE airport; the queue may end up on another one.
+      nearestNm: mission.nearestNm ?? null,
+      xp: cargoXp(mission.crates, mission.nearestNm),
+      durationMin: Math.round(cargoDurationMs(mission.crates) / 60000),
       createdAt: mission.createdAt,
     };
   }
 
-  function publicAssignment(entry) {
+  function publicAssignment(entry, route = null) {
+    const nm = route?.distanceById?.[entry.id];
+    const remaining = Math.max(0, entry.crates - (Number(entry.delivered) || 0));
     return {
-      ...publicMission({ ...entry, id: entry.missionId }),
       id: entry.id,
       missionId: entry.missionId,
+      type: CARGO_TYPE,
+      ppId: entry.ppId,
+      ppName: entry.ppName,
+      origin: entry.origin ? { lat: entry.origin.lat, lon: entry.origin.lon } : null,
       crates: entry.crates,
       delivered: Number(entry.delivered) || 0,
-      xp: entry.xp ?? CARGO_RULES.xp,
+      destination: route?.dropoff ? { ...route.dropoff, nm: nm ?? null } : (entry.lastAirport ? { name: entry.lastAirport } : null),
+      // Closed: XP given. Open: XP so far + the rest flown to the planned airport.
+      xp: entry.xp ?? Math.round((Number(entry.xpEarned) || 0) + cargoXp(remaining, nm ?? 0)),
       acceptedAt: entry.acceptedAt,
       expiresAt: entry.expiresAt,
       awaitingFlight: Boolean(entry.deliveredAt),
@@ -492,11 +497,13 @@ export function createHidcCargoMissions(deps) {
 
   function routeFor(assignments) {
     const tasks = assignments
-      .filter((entry) => !entry.deliveredAt && entry.origin && entry.destination)
+      .filter((entry) => !entry.deliveredAt && entry.origin)
       .map((entry) => ({
         id: entry.id,
-        pickup: { ...entry.origin, name: entry.ppName },
-        dropoff: { lat: entry.destination.lat, lon: entry.destination.lon, name: entry.destination.name, airportId: entry.destination.id },
+        name: entry.ppName,
+        lat: entry.origin.lat,
+        lon: entry.origin.lon,
+        crates: Math.max(1, entry.crates - (Number(entry.delivered) || 0)),
       }));
     return planCargoRoute(tasks, airportList(), CARGO_RULES.capacity);
   }
@@ -506,25 +513,26 @@ export function createHidcCargoMissions(deps) {
     const discordId = user?.id || null;
     const taken = new Set(state.active.map((entry) => entry.missionId));
     const mine = discordId ? state.active.filter((entry) => entry.discordId === discordId) : [];
+    const route = mine.length ? routeFor(mine) : null;
     return {
       rules: {
-        durationMin: Math.round(CARGO_RULES.durationMs / 60000),
+        minCrates: CARGO_RULES.minCrates,
         maxActive: CARGO_RULES.maxActive,
-        crates: CARGO_RULES.crates,
         capacity: CARGO_RULES.capacity,
-        xp: CARGO_RULES.xp,
+        xpPerCrate: CARGO_RULES.xpPerCrate,
+        xpPerCrateNm: CARGO_RULES.xpPerCrateNm,
         requireFlight: CARGO_RULES.requireFlight,
       },
       available: Object.values(state.board)
         .filter((mission) => !taken.has(mission.id))
         .map(publicMission)
-        .sort((a, b) => (a.distanceNm ?? 0) - (b.distanceNm ?? 0) || a.ppName.localeCompare(b.ppName, undefined, { numeric: true })),
+        .sort((a, b) => b.crates - a.crates || a.ppName.localeCompare(b.ppName, undefined, { numeric: true })),
       mine: discordId
         ? {
-          active: mine.map(publicAssignment),
-          recent: state.history.filter((entry) => entry.discordId === discordId).slice(0, RECENT_LIMIT).map(publicAssignment),
+          active: mine.map((entry) => publicAssignment(entry, route)),
+          recent: state.history.filter((entry) => entry.discordId === discordId).slice(0, RECENT_LIMIT).map((entry) => publicAssignment(entry)),
           canAccept: mine.length < CARGO_RULES.maxActive,
-          route: routeFor(mine),
+          route: route ? { ...route, distanceById: undefined } : null,
         }
         : null,
       now,
@@ -548,4 +556,4 @@ export function readDeliveriesFile(filePath) {
   }
 }
 
-export default { createHidcCargoMissions, planCargoRoute, readDeliveriesFile, CARGO_RULES };
+export default { createHidcCargoMissions, planCargoRoute, readDeliveriesFile, cargoXp, CARGO_RULES };

@@ -691,6 +691,15 @@ export default function MapOperationsPanel({
     productionPointOptions.map((pp) => ({ pp }))
   ), [productionPointOptions]);
 
+  // Red badge on each tab: how many missions that category has right now (not affected by the list filters).
+  const tabCounts = useMemo(() => ({
+    mission: hidcMissions
+      ? (hidcMissions.available || []).filter((mission) => !mission.mine).length
+      : missionRows.length,
+    logistic: hidcLogistics ? (hidcAirlift?.sites || []).length : logisticRows.length,
+    production: hidcCampaign?.cargo ? (hidcCampaign.cargo.available || []).length : 0,
+  }), [hidcMissions, missionRows, hidcLogistics, hidcAirlift, logisticRows, hidcCampaign]);
+
   const activeRows = activeTab === 'mission'
     ? missionRows
     : activeTab === 'logistic'
@@ -786,6 +795,11 @@ export default function MapOperationsPanel({
                 <Icon strokeWidth={2} />
               </span>
               <span className="map-ops-section__tab-label">{t(tab.labelKey)}</span>
+              {tabCounts[tab.id] > 0 && (
+                <span className="map-ops-section__tab-badge" aria-label={`${tabCounts[tab.id]}`}>
+                  {tabCounts[tab.id] > 99 ? '99+' : tabCounts[tab.id]}
+                </span>
+              )}
             </button>
           );
         })}

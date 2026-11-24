@@ -29,10 +29,34 @@
   align-items: stretch;
   gap: 8px;
   margin: 0 34px 10px 0;
-  padding: 0 2px 2px;
+  /* top room for the count badges (the section clips its overflow) */
+  padding: 7px 2px 2px;
   flex: 0 0 auto;
   min-width: 0;
   overflow: visible;
+}
+
+/* Missions per category: same red badge as the site's alerts (.lidc-occupancy-menu__badge). */
+.map-ops-section__tab-badge {
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: #ff3b30;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 1.5px #0e0e0e;
+  pointer-events: none;
 }
 
 .map-ops-section__tab {
@@ -1093,8 +1117,6 @@
 }
 
 /* ---- HIDC cargo transports (HidcCargoPanel.jsx, tab Produzione) ---- */
-.hidc-mission__type--cargo { color: #fdba74; background: rgba(255, 140, 0, 0.16); }
-
 /* no filter drawer on this tab: no room to keep clear on the right */
 .hidc-mission.hidc-cargo {
   padding-right: 10px;
@@ -1276,6 +1298,20 @@
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.hidc-cargo-route__crates,
+.hidc-cargo-route__trips {
+  flex-shrink: 0;
+  color: var(--ops-mute);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.hidc-cargo-route__trips {
+  color: var(--ops-gold);
+  font-variant-numeric: tabular-nums;
 }
 
 .hidc-cargo-route__leg {
