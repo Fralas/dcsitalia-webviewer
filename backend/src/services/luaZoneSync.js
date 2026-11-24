@@ -23,6 +23,15 @@ function pickDefaultInputPath(candidateFiles) {
   return path.join(SOURCE_DIR, candidateFiles[0]);
 }
 
+// DCORE writes two task exports: Export_Dzone_ActiveTask.json (front line only, read by the RED AI)
+// and Export_Dzone_ActiveTask_All.json (front line + every zone of the active region). The site uses the _All one
+// when it exists, also when an env var points at the front-line file.
+function preferAllTaskExport(taskPath) {
+  if (!/Export_Dzone_ActiveTask\.json$/i.test(taskPath)) return taskPath;
+  const allPath = taskPath.replace(/Export_Dzone_ActiveTask\.json$/i, 'Export_Dzone_ActiveTask_All.json');
+  return fs.existsSync(allPath) ? allPath : taskPath;
+}
+
 function getLuaPaths() {
   return {
     statusPath: process.env.DYZONE_STATUS_EXPORT_FILE
@@ -30,11 +39,11 @@ function getLuaPaths() {
       : process.env.DYZONE_STATUS_FILE
       ? path.resolve(process.env.DYZONE_STATUS_FILE)
       : pickDefaultInputPath(['Export_Dzone_Status.json', 'Dyzone_Status.lua']),
-    taskPath: process.env.DYZONE_TASK_EXPORT_FILE
+    taskPath: preferAllTaskExport(process.env.DYZONE_TASK_EXPORT_FILE
       ? path.resolve(process.env.DYZONE_TASK_EXPORT_FILE)
       : process.env.DYZONE_TASK_FILE
       ? path.resolve(process.env.DYZONE_TASK_FILE)
-      : pickDefaultInputPath(['Export_Dzone_ActiveTask.json', 'ActDyzone_Task.lua']),
+      : pickDefaultInputPath(['Export_Dzone_ActiveTask_All.json', 'Export_Dzone_ActiveTask.json', 'ActDyzone_Task.lua'])),
     positionPath: process.env.DYZONE_POSITION_EXPORT_FILE
       ? path.resolve(process.env.DYZONE_POSITION_EXPORT_FILE)
       : process.env.DYZONE_POSITION_FILE

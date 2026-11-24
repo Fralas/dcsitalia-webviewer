@@ -104,7 +104,7 @@ function CargoActive({ assignment, busy, onAbandon, onFocusPoint }) {
         <span className="hidc-mission__reward">
           {t('map.rightPanel.ops.missions.inProgress')}
           <span className="hidc-mission__sep">·</span>
-          <strong>~+{assignment.xp} XP</strong>
+          <strong>+{assignment.xp} XP</strong>
         </span>
         <button
           type="button"
@@ -146,7 +146,7 @@ function CargoRow({ mission, canAccept, blockedReason, busy, onAccept, onFocusPo
       </div>
       <div className="hidc-mission__foot">
         <span className="hidc-mission__reward">
-          <strong>~+{mission.xp} XP</strong>
+          <strong>+{mission.xp} XP</strong>
           <span className="hidc-mission__sep">·</span>
           <Clock strokeWidth={2.4} aria-hidden="true" />
           {formatHours(mission.durationMin)}
