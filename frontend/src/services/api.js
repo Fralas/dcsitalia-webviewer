@@ -1341,6 +1341,28 @@ export async function setHidcTestLevel(level) {
   return fetchAPI('/hidc/dev/level', { method: 'POST', body: JSON.stringify({ level }) });
 }
 
+/** Discord notifications debug panel (staff only, map with ?hidcDebug=1) */
+export async function getNotifyDebug() {
+  return fetchAPI('/hidc/notify-debug');
+}
+
+export async function sendNotifyTest({ type, title, message }) {
+  return fetchAPI('/hidc/notify-debug/test', { method: 'POST', body: JSON.stringify({ type, title, message }) });
+}
+
+export async function sendAllNotifyTests() {
+  return fetchAPI('/hidc/notify-debug/test-all', { method: 'POST', body: JSON.stringify({}) });
+}
+
+/** Test vote card on Discord: the menus work, votes do not count for the campaign */
+export async function sendVoteNotifyTest() {
+  return fetchAPI('/hidc/notify-debug/test-vote', { method: 'POST', body: JSON.stringify({}) });
+}
+
+export async function pollNotifyDebug() {
+  return fetchAPI('/hidc/notify-debug/poll', { method: 'POST', body: JSON.stringify({}) });
+}
+
 export async function getHidcCampaign() {
   return fetchAPI('/hidc/campaign');
 }

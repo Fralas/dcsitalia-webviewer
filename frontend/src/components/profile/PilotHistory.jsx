@@ -59,6 +59,9 @@ function level(sec) {
   return 4;
 }
 
+// Same shades as .pf-cal i.l0..l4 (ProfilePage.css), for the tooltip swatch.
+const LEVEL_COLORS = ['#262626', 'rgba(255, 140, 0, 0.28)', 'rgba(255, 140, 0, 0.5)', 'rgba(255, 140, 0, 0.75)', '#ff8c00'];
+
 /** 12 weeks x 7 days (Monday first), one square per UTC day, shaded by flight time. */
 export function ActivityCalendar({ activity, linked, available }) {
   if (!linked || !available) return null;
@@ -108,13 +111,32 @@ export function ActivityCalendar({ activity, linked, available }) {
             <span>L</span><span /><span>M</span><span /><span>V</span><span /><span>D</span>
           </div>
           <div className="pf-cal__grid" role="img" aria-label={`${activeDays} giorni attivi nelle ultime 12 settimane`}>
-            {cells.map((c) => (
-              <i
-                key={c.key}
-                className={c.future ? 'is-future' : `l${level(c.data?.sec)}`}
-                title={c.future ? undefined : `${c.day.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })} · ${c.data?.sec ? `${duration(c.data.sec)} · ${c.data.sorties} sortite` : 'nessun volo'}`}
-              />
-            ))}
+            {cells.map((c) => {
+              if (c.future) return <i key={c.key} className="is-future" />;
+              const lv = level(c.data?.sec);
+              return (
+                <i key={c.key} className={`l${lv}`}>
+                  {/* same box as the "Ore di volo" chart tooltip (.pf-tip) */}
+                  <span className="pf-tip pf-hover-tip">
+                    <span className="pf-tip__title">
+                      {c.day.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'long', timeZone: 'UTC' })}
+                    </span>
+                    <span className="pf-tip__row">
+                      <b className="pf-tip__swatch" style={{ background: LEVEL_COLORS[lv] }} />
+                      <span>In volo</span>
+                      <strong>{c.data?.sec ? duration(c.data.sec) : 'nessun volo'}</strong>
+                    </span>
+                    {c.data?.sec > 0 && (
+                      <span className="pf-tip__row">
+                        <b className="pf-tip__swatch" style={{ background: 'transparent' }} />
+                        <span>Sortite</span>
+                        <strong>{fmt(c.data.sorties)}</strong>
+                      </span>
+                    )}
+                  </span>
+                </i>
+              );
+            })}
           </div>
         </div>
         <div className="pf-cal__legend" aria-hidden="true">

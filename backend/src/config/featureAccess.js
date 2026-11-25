@@ -37,6 +37,8 @@ export const ATC_DISCORD_IDS = idsFromEnvOrDev('DISCORD_ATC_IDS', DEV_ATC_IDS);
 export const CHANGELOG_AUTHOR_IDS = idsFromEnvOrDev('CHANGELOG_AUTHOR_IDS', DEV_EDITOR_IDS);
 export const NOE_AUTHOR_IDS = idsFromEnvOrDev('NOE_AUTHOR_IDS', DEV_EDITOR_IDS);
 export const WIKI_EDITOR_IDS = idsFromEnvOrDev('WIKI_EDITOR_IDS', DEV_EDITOR_IDS);
+// Discord notification test panel (map with ?hidcDebug=1). Production: set the env, otherwise nobody.
+export const DISCORD_NOTIFY_TEST_IDS = idsFromEnvOrDev('DISCORD_NOTIFY_TEST_IDS', DEV_EDITOR_IDS);
 
 export function normalizeDiscordId(userId) {
   if (userId === null || userId === undefined) return '';
@@ -72,6 +74,11 @@ export function canEditWiki(userId, roleIds = []) {
 export function canEditChangelog(userId, roleIds = []) {
   const id = normalizeDiscordId(userId);
   return Boolean(id) && (CHANGELOG_AUTHOR_IDS.has(id) || hasRole(roleIds, 'DISCORD_CHANGELOG_AUTHOR_ROLE_ID'));
+}
+
+export function canTestDiscordNotify(userId, roleIds = []) {
+  const id = normalizeDiscordId(userId);
+  return Boolean(id) && (DISCORD_NOTIFY_TEST_IDS.has(id) || hasRole(roleIds, 'DISCORD_NOTIFY_TEST_ROLE_ID'));
 }
 
 export function requireFeatureFlag(flagName) {

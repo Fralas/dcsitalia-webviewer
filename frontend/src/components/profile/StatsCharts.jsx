@@ -1,8 +1,8 @@
 import {
-  Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import { aircraftName } from './Logbook';
-import { ACCENT, AXIS, SERIES } from './chartPalette';
+import { ACCENT, AXIS, OTHER, SERIES } from './chartPalette';
 
 const nf = (n, digits = 0) => (Number(n) || 0).toLocaleString('it-IT', { maximumFractionDigits: digits, minimumFractionDigits: digits });
 
@@ -187,11 +187,12 @@ export function FlightHours({ hours }) {
   const zone = offset === 0 ? 'UTC' : `UTC${offset > 0 ? '+' : ''}${offset}`;
 
   return (
-    <Panel title="Fascia oraria" hint={`Ora locale (${zone}) · picco ${hh(peak)}`}>
+    // No panel head: the lead mirrors the activity calendar summary, so "Sera" and the calendar hours line up.
+    <Panel>
       <div className="pf-hours">
-        <div className="pf-hours__lead">
+        <div className="pf-hours__lead" title={`Ora locale (${zone}) · picco ${hh(peak)}`}>
           <strong>{top.label}</strong>
-          <span>{hh(top.from)}–{hh(top.to % 24)} · {Math.round((top.sec / total) * 100)}% del tempo in volo</span>
+          <span>Fascia oraria · {Math.round((top.sec / total) * 100)}% · {zone}</span>
         </div>
         <div
           className="pf-hours__plot"
@@ -204,7 +205,15 @@ export function FlightHours({ hours }) {
             return (
               <div key={hour} className={`pf-hours__col${band.key === top.key ? ' is-top' : ''}`}>
                 <span className="pf-hours__bar" style={{ height: `${sec ? Math.max(3, (sec / max) * 100) : 0}%` }} />
-                <span className="pf-hours__tip">{hh(hour)} · {sec ? duration(sec) : 'nessun volo'}</span>
+                {/* same box as the "Ore di volo" chart tooltip (.pf-tip) */}
+                <span className="pf-tip pf-hover-tip">
+                  <span className="pf-tip__title">{hh(hour)}–{hh((hour + 1) % 24)} · {band.label}</span>
+                  <span className="pf-tip__row">
+                    <b className="pf-tip__swatch" style={{ background: band.key === top.key ? ACCENT : '#6b4a22' }} />
+                    <span>In volo</span>
+                    <strong>{sec ? duration(sec) : 'nessun volo'}</strong>
+                  </span>
+                </span>
               </div>
             );
           })}
@@ -222,44 +231,59 @@ export function FlightHours({ hours }) {
   );
 }
 
-/** Time by theatre (bars) and by coalition (one split bar). */
-export function TheatreSplit({ theatres, sides }) {
-  const list = (theatres || []).filter((t) => t.sec > 0);
-  if (list.length === 0 && !sides) return null;
-  const max = Math.max(1, ...list.map((t) => t.sec));
-  const blue = Number(sides?.blue) || 0;
-  const red = Number(sides?.red) || 0;
-  const total = blue + red;
+// Pie slots in fixed order (largest theatre first); beyond them the rest is grouped in "Altri".
+const PIE_COLORS = [SERIES.blue, SERIES.orange, SERIES.aqua, SERIES.yellow, SERIES.magenta, SERIES.violet];
+
+/** Time by theatre: donut (total in the middle) with the legend beside it. */
+export function TheatreSplit({ theatres }) {
+  const list = (theatres || []).filter((t) => t.sec > 0).sort((a, b) => b.sec - a.sec);
+  if (list.length === 0) return null;
+  const head = list.slice(0, PIE_COLORS.length - (list.length > PIE_COLORS.length ? 1 : 0));
+  const rest = list.slice(head.length);
+  const slices = head.map((t, i) => ({ key: t.theatre, name: theatreName(t.theatre), sec: t.sec, color: PIE_COLORS[i] }));
+  if (rest.length > 0) {
+    slices.push({ key: '_other', name: 'Altri', sec: rest.reduce((s, t) => s + t.sec, 0), color: OTHER });
+  }
+  const total = slices.reduce((s, t) => s + t.sec, 0);
 
   return (
     <Panel title="Dove voli">
-      {list.length > 0 && (
-        <div className="pf-bars">
-          {list.map((t) => (
-            <div key={t.theatre} className="pf-bars__row">
-              <div className="pf-bars__head">
-                <span className="pf-bars__name">{theatreName(t.theatre)}</span>
-                <span className="pf-bars__value">{duration(t.sec)}</span>
-              </div>
-              <div className="pf-bars__track">
-                <span style={{ width: `${Math.max(2, Math.round((t.sec / max) * 100))}%` }} />
-              </div>
-            </div>
+      <div className="pf-pie">
+        <div className="pf-pie__chart">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={slices}
+                dataKey="sec"
+                nameKey="name"
+                innerRadius="62%"
+                outerRadius="100%"
+                paddingAngle={slices.length > 1 ? 2 : 0}
+                stroke="none"
+                startAngle={90}
+                endAngle={-270}
+                isAnimationActive={false}
+              >
+                {slices.map((s) => <Cell key={s.key} fill={s.color} />)}
+              </Pie>
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="pf-pie__center" aria-hidden="true">
+            <strong>{Math.round(total / 3600)}<small>h</small></strong>
+            <span>Totale</span>
+          </div>
+        </div>
+        <ul className="pf-pie__legend">
+          {slices.map((s) => (
+            <li key={s.key}>
+              <i style={{ background: s.color }} />
+              <span className="pf-pie__name">{s.name}</span>
+              <span className="pf-pie__value">{duration(s.sec)}</span>
+              <span className="pf-pie__pct">{Math.round((s.sec / total) * 100)}%</span>
+            </li>
           ))}
-        </div>
-      )}
-      {total > 0 && (
-        <div className="pf-sides">
-          <div className="pf-control__bar" role="img" aria-label={`Blue ${Math.round((blue / total) * 100)}%, Red ${Math.round((red / total) * 100)}%`}>
-            <span className="is-blue" style={{ width: `${(blue / total) * 100}%` }} />
-            <span className="is-red" style={{ width: `${(red / total) * 100}%` }} />
-          </div>
-          <div className="pf-control__legend">
-            <span>Blue {duration(blue)} · {Math.round((blue / total) * 100)}%</span>
-            <span>Red {duration(red)} · {Math.round((red / total) * 100)}%</span>
-          </div>
-        </div>
-      )}
+        </ul>
+      </div>
     </Panel>
   );
 }

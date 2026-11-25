@@ -1,0 +1,98 @@
+/* Discord notification debug card: same dashed glass surface as the other debug panels (bottom-left row). */
+
+.hidc-vote.hidc-front-debug.hidc-notify-debug {
+  width: 320px;
+}
+
+.hidc-notify-debug__body {
+  max-height: min(62vh, 560px);
+  overflow-y: auto;
+}
+
+.hidc-notify-debug__input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid var(--hv-hairline);
+  border-radius: 14px;
+  background: rgba(10, 10, 10, 0.9);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.hidc-notify-debug__input::placeholder {
+  color: var(--hv-mute);
+}
+
+.hidc-notify-debug__input:focus {
+  outline: none;
+  border-color: rgba(255, 140, 0, 0.7);
+}
+
+.hidc-notify-debug__textarea {
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.hidc-notify-debug__problems {
+  margin: 0;
+  padding: 8px 10px 8px 26px;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #fca5a5;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.hidc-vote__msg.is-ok,
+.hidc-notify-debug__ok {
+  color: #86efac;
+}
+
+.hidc-notify-debug__ko {
+  color: #fca5a5;
+}
+
+.hidc-notify-debug__recent {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hidc-notify-debug__event {
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #dadbdf;
+}
+
+.hidc-notify-debug__event-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Orange: not posted yet. Green: already on Discord. */
+.hidc-notify-debug__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--hv-accent);
+}
+
+.hidc-notify-debug__dot.is-posted {
+  background: #22c55e;
+}
+
+@media (max-width: 760px) {
+  .hidc-vote.hidc-front-debug.hidc-notify-debug {
+    left: 12px !important;
+    right: 12px;
+    width: auto;
+  }
+}

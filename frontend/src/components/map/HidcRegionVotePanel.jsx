@@ -46,6 +46,7 @@ const COPY = {
     submit: 'Vota',
     change: 'Cambia voto',
     myBallot: 'Il tuo voto',
+    myBallotLine: (t, f, src) => `Hai votato ${t} da ${f}${src === 'discord' ? ' su Discord' : ''}: puoi cambiarlo qui o su Discord fino alla chiusura.`,
     endsIn: 'Chiude tra',
     quorum: (n, min) => `${n}/${min} voti minimi`,
     extended: 'Prorogata: non c\'erano ancora abbastanza voti.',
@@ -81,6 +82,7 @@ const COPY = {
     submit: 'Vote',
     change: 'Change vote',
     myBallot: 'Your vote',
+    myBallotLine: (t, f, src) => `You voted ${t} from ${f}${src === 'discord' ? ' on Discord' : ''}: you can change it here or on Discord until it closes.`,
     endsIn: 'Closes in',
     quorum: (n, min) => `${n}/${min} minimum votes`,
     extended: 'Extended: not enough votes yet.',
@@ -143,12 +145,13 @@ export default function HidcRegionVotePanel({ campaign, onCampaignChange, langua
   const myBallot = vote?.myBallot || null;
   const minVotes = rules?.minVotes ?? 3;
 
-  // Start from the pilot's own ballot; reset when a new round opens.
+  // Start from the pilot's own ballot; reset when a new round opens or the ballot changes elsewhere
+  // (e.g. voted from the Discord channel: one ballot per pilot, shared with the site).
   useEffect(() => {
     setTarget(myBallot?.target || '');
     setFrom(myBallot?.from || '');
     setError('');
-  }, [vote?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [vote?.id, myBallot?.target, myBallot?.from]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selected = options.find((option) => option.target === target) || null;
   useEffect(() => {
@@ -306,6 +309,10 @@ export default function HidcRegionVotePanel({ campaign, onCampaignChange, langua
                     ))}
                   </div>
                 </>
+              )}
+
+              {myBallot && !blocked && (
+                <p className="hidc-vote__msg">{t.myBallotLine(regionLabel(myBallot.target), regionLabel(myBallot.from), myBallot.source)}</p>
               )}
 
               {blocked ? (

@@ -37,6 +37,7 @@ import HidcRegionBorders from './map/HidcRegionBorders';
 import HidcRegionVotePanel from './map/HidcRegionVotePanel';
 import HidcFrontDebugPanel, { readHidcDebugFlag } from './map/HidcFrontDebugPanel';
 import HidcMarkerDebugPanel from './map/HidcMarkerDebugPanel';
+import HidcNotifyDebugPanel from './map/HidcNotifyDebugPanel';
 import { buildDebugMarkers } from '../utils/hidcDebugMarkers';
 import { HIDC_REGION_BORDERS } from '../config/hidcRegionBorders';
 import useHidcAirlift from '../utils/useHidcAirlift';
@@ -7813,6 +7814,11 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                     }
                   }}
                 />
+              )}
+
+              {/* Discord notifications test (same ?hidcDebug=1 flag; the backend lets only staff use it). */}
+              {hidcDebugEnabled && (
+                <HidcNotifyDebugPanel offset={isSyriaCampaign ? 704 : 352} />
               )}
 
               <LiveFeedPanel

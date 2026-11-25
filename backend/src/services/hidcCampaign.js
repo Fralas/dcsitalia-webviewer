@@ -26,6 +26,7 @@ import * as discordAuth from './discordAuth.js';
 import { createHidcMissions } from './hidcMissions.js';
 import { createHidcAirLift } from './hidcAirLift.js';
 import { createHidcCargoMissions, readDeliveriesFile } from './hidcCargoMissions.js';
+import { createHidcVoteDiscord } from './hidcVoteDiscord.js';
 
 const LINK_CODE_PATTERN = /^HIDC-[A-Z0-9]{6}$/;
 const LINK_CODE_TTL_MS = 15 * 60 * 1000;
@@ -74,8 +75,8 @@ function sanitizeText(value, maxLen = 120) {
 }
 
 function regionLabel(regionId) {
-  const match = String(regionId || '').match(/^REGION_(\d+)$/);
-  return match ? `Region ${match[1]}` : String(regionId || '?');
+  const match = String(regionId || '').match(/^REGION_0*(\d+)$/);
+  return match ? `Regione ${match[1]}` : String(regionId || '?');
 }
 
 function readJsonFile(targetPath, fallback = null) {
@@ -125,7 +126,8 @@ export function createHidcCampaign(deps) {
       || (dcoreSrcDir ? path.join(dcoreSrcDir, 'DWAREHOUSE', 'Export_Production_Deliveries.json') : null),
   };
   const botToken = String(process.env.DISCORD_BOT_TOKEN || '').trim();
-  const voteChannelId = String(process.env.HIDC_VOTE_CHANNEL_ID || '').trim();
+  // Votes go to their own channel if set, otherwise to the campaign notifications channel.
+  const voteChannelId = String(process.env.HIDC_VOTE_CHANNEL_ID || process.env.DISCORD_NOTIFY_CHANNEL_ID || '').trim();
   const siteUrl = String(process.env.FRONTEND_URL || '').trim();
   let linkRequestsSignature = '';
   const serverBot = deps.serverBot?.enabled ? deps.serverBot : null;
@@ -485,9 +487,22 @@ export function createHidcCampaign(deps) {
     }
   }
 
-  function announce(content) {
-    if (!voteChannelId) return;
-    postChannelMessage(voteChannelId, content).catch(() => {});
+  // Region votes on Discord: card with menus to vote from the channel (hidcVoteDiscord.js).
+  // HIDC_VOTE_DISCORD=false keeps the channel silent. Interactions come through the gateway (server.js).
+  const voteDiscord = createHidcVoteDiscord({
+    readVotes: () => readVotes(),
+    writeVotes: (state) => writeVotes(state),
+    castBallot: (user, voteId, target, from, source) => castBallot(user, voteId, target, from, source),
+    checkVoter: (user) => requirePilot(user, VOTE_RULES.minVoterLevel, 'votare'),
+    tally: (vote) => tally(vote),
+    rules: VOTE_RULES,
+    channelId: String(process.env.HIDC_VOTE_DISCORD || '').trim().toLowerCase() === 'false' ? '' : voteChannelId,
+    botToken,
+    siteUrl,
+  });
+
+  function announce(title, description) {
+    voteDiscord.announce(title, description).catch(() => {});
   }
 
   // ---------------------------------------------------------------- link
@@ -698,7 +713,7 @@ export function createHidcCampaign(deps) {
         votes: counts.targets[option.target]?.votes || 0,
         froms: option.froms.map((id) => ({ id, votes: counts.froms[`${option.target}|${id}`]?.votes || 0 })),
       })),
-      myBallot: mine ? { target: mine.target, from: mine.from } : null,
+      myBallot: mine ? { target: mine.target, from: mine.from, source: mine.source || 'site', at: mine.at || null } : null,
     };
   }
 
@@ -750,15 +765,8 @@ export function createHidcCampaign(deps) {
     state.current = vote;
     writeVotes(state);
     deps.emit('hidc:campaign-updated', { reason: 'vote-open' });
-    let headline = '**Votazione prossima regione aperta.**';
-    if (conquered) headline = `**${regionLabel(conquered)} conquistata!** Si vota la prossima regione.`;
-    else if (startedBy) headline = `**${startedBy.name}** ha avviato una votazione per cambiare la regione attiva${focus.target ? ` (ora ${regionLabel(focus.target)})` : ''}.`;
-    announce([
-      headline,
-      `Scegli la regione da attaccare e la regione BLUE da cui partire (${vote.options.length} regioni attaccabili).`,
-      `Chiude il <t:${Math.floor(vote.endsAt / 1000)}:f>.`,
-      siteUrl ? `Vota sulla mappa: ${siteUrl}` : '',
-    ].filter(Boolean).join('\n'));
+    // Card with the vote menus in the Discord channel.
+    voteDiscord.publish(vote.id).catch(() => {});
     return vote;
   }
 
@@ -790,7 +798,8 @@ export function createHidcCampaign(deps) {
     return openRound(state, focus, { startedBy: { id: user.id, name: user.globalName || user.username || user.id } });
   }
 
-  function castBallot(user, voteId, target, from) {
+  /** One ballot per Discord id, from the site or from Discord (source): voting again changes it. */
+  function castBallot(user, voteId, target, from, source = 'site') {
     requirePilot(user, VOTE_RULES.minVoterLevel, 'votare');
     const state = readVotes();
     const vote = state.current;
@@ -811,9 +820,16 @@ export function createHidcCampaign(deps) {
       throw error;
     }
     vote.ballots = vote.ballots || {};
-    vote.ballots[user.id] = { target, from, at: Date.now(), name: user.globalName || user.username || user.id };
+    vote.ballots[user.id] = {
+      target,
+      from,
+      at: Date.now(),
+      name: user.globalName || user.username || user.id,
+      source: source === 'discord' ? 'discord' : 'site',
+    };
     writeVotes(state);
     deps.emit('hidc:campaign-updated', { reason: 'ballot' });
+    voteDiscord.refresh(vote.id);
     return vote;
   }
 
@@ -824,6 +840,7 @@ export function createHidcCampaign(deps) {
     vote.resultMessage = message || null;
     state.history.unshift(vote);
     state.current = null;
+    voteDiscord.refresh(vote.id);
   }
 
   function enqueueFocusCommand(vote) {
@@ -878,7 +895,7 @@ export function createHidcCampaign(deps) {
             // Not enough pilots wanted the change: keep the current region.
             closeVote(state, 'rejected', `Non valida (${short}): la regione attiva resta invariata.`);
             writeVotes(state);
-            announce(`**Votazione non valida** (${short}): la regione attiva resta invariata.`);
+            announce('Votazione non valida', `Solo **${result.total}** voti su **${VOTE_RULES.minVotes}** minimi: la regione attiva resta invariata.`);
             deps.emit('hidc:campaign-updated', { reason: 'vote-closed' });
             return;
           }
@@ -886,7 +903,10 @@ export function createHidcCampaign(deps) {
           vote.endsAt = now + VOTE_RULES.durationMs;
           vote.extensions = (vote.extensions || 0) + 1;
           writeVotes(state);
-          if (vote.extensions === 1) announce(`**Votazione prossima regione prorogata**: ${short}.`);
+          voteDiscord.refresh(vote.id);
+          if (vote.extensions === 1) {
+            announce('Votazione prorogata', `Non ci sono ancora abbastanza voti: votate dal menu della votazione o sul sito.\n\n**Stato**\n- Voti: **${result.total}** su **${VOTE_RULES.minVotes}** minimi\n- Chiude <t:${Math.floor(vote.endsAt / 1000)}:R>`);
+          }
           deps.emit('hidc:campaign-updated', { reason: 'vote-extended' });
           return;
         }
@@ -896,7 +916,7 @@ export function createHidcCampaign(deps) {
         if (result.target === vote.activeTarget && result.from === vote.activeFrom) {
           closeVote(state, 'applied', `Confermata ${regionLabel(result.target)} da ${regionLabel(result.from)} (${targetVotes}/${result.total} voti).`);
           writeVotes(state);
-          announce(`**Votazione chiusa**: resta attiva **${regionLabel(result.target)}** da **${regionLabel(result.from)}** (${targetVotes} voti su ${result.total}).`);
+          announce('Votazione chiusa', `Resta attiva la **${regionLabel(result.target)}**.\n\n**Risultato**\n- Attacco da: **${regionLabel(result.from)}**\n- Voti: **${targetVotes}** su ${result.total}`);
           deps.emit('hidc:campaign-updated', { reason: 'vote-closed' });
           return;
         }
@@ -905,7 +925,8 @@ export function createHidcCampaign(deps) {
         vote.resultMessage = `${regionLabel(result.target)} da ${regionLabel(result.from)} (${targetVotes}/${result.total} voti): in attesa di DCS.`;
         enqueueFocusCommand(vote);
         writeVotes(state);
-        announce(`**Votazione chiusa**: si attacca **${regionLabel(result.target)}** partendo da **${regionLabel(result.from)}** (${targetVotes} voti su ${result.total}).`);
+        voteDiscord.refresh(vote.id);
+        announce('Votazione chiusa', `Il prossimo obiettivo è la **${regionLabel(result.target)}**.\n\n**Risultato**\n- Attacco da: **${regionLabel(result.from)}**\n- Voti: **${targetVotes}** su ${result.total}`);
         deps.emit('hidc:campaign-updated', { reason: 'vote-closed' });
         return;
       }
@@ -1313,6 +1334,14 @@ export function createHidcCampaign(deps) {
     files,
     registerRoutes,
     tick,
+    // Gateway INTERACTION_CREATE (server.js): votes from the Discord channel.
+    handleDiscordInteraction: (interaction) => voteDiscord.handleInteraction(interaction),
+    voteDiscordEnabled: voteDiscord.enabled,
+    // Debug panel: test vote card (options of the open vote if any), votes in memory only.
+    sendDiscordVoteTest: (by) => {
+      const current = readVotes().current;
+      return voteDiscord.publishTest({ by, options: current?.status === 'open' ? current.options : null });
+    },
     // test hooks
     missions,
     cargo,

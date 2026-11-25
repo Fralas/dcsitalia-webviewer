@@ -35,7 +35,7 @@ import { SqliteSessionStore } from './db/sessionStore.js';
 import * as airbaseStatusParser from './services/airbaseStatusParser.js';
 import * as airbaseStatusManager from './services/airbaseStatusManager.js';
 import * as discordAuth from './services/discordAuth.js';
-import { canAccessAtc, canAccessLidc, canEditChangelog, canEditWiki, canManageNoe, requireFeatureFlag } from './config/featureAccess.js';
+import { canAccessAtc, canAccessLidc, canEditChangelog, canEditWiki, canManageNoe, canTestDiscordNotify, requireFeatureFlag } from './config/featureAccess.js';
 import { authBypassMiddleware, isAuthBypassEnabled } from './config/authBypass.js';
 import { assertRuntimeSecrets, createHelmetMiddleware, createJsonBodyParser, resolveAdminPasswordHash } from './config/security.js';
 import { optionalPath } from './config/envPaths.js';
@@ -57,6 +57,8 @@ import { createDscoreFactionPoints } from './services/dscoreFactionPoints.js';
 import { createHidcCampaign } from './services/hidcCampaign.js';
 import { createDcsServerBot } from './services/dcsServerBot.js';
 import { createDcsServerBotMock } from './services/dcsServerBotMock.js';
+import { createDiscordNotifications } from './services/discordNotifications.js';
+import { createDiscordGateway } from './services/discordGateway.js';
 import { proxyCartoBasemapTile } from './services/cartoBasemapProxy.js';
 import {
   LIDC_EXPORT_FILES,
@@ -178,6 +180,8 @@ const WEB_SPAWN_MARKERS_FILE = resolveDbridgeExportFile('WEB_SPAWN_MARKERS_FILE'
 const DBUILD_SITES_FILE = resolveDbridgeExportFile('DBUILD_SITES_FILE', 'Export_DBUILD_Sites.json');
 const TANKER_ROUTES_FILE = resolveDbridgeExportFile('TANKER_ROUTES_FILE', 'Export_Tanker_Routes.json');
 const SHIP_POSITIONS_FILE = resolveDbridgeExportFile('SHIP_POSITIONS_FILE', 'Export_Ship_Positions.json');
+// Important campaign events (DBRIDGE_Notify.lua) forwarded to the Discord channel DISCORD_NOTIFY_CHANNEL_ID.
+const DCORE_NOTIFICATIONS_FILE = resolveDbridgeExportFile('DCORE_NOTIFICATIONS_FILE', 'Export_Notifications.json');
 
 // Max placement distance from airport center (matches DMAS blue_airbase_radius_m).
 const AIRPORT_SPAWN_RADIUS_M = Number.parseInt(process.env.AIRPORT_SPAWN_RADIUS_M, 10) || 2500;
@@ -485,6 +489,7 @@ async function ensureSessionUserPermissions(req, options = {}) {
     canAccessAtc: canAccessAtc(sessionUser.id, roleIds),
     canManageNoe: canManageNoe(sessionUser.id, roleIds),
     canEditChangelog: canEditChangelog(sessionUser.id, roleIds),
+    canTestDiscordNotify: canTestDiscordNotify(sessionUser.id, roleIds),
   };
   req.session.userPermissionsResolvedAt = Date.now();
   return req.session.user;
@@ -2180,6 +2185,7 @@ app.get('/api/auth/discord/callback', async (req, res) => {
       canAccessAtc: canAccessAtc(discordUser.id),
       canManageNoe: canManageNoe(discordUser.id),
       canEditChangelog: canEditChangelog(discordUser.id),
+      canTestDiscordNotify: canTestDiscordNotify(discordUser.id),
     };
 
     await ensureSessionUserPermissions(req, { forceRefresh: true });
@@ -2341,6 +2347,110 @@ const hidcCampaign = createHidcCampaign({
 });
 hidcCampaign.registerRoutes(app);
 setInterval(() => hidcCampaign.tick(), 15 * 1000);
+
+// Discord gateway: receives the clicks on the vote menus posted by the bot (vote from Discord).
+// Off with HIDC_VOTE_DISCORD=false. The application must NOT have an Interactions Endpoint URL set.
+if (hidcCampaign.voteDiscordEnabled) {
+  const discordGateway = createDiscordGateway({
+    token: String(process.env.DISCORD_BOT_TOKEN || '').trim(),
+    logger,
+    onDispatch: (type, data) => {
+      if (type !== 'INTERACTION_CREATE') return;
+      hidcCampaign.handleDiscordInteraction(data).catch((error) => {
+        logger.error('Discord interaction failed', { error: error.message });
+      });
+    },
+  });
+  discordGateway.start();
+}
+
+const discordNotifications = createDiscordNotifications({ file: DCORE_NOTIFICATIONS_FILE, logger });
+discordNotifications.start();
+
+// Debug panel for the Discord notifications (map with ?hidcDebug=1), staff only (DISCORD_NOTIFY_TEST_IDS).
+function requireNotifyTester(req, res, next) {
+  const user = req.session?.user;
+  if (!user?.id) return res.status(401).json({ error: 'Not authenticated' });
+  if (!canTestDiscordNotify(user.id, user.discordRoleIds || [])) return res.status(403).json({ error: 'Forbidden' });
+  return next();
+}
+const notifyTestLastAt = new Map();
+// Notification status + whether the test vote card can be sent (vote channel on Discord).
+const notifyDebugStatus = () => ({ ...discordNotifications.getStatus(), voteTestEnabled: Boolean(hidcCampaign.voteDiscordEnabled) });
+
+app.get('/api/hidc/notify-debug', requireNotifyTester, (req, res) => {
+  res.json(notifyDebugStatus());
+});
+
+app.post('/api/hidc/notify-debug/test', requireNotifyTester, async (req, res) => {
+  const userId = String(req.session.user.id);
+  const last = notifyTestLastAt.get(userId) || 0;
+  if (Date.now() - last < 3000) {
+    return res.status(429).json({ error: 'Aspetta qualche secondo tra un test e il successivo' });
+  }
+  notifyTestLastAt.set(userId, Date.now());
+  const body = req.body || {};
+  const by = req.session.user.globalName || req.session.user.username || userId;
+  const result = await discordNotifications.sendTest({
+    type: typeof body.type === 'string' ? body.type : '',
+    title: typeof body.title === 'string' ? body.title : '',
+    message: typeof body.message === 'string' ? body.message : '',
+    by,
+  });
+  logger.info(`Discord notify test by ${by}: ${result.ok ? 'ok' : `failed (${result.status} ${result.detail})`}`);
+  const error = result.ok ? undefined : `Discord: ${result.status ? `HTTP ${result.status}` : "nessuna risposta"}${result.detail ? ` - ${result.detail}` : ""}`;
+  return res.status(result.ok ? 200 : 502).json({ ...result, error, status_info: notifyDebugStatus() });
+});
+
+// One test message per type, to see every notification on Discord (about 15 s).
+let notifyTestAllRunning = false;
+app.post('/api/hidc/notify-debug/test-all', requireNotifyTester, async (req, res) => {
+  const userId = String(req.session.user.id);
+  const last = notifyTestLastAt.get(`all:${userId}`) || 0;
+  if (notifyTestAllRunning || Date.now() - last < 30000) {
+    return res.status(429).json({ error: "Invio di tutte le notifiche gia' in corso o appena fatto: riprova tra 30 secondi" });
+  }
+  notifyTestAllRunning = true;
+  notifyTestLastAt.set(`all:${userId}`, Date.now());
+  const by = req.session.user.globalName || req.session.user.username || userId;
+  try {
+    const result = await discordNotifications.sendAllTests({ by });
+    // Then the vote card (test vote, can be used from Discord: votes do not count).
+    if (result.ok && hidcCampaign.voteDiscordEnabled) {
+      const vote = await hidcCampaign.sendDiscordVoteTest(by);
+      result.total += 1;
+      result.results.push({ type: 'vote', title: 'Votazione prossima regione', ok: vote.ok, status: vote.status, detail: vote.detail });
+      if (vote.ok) result.sent += 1;
+      else Object.assign(result, { ok: false, status: vote.status, detail: vote.detail });
+    }
+    logger.info(`Discord notify test-all by ${by}: ${result.sent}/${result.total}`);
+    const error = result.ok ? undefined
+      : `Inviate ${result.sent}/${result.total}. Discord: ${result.status ? `HTTP ${result.status}` : 'nessuna risposta'}${result.detail ? ` - ${result.detail}` : ''}`;
+    return res.status(result.ok ? 200 : 502).json({ ...result, error, status_info: notifyDebugStatus() });
+  } finally {
+    notifyTestAllRunning = false;
+  }
+});
+
+// Test vote card in the vote channel: menus work, ballots stay in memory (campaign untouched).
+app.post('/api/hidc/notify-debug/test-vote', requireNotifyTester, async (req, res) => {
+  const userId = String(req.session.user.id);
+  const last = notifyTestLastAt.get(`vote:${userId}`) || 0;
+  if (Date.now() - last < 5000) {
+    return res.status(429).json({ error: 'Aspetta qualche secondo tra un test e il successivo' });
+  }
+  notifyTestLastAt.set(`vote:${userId}`, Date.now());
+  const by = req.session.user.globalName || req.session.user.username || userId;
+  const result = await hidcCampaign.sendDiscordVoteTest(by);
+  logger.info(`Discord vote test by ${by}: ${result.ok ? 'ok' : `failed (${result.status} ${result.detail})`}`);
+  const error = result.ok ? undefined : `Discord: ${result.status ? `HTTP ${result.status} - ` : ''}${result.detail}`;
+  return res.status(result.ok ? 200 : 502).json({ ...result, error, status_info: notifyDebugStatus() });
+});
+
+app.post('/api/hidc/notify-debug/poll', requireNotifyTester, async (req, res) => {
+  await discordNotifications.pollNow();
+  res.json(notifyDebugStatus());
+});
 
 /**
  * GET /api/lidc/logistics-alerts

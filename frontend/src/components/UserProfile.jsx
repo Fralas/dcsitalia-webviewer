@@ -551,7 +551,7 @@ export default function UserProfile() {
           <div className="pf-grid-3 pf-grid-3--flush pf-activity">
             <ActivityCalendar activity={combat.activity} linked={pilotLinked} available={botConnected} />
             <FlightHours hours={combat.hours} />
-            <TheatreSplit theatres={combat.theatres} sides={combat.sides} />
+            <TheatreSplit theatres={combat.theatres} />
           </div>
         </Section>
       )}
