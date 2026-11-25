@@ -117,6 +117,28 @@
   color: var(--fm-mute);
 }
 
+.flower-menu__meta.is-lock {
+  color: var(--fm-mute);
+}
+
+/* Locked petal (pilot level too low): dimmed, no lift; still clickable to explain the lock. */
+.flower-menu__petal.is-locked {
+  border-style: dashed;
+  color: var(--fm-mute);
+}
+
+.flower-menu__petal.is-locked .flower-menu__icon,
+.flower-menu__petal.is-locked:hover .flower-menu__icon,
+.flower-menu__petal.is-locked:focus-visible .flower-menu__icon {
+  color: var(--fm-mute);
+}
+
+.flower-menu__petal.is-locked:hover,
+.flower-menu__petal.is-locked:focus-visible {
+  border-color: var(--fm-hairline);
+  transform: none;
+}
+
 .flower-menu__meta.is-cost {
   color: var(--fm-gold);
   font-variant-numeric: tabular-nums;

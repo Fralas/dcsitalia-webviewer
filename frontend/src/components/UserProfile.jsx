@@ -9,6 +9,7 @@ import PilotHero, { AccountFooter } from './profile/PilotHero';
 import CombatRecord from './profile/CombatRecord';
 import SupportRecord from './profile/SupportRecord';
 import AwardsGrid from './profile/AwardsGrid';
+import UnlockRoadmap from './profile/UnlockRoadmap';
 import {
   AircraftTable, FlightHours, KpiStrip, MonthlyTrend, Section, TheatreSplit, TrapsRecord, WeaponsTable,
 } from './profile/StatsCharts';
@@ -532,6 +533,14 @@ export default function UserProfile() {
         />
         {pilotLinked && <KpiStrip profile={pilot.profile} boardPosition={ownPilotIndex >= 0 ? ownPilotIndex + 1 : null} />}
       </div>
+
+      {pilot.profile?.unlocks?.length > 0 && (
+        <UnlockRoadmap
+          unlocks={pilot.profile.unlocks}
+          level={pilot.profile.level?.level}
+          linked={pilotLinked}
+        />
+      )}
 
       {pilotLinked && pilot.profile && !botConnected && (
         <p className="profile-msg pf-bot-notice">

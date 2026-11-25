@@ -55,6 +55,7 @@ import * as lidcService from './services/lidcService.js';
 import * as hidcAirportLogistics from './services/hidcAirportLogistics.js';
 import { createDscoreFactionPoints } from './services/dscoreFactionPoints.js';
 import { createHidcCampaign } from './services/hidcCampaign.js';
+import { unlockKeyForWebAction } from './config/pilotUnlocks.config.js';
 import { createDcsServerBot } from './services/dcsServerBot.js';
 import { createDcsServerBotMock } from './services/dcsServerBotMock.js';
 import { createDiscordNotifications } from './services/discordNotifications.js';
@@ -3790,6 +3791,22 @@ app.get('/api/web-spawn-markers', (req, res) => {
   res.json({ markers: webSpawnMarkers });
 });
 
+/**
+ * Pilot level gate (config/pilotUnlocks.config.js): true when allowed, otherwise sends 403 and
+ * returns false. Same levels DCORE applies to in-game F10 markers.
+ */
+function checkPilotUnlock(res, actor, commandType, keyword) {
+  const unlockKey = unlockKeyForWebAction(commandType, keyword);
+  if (!unlockKey) return true;
+  try {
+    hidcCampaign.requireUnlock(actor, unlockKey);
+    return true;
+  } catch (error) {
+    res.status(Number(error.status) || 403).json({ error: error.message || 'Livello pilota insufficiente' });
+    return false;
+  }
+}
+
 function getSessionActor(req) {
   const user = req.session?.user;
   if (!user) return null;
@@ -4058,6 +4075,7 @@ app.post('/api/tanker/spawn', (req, res) => {
   if (!distanceCheck.ok) {
     return res.status(400).json({ error: distanceCheck.error });
   }
+  if (!checkPilotUnlock(res, actor, 'tanker_spawn', keyword)) return undefined;
 
   queueAndRespond(res, {
     id: randomUUID(),
@@ -4096,6 +4114,7 @@ app.post('/api/map/actions/spawn', (req, res) => {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
     return res.status(400).json({ error: 'Valid lat/lon are required' });
   }
+  if (!checkPilotUnlock(res, actor, commandType, keyword)) return undefined;
 
   queueAndRespond(res, {
     id: randomUUID(),

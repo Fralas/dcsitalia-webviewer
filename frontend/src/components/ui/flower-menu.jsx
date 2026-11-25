@@ -47,7 +47,8 @@ function HubReticle({ size }) {
 
 /**
  * Radial action menu in the map panels' style (dark glass cards, hairline border, orange accent).
- * Items: { id, icon, label, meta?, metaTone?: 'cost' | 'mute', hasChildren?, onClick }.
+ * Items: { id, icon, label, meta?, metaTone?: 'cost' | 'mute' | 'lock', hasChildren?, locked?, onClick }.
+ * locked: dimmed petal with a lock meta (e.g. pilot level too low); onClick still fires to explain why.
  * The hub sits on the clicked point: centerOnClick (e.g. back) or, without it, it closes the menu.
  * title / caption: the header chip above the ring (current path, coordinates).
  */
@@ -118,7 +119,8 @@ export function FlowerMenu({
             >
               <button
                 type="button"
-                className={cn('flower-menu__petal', item.hasChildren && 'has-children')}
+                className={cn('flower-menu__petal', item.hasChildren && 'has-children', item.locked && 'is-locked')}
+                aria-disabled={item.locked ? 'true' : undefined}
                 onClick={(event) => {
                   event.stopPropagation();
                   item.onClick?.(event);
@@ -129,7 +131,7 @@ export function FlowerMenu({
                 {Icon && <Icon className="flower-menu__icon" aria-hidden="true" />}
                 <span className="flower-menu__label">{item.label}</span>
                 {(item.meta || item.hasChildren) && (
-                  <span className={cn('flower-menu__meta', item.metaTone === 'cost' && 'is-cost')}>
+                  <span className={cn('flower-menu__meta', item.metaTone === 'cost' && 'is-cost', item.metaTone === 'lock' && 'is-lock')}>
                     {item.meta}
                     {item.hasChildren && <ChevronRight className="flower-menu__more" aria-hidden="true" />}
                   </span>

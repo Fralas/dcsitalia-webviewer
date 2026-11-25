@@ -1283,6 +1283,11 @@ export default {
 
 // ==================== HIDC pilot / campaign ====================
 
+/** Pilot level unlocks (assets, slot, vote, airlift) with the current user's state */
+export async function getPilotUnlocks() {
+  return fetchAPI('/hidc/unlocks', { credentials: 'include' });
+}
+
 /** Current user's DCS pilot link, XP and level */
 export async function getHidcPilotProfile() {
   return fetchAPI('/hidc/pilot/me');

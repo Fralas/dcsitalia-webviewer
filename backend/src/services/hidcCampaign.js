@@ -7,6 +7,8 @@
  *   - Export_Pilot_Cargo.json         DBRIDGE_Cargo.lua: sling-load deliveries / kg / km per UCID (read-only)
  *   - Export_DCampaign_Focus.json     DMAP_Focus.lua: active region, BLUE attack region, candidates (read-only)
  *   - Export_DRegion_Status.json      DMAP_Region.lua: region -> "blue" | "red" (read-only)
+ *   - Export_Pilot_WebLevels.json     written here: effective site level per UCID (mission XP, DCSServerBot),
+ *                                     read by DBRIDGE_Pilots / DPILOT_SlotHook for the in-game level unlocks
  * Missions (services/hidcMissions.js): SEAD / DEAD / CAS / LOGISTICS per zone, accepted on the site,
  * completed in DCS within 2 hours; their XP is added to the pilot level.
  * Region votes open by themselves after each conquest, or are started by a pilot of level >= 5:
@@ -24,7 +26,8 @@ import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
 import { optionalPath } from '../config/envPaths.js';
 import * as discordAuth from './discordAuth.js';
 import { createHidcMissions } from './hidcMissions.js';
-import { createHidcAirLift } from './hidcAirLift.js';
+import { createHidcAirLift, AIRLIFT_AIRCRAFT } from './hidcAirLift.js';
+import { PILOT_ASSET_UNLOCKS } from '../config/pilotUnlocks.config.js';
 import { createHidcCargoMissions, readDeliveriesFile } from './hidcCargoMissions.js';
 import { createHidcVoteDiscord } from './hidcVoteDiscord.js';
 
@@ -124,6 +127,9 @@ export function createHidcCampaign(deps) {
     // Production crates delivered at BLUE airports (DCORE DWAREHOUSE), for the "Trasporto cargo" missions.
     productionDeliveries: optionalPath('HIDC_PRODUCTION_DELIVERIES_FILE')
       || (dcoreSrcDir ? path.join(dcoreSrcDir, 'DWAREHOUSE', 'Export_Production_Deliveries.json') : null),
+    // Written by the site: effective level per UCID for the in-game unlocks (DCORE DBRIDGE_Pilots).
+    webLevels: optionalPath('HIDC_PILOT_WEB_LEVELS_FILE')
+      || (dbridgeDir ? path.join(dbridgeDir, 'Export_Pilot_WebLevels.json') : null),
   };
   const botToken = String(process.env.DISCORD_BOT_TOKEN || '').trim();
   // Votes go to their own channel if set, otherwise to the campaign notifications channel.
@@ -732,6 +738,90 @@ export function createHidcCampaign(deps) {
     return pilot;
   }
 
+  // ---------------------------------------------------------------- level unlocks
+
+  /** Asset levels exported by DCORE (Export_Pilot_Stats.json "unlock_levels"), read in both link modes. */
+  function readUnlockLevels() {
+    const parsed = readJsonFile(files.stats, null);
+    const raw = parsed?.unlock_levels;
+    return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  }
+
+  /** Every level unlock (assets from DCORE + site-only vote / airlift), sorted by level. */
+  function unlockCatalog() {
+    const dcoreLevels = readUnlockLevels();
+    const assets = PILOT_ASSET_UNLOCKS.map((entry) => {
+      const fromDcore = Number.parseInt(dcoreLevels[entry.key], 10);
+      return { ...entry, level: Number.isFinite(fromDcore) ? fromDcore : entry.level, source: 'dcore' };
+    });
+    const site = [
+      { key: 'vote', level: VOTE_RULES.minStartLevel, label: 'Votazione regione', group: 'Campagna', detail: 'Avvia il voto della regione attiva', source: 'site' },
+      ...Object.values(AIRLIFT_AIRCRAFT).map((aircraft) => ({
+        key: `airlift_${aircraft.key.toLowerCase()}`,
+        level: aircraft.minLevel,
+        label: aircraft.label,
+        group: 'Airlift AI',
+        detail: aircraft.runwayOnly ? 'Solo aeroporti con pista' : 'Aeroporti, FARP ed eliporti',
+        source: 'site',
+      })),
+    ];
+    return [...assets, ...site]
+      .filter((entry) => Number(entry.level) > 0)
+      .map((entry, order) => ({ ...entry, order }))
+      .sort((a, b) => a.level - b.level || a.order - b.order)
+      .map(({ order, ...entry }) => entry);
+  }
+
+  /** Unlock list with the user's state, for the profile roadmap and the map menu locks. */
+  function getUnlocks(user) {
+    const pilot = user?.id ? pilotForUser(user.id) : null;
+    const linked = Boolean(pilot?.link);
+    const level = linked ? (pilot.level?.level ?? 0) : null;
+    const bypass = Boolean(user?.id) && hasLevelBypass(user.id);
+    return {
+      unlocks: unlockCatalog().map((entry) => ({
+        ...entry,
+        unlocked: bypass || (level != null && level >= entry.level),
+      })),
+      me: user?.id ? { linked, level, bypass } : null,
+    };
+  }
+
+  /** Throws 403 when the user is below the level of an unlock key (no-op for unknown keys). */
+  function requireUnlock(user, key) {
+    const entry = unlockCatalog().find((item) => item.key === key);
+    if (!entry) return null;
+    return requirePilot(user, entry.level, `usare ${entry.label}`);
+  }
+
+  // Effective site level per UCID -> DCORE (in-game marker / slot unlocks use max(DCORE, site)).
+  let webLevelsSignature = '';
+  function writeWebLevels() {
+    const target = files.webLevels;
+    if (!target || !fs.existsSync(path.dirname(target))) return;
+    const stats = readStats();
+    const levels = {};
+    const add = (discordId, ucids) => {
+      const pilot = pilotForUser(discordId, stats);
+      const level = Number(pilot?.level?.level) || 0;
+      (ucids || []).filter(Boolean).forEach((ucid) => {
+        levels[ucid] = Math.max(levels[ucid] || 0, level);
+      });
+    };
+    if (serverBot) {
+      serverBot.listPilots().forEach((entry) => add(entry.discordId, entry.ucids));
+    } else {
+      Object.entries(readLinks()).forEach(([discordId, link]) => add(discordId, link?.ucids || [link?.ucid]));
+    }
+    const sorted = Object.fromEntries(Object.keys(levels).sort().map((ucid) => [ucid, levels[ucid]]));
+    const signature = JSON.stringify(sorted);
+    if (signature === webLevelsSignature) return;
+    const tmp = `${target}.tmp`;
+    fs.writeFileSync(tmp, `${JSON.stringify({ updated_at: Math.floor(Date.now() / 1000), levels: sorted }, null, 2)}\n`, 'utf8');
+    fs.renameSync(tmp, target);
+    webLevelsSignature = signature;
+  }
+
   /** Last round started by a pilot, for the start cooldown. */
   function lastManualRound(state) {
     return [state.current, ...state.history].find((vote) => vote?.kind === 'manual') || null;
@@ -1115,6 +1205,7 @@ export function createHidcCampaign(deps) {
       // DCSSB_MOCK: the profile also fills the patch grid with catalog patches to preview the layout.
       mock: Boolean(serverBot?.mock),
       minStartLevel: VOTE_RULES.minStartLevel,
+      unlocks: getUnlocks(user).unlocks,
     };
   }
 
@@ -1206,6 +1297,11 @@ export function createHidcCampaign(deps) {
       } catch (error) {
         sendError(res, error);
       }
+    });
+
+    // Level unlocks (profile roadmap, map menu locks). Works signed out too (no "unlocked" state then).
+    app.get('/api/hidc/unlocks', (req, res) => {
+      res.json(getUnlocks(req.session?.user || null));
     });
 
     app.get('/api/hidc/pilots/leaderboard', (req, res) => {
@@ -1328,12 +1424,20 @@ export function createHidcCampaign(deps) {
       console.error('HIDC cargo tick failed:', error.message);
     }
     airlift.tick();
+    try {
+      writeWebLevels();
+    } catch (error) {
+      console.error('HIDC web levels export failed:', error.message);
+    }
   }
 
   return {
     files,
     registerRoutes,
     tick,
+    // server.js: level gate on map actions / tanker spawns (config/pilotUnlocks.config.js keys).
+    requireUnlock: (user, key) => requireUnlock(user, key),
+    getUnlocks: (user) => getUnlocks(user),
     // Gateway INTERACTION_CREATE (server.js): votes from the Discord channel.
     handleDiscordInteraction: (interaction) => voteDiscord.handleInteraction(interaction),
     voteDiscordEnabled: voteDiscord.enabled,
@@ -1346,7 +1450,7 @@ export function createHidcCampaign(deps) {
     missions,
     cargo,
     airlift,
-    _internals: { botThresholds, botXp, startVote, castBallot, tickVotes, voteWinner, syncLinkRequests, startLink, getCampaignState, getPilotProfile, levelInfo },
+    _internals: { unlockCatalog, writeWebLevels, botThresholds, botXp, startVote, castBallot, tickVotes, voteWinner, syncLinkRequests, startLink, getCampaignState, getPilotProfile, levelInfo },
   };
 }
 

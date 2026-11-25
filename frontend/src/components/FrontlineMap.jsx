@@ -24,7 +24,7 @@ import airports from '../config/airports';
 import { importantWeaponsAirports, importantWeaponsCarriers, importantWeaponsHeliports } from '../config/weapons';
 import tankIcon from '../assets/tank-icon.svg';
 import socketService from '../services/socket';
-import { acceptDcsarTask, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, getAirliftPlayers, getAirportOccupancy, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getHidcLogisticsAlerts, getLogisticsRouteVisibility, getMissions, getServerTime, getTankerOptions, getTankerRoutes, purchaseAirportLogistics, setAirportLogisticsRoutePriority, getProductionPoints, getShipPositions, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate, spawnAirportCrateBundle, spawnMapAction, spawnTanker, updateAirportOrder } from '../services/api';
+import { acceptDcsarTask, acceptMission, cancelDbuildPlacement, cancelMission, completeDcsarTask, completeMission, composeAirportLogisticsMission, confirmDbuildPlacement, createDbuildPlacement, createOrder, getAirliftPlayers, getAirportOccupancy, getCombatMissions, getConvoys, getDcsar, getDbuildCatalog, getDbuildPlacements, getFeed, getFrontlineZones, getHidcLogisticsAlerts, getLogisticsRouteVisibility, getMissions, getPilotUnlocks, getServerTime, getTankerOptions, getTankerRoutes, purchaseAirportLogistics, setAirportLogisticsRoutePriority, getProductionPoints, getShipPositions, getSpawnOptions, getWebSpawnMarkers, requestProductionPointUpgrade, retrieveProductionPointCrates, spawnAirportInfantry, spawnAirportCrate, spawnAirportCrateBundle, spawnMapAction, spawnTanker, updateAirportOrder } from '../services/api';
 import ZoneMissionCard from './map/ZoneMissionCard';
 import LiveFeedPanel from './map/LiveFeedPanel';
 import MapFilterBar from './map/MapFilterBar';
@@ -5547,6 +5547,8 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
   const [dbuildSites, setDbuildSites] = useState([]);
   const [selectedDbuildPlacementId, setSelectedDbuildPlacementId] = useState(null);
   const [mapContextMenu, setMapContextMenu] = useState(null);
+  // Pilot level unlocks (GET /api/hidc/unlocks): locks CAP/CAS/.../tanker in the right-click menu.
+  const [pilotUnlocks, setPilotUnlocks] = useState(null);
   const [tankerOptions, setTankerOptions] = useState([]);
   const [tankerRoutes, setTankerRoutes] = useState([]);
   const [shipPositions, setShipPositions] = useState([]);
@@ -5578,6 +5580,22 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
       setCommandToastFading(false);
     }, COMMAND_TOAST_VISIBLE_MS + COMMAND_TOAST_FADE_MS);
   }, []);
+
+  // Refreshed on login change and every time the right-click menu opens (level ups mid-session).
+  const mapContextMenuOpen = Boolean(mapContextMenu);
+  useEffect(() => {
+    if (!mapContextMenuOpen && pilotUnlocks && pilotUnlocks.userId === (user?.id || null)) return undefined;
+    let cancelled = false;
+    getPilotUnlocks()
+      .then((data) => {
+        if (!cancelled && data) setPilotUnlocks({ ...data, userId: user?.id || null });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapContextMenuOpen, user?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -8004,6 +8022,8 @@ export default function FrontlineMap({ language = 'en', tacticalMapId, airportsD
                 onSelectDbuild={handleCreateDbuildDraft}
                 onSelectTanker={handleStartTankerMode}
                 onSelectMapAction={handleSelectMapAction}
+                unlockState={pilotUnlocks}
+                onLocked={(reason) => showCommandToast({ ok: false, message: reason, balance: null })}
               />
 
               {selectedDbuildPlacement && (

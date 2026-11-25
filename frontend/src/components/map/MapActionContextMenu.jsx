@@ -7,6 +7,7 @@ import {
   Factory,
   Fuel,
   Hammer,
+  Lock,
   Plane,
   PlaneLanding,
   Radar,
@@ -20,6 +21,7 @@ import {
   MAP_CONTEXT_MENU_ROOT,
   resolveContextMenuNode,
 } from '../../config/mapContextMenuConfig';
+import { menuActionLock } from '../../config/pilotUnlocks';
 import { FlowerMenu } from '../ui/flower-menu';
 
 const ICON_BY_KEY = {
@@ -59,6 +61,8 @@ export default function MapActionContextMenu({
   onSelectDbuild,
   onSelectTanker,
   onSelectMapAction,
+  unlockState = null,
+  onLocked,
 }) {
   const [path, setPath] = useState([]);
 
@@ -75,6 +79,11 @@ export default function MapActionContextMenu({
 
   const handleItemClick = useCallback((entry) => {
     if (entry.action) {
+      const lock = menuActionLock(entry.action, unlockState);
+      if (lock) {
+        onLocked?.(lock.reason);
+        return;
+      }
       const { type, buildType, keyword } = entry.action;
       if (type === 'dbuild' && buildType) {
         onSelectDbuild(buildType);
@@ -98,13 +107,17 @@ export default function MapActionContextMenu({
     if (entry.children?.length) {
       setPath((current) => [...current, entry.id]);
     }
-  }, [menu, onSelectDbuild, onSelectMapAction, onSelectTanker]);
+  }, [menu, onLocked, onSelectDbuild, onSelectMapAction, onSelectTanker, unlockState]);
 
   const flowerItems = useMemo(() => currentItems.map((entry) => {
     const hasChildren = Boolean(entry.children?.length) && !entry.action;
+    const lock = entry.action ? menuActionLock(entry.action, unlockState) : null;
     let meta = null;
     let metaTone = 'mute';
-    if (Number.isFinite(Number(entry.cost)) && entry.cost !== null && entry.cost !== undefined) {
+    if (lock) {
+      meta = `Lv ${lock.level}`;
+      metaTone = 'lock';
+    } else if (Number.isFinite(Number(entry.cost)) && entry.cost !== null && entry.cost !== undefined) {
       meta = `${entry.cost} fp`;
       metaTone = 'cost';
     } else if (entry.subtitle) {
@@ -114,15 +127,18 @@ export default function MapActionContextMenu({
     }
     return {
       id: entry.id,
-      icon: resolveIcon(entry),
+      icon: lock ? Lock : resolveIcon(entry),
       label: entry.label,
-      title: [entry.label, entry.subtitle, entry.cost != null ? `${entry.cost} fp` : null].filter(Boolean).join(' · '),
+      title: lock
+        ? lock.reason
+        : [entry.label, entry.subtitle, entry.cost != null ? `${entry.cost} fp` : null].filter(Boolean).join(' · '),
       meta,
       metaTone,
       hasChildren,
+      locked: Boolean(lock),
       onClick: () => handleItemClick(entry),
     };
-  }), [currentItems, handleItemClick]);
+  }), [currentItems, handleItemClick, unlockState]);
 
   // Esc: back one level, or close at the root.
   useEffect(() => {
