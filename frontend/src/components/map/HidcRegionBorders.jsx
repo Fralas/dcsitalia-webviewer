@@ -43,11 +43,13 @@ function roleFor(regionId, campaign) {
   return 'none';
 }
 
-/** Regions highlighted for the vote: every option while a round is open, the winner while DCS applies it. */
+/**
+ * Regions highlighted for the vote: every option while a round is open. Once the vote is valid the
+ * winner is already the active region (backend focus), so nothing is highlighted as "chosen".
+ */
 function voteTargets(campaign) {
   const vote = campaign?.vote;
   if (vote?.status === 'open') return new Set((vote.options || []).map((option) => option.target));
-  if (vote?.status === 'passed' && vote.target) return new Set([vote.target]);
   return new Set();
 }
 
@@ -189,7 +191,6 @@ function buildLabels(map, campaign) {
   if (!width || !height) return [];
   const showAll = map.getZoom() >= ALL_LABELS_MIN_ZOOM;
   const targets = voteTargets(campaign);
-  const passed = campaign?.vote?.status === 'passed';
 
   return HIDC_REGION_BORDERS.features.flatMap((feature) => {
     const { id, label, center } = feature.properties;
@@ -198,7 +199,7 @@ function buildLabels(map, campaign) {
     if (!showAll && role === 'none' && !isVote) return [];
     const point = map.project(center);
     if (!Number.isFinite(point?.x) || point.x < -80 || point.y < -40 || point.x > width + 80 || point.y > height + 40) return [];
-    const tag = isVote && role === 'none' ? (passed ? 'Scelta' : 'In votazione') : '';
+    const tag = isVote && role === 'none' ? 'In votazione' : '';
     return [{ id, label, tag, tone: role !== 'none' ? role : (isVote ? 'vote' : 'none'), x: point.x, y: point.y }];
   });
 }

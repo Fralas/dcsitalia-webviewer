@@ -1012,11 +1012,22 @@ export function createHidcCampaign(deps) {
         }
         vote.status = 'passed';
         vote.passedAt = now;
-        vote.resultMessage = `${regionLabel(result.target)} da ${regionLabel(result.from)} (${targetVotes}/${result.total} voti): in attesa di DCS.`;
+        vote.resultMessage = `Regione attiva: ${regionLabel(result.target)} da ${regionLabel(result.from)} (${targetVotes}/${result.total} voti).`;
         enqueueFocusCommand(vote);
         writeVotes(state);
         voteDiscord.refresh(vote.id);
-        announce('Votazione chiusa', `Il prossimo obiettivo è la **${regionLabel(result.target)}**.\n\n**Risultato**\n- Attacco da: **${regionLabel(result.from)}**\n- Voti: **${targetVotes}** su ${result.total}`);
+        // The vote is valid: the site shows the new region as active right away (effectiveFocus),
+        // DCS applies it in the background. DCORE's own region_active for a vote is not posted again.
+        const previous = vote.activeTarget || vote.conquered || null;
+        announce('Regione attiva cambiata', [
+          previous
+            ? `Regione attiva cambiata da **${regionLabel(previous)}** a **${regionLabel(result.target)}**.`
+            : `Nuova regione attiva: **${regionLabel(result.target)}**.`,
+          '',
+          '**Risultato della votazione**',
+          `- Attacco da: **${regionLabel(result.from)}**`,
+          `- Voti: **${targetVotes}** su ${result.total}`,
+        ].join('\n'));
         deps.emit('hidc:campaign-updated', { reason: 'vote-closed' });
         return;
       }
@@ -1024,17 +1035,24 @@ export function createHidcCampaign(deps) {
       // ---- passed round, waiting for DCS
       if (vote?.status === 'passed') {
         const result = vote.commandId ? deps.getWebCommandResult(vote.commandId) : null;
+        // The site already showed the change: if DCS does not apply it, say so (the map goes back).
+        const announceRevert = (why) => {
+          const back = focus.target ? ` Resta attiva la **${regionLabel(focus.target)}**.` : '';
+          announce('Cambio regione non applicato', `Il server DCS non ha applicato la **${regionLabel(vote.target)}**: ${why}.${back}`);
+        };
         if (result) {
           closeVote(state, result.ok ? 'applied' : 'failed', result.ok
             ? (result.message || 'Applicata in DCS.')
             : `DCS ha rifiutato: ${result.message || 'errore'}`);
           writeVotes(state);
+          if (!result.ok) announceRevert(result.message || 'errore');
           deps.emit('hidc:campaign-updated', { reason: 'vote-applied' });
           return;
         }
         if (now - (vote.passedAt || now) > VOTE_RULES.applyTimeoutMs) {
           closeVote(state, 'failed', 'Server DCS non raggiungibile: esito scaduto.');
           writeVotes(state);
+          announceRevert('server non raggiungibile');
           deps.emit('hidc:campaign-updated', { reason: 'vote-expired' });
           return;
         }
@@ -1144,9 +1162,19 @@ export function createHidcCampaign(deps) {
 
   // ---------------------------------------------------------------- state for UI
 
+  /**
+   * Active region shown on the site: a validated vote (passed, DCS still applying it) is already
+   * the active region, so the map switches as soon as the vote closes. pending=true until DCS confirms.
+   */
+  function effectiveFocus(focus, votes) {
+    const vote = votes.current;
+    if (vote?.status !== 'passed' || !vote.target || !vote.from) return { ...focus, pending: false };
+    return { ...focus, target: vote.target, from: vote.from, since: vote.passedAt || focus.since, pending: true };
+  }
+
   function getCampaignState(user) {
-    const focus = readFocus();
     const votes = readVotes();
+    const focus = effectiveFocus(readFocus(), votes);
     const pilot = user?.id ? pilotForUser(user.id) : null;
     const level = pilot?.level?.level || 0;
     const linked = Boolean(pilot?.link);

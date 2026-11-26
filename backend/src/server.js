@@ -2365,7 +2365,13 @@ if (hidcCampaign.voteDiscordEnabled) {
   discordGateway.start();
 }
 
-const discordNotifications = createDiscordNotifications({ file: DCORE_NOTIFICATIONS_FILE, logger });
+const discordNotifications = createDiscordNotifications({
+  file: DCORE_NOTIFICATIONS_FILE,
+  logger,
+  // A region change won by a vote is announced by the site when the vote closes
+  // ("Regione attiva cambiata"): DCORE's region_active for it would be a duplicate.
+  skip: (ev) => ev.type === 'region_active' && ev.meta?.reason === 'vote' && hidcCampaign.voteDiscordEnabled,
+});
 discordNotifications.start();
 
 // Debug panel for the Discord notifications (map with ?hidcDebug=1), staff only (DISCORD_NOTIFY_TEST_IDS).

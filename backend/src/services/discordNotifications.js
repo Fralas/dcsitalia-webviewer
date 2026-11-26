@@ -224,6 +224,8 @@ export function createDiscordNotifications(opts = {}) {
   const disabledTypes = new Set(String(process.env.DISCORD_NOTIFY_DISABLED_TYPES || '')
     .split(',').map((s) => s.trim()).filter(Boolean));
   const footer = String(process.env.DISCORD_NOTIFY_FOOTER || 'DCS Italia').trim();
+  // Events the site already announces itself (e.g. region change from a vote): never posted.
+  const skip = typeof opts.skip === 'function' ? opts.skip : () => false;
   const enabled = Boolean(file && channelId && botToken);
 
   const stored = loadJsonIfPresent(DOC.DISCORD_NOTIFICATIONS);
@@ -362,7 +364,9 @@ export function createDiscordNotifications(opts = {}) {
         if (postedSet.has(ev.id)) continue;
         const at = Number(ev.at);
         const stale = maxAgeSec > 0 && Number.isFinite(at) && at > 0 && nowSec - at > maxAgeSec;
-        if (stale || disabledTypes.has(ev.type)) {
+        let skipped = false;
+        try { skipped = Boolean(skip(ev)); } catch { skipped = false; }
+        if (stale || skipped || disabledTypes.has(ev.type)) {
           markPosted(ev.id);
           changed = true;
           continue;

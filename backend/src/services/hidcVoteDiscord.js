@@ -122,8 +122,8 @@ export function createHidcVoteDiscord(deps) {
   }
 
   const STATUS_TEXT = {
-    passed: 'Votazione chiusa: in attesa del server DCS.',
-    applied: 'Votazione chiusa.',
+    passed: 'Votazione chiusa: regione attiva cambiata.',
+    applied: 'Votazione chiusa: regione attiva cambiata.',
     failed: 'Votazione chiusa: non applicata in DCS.',
     cancelled: 'Votazione annullata.',
     rejected: 'Votazione non valida.',
