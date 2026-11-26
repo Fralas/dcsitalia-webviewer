@@ -1001,19 +1001,26 @@
   flex-shrink: 0;
 }
 
+/* Round avatar; the rank badge is a disc whose ring is its edge, centred on the avatar's circle
+   at the bottom-right (45 deg): 14.64% = 1 - cos(45deg)/2 of the avatar, minus half the 40px badge. */
 .pf-hero__avatar .profile__avatar {
   width: 96px;
   height: 96px;
+  border-radius: 50%;
 }
 
 .pf-hero__insignia {
   position: absolute;
-  right: -14px;
-  bottom: -10px;
+  right: calc(14.64% - 20px);
+  bottom: calc(14.64% - 20px);
   display: flex;
-  padding: 3px;
-  border: 1px solid var(--profile-border);
+  border-radius: 50%;
   background: var(--profile-bg);
+  box-shadow: 0 0 0 2px var(--profile-bg);
+}
+
+.pf-hero__insignia svg {
+  display: block;
 }
 
 .pf-hero__body {

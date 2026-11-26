@@ -84,7 +84,7 @@ function RankProgress({ levelInfo }) {
   let caption = 'Grado massimo raggiunto';
   if (next) {
     const left = next.from - level;
-    caption = `Livello ${level + 1} tra ${fmt(toNextLevel)} XP · ${left === 1 ? 'ultimo livello' : `${left} livelli`} a ${next.name}`;
+    caption = `Livello ${level + 1} tra ${fmt(toNextLevel)} XP · ${left === 1 ? 'ultimo livello' : `${left} livelli`} al prossimo grado`;
   }
 
   return (
@@ -102,7 +102,7 @@ function RankProgress({ levelInfo }) {
       <div className="pf-hero__caption">
         <span>{caption}</span>
         {next && (
-          <span className="pf-hero__next" title={`Prossimo grado: ${next.name}`}>
+          <span className="pf-hero__next" title={`Prossimo grado: Livello ${next.from}`}>
             <RankInsignia level={next.from} size={22} />
           </span>
         )}
@@ -175,7 +175,7 @@ export default function PilotHero({ user, displayName, avatarUrl, pilot }) {
 
       <div className="pf-hero__body">
         <p className="profile__kicker">
-          {rank ? `${rank.fullName} · Livello ${levelInfo.level} / ${levelInfo.maxLevel ?? PILOT_MAX_LEVEL}` : 'Profilo'}
+          {rank ? `${rank.fullName} / ${levelInfo.maxLevel ?? PILOT_MAX_LEVEL}` : 'Profilo'}
         </p>
         <h1 className="pf-hero__name">{displayName}</h1>
         <p className="profile__meta">{metaLine(user, profile)}</p>

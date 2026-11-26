@@ -1279,6 +1279,7 @@ export default {
         },
         missions: {
           desc: {
+            CAP: 'Enemy aircraft in the area: patrol the active region and the attack region for at least 30 minutes of the hour.',
             SEAD: 'Suppress the short-range air defences (SHORAD) protecting the zone.',
             DEAD: 'Destroy the anti-aircraft artillery (AAA) deployed in the zone.',
             CAS: 'Close air support: take out the enemy ground forces in the zone.',
@@ -1290,6 +1291,8 @@ export default {
           abandon: 'Abandon mission',
           inProgress: 'In progress',
           awaitingFlight: 'Task done, waiting for your flight',
+          capArea: 'Region {{regions}}',
+          capProgress: 'Airborne in the area: {{done}}/{{required}} min',
           empty: 'No missions available',
           error: 'Action failed',
           loginRequired: 'Sign in with Discord to accept missions',
@@ -1299,7 +1302,9 @@ export default {
             completed: '{{type}} Zone {{number}} completed: +{{xp}} XP',
             expired: '{{type}} Zone {{number}} expired',
             expiredNoFlight: '{{type}} Zone {{number}} expired: no flight recorded',
-            cancelled: '{{type}} Zone {{number}} cancelled'
+            cancelled: '{{type}} Zone {{number}} cancelled',
+            capCompleted: 'CAP {{place}} completed: +{{xp}} XP',
+            capFailed: 'CAP {{place}} failed: less than {{required}} min airborne in the area'
           }
         },
         cargo: {

@@ -79,7 +79,7 @@ export default function RankInsignia({ level = 0, size = 96, className = '', tit
   const color = METALS[rank.tier.metal] || METALS.gold;
   const { insignia } = rank.tier;
 
-  // Step ticks along the lower arc (Capitano III of IX -> 3 lit ticks of 9).
+  // Step ticks along the lower arc (3rd level of a 9-level rank -> 3 lit ticks of 9).
   const ticks = [];
   if (rank.steps > 1) {
     const span = Math.PI * 0.62;
@@ -99,7 +99,7 @@ export default function RankInsignia({ level = 0, size = 96, className = '', tit
       height={size}
       className={className}
       role="img"
-      aria-label={title || `${rank.fullName}, livello ${rank.level}`}
+      aria-label={title || rank.fullName}
     >
       <circle cx="60" cy="60" r="55" fill="none" stroke={color} strokeWidth="2.5" />
 

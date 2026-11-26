@@ -1279,6 +1279,7 @@ export default {
         },
         missions: {
           desc: {
+            CAP: 'Aerei nemici nell\'area: pattuglia la regione attiva e quella di partenza per almeno 30 minuti nell\'ora.',
             SEAD: 'Sopprimi le difese antiaeree a corto raggio (SHORAD) che proteggono la zona.',
             DEAD: 'Distruggi l\'artiglieria contraerea (AAA) schierata nella zona.',
             CAS: 'Supporto aereo ravvicinato: elimina le forze di terra nemiche nella zona.',
@@ -1290,6 +1291,8 @@ export default {
           abandon: 'Abbandona missione',
           inProgress: 'In corso',
           awaitingFlight: 'Task completata, in attesa del volo',
+          capArea: 'Regione {{regions}}',
+          capProgress: 'In volo nell\'area: {{done}}/{{required}} min',
           empty: 'Nessuna missione disponibile',
           error: 'Operazione non riuscita',
           loginRequired: 'Accedi con Discord per accettare le missioni',
@@ -1299,7 +1302,9 @@ export default {
             completed: '{{type}} Zona {{number}} completata: +{{xp}} XP',
             expired: '{{type}} Zona {{number}} scaduta',
             expiredNoFlight: '{{type}} Zona {{number}} scaduta: nessun volo registrato',
-            cancelled: '{{type}} Zona {{number}} annullata'
+            cancelled: '{{type}} Zona {{number}} annullata',
+            capCompleted: 'CAP {{place}} completata: +{{xp}} XP',
+            capFailed: 'CAP {{place}} fallita: meno di {{required}} min in volo nell\'area'
           }
         },
         cargo: {

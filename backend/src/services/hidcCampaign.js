@@ -122,6 +122,9 @@ export function createHidcCampaign(deps) {
       || (dcoreSrcDir ? path.join(dcoreSrcDir, 'DMAP', 'Export_DCampaign_Focus.json') : null),
     regionStatus: optionalPath('HIDC_REGION_STATUS_FILE')
       || (dcoreSrcDir ? path.join(dcoreSrcDir, 'DMAP', 'Export_DRegion_Status.json') : null),
+    // CAP mission (DCORE DBRIDGE_Cap.lua): RED aircraft in the active area, cumulative time in area per UCID.
+    capStatus: optionalPath('HIDC_CAP_STATUS_FILE')
+      || (dbridgeDir ? path.join(dbridgeDir, 'Export_CAP_Status.json') : null),
     airlift: optionalPath('HIDC_AIRLIFT_STATE_FILE')
       || (dbridgeDir ? path.join(dbridgeDir, 'Export_AirLift.json') : null),
     // Production crates delivered at BLUE airports (DCORE DWAREHOUSE), for the "Trasporto cargo" missions.
@@ -1115,9 +1118,18 @@ export function createHidcCampaign(deps) {
     return (Number(row.last_seen) || 0) * 1000 >= sinceMs;
   }
 
+  /** DCS UCIDs linked to a Discord account (DCSServerBot or HIDC-XXXXXX link). */
+  function ucidsFor(discordId) {
+    if (serverBot) return serverBot.getPilot(discordId)?.ucids || [];
+    const link = readLinks()[discordId];
+    return (link?.ucids || [link?.ucid]).filter(Boolean);
+  }
+
   const missions = createHidcMissions({
     getZones: () => (typeof deps.getZones === 'function' ? deps.getZones() : []),
     readFocus: () => readJsonFile(files.focus, null),
+    readCapStatus: () => readJsonFile(files.capStatus, null),
+    ucidsFor,
     requirePilot: (user, minLevel, action) => requirePilot(user, minLevel, action),
     flewSince,
     emit: deps.emit,

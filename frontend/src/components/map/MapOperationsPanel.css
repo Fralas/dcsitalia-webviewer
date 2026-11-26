@@ -971,6 +971,7 @@
   text-box: trim-both cap alphabetic;
 }
 
+.hidc-mission__type--cap { color: #7dd3fc; background: rgba(56, 189, 248, 0.14); }
 .hidc-mission__type--sead { color: #c4b5fd; background: rgba(167, 139, 250, 0.14); }
 .hidc-mission__type--dead { color: #fca5a5; background: rgba(248, 113, 113, 0.14); }
 .hidc-mission__type--cas { color: #fcd34d; background: rgba(251, 191, 36, 0.14); }

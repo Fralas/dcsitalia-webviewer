@@ -12,11 +12,17 @@
  * The mission is complete when its task is no longer active on the zone (LOGISTICS: the zone turned BLUE)
  * and the pilot flew in DCS after accepting (DCSServerBot sorties, or DBRIDGE last_seen).
  * A completed mission adds XP to the pilot's level (stored here, per Discord account).
+ *
+ * CAP (DCORE DBRIDGE_Cap.lua, Export_CAP_Status.json): area = active RED region (focus target) + BLUE region the
+ * attack starts from (focus from). Offered while at least one RED airplane or helicopter is airborne in the area.
+ * It never completes early (RED aircraft shot down, area empty): it closes HIDC_CAP_DURATION_MIN (60) after
+ * acceptance, completed with XP if the pilot flew at least HIDC_CAP_MIN_AREA_MIN (30) inside the area,
+ * failed otherwise. Time in area = growth of the pilot's cumulative cap_sec (per UCID) since acceptance.
  */
 import crypto from 'crypto';
 import { DOC, loadJson, saveJson } from '../db/jsonStore.js';
 
-export const MISSION_TYPES = Object.freeze(['SEAD', 'DEAD', 'CAS', 'LOGISTICS']);
+export const MISSION_TYPES = Object.freeze(['CAP', 'SEAD', 'DEAD', 'CAS', 'LOGISTICS']);
 
 function envInt(name, fallback) {
   const value = Number.parseInt(process.env[name], 10);
@@ -35,7 +41,14 @@ export const MISSION_RULES = Object.freeze({
   confirmMs: envIntOrZero('HIDC_MISSION_CONFIRM_SEC', 90) * 1000,
   // XP is given only if the pilot flew in DCS after accepting.
   requireFlight: String(process.env.HIDC_MISSION_REQUIRE_FLIGHT || 'true').toLowerCase() !== 'false',
+  cap: Object.freeze({
+    durationMs: envInt('HIDC_CAP_DURATION_MIN', 60) * 60 * 1000,
+    minAreaMs: envInt('HIDC_CAP_MIN_AREA_MIN', 30) * 60 * 1000,
+    // Export_CAP_Status.json older than this (DCS down): no new CAP offered, time not counted.
+    staleMs: envInt('HIDC_CAP_STALE_SEC', 180) * 1000,
+  }),
   xp: Object.freeze({
+    CAP: envIntOrZero('HIDC_MISSION_XP_CAP', 50),
     SEAD: envIntOrZero('HIDC_MISSION_XP_SEAD', 60),
     DEAD: envIntOrZero('HIDC_MISSION_XP_DEAD', 50),
     CAS: envIntOrZero('HIDC_MISSION_XP_CAS', 40),
@@ -64,6 +77,29 @@ export function missionTypeForZone(zone) {
   return null;
 }
 
+function durationMsFor(type) {
+  return type === 'CAP' ? MISSION_RULES.cap.durationMs : MISSION_RULES.durationMs;
+}
+
+/** Fresh CAP status from DCORE, or null (file missing or older than staleMs). */
+function freshCapStatus(raw, now) {
+  if (!raw || typeof raw !== 'object') return null;
+  const updatedMs = (Number(raw.updated_at) || 0) * 1000;
+  if (!updatedMs || now - updatedMs > MISSION_RULES.cap.staleMs) return null;
+  return raw;
+}
+
+/** CAP area { target, from, regions } when at least one RED airplane/helicopter is airborne in it, else null. */
+function capOffer(status) {
+  if (!status?.target) return null;
+  const regions = [status.target, status.from].filter((region, index, list) => region && list.indexOf(region) === index);
+  const redAir = status.red_air && typeof status.red_air === 'object' ? status.red_air : {};
+  const present = regions.some((region) => (
+    (Number(redAir[region]?.airplane) || 0) + (Number(redAir[region]?.helicopter) || 0) > 0
+  ));
+  return present ? { target: status.target, from: status.from || null, regions } : null;
+}
+
 /** Is the mission's task still active on the zone? */
 function taskActive(type, zone) {
   if (type === 'LOGISTICS') return zoneStatus(zone) === 'NEUTRAL';
@@ -76,6 +112,8 @@ function taskActive(type, zone) {
  * @param {() => object} deps.readFocus            active region (target, target_zones)
  * @param {(user: object) => object} deps.requirePilot  throws if the Discord user has no linked DCS pilot
  * @param {(discordId: string, sinceMs: number) => boolean|null} deps.flewSince  null = no flight data
+ * @param {() => object|null} [deps.readCapStatus]  DCORE Export_CAP_Status.json
+ * @param {(discordId: string) => string[]} [deps.ucidsFor]  DCS UCIDs linked to the Discord account
  * @param {(event: string, payload: object) => void} deps.emit
  * @param {(event: object) => void} [deps.pushFeed]
  */
@@ -104,27 +142,45 @@ export function createHidcMissions(deps) {
     return new Map(zones.filter((zone) => zone?.id).map((zone) => [String(zone.id), zone]));
   }
 
-  /** Brings the board in line with the zones: new missions appear, cleared ones go. */
-  function syncBoard(state, zones, now) {
-    if (zones.size === 0) return false; // no zone data (file missing): leave the board alone
+  function readCap(now) {
+    return freshCapStatus(typeof deps.readCapStatus === 'function' ? deps.readCapStatus() : null, now);
+  }
+
+  /** Cumulative seconds in the CAP area of the pilot's UCIDs; 0 if never seen there, null without CAP data. */
+  function capSecFor(capStatus, discordId) {
+    if (!capStatus) return null;
+    const pilots = capStatus.pilots && typeof capStatus.pilots === 'object' ? capStatus.pilots : {};
+    const ucids = typeof deps.ucidsFor === 'function' ? deps.ucidsFor(discordId) || [] : [];
+    return ucids.reduce((sum, ucid) => sum + (Number(pilots[ucid]?.cap_sec) || 0), 0);
+  }
+
+  /** Brings the board in line with the zones and the CAP area: new missions appear, cleared ones go. */
+  function syncBoard(state, zones, now, capStatus = readCap(now)) {
+    const haveZones = zones.size > 0; // no zone data (file missing): leave the zone missions alone
     const focus = deps.readFocus();
     let changed = false;
     const wanted = new Map();
-    zones.forEach((zone, zoneId) => {
-      const type = missionTypeForZone(zone);
-      if (type) wanted.set(`${zoneId}|${type}`, { zoneId, type });
-    });
+    if (haveZones) {
+      zones.forEach((zone, zoneId) => {
+        const type = missionTypeForZone(zone);
+        if (type) wanted.set(`${zoneId}|${type}`, { zoneId, type });
+      });
+    }
+    const offer = capOffer(capStatus);
+    if (offer) wanted.set(`${offer.target}|CAP`, { zoneId: offer.target, type: 'CAP', regions: offer.regions });
     Object.values(state.board).forEach((mission) => {
-      if (!wanted.has(`${mission.zoneId}|${mission.type}`)) {
+      const key = `${mission.zoneId}|${mission.type}`;
+      if (!haveZones && mission.type !== 'CAP') return;
+      if (!wanted.has(key)) {
         delete state.board[mission.id];
         changed = true;
       } else {
-        wanted.delete(`${mission.zoneId}|${mission.type}`);
+        wanted.delete(key);
       }
     });
-    wanted.forEach(({ zoneId, type }) => {
+    wanted.forEach(({ zoneId, type, regions }) => {
       const id = `${zoneId}:${type}:${now}`;
-      state.board[id] = { id, zoneId, type, region: focus?.target || null, createdAt: now };
+      state.board[id] = { id, zoneId, type, region: focus?.target || null, createdAt: now, ...(regions ? { regions } : {}) };
       changed = true;
     });
     return changed;
@@ -147,12 +203,40 @@ export function createHidcMissions(deps) {
     return xp;
   }
 
+  /**
+   * CAP: adds the growth of the pilot's cap_sec to the assignment, closes it only at expiry.
+   * Counter reset in DCORE (value below the last one): the new value is all time since the reset.
+   */
+  function evaluateCap(state, assignment, capStatus, now) {
+    const value = capSecFor(capStatus, assignment.discordId);
+    if (value != null) {
+      const last = assignment.capLast;
+      if (last == null) assignment.capLast = value;
+      else if (value !== last) {
+        assignment.capSec = (Number(assignment.capSec) || 0) + (value > last ? value - last : value);
+        assignment.capLast = value;
+      }
+    }
+    if (now < assignment.expiresAt) return null;
+    const capSec = Number(assignment.capSec) || 0;
+    if (capSec * 1000 >= MISSION_RULES.cap.minAreaMs) {
+      const xp = award(state, assignment);
+      return { kind: 'completed', entry: closeAssignment(state, assignment, 'completed', now, { xp }) };
+    }
+    return { kind: 'failed', entry: closeAssignment(state, assignment, 'failed', now, { reason: 'cap-time' }) };
+  }
+
   /** Checks every accepted mission: completed, waiting for a flight, expired or cancelled. */
-  function evaluate(state, zones, now) {
-    if (zones.size === 0) return [];
+  function evaluate(state, zones, now, capStatus = readCap(now)) {
     const focus = deps.readFocus();
     const events = [];
     [...state.active].forEach((assignment) => {
+      if (assignment.type === 'CAP') {
+        const event = evaluateCap(state, assignment, capStatus, now);
+        if (event) events.push(event);
+        return;
+      }
+      if (zones.size === 0) return;
       const zone = zones.get(assignment.zoneId);
       const status = zoneStatus(zone);
       const cleared = Boolean(zone) && !taskActive(assignment.type, zone);
@@ -218,9 +302,10 @@ export function createHidcMissions(deps) {
   function tick(now = Date.now()) {
     const state = readState();
     const zones = zonesById();
-    const boardChanged = syncBoard(state, zones, now);
+    const capStatus = readCap(now);
+    const boardChanged = syncBoard(state, zones, now, capStatus);
     const before = JSON.stringify(state.active);
-    const events = evaluate(state, zones, now);
+    const events = evaluate(state, zones, now, capStatus);
     if (boardChanged || events.length > 0 || JSON.stringify(state.active) !== before) {
       writeState(state);
       deps.emit('hidc:campaign-updated', { reason: 'missions' });
@@ -232,7 +317,8 @@ export function createHidcMissions(deps) {
   function accept(user, missionId, now = Date.now()) {
     const pilot = deps.requirePilot(user, 0, 'accettare una missione');
     const state = readState();
-    syncBoard(state, zonesById(), now);
+    const capStatus = readCap(now);
+    syncBoard(state, zonesById(), now, capStatus);
     const mission = state.board[missionId];
     if (!mission) {
       const error = new Error('Missione non piu disponibile.');
@@ -261,10 +347,16 @@ export function createHidcMissions(deps) {
       discordId: user.id,
       pilotName: pilot.stats?.name || pilot.link?.name || user.username || null,
       acceptedAt: now,
-      expiresAt: now + MISSION_RULES.durationMs,
+      expiresAt: now + durationMsFor(mission.type),
       clearSeenAt: null,
       clearedAt: null,
     };
+    if (mission.type === 'CAP') {
+      assignment.regions = Array.isArray(mission.regions) ? mission.regions : [mission.zoneId];
+      assignment.capSec = 0;
+      // Baseline of the cumulative counter; null without CAP data now (set on the first fresh export).
+      assignment.capLast = capSecFor(capStatus, user.id);
+    }
     state.active.push(assignment);
     writeState(state);
     deps.emit('hidc:campaign-updated', { reason: 'mission-accepted' });
@@ -313,6 +405,13 @@ export function createHidcMissions(deps) {
       expiresAt: entry.expiresAt,
       // Task done in DCS, waiting for the pilot's flight to show up in the stats.
       awaitingFlight: Boolean(entry.clearedAt),
+      ...(entry.type === 'CAP'
+        ? {
+          regions: entry.regions || [entry.zoneId],
+          capMinutes: Math.floor((Number(entry.capSec) || 0) / 60),
+          capRequiredMin: Math.round(MISSION_RULES.cap.minAreaMs / 60000),
+        }
+        : {}),
       status: entry.status || 'active',
       closedAt: entry.closedAt || null,
       reason: entry.reason || null,
@@ -335,12 +434,18 @@ export function createHidcMissions(deps) {
         maxActive: MISSION_RULES.maxActive,
         requireFlight: MISSION_RULES.requireFlight,
         xp: MISSION_RULES.xp,
+        cap: {
+          durationMin: Math.round(MISSION_RULES.cap.durationMs / 60000),
+          minAreaMin: Math.round(MISSION_RULES.cap.minAreaMs / 60000),
+        },
       },
       available: Object.values(state.board)
         .map((mission) => ({
           id: mission.id,
           zoneId: mission.zoneId,
           type: mission.type,
+          ...(mission.regions ? { regions: mission.regions } : {}),
+          durationMin: Math.round(durationMsFor(mission.type) / 60000),
           xp: MISSION_RULES.xp[mission.type] || 0,
           createdAt: mission.createdAt,
           pilots: pilotsByMission.get(mission.id) || [],

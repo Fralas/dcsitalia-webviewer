@@ -36,8 +36,15 @@ export function getRankTier(level) {
   return PILOT_RANK_TIERS.find((tier) => lv >= tier.from && lv <= tier.to) || PILOT_RANK_TIERS[0];
 }
 
+/** Label shown everywhere for a level: "Livello 25" (the rank name stays internal, only the insignia shows it). */
+export function levelLabel(level) {
+  return `Livello ${clampLevel(level)}`;
+}
+
 /**
  * @returns {{ level, tier, tierIndex, step, steps, name, fullName, short }}
+ * name / fullName / short are all "Livello N": ranks are not shown by name.
+ * tier.name keeps the Aeronautica rank for the insignia logic only.
  */
 export function getPilotRank(level) {
   const lv = clampLevel(level);
@@ -45,16 +52,16 @@ export function getPilotRank(level) {
   const tierIndex = PILOT_RANK_TIERS.indexOf(tier);
   const steps = tier.to - tier.from + 1;
   const step = lv - tier.from + 1;
-  const numeral = steps > 1 ? ROMAN[step] || String(step) : '';
+  const label = levelLabel(lv);
   return {
     level: lv,
     tier,
     tierIndex,
     step,
     steps,
-    name: tier.name,
-    fullName: numeral ? `${tier.name} ${numeral}` : tier.name,
-    short: numeral ? `${tier.short} ${numeral}` : tier.short,
+    name: label,
+    fullName: label,
+    short: label,
   };
 }
 

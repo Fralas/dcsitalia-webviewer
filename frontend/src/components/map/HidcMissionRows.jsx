@@ -7,7 +7,7 @@ import { t } from '../../utils/locale';
  * the pilot's mission in progress with its 2 h countdown, and the missions they can accept.
  */
 
-export const HIDC_MISSION_FILTERS = ['SEAD', 'DEAD', 'CAS', 'LOGISTICS'];
+export const HIDC_MISSION_FILTERS = ['CAP', 'SEAD', 'DEAD', 'CAS', 'LOGISTICS'];
 const RESULT_VISIBLE_MS = 15 * 60 * 1000;
 
 export function missionTypeLabel(type) {
@@ -17,6 +17,21 @@ export function missionTypeLabel(type) {
 function zoneNumber(zoneId) {
   const match = String(zoneId || '').match(/\d+/);
   return match ? match[0] : String(zoneId || '?');
+}
+
+/** "Zona 113", or for CAP the area: "Regione 21 + 32" (active RED region + BLUE attack region). */
+function placeLabel(entry) {
+  if (entry?.type === 'CAP') {
+    const regions = (entry.regions && entry.regions.length > 0 ? entry.regions : [entry.zoneId])
+      .map((region) => String(Number(zoneNumber(region)) || zoneNumber(region)));
+    return t('map.rightPanel.ops.missions.capArea', { regions: regions.join(' + ') });
+  }
+  return t('map.rightPanel.ops.zone', { number: zoneNumber(entry?.zoneId) });
+}
+
+/** CAP missions cover regions, not a zone: nothing to select on the map. */
+function selectPlace(entry, onSelectZone) {
+  if (entry?.type !== 'CAP') onSelectZone?.(entry?.zoneId);
 }
 
 export function formatCountdown(ms) {
@@ -60,23 +75,26 @@ export function HidcActiveMission({ assignment, busy, onAbandon, onSelectZone })
       className={`map-ops-section__row hidc-mission hidc-mission--active${assignment.awaitingFlight ? ' is-awaiting' : ''}`}
       role="button"
       tabIndex={0}
-      onClick={() => onSelectZone?.(assignment.zoneId)}
-      onKeyDown={(event) => { if (event.key === 'Enter') onSelectZone?.(assignment.zoneId); }}
+      onClick={() => selectPlace(assignment, onSelectZone)}
+      onKeyDown={(event) => { if (event.key === 'Enter') selectPlace(assignment, onSelectZone); }}
     >
       <div className="hidc-mission__head">
         <TypeTag type={assignment.type} />
-        <span className="map-ops-section__row-title">
-          {t('map.rightPanel.ops.zone', { number: zoneNumber(assignment.zoneId) })}
-        </span>
+        <span className="map-ops-section__row-title">{placeLabel(assignment)}</span>
         <span className="hidc-mission__timer">
           <Clock strokeWidth={2.4} aria-hidden="true" />
           {formatCountdown(remaining)}
         </span>
       </div>
       <p className="hidc-mission__desc">
-        {assignment.awaitingFlight
-          ? t('map.rightPanel.ops.missions.awaitingFlight')
-          : t(`map.rightPanel.ops.missions.desc.${assignment.type}`)}
+        {assignment.type === 'CAP'
+          ? t('map.rightPanel.ops.missions.capProgress', {
+            done: Math.min(assignment.capMinutes ?? 0, assignment.capRequiredMin ?? 30),
+            required: assignment.capRequiredMin ?? 30,
+          })
+          : assignment.awaitingFlight
+            ? t('map.rightPanel.ops.missions.awaitingFlight')
+            : t(`map.rightPanel.ops.missions.desc.${assignment.type}`)}
       </p>
       <div className="hidc-mission__foot">
         <span className="hidc-mission__reward">
@@ -104,15 +122,20 @@ export function HidcActiveMission({ assignment, busy, onAbandon, onSelectZone })
 export function HidcMissionResult({ entry }) {
   const now = useNow(false);
   if (!entry?.closedAt || now - entry.closedAt > RESULT_VISIBLE_MS || entry.status === 'abandoned') return null;
-  const key = entry.status === 'expired' && entry.reason === 'no-flight' ? 'expiredNoFlight' : entry.status;
+  const key = entry.type === 'CAP'
+    ? (entry.status === 'completed' ? 'capCompleted' : 'capFailed')
+    : entry.status === 'expired' && entry.reason === 'no-flight' ? 'expiredNoFlight' : entry.status;
+  const resultClass = entry.status === 'failed' ? 'expired' : entry.status;
   return (
-    <div className={`hidc-mission-result hidc-mission-result--${entry.status}`}>
+    <div className={`hidc-mission-result hidc-mission-result--${resultClass}`}>
       {entry.status === 'completed' ? <Check strokeWidth={2.6} aria-hidden="true" /> : <X strokeWidth={2.6} aria-hidden="true" />}
       <span>
         {t(`map.rightPanel.ops.missions.result.${key}`, {
           type: missionTypeLabel(entry.type),
           number: zoneNumber(entry.zoneId),
+          place: placeLabel(entry),
           xp: entry.xp,
+          required: entry.capRequiredMin ?? 30,
         })}
       </span>
     </div>
@@ -127,14 +150,12 @@ export function HidcMissionRow({ mission, distance, durationMin, canAccept, bloc
       className={`map-ops-section__row hidc-mission${mission.mine ? ' is-mine' : ''}`}
       role="button"
       tabIndex={0}
-      onClick={() => onSelectZone?.(mission.zoneId)}
-      onKeyDown={(event) => { if (event.key === 'Enter') onSelectZone?.(mission.zoneId); }}
+      onClick={() => selectPlace(mission, onSelectZone)}
+      onKeyDown={(event) => { if (event.key === 'Enter') selectPlace(mission, onSelectZone); }}
     >
       <div className="hidc-mission__head">
         <TypeTag type={mission.type} />
-        <span className="map-ops-section__row-title">
-          {t('map.rightPanel.ops.zone', { number: zoneNumber(mission.zoneId) })}
-        </span>
+        <span className="map-ops-section__row-title">{placeLabel(mission)}</span>
         {distance && <span className="map-ops-section__row-meta">{distance}</span>}
         {pilots > 0 && (
           <span className="hidc-mission__pilots" title={mission.pilots.join(', ')}>
@@ -149,7 +170,7 @@ export function HidcMissionRow({ mission, distance, durationMin, canAccept, bloc
           <strong>+{mission.xp} XP</strong>
           <span className="hidc-mission__sep">·</span>
           <Clock strokeWidth={2.4} aria-hidden="true" />
-          {formatHours(durationMin)}
+          {formatHours(mission.durationMin ?? durationMin)}
         </span>
         {!mission.mine && (
           <button
