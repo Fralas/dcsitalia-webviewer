@@ -627,11 +627,31 @@ export function createDcsServerBot(options = {}) {
     pool = null;
   }
 
+  /**
+   * Live lookup (not the snapshot, which lags up to DCSSB_REFRESH_SEC): DCS accounts linked to a
+   * Discord id right now. Used by the Discord link panel to confirm a /linkme just done.
+   * @returns {Promise<Array<{ucid: string, name: string}>>}  manual link first; throws if the DB is unreachable
+   */
+  async function findLinkedPlayers(discordId) {
+    const id = String(discordId || '').trim();
+    if (!enabled || !/^\d{1,20}$/.test(id)) return [];
+    const q = await getQuery();
+    const { rows } = await q(
+      `SELECT ucid, name
+         FROM players
+        WHERE discord_id = $1::bigint
+        ORDER BY manual DESC, last_seen DESC NULLS LAST`,
+      [id],
+    );
+    return rows.map((row) => ({ ucid: String(row.ucid), name: row.name ? String(row.name) : '' }));
+  }
+
   return {
     enabled,
     refresh,
     tick,
     close,
+    findLinkedPlayers,
     getSnapshot: () => snapshot,
     getPilot: (discordId) => snapshot.byDiscord[String(discordId)] || null,
     listPilots: () => Object.values(snapshot.byDiscord),

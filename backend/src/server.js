@@ -30,7 +30,7 @@ import { authenticateToken, requireAdmin } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import logger from './utils/logger.js';
 import { getSqlitePath } from './db/client.js';
-import { DOC, loadJson, saveJson } from './db/jsonStore.js';
+import { DOC, loadJson, loadJsonIfPresent, saveJson } from './db/jsonStore.js';
 import { SqliteSessionStore } from './db/sessionStore.js';
 import * as airbaseStatusParser from './services/airbaseStatusParser.js';
 import * as airbaseStatusManager from './services/airbaseStatusManager.js';
@@ -60,6 +60,7 @@ import { createDcsServerBot } from './services/dcsServerBot.js';
 import { createDcsServerBotMock } from './services/dcsServerBotMock.js';
 import { createDiscordNotifications } from './services/discordNotifications.js';
 import { createDiscordGateway } from './services/discordGateway.js';
+import { createDiscordLinkHelp } from './services/discordLinkHelp.js';
 import { proxyCartoBasemapTile } from './services/cartoBasemapProxy.js';
 import {
   LIDC_EXPORT_FILES,
@@ -2349,15 +2350,39 @@ const hidcCampaign = createHidcCampaign({
 hidcCampaign.registerRoutes(app);
 setInterval(() => hidcCampaign.tick(), 15 * 1000);
 
-// Discord gateway: receives the clicks on the vote menus posted by the bot (vote from Discord).
-// Off with HIDC_VOTE_DISCORD=false. The application must NOT have an Interactions Endpoint URL set.
-if (hidcCampaign.voteDiscordEnabled) {
+// "Collega il tuo account DCS" panel on Discord (services/discordLinkHelp.js): one message with a
+// button in DISCORD_LINK_CHANNEL_ID, guided DCSServerBot /linkme + live check of players.discord_id.
+const discordLinkHelp = createDiscordLinkHelp({
+  channelId: process.env.DISCORD_LINK_CHANNEL_ID,
+  botToken: process.env.DISCORD_BOT_TOKEN,
+  linkmeCommandId: process.env.DISCORD_LINKME_COMMAND_ID,
+  guideUrl: process.env.DISCORD_LINK_GUIDE_URL,
+  findLinkedPlayers: dcsServerBot.enabled ? (discordId) => dcsServerBot.findLinkedPlayers(discordId) : null,
+  loadState: () => loadJsonIfPresent(DOC.DISCORD_LINK_PANEL),
+  saveState: (state) => saveJson(DOC.DISCORD_LINK_PANEL, state),
+  logger,
+});
+if (discordLinkHelp.enabled) {
+  // Posts the panel the first time, then only edits it (text/buttons kept up to date).
+  discordLinkHelp.publishPanel().then((result) => {
+    if (result.ok) logger.info(`Discord link panel ${result.action} (message ${result.messageId})`);
+  });
+} else if (String(process.env.DISCORD_LINK_CHANNEL_ID || '').trim()) {
+  logger.warn('Discord link panel off: needs DISCORD_BOT_TOKEN and DCSSB_DATABASE_URL');
+}
+
+// Discord gateway: receives the clicks on the bot's own messages (vote menus, link panel).
+// The application must NOT have an Interactions Endpoint URL set.
+if (hidcCampaign.voteDiscordEnabled || discordLinkHelp.enabled) {
   const discordGateway = createDiscordGateway({
     token: String(process.env.DISCORD_BOT_TOKEN || '').trim(),
     logger,
     onDispatch: (type, data) => {
       if (type !== 'INTERACTION_CREATE') return;
-      hidcCampaign.handleDiscordInteraction(data).catch((error) => {
+      (async () => {
+        if (await discordLinkHelp.handleInteraction(data)) return;
+        await hidcCampaign.handleDiscordInteraction(data);
+      })().catch((error) => {
         logger.error('Discord interaction failed', { error: error.message });
       });
     },
@@ -2407,6 +2432,17 @@ app.post('/api/hidc/notify-debug/test', requireNotifyTester, async (req, res) =>
   logger.info(`Discord notify test by ${by}: ${result.ok ? 'ok' : `failed (${result.status} ${result.detail})`}`);
   const error = result.ok ? undefined : `Discord: ${result.status ? `HTTP ${result.status}` : "nessuna risposta"}${result.detail ? ` - ${result.detail}` : ""}`;
   return res.status(result.ok ? 200 : 502).json({ ...result, error, status_info: notifyDebugStatus() });
+});
+
+// "Collega il tuo account DCS" panel: status, and (re)publish. body.recreate=true posts a new message
+// (deleting the old one) instead of editing it, e.g. to bring it back to the bottom of the channel.
+app.get('/api/discord/link-panel', requireNotifyTester, (req, res) => {
+  res.json(discordLinkHelp.getStatus());
+});
+
+app.post('/api/discord/link-panel/publish', requireNotifyTester, async (req, res) => {
+  const result = await discordLinkHelp.publishPanel({ recreate: req.body?.recreate === true });
+  return res.status(result.ok ? 200 : 502).json({ ...result, status: discordLinkHelp.getStatus() });
 });
 
 // One test message per type, to see every notification on Discord (about 15 s).

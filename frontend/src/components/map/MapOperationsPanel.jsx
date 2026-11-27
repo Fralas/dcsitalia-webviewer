@@ -1015,9 +1015,6 @@ export default function MapOperationsPanel({
                       </span>
                       <span className="map-ops-section__row-meta">{formatRowDistance(row.distanceNm)}</span>
                     </div>
-                    <div className="map-ops-section__row-tags">
-                      <span className="map-ops-section__tag">{t('map.rightPanel.feedTypes.dcsar')}</span>
-                    </div>
                   </button>
                 );
               }
@@ -1030,15 +1027,12 @@ export default function MapOperationsPanel({
                   onClick={() => onSelectZone?.(row.zone.id)}
                 >
                   <div className="map-ops-section__row-top">
+                    {/* Task types in the name, no tags: "SEAD - Zona 125", "SEAD / CAS - Zona 125". */}
                     <span className="map-ops-section__row-title">
+                      {row.tasks.length > 0 ? `${row.tasks.join(' / ')} - ` : ''}
                       {t('map.rightPanel.ops.zone', { number: getZoneNumber(row.zone) })}
                     </span>
                     <span className="map-ops-section__row-meta">{formatRowDistance(row.distanceNm)}</span>
-                  </div>
-                  <div className="map-ops-section__row-tags">
-                    {row.tasks.map((task) => (
-                      <span key={`${row.zone.id}-${task}`} className="map-ops-section__tag">{task}</span>
-                    ))}
                   </div>
                 </button>
               );

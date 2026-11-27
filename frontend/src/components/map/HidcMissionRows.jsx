@@ -57,12 +57,9 @@ export function useNow(enabled) {
   return now;
 }
 
-function TypeTag({ type }) {
-  return (
-    <span className={`map-ops-section__tag hidc-mission__type hidc-mission__type--${String(type).toLowerCase()}`}>
-      {missionTypeLabel(type)}
-    </span>
-  );
+/** Row name with the type in front, no separate tag: "SEAD - Zona 125", "CAP - Regione 21 + 32". */
+export function missionTitle(entry) {
+  return `${missionTypeLabel(entry?.type)} - ${placeLabel(entry)}`;
 }
 
 /** Mission in progress (pinned at the top of the list). */
@@ -79,8 +76,7 @@ export function HidcActiveMission({ assignment, busy, onAbandon, onSelectZone })
       onKeyDown={(event) => { if (event.key === 'Enter') selectPlace(assignment, onSelectZone); }}
     >
       <div className="hidc-mission__head">
-        <TypeTag type={assignment.type} />
-        <span className="map-ops-section__row-title">{placeLabel(assignment)}</span>
+        <span className="map-ops-section__row-title">{missionTitle(assignment)}</span>
         <span className="hidc-mission__timer">
           <Clock strokeWidth={2.4} aria-hidden="true" />
           {formatCountdown(remaining)}
@@ -154,8 +150,7 @@ export function HidcMissionRow({ mission, distance, durationMin, canAccept, bloc
       onKeyDown={(event) => { if (event.key === 'Enter') selectPlace(mission, onSelectZone); }}
     >
       <div className="hidc-mission__head">
-        <TypeTag type={mission.type} />
-        <span className="map-ops-section__row-title">{placeLabel(mission)}</span>
+        <span className="map-ops-section__row-title">{missionTitle(mission)}</span>
         {distance && <span className="map-ops-section__row-meta">{distance}</span>}
         {pilots > 0 && (
           <span className="hidc-mission__pilots" title={mission.pilots.join(', ')}>

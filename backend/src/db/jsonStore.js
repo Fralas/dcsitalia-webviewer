@@ -37,6 +37,7 @@ export const DOC = Object.freeze({
   LOGISTICS_ROUTE_VISIBILITY: 'logistics.route-visibility',
   COMBAT_MISSIONS: 'combat.missions',
   DISCORD_NOTIFICATIONS: 'discord.notifications',
+  DISCORD_LINK_PANEL: 'discord.link-panel',
   CSV_BUFFER: 'csv.buffer',
   LUA_ZONE_BUFFER: 'lua.zones-buffer',
 });

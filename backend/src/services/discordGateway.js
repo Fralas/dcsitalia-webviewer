@@ -81,7 +81,7 @@ export function createDiscordGateway({ token, onDispatch, logger = console }) {
       base = resume && resumeUrl ? resumeUrl : await gatewayUrl();
     } catch (error) {
       if (error.status === 401) {
-        logger.error?.('Discord gateway: invalid DISCORD_BOT_TOKEN, voting on Discord disabled');
+        logger.error?.('Discord gateway: invalid DISCORD_BOT_TOKEN, Discord buttons (votes, link panel) disabled');
         stopped = true;
         return;
       }

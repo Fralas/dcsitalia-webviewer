@@ -958,25 +958,6 @@
   height: 12px;
 }
 
-.hidc-mission__type {
-  flex-shrink: 0;
-  box-sizing: border-box;
-  height: 16px;
-  min-height: 16px;
-  justify-content: center;
-  /* letter-spacing adds space after the last letter: take it back on the right so the word is centred */
-  padding: 0 calc(6px - 0.08em) 0 6px;
-  line-height: 1;
-  /* centre the capitals themselves, not the font line box */
-  text-box: trim-both cap alphabetic;
-}
-
-.hidc-mission__type--cap { color: #7dd3fc; background: rgba(56, 189, 248, 0.14); }
-.hidc-mission__type--sead { color: #c4b5fd; background: rgba(167, 139, 250, 0.14); }
-.hidc-mission__type--dead { color: #fca5a5; background: rgba(248, 113, 113, 0.14); }
-.hidc-mission__type--cas { color: #fcd34d; background: rgba(251, 191, 36, 0.14); }
-.hidc-mission__type--logistics { color: #86efac; background: rgba(74, 222, 128, 0.14); }
-
 .hidc-mission__pilots,
 .hidc-mission__timer {
   display: inline-flex;

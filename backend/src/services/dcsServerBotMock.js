@@ -249,6 +249,11 @@ export function createDcsServerBotMock() {
     close: async () => {},
     getSnapshot: snapshot,
     getPilot,
+    // Every Discord account counts as linked in the mock.
+    findLinkedPlayers: async (discordId) => {
+      const entry = getPilot(discordId);
+      return entry ? [{ ucid: entry.ucids[0], name: entry.name }] : [];
+    },
     listPilots: () => [...entries.values()],
     // Fake DCORE logistics for the same pilots.
     getCargo: (ucids) => {
